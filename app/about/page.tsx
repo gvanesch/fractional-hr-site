@@ -1,242 +1,254 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-const stats = [
-  { value: "17+", label: "Years in HR Operations" },
-  { value: "27", label: "Countries Supported" },
-  { value: "4,000+", label: "Employees Supported" },
-  { value: "40%", label: "Reduction in Manual HR Admin" },
-];
+export const metadata: Metadata = {
+  title: "Services | Greg van Esch",
+  description:
+    "HR operations advisory services for enterprise organisations, scale-ups, and growing businesses, including HR technology, shared services, governance, and onboarding automation.",
+};
 
-const servicePaths = [
+const enterpriseServices = [
   {
-    title: "Enterprise & Complex Environments",
-    text: "Support for organisations navigating global scale, shared services, HR technology programmes, regulatory complexity, and transformation.",
+    title: "HR Operations Transformation",
+    text: "Support for larger organisations redesigning HR operations, service delivery, and operating models to improve scale, control, and efficiency.",
     bullets: [
-      "HR operations transformation",
-      "Service delivery and shared services",
-      "HR technology and workflow redesign",
-      "M&A integration and harmonisation",
+      "Global HR operating model design",
+      "Shared services and service delivery improvement",
+      "Employee lifecycle process redesign",
+      "Operational governance and controls",
     ],
-    href: "/services",
   },
   {
-    title: "Growing Companies & HR Foundations",
-    text: "Support for scaling businesses that need stronger HR infrastructure, cleaner processes, better systems, and more operational consistency.",
+    title: "HR Technology & Workflow Transformation",
+    text: "Advisory and delivery support across HR technology, workflow orchestration, and automation to reduce manual effort and improve data quality.",
     bullets: [
-      "Core HR policies and process design",
-      "Onboarding and employee lifecycle foundations",
-      "HR systems setup and improvement",
-      "Knowledge, SOPs, and manager guidance",
+      "ServiceNow HRSD implementation and optimisation",
+      "HRIS integration and process automation",
+      "Workflow and approval design",
+      "Operational readiness for AI-enabled service delivery",
     ],
-    href: "/services",
+  },
+  {
+    title: "M&A, Integration & Harmonisation",
+    text: "Operational support through acquisitions, integrations, TUPE activity, entity consolidation, and workforce harmonisation across jurisdictions.",
+    bullets: [
+      "Operational due diligence support",
+      "Integration planning and execution",
+      "TUPE and harmonisation workstreams",
+      "Benefits and policy alignment",
+    ],
+  },
+  {
+    title: "Governance, Compliance & Controls",
+    text: "Strengthening operational discipline across HR through clear ownership, documentation, controls, and audit-ready structures.",
+    bullets: [
+      "Operational policies and SOPs",
+      "Compliance controls and audit readiness",
+      "Risk reduction across HR processes",
+      "Vendor and service governance",
+    ],
   },
 ];
 
-const caseStudyPreviews = [
+const growthServices = [
   {
-    title: "Global onboarding automation",
-    text: "Redesigned onboarding using ServiceNow HRSD and HRIS integration to reduce manual effort, improve control, and create a scalable operating model.",
-    href: "/case-studies",
+    title: "HR Foundations for Growing Companies",
+    text: "Practical support for SMEs and mid-sized businesses that need stronger HR infrastructure, clearer processes, and more consistency as they grow.",
+    bullets: [
+      "Core HR lifecycle process design",
+      "Foundational documentation and templates",
+      "Manager-friendly workflows",
+      "Scalable HR operating basics",
+    ],
   },
   {
-    title: "Scaling HR operations across 27 countries",
-    text: "Restructured People Operations and Shared Services to support a global workforce with stronger governance, consistency, and service delivery.",
-    href: "/case-studies",
+    title: "Policies, Processes & Operational Clarity",
+    text: "Building the practical HR foundations that many growing organisations delay until the wheels start wobbling.",
+    bullets: [
+      "Core policy suite",
+      "Onboarding and employee journey processes",
+      "Approval flows and responsibilities",
+      "Operational process mapping",
+    ],
+  },
+  {
+    title: "HR Systems Setup & Improvement",
+    text: "Helping businesses select, structure, or improve the systems that support their people operations without overengineering the solution.",
+    bullets: [
+      "HR system selection support",
+      "Setup and process alignment",
+      "Data structure and ownership clarity",
+      "Practical automation opportunities",
+    ],
+  },
+  {
+    title: "Knowledge, SOPs & Internal Service Design",
+    text: "Creating the internal documentation and service structures that make HR easier to run and easier for managers and employees to navigate.",
+    bullets: [
+      "Knowledge base design",
+      "SOP and playbook creation",
+      "Internal HR service catalogue thinking",
+      "Reduced dependency on tribal knowledge",
+    ],
   },
 ];
 
-export default function HomePage() {
+export default function ServicesPage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-slate-950 text-white">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950" />
-        <div className="absolute inset-0 opacity-20">
-          <img
-            src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80"
-            alt="Modern boardroom"
-            className="h-full w-full object-cover"
-          />
-        </div>
-
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr] lg:py-32">
-          <div>
-            <div className="mb-5 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-slate-200">
-              HR Operations • Service Delivery • Transformation Advisory
-            </div>
-
-            <h1 className="max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
-              Building HR operations that scale with growth, complexity, and change.
-            </h1>
-
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-              I help organisations strengthen HR operations, service delivery, knowledge
-              frameworks, and HR technology so they can scale with more clarity, control,
-              and efficiency.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/services"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
-              >
-                Explore Services
-              </Link>
-              <Link
-                href="/case-studies"
-                className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium transition hover:bg-white/10"
-              >
-                View Case Studies
-              </Link>
-            </div>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20 backdrop-blur">
+      <section className="bg-slate-950 text-white">
+        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
+          <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-300">
-              Where I typically help
+              Services
             </p>
-
-            <div className="mt-6 space-y-4 text-slate-200">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                Global HR operating models and shared services
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                HR technology, workflow automation, and ServiceNow HRSD
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                Knowledge management and employee self-service
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                Governance, controls, and audit-ready operations
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                HR foundations for scaling businesses and mid-market organisations
-              </div>
-            </div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
+              Advisory support for both complex organisations and growing businesses.
+            </h1>
+            <p className="mt-6 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">
+              My work sits at the intersection of HR operations, service delivery, systems,
+              governance, and transformation. For larger organisations, that often means
+              redesigning or stabilising complex operating environments. For growing companies,
+              it often means building the practical HR infrastructure needed to scale properly.
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center shadow-sm"
-            >
-              <div className="text-3xl font-semibold tracking-tight text-slate-950">
-                {stat.value}
-              </div>
-              <div className="mt-2 text-sm text-slate-600">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20">
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-            Two ways I typically support clients
+            Enterprise & Complex Environments
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Advisory for both complex organisations and growing businesses.
+            For larger organisations navigating scale, complexity, or transformation.
           </h2>
-          <p className="mt-4 text-lg leading-8 text-slate-700">
-            Some clients need support with large-scale operational transformation. Others need
-            strong HR foundations before complexity starts to cost them time, money, and control.
+          <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+            This area is suited to organisations with multi-country operations, shared services
+            environments, HR technology programmes, regulatory complexity, or significant change
+            activity such as M&A, harmonisation, or service delivery redesign.
           </p>
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          {servicePaths.map((path) => (
+          {enterpriseServices.map((service) => (
             <div
-              key={path.title}
-              className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm"
+              key={service.title}
+              className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
             >
-              <h3 className="text-2xl font-semibold text-slate-950">{path.title}</h3>
-              <p className="mt-4 leading-7 text-slate-600">{path.text}</p>
+              <h3 className="text-2xl font-semibold text-slate-950">{service.title}</h3>
+              <p className="mt-4 leading-7 text-slate-600">{service.text}</p>
               <ul className="mt-6 space-y-3 text-sm text-slate-700">
-                {path.bullets.map((bullet) => (
+                {service.bullets.map((bullet) => (
                   <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
                     {bullet}
                   </li>
                 ))}
               </ul>
-              <div className="mt-6">
-                <Link
-                  href={path.href}
-                  className="inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-                >
-                  Learn More
-                </Link>
-              </div>
             </div>
           ))}
         </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
+        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-              Selected Case Studies
+              Growing Companies, SMB & Mid-Market
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Operational transformation in practice.
+              For businesses that need stronger HR infrastructure before complexity gets expensive.
             </h2>
-            <p className="mt-4 text-lg leading-8 text-slate-700">
-              A few examples of the kind of work I have led across global People Operations,
-              service delivery, workflow design, and HR technology transformation.
+            <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+              Many growing organisations do not need enterprise-scale HR transformation. They
+              need clear foundations: better processes, stronger policies, sensible systems,
+              cleaner onboarding, and operational discipline that supports growth without adding
+              bureaucracy for the sake of it.
             </p>
           </div>
 
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {caseStudyPreviews.map((study) => (
+            {growthServices.map((service) => (
               <div
-                key={study.title}
-                className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-8 shadow-sm"
+                key={service.title}
+                className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8"
               >
-                <h3 className="text-2xl font-semibold text-slate-950">{study.title}</h3>
-                <p className="mt-4 leading-7 text-slate-600">{study.text}</p>
-                <div className="mt-6">
-                  <Link
-                    href={study.href}
-                    className="inline-flex rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-800 transition hover:bg-white"
-                  >
-                    Read Case Studies
-                  </Link>
-                </div>
+                <h3 className="text-2xl font-semibold text-slate-950">{service.title}</h3>
+                <p className="mt-4 leading-7 text-slate-600">{service.text}</p>
+                <ul className="mt-6 space-y-3 text-sm text-slate-700">
+                  {service.bullets.map((bullet) => (
+                    <li key={bullet} className="rounded-lg bg-white px-4 py-3">
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-slate-950 py-20 text-white">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
+        <div className="rounded-[2rem] bg-slate-950 px-6 py-10 text-white shadow-xl sm:px-8 sm:py-12">
+          <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-300">
-              Start here
+              How support is typically structured
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Need stronger HR operations, better service delivery, or more scalable infrastructure?
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
+              Advisory that fits the work, rather than forcing the work to fit a model.
             </h2>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-              Whether the challenge is enterprise transformation or simply getting the basics
-              right in a growing business, the best place to start is a short conversation.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
-              >
-                Contact Me
-              </Link>
-              <a
-                href="mailto:info@vanesch.uk"
-                className="rounded-xl border border-white/20 px-6 py-3 text-sm font-medium transition hover:bg-white/10"
-              >
-                info@vanesch.uk
-              </a>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="text-lg font-semibold">Advisory Support</h3>
+                <p className="mt-2 text-sm leading-7 text-slate-300">
+                  Ongoing strategic and operational guidance on a flexible basis.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="text-lg font-semibold">Project-Based Delivery</h3>
+                <p className="mt-2 text-sm leading-7 text-slate-300">
+                  Focused support for a specific transformation, implementation, or operational challenge.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h3 className="text-lg font-semibold">Interim Leadership</h3>
+                <p className="mt-2 text-sm leading-7 text-slate-300">
+                  Short-term leadership support during periods of change, transition, or build-out.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
+          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 px-6 py-10 sm:px-8 sm:py-12">
+            <div className="max-w-4xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+                Next step
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl lg:text-4xl">
+                Need help shaping the right HR operating model?
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700 sm:text-lg">
+                Whether you need transformation support or stronger foundations, the best place
+                to start is a conversation.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+                <Link
+                  href="/contact"
+                  className="w-full rounded-xl bg-blue-600 px-6 py-3 text-center text-sm font-medium text-white transition hover:bg-blue-700 sm:w-auto"
+                >
+                  Contact Me
+                </Link>
+                <Link
+                  href="/case-studies"
+                  className="w-full rounded-xl border border-slate-300 px-6 py-3 text-center text-sm font-medium text-slate-800 transition hover:bg-white sm:w-auto"
+                >
+                  View Case Studies
+                </Link>
+              </div>
             </div>
           </div>
         </div>

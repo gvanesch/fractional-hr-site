@@ -1,0 +1,73 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+
+export default function Header() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6">
+        <div className="flex items-center justify-between py-4">
+          <div>
+            <Link href="/" className="text-xl font-semibold tracking-tight text-slate-950">
+              Greg van Esch
+            </Link>
+            <p className="text-sm text-slate-500">HR Operations & Transformation Advisor</p>
+          </div>
+
+          <nav className="hidden gap-8 text-sm font-medium text-slate-700 md:flex">
+            <Link href="/services" className="transition hover:text-blue-600">
+              Services
+            </Link>
+            <Link href="/case-studies" className="transition hover:text-blue-600">
+              Case Studies
+            </Link>
+            <Link href="/about" className="transition hover:text-blue-600">
+              About
+            </Link>
+            <Link href="/contact" className="transition hover:text-blue-600">
+              Contact
+            </Link>
+            <Link href="/insights" className="transition hover:text-blue-600">
+              Insights
+            </Link>
+          </nav>
+
+          <button
+            type="button"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 md:hidden"
+            onClick={() => setOpen(!open)}
+            aria-label="Toggle menu"
+            aria-expanded={open}
+          >
+            Menu
+          </button>
+        </div>
+
+        {open && (
+          <div className="border-t border-slate-200 py-4 md:hidden">
+            <nav className="flex flex-col gap-4 text-sm font-medium text-slate-700">
+              <Link href="/services" onClick={() => setOpen(false)}>
+                Services
+              </Link>
+              <Link href="/case-studies" onClick={() => setOpen(false)}>
+                Case Studies
+              </Link>
+              <Link href="/about" onClick={() => setOpen(false)}>
+                About
+              </Link>
+              <Link href="/contact" onClick={() => setOpen(false)}>
+                Contact
+              </Link>
+              <Link href="/insights" onClick={() => setOpen(false)}>
+                Insights
+              </Link>
+            </nav>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
