@@ -1,20 +1,30 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Contact | Greg van Esch",
+  description:
+    "Contact Greg van Esch to discuss HR operations advisory, HR technology transformation, onboarding automation, and service delivery improvement.",
+};
+
 export default function ContactPage() {
   return (
-    <section className="bg-white py-20">
-      <div className="mx-auto max-w-7xl px-6">
+    <section className="bg-white py-14 sm:py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">Contact</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            Contact
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
             Start a conversation
           </h1>
-          <p className="mt-4 text-lg leading-8 text-slate-700">
+          <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
             If you are exploring HR operations advisory, HR technology transformation,
             or building stronger HR infrastructure, feel free to get in touch.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+        <div className="mt-12 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8">
             <form
               action="https://api.web3forms.com/submit"
               method="POST"
@@ -91,8 +101,8 @@ export default function ContactPage() {
           </div>
 
           <div className="space-y-8">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
-              <h3 className="text-xl font-semibold text-slate-900">Contact Information</h3>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-xl font-semibold text-slate-900">Contact Information</h2>
 
               <div className="mt-6 space-y-5 text-slate-700">
                 <div>
