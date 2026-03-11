@@ -1,5 +1,3 @@
-import SiteShell from "../../components/SiteShell";
-
 const enterpriseServices = [
   {
     title: "HR Operations Transformation",
@@ -88,7 +86,7 @@ const growthServices = [
 
 export default function ServicesPage() {
   return (
-    <SiteShell>
+    <>
       <section className="bg-slate-950 text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
@@ -213,6 +211,6 @@ export default function ServicesPage() {
           </div>
         </div>
       </section>
-    </SiteShell>
+    </>
   );
 }
