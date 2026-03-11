@@ -1,114 +1,224 @@
-import SiteShell from "@/components/SiteShell";
+import SiteShell from "../../components/SiteShell";
 
 export default function ContactPage() {
   return (
     <SiteShell>
+
       <section className="bg-white py-20">
         <div className="mx-auto max-w-7xl px-6">
+
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">Contact</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+              Contact
+            </p>
+
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-              Start a professional conversation.
+              Start a conversation
             </h1>
+
             <p className="mt-4 text-lg leading-8 text-slate-700">
-              If you are exploring HR operations advisory, service delivery redesign, knowledge
-              architecture, or HR technology transformation, the best place to start is a short
-              introductory discussion.
+              If you are exploring HR operations advisory, HR technology transformation,
+              or building stronger HR infrastructure, feel free to get in touch.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Name</label>
-                  <input className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500" placeholder="Your name" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Organisation</label>
-                  <input className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500" placeholder="Company name" />
-                </div>
-              </div>
 
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="mt-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+
+            {/* CONTACT FORM */}
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+
+              <form
+                action="https://api.web3forms.com/submit"
+                method="POST"
+                className="space-y-6"
+              >
+
+                {/* Web3Forms key */}
+                <input
+                  type="hidden"
+                  name="access_key"
+                  value="7788dde8-752d-47d1-afd8-41937cd93897"
+                />
+
+                {/* Optional subject */}
+                <input
+                  type="hidden"
+                  name="subject"
+                  value="New enquiry from vanesch.uk"
+                />
+
+                {/* redirect after submit */}
+                <input
+                  type="hidden"
+                  name="redirect"
+                  value="https://vanesch.uk/contact"
+                />
+
+                {/* Name */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Email</label>
-                  <input className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500" placeholder="you@company.com" />
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Name
+                  </label>
+
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    placeholder="Your name"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 outline-none"
+                  />
                 </div>
+
+                {/* Email */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Area of interest</label>
-                  <select className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    placeholder="you@company.com"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Company */}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Organisation
+                  </label>
+
+                  <input
+                    type="text"
+                    name="company"
+                    placeholder="Company name"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Topic */}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Area of Interest
+                  </label>
+
+                  <select
+                    name="topic"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 outline-none"
+                  >
                     <option>HR Operations Advisory</option>
                     <option>HR Technology Transformation</option>
-                    <option>Knowledge & Service Design</option>
-                    <option>M&A Integration Support</option>
+                    <option>HR Foundations for Growing Companies</option>
+                    <option>M&A Integration</option>
+                    <option>Other</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="mt-6">
-                <label className="mb-2 block text-sm font-medium text-slate-700">Message</label>
-                <textarea
-                  rows={6}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500"
-                  placeholder="Briefly describe your organisation, challenge, or transformation objective."
-                />
-              </div>
+                {/* Message */}
 
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-                <p className="max-w-md text-sm leading-6 text-slate-500">
-                  This form is currently a front-end design and can be connected to Formspree,
-                  Formspark, or your preferred CRM workflow.
-                </p>
-                <a
-                  href="mailto:info@vanesch.uk?subject=Website%20Enquiry"
-                  className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-blue-700"
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Message
+                  </label>
+
+                  <textarea
+                    name="message"
+                    required
+                    rows={6}
+                    placeholder="Briefly describe your organisation or challenge."
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Submit */}
+
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-blue-600 py-3 font-medium text-white hover:bg-blue-700 transition"
                 >
-                  Submit Enquiry
-                </a>
-              </div>
+                  Send Enquiry
+                </button>
+
+              </form>
+
             </div>
 
-            <div className="space-y-6">
-              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Contact Details</p>
-                <div className="mt-5 space-y-5 text-slate-700">
+
+            {/* CONTACT INFO */}
+
+            <div className="space-y-8">
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
+
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Contact Information
+                </h3>
+
+                <div className="mt-6 space-y-5 text-slate-700">
+
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Email</p>
-                    <a href="mailto:info@vanesch.uk" className="mt-2 block text-xl font-semibold text-blue-700 hover:text-blue-800">
+                    <p className="text-sm uppercase tracking-wider text-slate-500">
+                      Email
+                    </p>
+                    <a
+                      href="mailto:info@vanesch.uk"
+                      className="text-lg font-semibold text-blue-700 hover:text-blue-800"
+                    >
                       info@vanesch.uk
                     </a>
                   </div>
+
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Location</p>
-                    <p className="mt-2 text-base">Didcot, Oxfordshire, United Kingdom</p>
+                    <p className="text-sm uppercase tracking-wider text-slate-500">
+                      Location
+                    </p>
+                    <p className="text-base">
+                      Didcot, Oxfordshire, United Kingdom
+                    </p>
                   </div>
+
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Engagement</p>
-                    <p className="mt-2 text-base">Remote advisory support, project consulting, and selected on-site engagements.</p>
+                    <p className="text-sm uppercase tracking-wider text-slate-500">
+                      Engagement
+                    </p>
+                    <p className="text-base">
+                      Remote advisory, transformation programmes,
+                      and selected on-site engagements.
+                    </p>
                   </div>
+
                 </div>
+
               </div>
 
-              <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50 shadow-sm">
-                <div className="border-b border-slate-200 px-6 py-4">
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Location</p>
-                  <p className="mt-2 text-slate-700">Didcot, Oxfordshire</p>
-                </div>
-                <div className="h-[320px] w-full bg-slate-200">
-                  <iframe
-                    title="Didcot Oxfordshire map"
-                    src="https://www.google.com/maps?q=Didcot,Oxfordshire&output=embed"
-                    className="h-full w-full border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
+
+              {/* MAP */}
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+
+                <iframe
+                  src="https://www.google.com/maps?q=Didcot,Oxfordshire&output=embed"
+                  className="w-full h-[320px] border-0"
+                  loading="lazy"
+                ></iframe>
+
               </div>
+
             </div>
+
           </div>
+
         </div>
       </section>
+
     </SiteShell>
   );
 }
