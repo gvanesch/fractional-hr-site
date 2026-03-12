@@ -1,6 +1,7 @@
 export default function Head() {
   return (
     <>
+      {/* Open Graph meta tags */}
       <meta
         property="og:image"
         content="https://www.vanesch.uk/og-image.jpg"
@@ -21,7 +22,11 @@ export default function Head() {
         content="Greg van Esch | HR Operations & Transformation Advisor"
       />
 
+      {/* Twitter meta tags */}
       <meta name="twitter:image" content="https://www.vanesch.uk/og-image.jpg" />
+      
+      {/* Canonical URL meta tag */}
+      <link rel="canonical" href="https://www.vanesch.uk" />
     </>
   );
 }
