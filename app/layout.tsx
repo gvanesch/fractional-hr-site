@@ -21,10 +21,12 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "https://www.vanesch.uk/og-image.jpg",
+        secureUrl: "https://www.vanesch.uk/og-image.jpg",
         width: 1200,
-        height: 630,
+        height: 672,
         alt: "Greg van Esch | HR Operations & Transformation Advisor",
+        type: "image/jpeg",
       },
     ],
   },
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
     title: "Greg van Esch | HR Operations & Transformation Advisor",
     description:
       "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HRSD, knowledge management, onboarding automation, and HR transformation.",
-    images: ["/og-image.jpg"],
+    images: ["https://www.vanesch.uk/og-image.jpg"],
   },
 };
 
