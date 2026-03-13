@@ -1,71 +1,131 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-  title: "Services | Greg van Esch",
-  description:
-    "HR operations advisory for growing companies, mid-market organisations, and enterprise businesses navigating transformation, service delivery, and HR technology change.",
-};
+const stats = [
+  { value: "17+", label: "Years in HR Operations" },
+  { value: "27", label: "Countries Supported" },
+  { value: "4,000+", label: "Employees Supported" },
+];
 
-const audiences = [
+const audiencePaths = [
   {
     title: "Growing Companies & Mid-Market",
-    text: "Support for scaling businesses that need stronger HR infrastructure, clearer processes, better onboarding, and practical systems that fit the realities of the business.",
+    text: "For scaling businesses that need stronger HR foundations, clearer processes, better onboarding, and systems that support growth without unnecessary bureaucracy.",
     bullets: [
-      "HR foundations and process clarity",
+      "HR foundations and operational clarity",
       "Onboarding and employee lifecycle design",
-      "Policies, playbooks, and manager guidance",
+      "Manager-friendly workflows and documentation",
       "HR systems improvement and practical automation",
     ],
     href: "/services/growing-companies",
-    cta: "Explore Growing Companies Support",
+    cta: "For Growing Companies",
   },
   {
     title: "Enterprise & Complex Organisations",
-    text: "Support for organisations navigating global operations, shared services, HR technology programmes, regulatory complexity, and large-scale transformation.",
+    text: "For organisations navigating global operations, shared services, HR technology programmes, regulatory complexity, and transformation across multiple markets or entities.",
     bullets: [
       "HR operations transformation",
       "Service delivery and shared services",
-      "ServiceNow HRSD and workflow redesign",
+      "HR technology and workflow redesign",
       "M&A integration and harmonisation",
     ],
     href: "/services/enterprise",
-    cta: "Explore Enterprise Support",
+    cta: "Enterprise Organisations",
   },
 ];
 
-export default function ServicesPage() {
+export default function HomePage() {
   return (
     <>
-      <section className="bg-[#0A1628] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              Services
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Different organisations need different kinds of HR support.
+      <section className="brand-hero">
+        <div className="brand-hero-content mx-auto grid max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr] lg:py-32">
+          <div>
+            <div className="mb-5 inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1 text-sm text-[#8AAAC8]">
+              HR Operations • Service Delivery • Transformation Advisory
+            </div>
+
+            <h1 className="brand-heading-xl max-w-4xl">
+              Building HR operations that scale with growth, complexity, and change.
             </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              A growing business building its HR foundations has very different needs from a global
-              organisation redesigning shared services or navigating complex transformation. Choose
-              the path that best reflects where your organisation is today.
+
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
+              I help organisations strengthen HR operations, service delivery, knowledge
+              frameworks, and HR technology so they can scale with more clarity, control,
+              and operational confidence.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/services"
+                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+              >
+                Explore Services
+              </Link>
+            </div>
+          </div>
+
+          <div className="brand-card-dark rounded-[1.75rem] p-8 shadow-2xl shadow-black/20">
+            <p className="brand-kicker">Where I typically help</p>
+
+            <div className="mt-6 space-y-4 text-lg text-white">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                HR foundations for scaling businesses and mid-market organisations
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                Global HR operating models and shared services
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                HR technology, workflow automation, and ServiceNow HRSD
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                Knowledge management and employee self-service
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                Governance, controls, and audit-ready operations
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="grid gap-6 lg:grid-cols-2">
-          {audiences.map((audience) => (
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 sm:grid-cols-2 lg:grid-cols-3">
+          {stats.map((stat) => (
             <div
-              key={audience.title}
-              className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm"
+              key={stat.label}
+              className="brand-surface-soft rounded-2xl p-6 text-center"
             >
-              <h2 className="text-2xl font-semibold text-slate-950">{audience.title}</h2>
-              <p className="mt-4 text-lg leading-8 text-slate-600">{audience.text}</p>
+              <div className="text-3xl font-semibold tracking-tight text-slate-950">
+                {stat.value}
+              </div>
+              <div className="mt-3 text-base text-slate-600">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="max-w-3xl">
+          <p className="brand-section-kicker">Choose the path that fits your organisation</p>
+          <h2 className="brand-heading-lg mt-3 text-slate-950">
+            Different organisations need different kinds of HR support.
+          </h2>
+          <p className="brand-subheading mt-4 text-slate-700">
+            A growing business building its HR foundations has very different needs from a global
+            organisation redesigning service delivery or navigating complex change. Choose the path
+            that best reflects where your organisation is today.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          {audiencePaths.map((path) => (
+            <div
+              key={path.title}
+              className="brand-surface rounded-[1.75rem] p-8"
+            >
+              <h3 className="brand-heading-md text-slate-950">{path.title}</h3>
+              <p className="brand-body mt-4">{path.text}</p>
               <ul className="mt-6 space-y-3 text-base text-slate-700">
-                {audience.bullets.map((bullet) => (
+                {path.bullets.map((bullet) => (
                   <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
                     {bullet}
                   </li>
@@ -73,10 +133,10 @@ export default function ServicesPage() {
               </ul>
               <div className="mt-6">
                 <Link
-                  href={audience.href}
-                  className="inline-flex rounded-xl bg-[#0D1F3C] px-5 py-3 text-base font-medium text-white transition hover:bg-[#0A1628]"
+                  href={path.href}
+                  className="brand-button-dark inline-flex rounded-xl px-5 py-3 text-base font-medium"
                 >
-                  {audience.cta}
+                  {path.cta}
                 </Link>
               </div>
             </div>
@@ -84,29 +144,55 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      <section className="border-t border-slate-200 bg-white">
+      <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 px-8 py-12">
+          <div className="brand-surface-soft rounded-[2rem] p-8">
             <div className="max-w-4xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-                Popular starting point
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              <p className="brand-section-kicker">Signature Offer for Growing Companies</p>
+              <h2 className="brand-heading-lg mt-3 text-slate-950">
                 HR Foundations Sprint
               </h2>
-              <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-700">
-                Many growing organisations begin with a short HR Foundations Sprint — a focused
-                engagement designed to identify operational gaps, prioritise improvements, and give
-                the business a clear plan for building stronger HR foundations.
+              <p className="brand-subheading mt-4 text-slate-700">
+                A focused 2–4 week engagement for growing organisations that need stronger HR
+                foundations, clearer processes, and a practical plan for what to fix first.
               </p>
-              <div className="mt-8">
+              <div className="mt-8 flex flex-wrap gap-4">
                 <Link
                   href="/services/hr-foundations-sprint"
-                  className="inline-flex rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
                 >
                   Learn About the Sprint
                 </Link>
+                <Link
+                  href="/contact"
+                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
+                >
+                  Discuss Your Situation
+                </Link>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="brand-dark-section py-20">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
+            <p className="brand-kicker">Start here</p>
+            <h2 className="brand-heading-lg mt-3">
+              Need stronger HR operations, better service delivery, or more scalable infrastructure?
+            </h2>
+            <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
+              Whether the challenge is enterprise transformation or simply getting the basics
+              right in a growing business, the best place to start is a short conversation.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/contact"
+                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+              >
+                Contact Me
+              </Link>
             </div>
           </div>
         </div>

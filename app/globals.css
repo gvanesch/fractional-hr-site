@@ -1,15 +1,12 @@
-@import "tailwindcss";
-
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --brand-navy-1: #0a1628;
+  --brand-navy-2: #0d1f3c;
+  --brand-accent: #1e6fd9;
+  --brand-accent-hover: #2979ff;
+  --brand-text-primary: #ffffff;
+  --brand-text-secondary: #8aaac8;
+  --brand-light-bg: #f4f6fa;
+  --brand-light-text: #0d1f3c;
 }
 
 html {
@@ -17,8 +14,197 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  margin: 0;
+  background: var(--brand-light-bg);
+  color: #0f172a;
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+/* Typography system */
+.brand-kicker {
+  color: var(--brand-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.brand-section-kicker {
+  color: var(--brand-accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.brand-heading-xl {
+  font-size: clamp(2.5rem, 5vw, 4.25rem);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.brand-heading-lg {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.brand-heading-md {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-subheading {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.brand-body {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: #475569;
+}
+
+.brand-body-lg {
+  font-size: 1.2rem;
+  line-height: 1.9;
+}
+
+.brand-body-on-dark {
+  color: var(--brand-text-secondary);
+}
+
+.brand-muted {
+  color: #64748b;
+}
+
+/* Dark hero / dark section system */
+.brand-hero,
+.brand-dark-section {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--brand-navy-1) 0%,
+    var(--brand-navy-2) 55%,
+    var(--brand-navy-1) 100%
+  );
+  color: var(--brand-text-primary);
+}
+
+.brand-hero::before,
+.brand-dark-section::before {
+  content: "";
+  position: absolute;
+  right: -8%;
+  top: -10%;
+  width: 520px;
+  height: 520px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at center,
+    rgba(41, 121, 255, 0.18),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+.brand-hero::after,
+.brand-dark-section::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 48%;
+  height: 100%;
+  opacity: 0.16;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0,
+      transparent 12px,
+      rgba(30, 111, 217, 0.22) 12px,
+      rgba(30, 111, 217, 0.22) 13px
+    );
+  mask-image: linear-gradient(to left, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, black 40%, transparent 100%);
+  pointer-events: none;
+}
+
+.brand-hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-card-dark {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+/* Light section helpers */
+.brand-light-section {
+  background: var(--brand-light-bg);
+  color: var(--brand-light-text);
+}
+
+.brand-surface {
+  background: white;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.brand-surface-soft {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Accent helpers */
+.brand-accent-text {
+  color: var(--brand-accent);
+}
+
+.brand-button-primary {
+  background: var(--brand-accent);
+  color: white;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.brand-button-primary:hover {
+  background: var(--brand-accent-hover);
+}
+
+.brand-button-secondary-dark {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: white;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.brand-button-secondary-dark:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.brand-button-dark {
+  background: var(--brand-navy-2);
+  color: white;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.brand-button-dark:hover {
+  background: var(--brand-navy-1);
+}
+
+.brand-link {
+  color: var(--brand-accent);
+  transition: color 0.2s ease;
+}
+
+.brand-link:hover {
+  color: var(--brand-accent-hover);
 }
