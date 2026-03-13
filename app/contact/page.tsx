@@ -17,7 +17,7 @@ export default function ContactPage() {
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
             Start a conversation
           </h1>
-          <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+          <p className="mt-4 text-xl leading-9 text-slate-700">
             If you are exploring HR operations advisory, HR technology
             transformation, or building stronger HR infrastructure, feel free to
             get in touch.
@@ -44,11 +44,11 @@ export default function ContactPage() {
               <input
                 type="hidden"
                 name="redirect"
-                value="https://www.vanesch.uk/contact"
+                value="https://vanesch.uk/contact"
               />
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-base font-medium text-slate-700">
                   Name
                 </label>
                 <input
@@ -61,7 +61,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-base font-medium text-slate-700">
                   Email
                 </label>
                 <input
@@ -74,7 +74,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-base font-medium text-slate-700">
                   Organisation
                 </label>
                 <input
@@ -86,7 +86,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-base font-medium text-slate-700">
                   Area of Interest
                 </label>
                 <select
@@ -103,7 +103,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-base font-medium text-slate-700">
                   Message
                 </label>
                 <textarea
@@ -117,7 +117,7 @@ export default function ContactPage() {
 
               <button
                 type="submit"
-                className="w-full rounded-xl bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700"
+                className="w-full rounded-xl bg-blue-600 py-3 text-base font-medium text-white transition hover:bg-blue-700"
               >
                 Send Enquiry
               </button>
@@ -126,7 +126,7 @@ export default function ContactPage() {
 
           <div className="space-y-8">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8">
-              <h2 className="text-xl font-semibold text-slate-900">
+              <h2 className="text-2xl font-semibold text-slate-900">
                 Contact Information
               </h2>
 
@@ -147,7 +147,7 @@ export default function ContactPage() {
                   <p className="text-sm uppercase tracking-wider text-slate-500">
                     Location
                   </p>
-                  <p className="text-base">
+                  <p className="text-lg">
                     Didcot, Oxfordshire, United Kingdom
                   </p>
                 </div>
@@ -156,7 +156,7 @@ export default function ContactPage() {
                   <p className="text-sm uppercase tracking-wider text-slate-500">
                     Engagement
                   </p>
-                  <p className="text-base">
+                  <p className="text-lg leading-8">
                     Remote advisory, transformation programmes, and selected
                     on-site engagements.
                   </p>

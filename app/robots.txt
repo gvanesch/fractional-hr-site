@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.vanesch.uk/sitemap.xml
+Sitemap: https://vanesch.uk/sitemap.xml

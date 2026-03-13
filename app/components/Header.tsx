@@ -11,27 +11,26 @@ export default function Header() {
       <div className="mx-auto max-w-7xl px-5 sm:px-6">
         <div className="flex items-center justify-between py-4">
           <div>
-            <Link href="/" className="text-xl font-semibold tracking-tight text-slate-950">
+            <Link href="/" className="text-2xl font-semibold tracking-tight text-slate-950">
               Greg van Esch
             </Link>
-            <p className="text-sm text-slate-500">HR Operations & Transformation Advisor</p>
+            <p className="mt-1 text-base text-slate-600">
+              HR Operations & Transformation Advisor
+            </p>
           </div>
 
-          <nav className="hidden gap-8 text-sm font-medium text-slate-700 md:flex">
-            <Link href="/services" className="transition hover:text-blue-600">
+          <nav className="hidden gap-8 text-base font-medium text-slate-700 md:flex">
+            <Link href="/services" className="transition hover:text-blue-700">
               Services
             </Link>
-            <Link href="/case-studies" className="transition hover:text-blue-600">
+            <Link href="/case-studies" className="transition hover:text-blue-700">
               Case Studies
             </Link>
-            <Link href="/about" className="transition hover:text-blue-600">
+            <Link href="/about" className="transition hover:text-blue-700">
               About
             </Link>
-            <Link href="/contact" className="transition hover:text-blue-600">
+            <Link href="/contact" className="transition hover:text-blue-700">
               Contact
-            </Link>
-            <Link href="/insights" className="transition hover:text-blue-600">
-              Insights
             </Link>
           </nav>
 
@@ -48,7 +47,7 @@ export default function Header() {
 
         {open && (
           <div className="border-t border-slate-200 py-4 md:hidden">
-            <nav className="flex flex-col gap-4 text-sm font-medium text-slate-700">
+            <nav className="flex flex-col gap-4 text-base font-medium text-slate-700">
               <Link href="/services" onClick={() => setOpen(false)}>
                 Services
               </Link>
@@ -60,9 +59,6 @@ export default function Header() {
               </Link>
               <Link href="/contact" onClick={() => setOpen(false)}>
                 Contact
-              </Link>
-              <Link href="/insights" onClick={() => setOpen(false)}>
-                Insights
               </Link>
             </nav>
           </div>
