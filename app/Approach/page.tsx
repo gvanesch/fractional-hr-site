@@ -44,16 +44,16 @@ const principles = [
 export default function ApproachPage() {
   return (
     <>
-      <section className="bg-[#123a63] text-white">
+      <section className="bg-[#0A1628] text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Approach
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
               A boutique, practical approach to HR operations advisory.
             </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               My approach starts with understanding how a business actually works — its people,
               priorities, constraints, ambitions, and operational realities. From there, I help
               design HR structures, processes, and systems that fit the business rather than
@@ -65,7 +65,7 @@ export default function ApproachPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-4xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             Why this matters
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -88,7 +88,7 @@ export default function ApproachPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
               How engagements typically begin
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -117,7 +117,7 @@ export default function ApproachPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-4xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             Typical methods
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -145,7 +145,7 @@ export default function ApproachPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
               Core principles
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -173,7 +173,7 @@ export default function ApproachPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-4xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             What clients can expect
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -188,29 +188,29 @@ export default function ApproachPage() {
         </div>
       </section>
 
-      <section className="bg-[#123a63] py-20 text-white">
+      <section className="bg-[#0D1F3C] py-20 text-white">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="max-w-4xl rounded-[2rem] border border-white/15 bg-white/10 p-10 shadow-2xl shadow-black/20">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Next step
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
               Want to discuss how this could apply to your organisation?
             </h2>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               If you are exploring how to improve HR operations, strengthen service delivery, or
               build more scalable foundations, I would be happy to talk.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Contact Me
               </Link>
               <Link
                 href="/services"
-                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 View Services
               </Link>
