@@ -53,16 +53,16 @@ const enterpriseServices = [
 export default function EnterprisePage() {
   return (
     <>
-      <section className="bg-[#123a63] text-white">
+      <section className="bg-[#0A1628] text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Enterprise & Complex Organisations
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
               Advisory for organisations navigating scale, complexity, and transformation.
             </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               Larger organisations often face a different kind of HR challenge. Processes exist,
               but they have become fragmented. Shared services struggle with scale. Technology
               environments grow complex. M&A introduces multiple operating models. My enterprise
@@ -72,7 +72,7 @@ export default function EnterprisePage() {
             <div className="mt-8">
               <Link
                 href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Discuss Your Situation
               </Link>
@@ -83,17 +83,12 @@ export default function EnterprisePage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             Typical areas of support
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             Support for complex HR operating environments
           </h2>
-          <p className="mt-4 text-xl leading-9 text-slate-700">
-            This work is suited to organisations with global operations, shared services
-            environments, HR technology programmes, regulatory complexity, or significant change
-            activity such as M&A, harmonisation, or service delivery redesign.
-          </p>
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
@@ -116,35 +111,16 @@ export default function EnterprisePage() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-              Engagement structure
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Support shaped around the work itself.
-            </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              Enterprise engagements vary depending on the scope and context, but typically take
-              the form of strategic advisory support, project-based transformation work, or interim
-              leadership during periods of change. The focus is always on practical operational
-              improvement, not just theoretical design.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-[2rem] bg-[#123a63] px-8 py-12 text-white shadow-xl">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+      <section className="bg-[#0D1F3C] py-20 text-white">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Next step
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
               Need support in a complex HR operating environment?
             </h2>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               If you are working through service delivery redesign, HR technology change, global
               operating model complexity, or post-acquisition integration, I would be happy to
               discuss your situation.
@@ -152,13 +128,13 @@ export default function EnterprisePage() {
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Contact Me
               </Link>
               <Link
                 href="/case-studies"
-                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 View Case Studies
               </Link>

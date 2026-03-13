@@ -56,34 +56,41 @@ export default function RootLayout({
         className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`}
       >
         <Header />
-
         <main>{children}</main>
 
-        <footer className="border-t border-slate-200 bg-[#0f2746] text-slate-200">
+        <footer className="border-t border-slate-200 bg-[#0D1F3C] text-white">
           <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xl font-semibold text-white">
-                Greg van Esch
-              </p>
-              <p className="mt-2 text-base text-slate-300">
+              <p className="text-xl font-semibold text-white">Greg van Esch</p>
+              <p className="mt-2 text-base text-[#8AAAC8]">
                 HR Operations & Transformation Advisor
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-5 text-base">
+            <div className="flex flex-wrap gap-5 text-base text-[#8AAAC8]">
+              <Link href="/services" className="transition hover:text-white">
+                Services
+              </Link>
+              <Link href="/approach" className="transition hover:text-white">
+                Approach
+              </Link>
+              <Link href="/about" className="transition hover:text-white">
+                About
+              </Link>
+              <Link href="/case-studies" className="transition hover:text-white">
+                Case Studies
+              </Link>
               <Link href="/contact" className="transition hover:text-white">
                 Contact
               </Link>
-
               <a
                 href="mailto:info@vanesch.uk"
                 className="transition hover:text-white"
               >
                 info@vanesch.uk
               </a>
-
               <a
-                href="https://www.linkedin.com/in/gregvanesch"
+                href="https://www.linkedin.com/in/greg-van-esch/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="transition hover:text-white"

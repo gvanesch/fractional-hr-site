@@ -20,16 +20,19 @@ export default function Header() {
           </div>
 
           <nav className="hidden gap-8 text-base font-medium text-slate-700 md:flex">
-            <Link href="/services" className="transition hover:text-blue-700">
+            <Link href="/services" className="transition hover:text-[#1E6FD9]">
               Services
             </Link>
-            <Link href="/case-studies" className="transition hover:text-blue-700">
-              Case Studies
+            <Link href="/approach" className="transition hover:text-[#1E6FD9]">
+              Approach
             </Link>
-            <Link href="/about" className="transition hover:text-blue-700">
+            <Link href="/about" className="transition hover:text-[#1E6FD9]">
               About
             </Link>
-            <Link href="/contact" className="transition hover:text-blue-700">
+            <Link href="/case-studies" className="transition hover:text-[#1E6FD9]">
+              Case Studies
+            </Link>
+            <Link href="/contact" className="transition hover:text-[#1E6FD9]">
               Contact
             </Link>
           </nav>
@@ -51,11 +54,14 @@ export default function Header() {
               <Link href="/services" onClick={() => setOpen(false)}>
                 Services
               </Link>
-              <Link href="/case-studies" onClick={() => setOpen(false)}>
-                Case Studies
+              <Link href="/approach" onClick={() => setOpen(false)}>
+                Approach
               </Link>
               <Link href="/about" onClick={() => setOpen(false)}>
                 About
+              </Link>
+              <Link href="/case-studies" onClick={() => setOpen(false)}>
+                Case Studies
               </Link>
               <Link href="/contact" onClick={() => setOpen(false)}>
                 Contact
