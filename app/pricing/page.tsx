@@ -73,7 +73,7 @@ export default function PricingPage() {
                     Investment
                   </p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    £11,500
+                    £11,500 + VAT
                   </p>
                 </div>
 
@@ -82,7 +82,7 @@ export default function PricingPage() {
                     Duration
                   </p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    2–4 weeks
+                    4 weeks
                   </p>
                 </div>
               </div>
@@ -94,7 +94,7 @@ export default function PricingPage() {
                   or reactive.
                 </p>
                 <p>
-                  During the sprint we analyse how HR currently operates,
+                  During the sprint, I analyse how HR currently operates,
                   identify operational friction, and provide a practical roadmap
                   for improvement.
                 </p>
@@ -187,7 +187,7 @@ export default function PricingPage() {
 
                 <p className="brand-body mt-5">
                   Advisory engagements are typically structured on a monthly
-                  basis and scoped based on the organisation’s needs.
+                  basis and scoped based on the organisation&apos;s needs.
                 </p>
               </div>
             </div>

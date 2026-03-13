@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "HR Foundations Sprint | Greg van Esch",
   description:
-    "A focused 2–4 week engagement for growing companies that need stronger HR foundations, clearer processes, better onboarding, and a practical roadmap for improvement.",
+    "A focused 4 week engagement for growing companies that need stronger HR foundations, clearer processes, better onboarding, and a practical roadmap for improvement.",
 };
 
 const outcomes = [
@@ -35,7 +35,7 @@ export default function HRFoundationsSprintPage() {
               HR Foundations Sprint
             </h1>
             <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
-              A focused 2–4 week engagement for growing organisations that need stronger HR
+              A focused 4 week engagement for growing organisations that need stronger HR
               foundations, clearer processes, and a practical plan for what to fix first.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
@@ -82,7 +82,7 @@ export default function HRFoundationsSprintPage() {
               How it works
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              A focused engagement over 2–4 weeks
+              A focused 4 week engagement
             </h2>
           </div>
 
@@ -189,7 +189,7 @@ export default function HRFoundationsSprintPage() {
                   href="/contact"
                   className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
                 >
-                  Contact Me
+                  Contact
                 </Link>
                 <Link
                   href="/services/growing-companies"

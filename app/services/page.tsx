@@ -2,13 +2,13 @@ import Link from "next/link";
 
 const stats = [
   { value: "17+", label: "Years in HR Operations" },
-  { value: "27", label: "Countries Supported" },
+  { value: "30+", label: "Countries Supported" },
   { value: "4,000+", label: "Employees Supported" },
 ];
 
 const proofPoints = [
   "Global People Operations leadership",
-  "ServiceNow HRSD and workflow transformation",
+  "ServiceNow HR Integration and workflow transformation",
   "Shared services, controls, and governance",
   "M&A integration and harmonisation",
 ];
@@ -59,15 +59,6 @@ export default function HomePage() {
               frameworks, and HR technology so they can scale with more clarity, control,
               and operational confidence.
             </p>
-
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/services"
-                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-              >
-                Explore Services
-              </Link>
-            </div>
           </div>
 
           <div className="brand-card-dark rounded-[1.75rem] p-8 shadow-2xl shadow-black/20">
@@ -81,7 +72,7 @@ export default function HomePage() {
                 Global HR operating models and shared services
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                HR technology, workflow automation, and ServiceNow HRSD
+                HR technology, workflow automation, and ServiceNow HR Integration
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 Knowledge management and employee self-service
@@ -214,7 +205,7 @@ export default function HomePage() {
                 HR Foundations Sprint
               </h2>
               <p className="brand-subheading mt-4 text-slate-700">
-                A focused 2–4 week engagement for growing organisations that need stronger HR
+                A focused 4 week engagement for growing organisations that need stronger HR
                 foundations, clearer processes, and a practical plan for what to fix first.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
@@ -252,7 +243,7 @@ export default function HomePage() {
                 href="/contact"
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
               >
-                Contact Me
+                Contact
               </Link>
             </div>
           </div>
