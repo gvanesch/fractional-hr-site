@@ -4,13 +4,13 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Case Studies | Greg van Esch",
   description:
-    "Representative examples of work across growing companies, mid-market organisations, and enterprise HR operations transformation.",
+    "Selected examples of HR operations work across growing companies, mid-market organisations, and enterprise transformation environments.",
 };
 
-const smbExamples = [
+const growthStageExamples = [
   {
     title: "Bringing Structure to HR in a Rapidly Growing Technology Company",
-    organisation: "Representative growth-stage example",
+    label: "Representative growth-stage example",
     challenge:
       "A growing business had expanded quickly and HR activities were being handled informally across managers, finance, and operations. Onboarding varied by team, employee data sat across multiple spreadsheets, and managers lacked clear guidance.",
     approach:
@@ -20,7 +20,7 @@ const smbExamples = [
   },
   {
     title: "Improving Onboarding and Early Employee Experience in a Scaling Business",
-    organisation: "Representative growth-stage example",
+    label: "Representative growth-stage example",
     challenge:
       "A scaling organisation recognised that new hires were experiencing a confusing first few weeks. Preparation before day one was inconsistent, manager expectations varied, and there was no repeatable onboarding structure.",
     approach:
@@ -30,7 +30,7 @@ const smbExamples = [
   },
 ];
 
-const enterpriseExamples = [
+const enterpriseCaseStudies = [
   {
     title: "Transforming Global Employee Onboarding Through HR Technology Automation",
     challenge:
@@ -98,13 +98,14 @@ export default function CaseStudiesPage() {
         </div>
 
         <div className="mt-10 space-y-8">
-          {smbExamples.map((study) => (
+          {growthStageExamples.map((study) => (
             <div
               key={study.title}
               className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
             >
-              <p className="text-sm font-medium text-[#1E6FD9]">{study.organisation}</p>
+              <p className="text-sm font-medium text-[#1E6FD9]">{study.label}</p>
               <h2 className="mt-3 text-2xl font-semibold text-slate-950">{study.title}</h2>
+
               <div className="mt-6 grid gap-6 lg:grid-cols-3">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -112,12 +113,14 @@ export default function CaseStudiesPage() {
                   </p>
                   <p className="mt-3 text-lg leading-8 text-slate-700">{study.challenge}</p>
                 </div>
+
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Approach
                   </p>
                   <p className="mt-3 text-lg leading-8 text-slate-700">{study.approach}</p>
                 </div>
+
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Outcome
@@ -146,7 +149,7 @@ export default function CaseStudiesPage() {
           </div>
 
           <div className="mt-10 space-y-8">
-            {enterpriseExamples.map((study) => (
+            {enterpriseCaseStudies.map((study) => (
               <div
                 key={study.title}
                 className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8"
@@ -161,7 +164,9 @@ export default function CaseStudiesPage() {
                     </span>
                   ))}
                 </div>
+
                 <h2 className="mt-4 text-2xl font-semibold text-slate-950">{study.title}</h2>
+
                 <div className="mt-6 grid gap-6 lg:grid-cols-3">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -169,12 +174,14 @@ export default function CaseStudiesPage() {
                     </p>
                     <p className="mt-3 text-lg leading-8 text-slate-700">{study.challenge}</p>
                   </div>
+
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                       Approach
                     </p>
                     <p className="mt-3 text-lg leading-8 text-slate-700">{study.approach}</p>
                   </div>
+
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                       Impact
@@ -201,6 +208,7 @@ export default function CaseStudiesPage() {
               Whether you are working through scaling challenges, onboarding inconsistency,
               service delivery complexity, or HR transformation, I would be happy to talk.
             </p>
+
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
               <Link
                 href="/contact"

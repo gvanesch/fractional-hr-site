@@ -84,12 +84,6 @@ export default function RootLayout({
                 Contact
               </Link>
               <a
-                href="mailto:info@vanesch.uk"
-                className="transition hover:text-white"
-              >
-                info@vanesch.uk
-              </a>
-              <a
                 href="https://www.linkedin.com/in/greg-van-esch/"
                 target="_blank"
                 rel="noopener noreferrer"

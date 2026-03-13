@@ -58,16 +58,16 @@ const supportAreas = [
 export default function GrowingCompaniesPage() {
   return (
     <>
-      <section className="bg-[#123a63] text-white">
+      <section className="bg-[#0A1628] text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Growing Companies & Mid-Market
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
               HR foundations that support growth — without unnecessary bureaucracy.
             </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               Growing organisations often reach a point where informal people practices stop
               working. Hiring accelerates, managers create their own processes, and HR becomes
               reactive rather than operational. I help scaling businesses build practical HR
@@ -76,13 +76,13 @@ export default function GrowingCompaniesPage() {
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Discuss Your Situation
               </Link>
               <Link
                 href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 See the HR Foundations Sprint
               </Link>
@@ -93,7 +93,7 @@ export default function GrowingCompaniesPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             Common signs
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -116,12 +116,34 @@ export default function GrowingCompaniesPage() {
             </div>
           ))}
         </div>
+
+        <div className="mt-10 rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
+            Explore further
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold text-slate-950">
+            Want to see the signals in more detail?
+          </h3>
+          <p className="mt-4 text-lg leading-8 text-slate-700">
+            I’ve set out the most common signs of HR friction in growing companies in more detail
+            on the HR Chaos Signals page, including what they usually mean and when it may be time
+            to reset HR foundations more intentionally.
+          </p>
+          <div className="mt-6">
+            <Link
+              href="/services/hr-chaos-signals"
+              className="inline-flex rounded-xl bg-[#0D1F3C] px-5 py-3 text-base font-medium text-white transition hover:bg-[#0A1628]"
+            >
+              View HR Chaos Signals
+            </Link>
+          </div>
+        </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-4xl rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
               A boutique advisory approach
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -146,7 +168,7 @@ export default function GrowingCompaniesPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
             Where I typically help
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -177,7 +199,7 @@ export default function GrowingCompaniesPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
               How engagements usually begin
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
@@ -194,7 +216,7 @@ export default function GrowingCompaniesPage() {
               Many growing organisations begin with a structured{" "}
               <Link
                 href="/services/hr-foundations-sprint"
-                className="font-medium text-blue-700 underline underline-offset-4"
+                className="font-medium text-[#1E6FD9] underline underline-offset-4"
               >
                 HR Foundations Sprint
               </Link>
@@ -204,16 +226,16 @@ export default function GrowingCompaniesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-[2rem] bg-[#123a63] px-8 py-12 text-white shadow-xl">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+      <section className="bg-[#0D1F3C] py-20 text-white">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
               Next step
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
               Building the right HR foundations early saves significant complexity later.
             </h2>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-100/90">
+            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
               If your business is growing and HR operations are starting to feel reactive,
               inconsistent, or difficult to scale, the best place to start is a short
               conversation.
@@ -221,13 +243,13 @@ export default function GrowingCompaniesPage() {
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Contact Me
               </Link>
               <Link
                 href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 Learn About the Sprint
               </Link>

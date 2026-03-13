@@ -133,18 +133,6 @@ export default function ContactPage() {
               <div className="mt-6 space-y-5 text-slate-700">
                 <div>
                   <p className="text-sm uppercase tracking-wider text-slate-500">
-                    Email
-                  </p>
-                  <a
-                    href="mailto:info@vanesch.uk"
-                    className="text-lg font-semibold text-[#1E6FD9] hover:text-[#2979FF]"
-                  >
-                    info@vanesch.uk
-                  </a>
-                </div>
-
-                <div>
-                  <p className="text-sm uppercase tracking-wider text-slate-500">
                     Location
                   </p>
                   <p className="text-lg">
