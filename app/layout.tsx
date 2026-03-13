@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import Header from "./components/Header";
+import CookieBanner from "./components/CookieBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,6 +46,44 @@ export const metadata: Metadata = {
   },
 };
 
+const personSchema = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: "Greg van Esch",
+  url: "https://vanesch.uk",
+  image: "https://vanesch.uk/og-image.jpg",
+  jobTitle: "HR Operations & Transformation Advisor",
+  description:
+    "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HRSD, knowledge management, onboarding automation, and HR transformation.",
+  sameAs: ["https://www.linkedin.com/in/greg-van-esch/"],
+  email: "privacy@vanesch.uk",
+  knowsAbout: [
+    "HR Operations",
+    "People Operations",
+    "HR Transformation",
+    "Service Delivery",
+    "Shared Services",
+    "ServiceNow HRSD",
+    "HRIS",
+    "Onboarding Automation",
+    "M&A Integration",
+    "Governance and Compliance",
+  ],
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Greg van Esch",
+  url: "https://vanesch.uk",
+  description:
+    "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HRSD, knowledge management, onboarding automation, and HR transformation.",
+  publisher: {
+    "@type": "Person",
+    name: "Greg van Esch",
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -55,8 +94,18 @@ export default function RootLayout({
       <body
         className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+
         <Header />
         <main>{children}</main>
+        <CookieBanner />
 
         <footer className="border-t border-slate-200 bg-[#0D1F3C] text-white">
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-10 sm:px-6">

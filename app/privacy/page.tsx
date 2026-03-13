@@ -14,9 +14,7 @@ export default function PrivacyPage() {
         <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
             <p className="brand-kicker">Privacy Policy</p>
-            <h1 className="brand-heading-xl mt-3">
-              Privacy Policy
-            </h1>
+            <h1 className="brand-heading-xl mt-3">Privacy Policy</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               This Privacy Policy explains how personal information is collected, used,
               and protected when you visit vanesch.uk or contact me through the website.
@@ -33,10 +31,9 @@ export default function PrivacyPage() {
               <h2 className="brand-heading-md mt-3 text-slate-950">Data controller</h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  This website is operated by Greg van Esch.
-                </p>
-                <p>
-                  This website is operated by Greg van Esch. For the purposes of applicable data protection law, Greg van Esch acts as the data controller for personal data collected through this website.
+                  This website is operated by Greg van Esch. For the purposes of applicable data
+                  protection law, Greg van Esch acts as the data controller for personal data
+                  collected through this website.
                 </p>
               </div>
             </section>
@@ -45,9 +42,7 @@ export default function PrivacyPage() {
               <p className="brand-section-kicker">Information collected</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">What information may be collected</h2>
               <div className="brand-body mt-4 space-y-4">
-                <p>
-                  Depending on how you use the website, I may collect:
-                </p>
+                <p>Depending on how you use the website, I may collect:</p>
                 <ul className="list-disc space-y-2 pl-6">
                   <li>Your name</li>
                   <li>Your email address</li>
@@ -110,9 +105,7 @@ export default function PrivacyPage() {
                   Personal data may be shared with service providers who support the operation of the website
                   or enquiry handling process, where necessary and subject to appropriate safeguards.
                 </p>
-                <p>
-                  Information is not sold to third parties.
-                </p>
+                <p>Information is not sold to third parties.</p>
               </div>
             </section>
 
@@ -143,25 +136,19 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-                <p className="brand-section-kicker">Contact</p>
-                <h2 className="brand-heading-md mt-3 text-slate-950">Questions about privacy</h2>
-
-                <div className="brand-body mt-4 space-y-4">
+              <p className="brand-section-kicker">Contact</p>
+              <h2 className="brand-heading-md mt-3 text-slate-950">Questions about privacy</h2>
+              <div className="brand-body mt-4 space-y-4">
                 <p>
-                  If you have any questions about this Privacy Policy or how personal data
-                  is handled, you can contact me directly.
+                  If you have any questions about this Privacy Policy or how personal data is handled,
+                  you can contact me directly.
                 </p>
-
                 <p>
                   Email:{" "}
-                  <a
-                    href="mailto:privacy@vanesch.uk"
-                    className="brand-link font-medium"
-                  >
+                  <a href="mailto:privacy@vanesch.uk" className="brand-link font-medium">
                     privacy@vanesch.uk
                   </a>
                 </p>
-
                 <p>
                   You may also contact me using the{" "}
                   <Link href="/contact" className="brand-link font-medium">

@@ -6,6 +6,13 @@ const stats = [
   { value: "4,000+", label: "Employees Supported" },
 ];
 
+const proofPoints = [
+  "Global People Operations leadership",
+  "ServiceNow HRSD and workflow transformation",
+  "Shared services, controls, and governance",
+  "M&A integration and harmonisation",
+];
+
 const audiencePaths = [
   {
     title: "Growing Companies & Mid-Market",
@@ -88,6 +95,21 @@ export default function HomePage() {
       </section>
 
       <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-8">
+          <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-[#F4F6FA] p-6 md:grid-cols-2 lg:grid-cols-4">
+            {proofPoints.map((point) => (
+              <div
+                key={point}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm font-medium text-slate-700 shadow-sm"
+              >
+                {point}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 sm:grid-cols-2 lg:grid-cols-3">
           {stats.map((stat) => (
             <div
@@ -100,6 +122,45 @@ export default function HomePage() {
               <div className="mt-3 text-base text-slate-600">{stat.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="brand-surface-soft rounded-[2rem] p-8">
+            <div className="max-w-4xl">
+              <p className="brand-section-kicker">A common growth-stage pattern</p>
+              <h2 className="brand-heading-lg mt-3 text-slate-950">
+                Is your HR starting to feel messy?
+              </h2>
+              <p className="brand-subheading mt-4 text-slate-700">
+                Many organisations do not suddenly decide they need HR transformation.
+                What they notice instead is friction: inconsistent onboarding, managers
+                handling people situations differently, too many manual workarounds, and
+                HR becoming reactive rather than operational.
+              </p>
+              <p className="brand-body mt-4">
+                I’ve set out the most common early warning signs on the HR Chaos Signals
+                page — a useful starting point for leaders trying to understand whether
+                their people operations have outgrown the current structure.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/services/hr-chaos-signals"
+                  className="brand-button-dark rounded-xl px-6 py-3 text-base font-medium"
+                >
+                  Read HR Chaos Signals
+                </Link>
+                <Link
+                  href="/services/hr-foundations-sprint"
+                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
+                >
+                  Explore the HR Foundations Sprint
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
