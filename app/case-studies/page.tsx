@@ -66,16 +66,14 @@ const enterpriseCaseStudies = [
 export default function CaseStudiesPage() {
   return (
     <>
-      <section className="bg-[#0A1628] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
+      <section className="brand-hero">
+        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              Case Studies
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+            <p className="brand-kicker">Case Studies</p>
+            <h1 className="brand-heading-xl mt-3">
               Selected examples of operational transformation work.
             </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               The examples below combine representative growth-stage scenarios with selected
               transformation work from more complex enterprise environments.
             </p>
@@ -83,66 +81,64 @@ export default function CaseStudiesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-            Growing Companies & Mid-Market
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Representative example engagements
-          </h2>
-          <p className="mt-4 text-xl leading-9 text-slate-700">
-            These examples reflect typical challenges seen in scaling businesses and mid-market
-            organisations. Client details are anonymised and presented as representative scenarios.
-          </p>
-        </div>
+      <section className="brand-light-section">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="max-w-3xl">
+            <p className="brand-section-kicker">Growing Companies & Mid-Market</p>
+            <h2 className="brand-heading-lg mt-3 text-slate-950">
+              Representative example engagements
+            </h2>
+            <p className="brand-subheading mt-4 text-slate-700">
+              These examples reflect typical challenges seen in scaling businesses and mid-market
+              organisations. Client details are anonymised and presented as representative scenarios.
+            </p>
+          </div>
 
-        <div className="mt-10 space-y-8">
-          {growthStageExamples.map((study) => (
-            <div
-              key={study.title}
-              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-            >
-              <p className="text-sm font-medium text-[#1E6FD9]">{study.label}</p>
-              <h2 className="mt-3 text-2xl font-semibold text-slate-950">{study.title}</h2>
+          <div className="mt-10 space-y-8">
+            {growthStageExamples.map((study) => (
+              <div
+                key={study.title}
+                className="brand-surface rounded-[2rem] p-6 sm:p-8"
+              >
+                <p className="brand-accent-text text-sm font-medium">{study.label}</p>
+                <h2 className="brand-heading-md mt-3 text-slate-950">{study.title}</h2>
 
-              <div className="mt-6 grid gap-6 lg:grid-cols-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Challenge
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.challenge}</p>
-                </div>
+                <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Challenge
+                    </p>
+                    <p className="brand-body mt-3">{study.challenge}</p>
+                  </div>
 
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Approach
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.approach}</p>
-                </div>
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Approach
+                    </p>
+                    <p className="brand-body mt-3">{study.approach}</p>
+                  </div>
 
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Outcome
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.outcome}</p>
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Outcome
+                    </p>
+                    <p className="brand-body mt-3">{study.outcome}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-              Enterprise & Complex Organisations
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+            <p className="brand-section-kicker">Enterprise & Complex Organisations</p>
+            <h2 className="brand-heading-lg mt-3 text-slate-950">
               Selected transformation experience
             </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
+            <p className="brand-subheading mt-4 text-slate-700">
               Examples of the kind of work delivered across global People Operations, service
               delivery, HR technology, and operational integration.
             </p>
@@ -152,7 +148,7 @@ export default function CaseStudiesPage() {
             {enterpriseCaseStudies.map((study) => (
               <div
                 key={study.title}
-                className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6 shadow-sm sm:p-8"
+                className="brand-surface-soft rounded-[2rem] p-6 sm:p-8"
               >
                 <div className="flex flex-wrap gap-2">
                   {study.tags.map((tag) => (
@@ -165,28 +161,28 @@ export default function CaseStudiesPage() {
                   ))}
                 </div>
 
-                <h2 className="mt-4 text-2xl font-semibold text-slate-950">{study.title}</h2>
+                <h2 className="brand-heading-md mt-4 text-slate-950">{study.title}</h2>
 
                 <div className="mt-6 grid gap-6 lg:grid-cols-3">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                       Challenge
                     </p>
-                    <p className="mt-3 text-lg leading-8 text-slate-700">{study.challenge}</p>
+                    <p className="brand-body mt-3">{study.challenge}</p>
                   </div>
 
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                       Approach
                     </p>
-                    <p className="mt-3 text-lg leading-8 text-slate-700">{study.approach}</p>
+                    <p className="brand-body mt-3">{study.approach}</p>
                   </div>
 
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                       Impact
                     </p>
-                    <p className="mt-3 text-lg leading-8 text-slate-700">{study.impact}</p>
+                    <p className="brand-body mt-3">{study.impact}</p>
                   </div>
                 </div>
               </div>
@@ -195,16 +191,14 @@ export default function CaseStudiesPage() {
         </div>
       </section>
 
-      <section className="bg-[#0D1F3C] py-20 text-white">
+      <section className="brand-dark-section py-20">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              Explore further
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+          <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
+            <p className="brand-kicker">Explore further</p>
+            <h2 className="brand-heading-lg mt-3">
               Want to discuss a similar challenge in your organisation?
             </h2>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
+            <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
               Whether you are working through scaling challenges, onboarding inconsistency,
               service delivery complexity, or HR transformation, I would be happy to talk.
             </p>
@@ -212,13 +206,13 @@ export default function CaseStudiesPage() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
               <Link
                 href="/contact"
-                className="w-full rounded-xl bg-[#1E6FD9] px-6 py-3 text-center text-base font-medium text-white transition hover:bg-[#2979FF] sm:w-auto"
+                className="brand-button-primary w-full rounded-xl px-6 py-3 text-center text-base font-medium sm:w-auto"
               >
                 Contact Me
               </Link>
               <Link
                 href="/services"
-                className="w-full rounded-xl border border-white/20 px-6 py-3 text-center text-base font-medium transition hover:bg-white/10 sm:w-auto"
+                className="brand-button-secondary-dark w-full rounded-xl px-6 py-3 text-center text-base font-medium sm:w-auto"
               >
                 View Services
               </Link>

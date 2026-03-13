@@ -36,8 +36,7 @@ export default function PrivacyPage() {
                   This website is operated by Greg van Esch.
                 </p>
                 <p>
-                  For the purposes of applicable data protection law, I am the controller of
-                  personal data collected through this website unless otherwise stated.
+                  This website is operated by Greg van Esch. For the purposes of applicable data protection law, Greg van Esch acts as the data controller for personal data collected through this website.
                 </p>
               </div>
             </section>
@@ -144,15 +143,30 @@ export default function PrivacyPage() {
             </section>
 
             <section>
-              <p className="brand-section-kicker">Contact</p>
-              <h2 className="brand-heading-md mt-3 text-slate-950">Questions about privacy</h2>
-              <div className="brand-body mt-4 space-y-4">
+                <p className="brand-section-kicker">Contact</p>
+                <h2 className="brand-heading-md mt-3 text-slate-950">Questions about privacy</h2>
+
+                <div className="brand-body mt-4 space-y-4">
                 <p>
-                  If you have any questions about this Privacy Policy or how your data is handled,
-                  please use the website contact form.
+                  If you have any questions about this Privacy Policy or how personal data
+                  is handled, you can contact me directly.
                 </p>
+
                 <p>
-                  You can also visit the <Link href="/contact" className="brand-link font-medium">Contact</Link> page.
+                  Email:{" "}
+                  <a
+                    href="mailto:privacy@vanesch.uk"
+                    className="brand-link font-medium"
+                  >
+                    privacy@vanesch.uk
+                  </a>
+                </p>
+
+                <p>
+                  You may also contact me using the{" "}
+                  <Link href="/contact" className="brand-link font-medium">
+                    website contact form
+                  </Link>.
                 </p>
               </div>
             </section>
