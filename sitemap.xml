@@ -1,59 +1,25 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://vanesch.uk/</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/about</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/approach</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/pricing</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/services</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/services/enterprise</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/services/growing-companies</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/services/hr-chaos-signals</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/services/hr-foundations-sprint</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/case-studies</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/contact</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/privacy</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/cookies</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-  <url>
-    <loc>https://vanesch.uk/terms</loc>
-    <lastmod>2026-03-13</lastmod>
-  </url>
-</urlset>
+export default function sitemap() {
+  return [
+    { url: "https://vanesch.uk", priority: 1 },
+
+    { url: "https://vanesch.uk/services", priority: 0.9 },
+    { url: "https://vanesch.uk/services/hr-chaos-signals", priority: 0.8 },
+    { url: "https://vanesch.uk/services/hr-foundations-sprint", priority: 0.8 },
+
+    { url: "https://vanesch.uk/approach", priority: 0.8 },
+    { url: "https://vanesch.uk/case-studies", priority: 0.8 },
+    { url: "https://vanesch.uk/about", priority: 0.7 },
+
+    { url: "https://vanesch.uk/pricing", priority: 0.7 },
+
+    { url: "https://vanesch.uk/insights", priority: 0.7 },
+    {
+      url: "https://vanesch.uk/insights/why-hr-operations-break-as-companies-grow",
+      priority: 0.6,
+    },
+
+    { url: "https://vanesch.uk/diagnostic", priority: 0.6 },
+
+    { url: "https://vanesch.uk/contact", priority: 0.6 },
+  ];
+}
