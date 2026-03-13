@@ -23,6 +23,9 @@ export default function Header() {
             <Link href="/services" className="transition hover:text-blue-700">
               Services
             </Link>
+            <Link href="/approach" className="transition hover:text-blue-700">
+              Approach
+            </Link>
             <Link href="/case-studies" className="transition hover:text-blue-700">
               Case Studies
             </Link>
@@ -50,6 +53,9 @@ export default function Header() {
             <nav className="flex flex-col gap-4 text-base font-medium text-slate-700">
               <Link href="/services" onClick={() => setOpen(false)}>
                 Services
+              </Link>
+              <Link href="/approach" onClick={() => setOpen(false)}>
+                Approach
               </Link>
               <Link href="/case-studies" onClick={() => setOpen(false)}>
                 Case Studies
