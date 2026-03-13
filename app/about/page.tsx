@@ -33,7 +33,7 @@ export default function AboutPage() {
               across HR operations, HR systems, service delivery, compliance, shared services, and
               organisational change. My background combines strategic thinking with a hands-on
               operational mindset, with a strong focus on building HR structures that work in
-              practice and scale effectively over time. :contentReference[oaicite:3]{index=3}
+              practice and scale effectively over time.
             </p>
           </div>
         </div>
@@ -53,18 +53,18 @@ export default function AboutPage() {
               OnDemand, where I led Global People Operations & Shared Services supporting more than
               4,000 employees, contractors, and consultants across 27 countries. The role covered
               HR operations, compliance, controls, HR policy, M&A due diligence and integration,
-              HR systems, global mobility, vendor governance, and service delivery improvement. :contentReference[oaicite:4]{index=4}
+              HR systems, global mobility, vendor governance, and service delivery improvement.
             </p>
             <p className="mt-4 text-xl leading-9 text-slate-700">
               Earlier in my career, I held senior HR leadership roles at Bravo Group Manufacturing
               and Unitrans Supply Chain Solutions, building experience across industrial relations,
               restructuring, executive support, talent processes, HRIS, and workforce change in
-              complex operating environments. :contentReference[oaicite:5]{index=5}
+              complex operating environments.
             </p>
             <p className="mt-4 text-xl leading-9 text-slate-700">
               Across these roles, the common thread has been helping organisations create more
               structured, scalable, and resilient people operations — whether through process
-              redesign, systems improvement, governance, integration work, or operational clarity. :contentReference[oaicite:6]{index=6}
+              redesign, systems improvement, governance, integration work, or operational clarity.
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export default function AboutPage() {
             <p className="mt-4 text-xl leading-9 text-slate-700">
               My approach is collaborative and practical. I work closely with leadership teams,
               stakeholders, and HR functions to design changes that are not only well thought
-              through, but also realistic and sustainable for the organisation implementing them. :contentReference[oaicite:7]{index=7}
+              through, but also realistic and sustainable for the organisation implementing them.
             </p>
           </div>
         </div>
