@@ -15,13 +15,16 @@ export default function Header() {
               Greg van Esch
             </Link>
             <p className="mt-1 text-base text-slate-600">
-              HR Operations & Transformation Advisor
+              HR Operations &amp; Transformation Advisor
             </p>
           </div>
 
           <nav className="hidden gap-8 text-base font-medium text-slate-700 md:flex">
             <Link href="/services" className="transition hover:text-[#1E6FD9]">
               Services
+            </Link>
+            <Link href="/pricing" className="transition hover:text-[#1E6FD9]">
+              Pricing
             </Link>
             <Link href="/approach" className="transition hover:text-[#1E6FD9]">
               Approach
@@ -53,6 +56,9 @@ export default function Header() {
             <nav className="flex flex-col gap-4 text-base font-medium text-slate-700">
               <Link href="/services" onClick={() => setOpen(false)}>
                 Services
+              </Link>
+              <Link href="/pricing" onClick={() => setOpen(false)}>
+                Pricing
               </Link>
               <Link href="/approach" onClick={() => setOpen(false)}>
                 Approach

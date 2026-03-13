@@ -113,13 +113,16 @@ export default function RootLayout({
               <div>
                 <p className="text-xl font-semibold text-white">Greg van Esch</p>
                 <p className="mt-2 text-base text-[#8AAAC8]">
-                  HR Operations & Transformation Advisor
+                  HR Operations &amp; Transformation Advisor
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-5 text-base text-[#8AAAC8]">
                 <Link href="/services" className="transition hover:text-white">
                   Services
+                </Link>
+                <Link href="/pricing" className="transition hover:text-white">
+                  Pricing
                 </Link>
                 <Link href="/approach" className="transition hover:text-white">
                   Approach
