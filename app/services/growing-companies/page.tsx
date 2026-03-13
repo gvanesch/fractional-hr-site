@@ -2,90 +2,80 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Growing Companies & Mid-Market | Greg van Esch",
+  title: "Enterprise & Complex Organisations | Greg van Esch",
   description:
-    "Practical HR operations support for growing companies and mid-market businesses building stronger onboarding, clearer processes, better systems, and scalable HR foundations.",
+    "HR operations advisory for enterprise organisations navigating service delivery transformation, HR technology change, shared services, governance, and global complexity.",
 };
 
-const signs = [
-  "Onboarding looks different depending on the manager or team",
-  "Policies exist but people are not always sure which version applies",
-  "HR processes rely heavily on manual coordination and follow-up",
-  "Employee data is spread across spreadsheets, inboxes, or disconnected systems",
-  "Managers are uncertain about how to handle common people situations",
-  "Hiring growth is starting to expose operational gaps",
-];
-
-const supportAreas = [
+const enterpriseServices = [
   {
-    title: "HR Process Foundations",
-    text: "Building the core structures that help HR operate consistently as the business grows.",
+    title: "HR Operations Transformation",
+    text: "Support for larger organisations redesigning HR operations, service delivery, and operating models to improve scale, control, and efficiency.",
     bullets: [
-      "Onboarding and employee lifecycle design",
-      "Clear process ownership and handoffs",
-      "Manager-friendly workflows",
+      "Global HR operating model design",
+      "Shared services and service delivery improvement",
+      "Employee lifecycle process redesign",
+      "Operational governance and controls",
     ],
   },
   {
-    title: "Policies & Operational Clarity",
-    text: "Creating the practical documentation and structure that reduce ambiguity and support better decision-making.",
+    title: "HR Technology & Workflow Transformation",
+    text: "Advisory and delivery support across HR technology, workflow orchestration, and automation to reduce manual effort and improve data quality.",
     bullets: [
-      "Core policy frameworks",
-      "Employee documentation",
-      "Approval structures and responsibilities",
+      "ServiceNow HRSD implementation and optimisation",
+      "HRIS integration and process automation",
+      "Workflow and approval design",
+      "Operational readiness for AI-enabled service delivery",
     ],
   },
   {
-    title: "HR Systems & Automation",
-    text: "Improving the systems and workflows that support people operations without overengineering the solution.",
+    title: "M&A, Integration & Harmonisation",
+    text: "Operational support through acquisitions, integrations, TUPE activity, entity consolidation, and workforce harmonisation across jurisdictions.",
     bullets: [
-      "HR system selection or improvement",
-      "Reducing manual work and duplication",
-      "Practical automation opportunities",
+      "Operational due diligence support",
+      "Integration planning and execution",
+      "TUPE and harmonisation workstreams",
+      "Benefits and policy alignment",
     ],
   },
   {
-    title: "Knowledge & Manager Guidance",
-    text: "Helping managers and employees navigate HR processes more consistently and with less dependency on tribal knowledge.",
+    title: "Governance, Compliance & Controls",
+    text: "Strengthening operational discipline across HR through clear ownership, documentation, controls, and audit-ready structures.",
     bullets: [
-      "SOPs and playbooks",
-      "Knowledge base design",
-      "Manager guidance materials",
+      "Operational policies and SOPs",
+      "Compliance controls and audit readiness",
+      "Risk reduction across HR processes",
+      "Vendor and service governance",
     ],
   },
 ];
 
-export default function GrowingCompaniesPage() {
+export default function EnterprisePage() {
   return (
     <>
       <section className="bg-[#123a63] text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
-              Growing Companies & Mid-Market
+              Enterprise & Complex Organisations
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-              HR foundations that support growth — without unnecessary bureaucracy.
+              Advisory for organisations navigating scale, complexity, and transformation.
             </h1>
             <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
-              Growing organisations often reach a point where informal people practices stop
-              working. Hiring accelerates, managers create their own processes, and HR becomes
-              reactive rather than operational. I help scaling businesses build practical HR
-              infrastructure that fits the reality of the business and supports sustainable growth.
+              Larger organisations often face a different kind of HR challenge. Processes exist,
+              but they have become fragmented. Shared services struggle with scale. Technology
+              environments grow complex. M&A introduces multiple operating models. My enterprise
+              advisory work focuses on stabilising and redesigning HR operations so they can
+              operate consistently across regions, systems, and regulatory environments.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8">
               <Link
                 href="/contact"
                 className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
               >
                 Discuss Your Situation
               </Link>
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
-              >
-                See the HR Foundations Sprint
-              </Link>
             </div>
           </div>
         </div>
@@ -94,76 +84,28 @@ export default function GrowingCompaniesPage() {
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-            Common signs
+            Typical areas of support
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Signs your HR operations may be starting to struggle
+            Support for complex HR operating environments
           </h2>
           <p className="mt-4 text-xl leading-9 text-slate-700">
-            Many growing businesses reach a point where people operations start to feel messy,
-            inconsistent, or overly manual. These problems are common — and usually signal that
-            the business has outgrown its current HR foundations.
+            This work is suited to organisations with global operations, shared services
+            environments, HR technology programmes, regulatory complexity, or significant change
+            activity such as M&A, harmonisation, or service delivery redesign.
           </p>
-        </div>
-
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
-          {signs.map((sign) => (
-            <div
-              key={sign}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-lg leading-8 text-slate-700 shadow-sm"
-            >
-              {sign}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="max-w-4xl rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-              A boutique advisory approach
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Tailored support, not recycled templates.
-            </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              Large consulting firms often begin with predefined frameworks and standard templates.
-              While those approaches may work well in large enterprise programmes, growing
-              organisations often need something different. My work starts by understanding how the
-              business actually operates — how decisions are made, where friction shows up, what
-              the organisation is trying to achieve, and what its practical constraints are.
-            </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              From there, we design HR structures, processes, and systems that fit the business
-              rather than forcing the business into a theoretical model. The aim is not to produce
-              documents for the sake of it. The aim is to create HR operations that work day-to-day
-              and remain stable as the organisation grows.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-            Where I typically help
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Practical support for growing businesses
-          </h2>
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          {supportAreas.map((area) => (
+          {enterpriseServices.map((service) => (
             <div
-              key={area.title}
+              key={service.title}
               className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm"
             >
-              <h3 className="text-2xl font-semibold text-slate-950">{area.title}</h3>
-              <p className="mt-4 text-lg leading-8 text-slate-600">{area.text}</p>
+              <h3 className="text-2xl font-semibold text-slate-950">{service.title}</h3>
+              <p className="mt-4 text-lg leading-8 text-slate-600">{service.text}</p>
               <ul className="mt-6 space-y-3 text-base text-slate-700">
-                {area.bullets.map((bullet) => (
+                {service.bullets.map((bullet) => (
                   <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
                     {bullet}
                   </li>
@@ -178,27 +120,16 @@ export default function GrowingCompaniesPage() {
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-              How engagements usually begin
+              Engagement structure
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Start with clarity, not assumptions.
+              Support shaped around the work itself.
             </h2>
             <p className="mt-4 text-xl leading-9 text-slate-700">
-              Most engagements begin with a short discovery phase where we review the current
-              operating environment, map existing HR processes, identify friction points, and
-              prioritise practical improvement opportunities. Tools may include process mapping,
-              Start / Stop / Continue reviews, future-state workshops, and leadership alignment
-              discussions.
-            </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              Many growing organisations begin with a structured{" "}
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="font-medium text-blue-700 underline underline-offset-4"
-              >
-                HR Foundations Sprint
-              </Link>
-              , which creates a clear and actionable plan for strengthening HR operations.
+              Enterprise engagements vary depending on the scope and context, but typically take
+              the form of strategic advisory support, project-based transformation work, or interim
+              leadership during periods of change. The focus is always on practical operational
+              improvement, not just theoretical design.
             </p>
           </div>
         </div>
@@ -211,12 +142,12 @@ export default function GrowingCompaniesPage() {
               Next step
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Building the right HR foundations early saves significant complexity later.
+              Need support in a complex HR operating environment?
             </h2>
             <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-100/90">
-              If your business is growing and HR operations are starting to feel reactive,
-              inconsistent, or difficult to scale, the best place to start is a short
-              conversation.
+              If you are working through service delivery redesign, HR technology change, global
+              operating model complexity, or post-acquisition integration, I would be happy to
+              discuss your situation.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -226,10 +157,10 @@ export default function GrowingCompaniesPage() {
                 Contact Me
               </Link>
               <Link
-                href="/services/hr-foundations-sprint"
+                href="/case-studies"
                 className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
-                Learn About the Sprint
+                View Case Studies
               </Link>
             </div>
           </div>

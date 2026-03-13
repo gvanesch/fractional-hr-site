@@ -2,97 +2,82 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Case Studies | Greg van Esch",
+  title: "Services | Greg van Esch",
   description:
-    "Selected case studies across HR operations transformation, ServiceNow HRSD, onboarding automation, shared services, and global workforce integration.",
+    "HR operations advisory for growing companies, mid-market organisations, and enterprise businesses navigating transformation, service delivery, and HR technology change.",
 };
 
-const caseStudies = [
+const audiences = [
   {
-    title: "Transforming Global Employee Onboarding Through HR Technology Automation",
-    challenge:
-      "A global onboarding process had become fragmented across regions, heavily manual, and difficult to scale. The organisation needed a more structured, automated, and globally consistent operating model.",
-    approach:
-      "The onboarding lifecycle was redesigned using ServiceNow HR Service Delivery integrated with the HRIS. Workflows, approvals, task orchestration, and data structures were standardised to create a scalable operational system rather than a collection of disconnected tasks.",
-    impact:
-      "Onboarding became faster, more consistent, and more measurable across countries, with improved data quality, stronger compliance controls, and better leadership visibility.",
-    tags: ["ServiceNow HRSD", "HRIS Integration", "Automation", "Global Operations"],
+    title: "Growing Companies & Mid-Market",
+    text: "Support for scaling businesses that need stronger HR infrastructure, clearer processes, better onboarding, and practical systems that fit the realities of the business.",
+    bullets: [
+      "HR foundations and process clarity",
+      "Onboarding and employee lifecycle design",
+      "Policies, playbooks, and manager guidance",
+      "HR systems improvement and practical automation",
+    ],
+    href: "/services/growing-companies",
+    cta: "Explore Growing Companies Support",
   },
   {
-    title: "Scaling Global HR Operations Across 27 Countries",
-    challenge:
-      "A growing global organisation required a stronger HR operations model capable of supporting more than 4,000 employees, contractors, and consultants across multiple jurisdictions.",
-    approach:
-      "The People Operations and Shared Services function was restructured to standardise core employee lifecycle processes, strengthen controls, improve governance, and create more scalable global operating rhythms.",
-    impact:
-      "The result was a more resilient HR service environment with clearer ownership, stronger compliance foundations, and more scalable service delivery across 27 countries.",
-    tags: ["Shared Services", "Global HR", "Governance", "Operating Model"],
-  },
-  {
-    title: "Operational Integration Through Global M&A Activity",
-    challenge:
-      "Following multiple transactions, the business needed to integrate HR operations, benefits, legal entities, and workforce structures while maintaining continuity and compliance.",
-    approach:
-      "End-to-end operational support was provided across due diligence, clean room activity, integration planning, TUPE and harmonisation workstreams, and post-close operational execution.",
-    impact:
-      "Multiple transactions were supported successfully, including entity consolidation, benefit harmonisation, and integration of 30+ employer entities supporting around 2,000 employees globally.",
-    tags: ["M&A", "TUPE", "Integration", "Harmonisation"],
+    title: "Enterprise & Complex Organisations",
+    text: "Support for organisations navigating global operations, shared services, HR technology programmes, regulatory complexity, and large-scale transformation.",
+    bullets: [
+      "HR operations transformation",
+      "Service delivery and shared services",
+      "ServiceNow HRSD and workflow redesign",
+      "M&A integration and harmonisation",
+    ],
+    href: "/services/enterprise",
+    cta: "Explore Enterprise Support",
   },
 ];
 
-export default function CaseStudiesPage() {
+export default function ServicesPage() {
   return (
     <>
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-            Case Studies
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
-            Selected transformation experience.
-          </h1>
-          <p className="mt-4 text-xl leading-9 text-slate-700">
-            A few examples of the kind of work I have led across global People Operations, service
-            delivery, and HR technology transformation.
-          </p>
+      <section className="bg-[#123a63] text-white">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
+              Services
+            </p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+              Different organisations need different kinds of HR support.
+            </h1>
+            <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-100/90">
+              A growing business building its HR foundations has very different needs from a global
+              organisation redesigning shared services or navigating complex transformation. Choose
+              the path that best reflects where your organisation is today.
+            </p>
+          </div>
         </div>
+      </section>
 
-        <div className="mt-10 space-y-8">
-          {caseStudies.map((study) => (
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {audiences.map((audience) => (
             <div
-              key={study.title}
-              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+              key={audience.title}
+              className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm"
             >
-              <div className="flex flex-wrap gap-2">
-                {study.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800"
-                  >
-                    {tag}
-                  </span>
+              <h2 className="text-2xl font-semibold text-slate-950">{audience.title}</h2>
+              <p className="mt-4 text-lg leading-8 text-slate-600">{audience.text}</p>
+              <ul className="mt-6 space-y-3 text-base text-slate-700">
+                {audience.bullets.map((bullet) => (
+                  <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
+                    {bullet}
+                  </li>
                 ))}
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold text-slate-950">{study.title}</h2>
-              <div className="mt-6 grid gap-6 lg:grid-cols-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Challenge
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.challenge}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Approach
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.approach}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Impact
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{study.impact}</p>
-                </div>
+              </ul>
+              <div className="mt-6">
+                <Link
+                  href={audience.href}
+                  className="inline-flex rounded-xl bg-slate-950 px-5 py-3 text-base font-medium text-white transition hover:bg-slate-800"
+                >
+                  {audience.cta}
+                </Link>
               </div>
             </div>
           ))}
@@ -101,30 +86,25 @@ export default function CaseStudiesPage() {
 
       <section className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="rounded-[2rem] bg-[#123a63] px-8 py-12 text-white shadow-xl">
+          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 px-8 py-12">
             <div className="max-w-4xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
-                Explore further
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+                Popular starting point
               </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Want to discuss a similar challenge in your organisation?
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                HR Foundations Sprint
               </h2>
-              <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-100/90">
-                If you are working through HR transformation, onboarding automation, operating
-                model redesign, or service delivery complexity, I would be happy to talk.
+              <p className="mt-4 max-w-3xl text-xl leading-9 text-slate-700">
+                Many growing organisations begin with a short HR Foundations Sprint — a focused
+                engagement designed to identify operational gaps, prioritise improvements, and give
+                the business a clear plan for building stronger HR foundations.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+              <div className="mt-8">
                 <Link
-                  href="/contact"
-                  className="w-full rounded-xl bg-blue-600 px-6 py-3 text-center text-base font-medium text-white transition hover:bg-blue-700 sm:w-auto"
+                  href="/services/hr-foundations-sprint"
+                  className="inline-flex rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
                 >
-                  Contact Me
-                </Link>
-                <Link
-                  href="/services"
-                  className="w-full rounded-xl border border-white/20 px-6 py-3 text-center text-base font-medium transition hover:bg-white/10 sm:w-auto"
-                >
-                  View Services
+                  Learn About the Sprint
                 </Link>
               </div>
             </div>
