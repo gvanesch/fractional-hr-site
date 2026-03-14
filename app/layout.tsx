@@ -14,14 +14,14 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://vanesch.uk"),
   title: "Greg van Esch | HR Operations & Transformation Advisor",
   description:
-    "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HR Integration, knowledge management, onboarding automation, and HR transformation.",
+    "Independent HR operations advisor helping organisations improve service delivery, HR technology, onboarding, governance, and scalable people operations.",
   alternates: {
     canonical: "https://vanesch.uk",
   },
   openGraph: {
     title: "Greg van Esch | HR Operations & Transformation Advisor",
     description:
-      "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HR Integration, knowledge management, onboarding automation, and HR transformation.",
+      "Independent HR operations advisor helping organisations improve service delivery, HR technology, onboarding, governance, and scalable people operations.",
     url: "https://vanesch.uk",
     siteName: "Greg van Esch",
     locale: "en_GB",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Greg van Esch | HR Operations & Transformation Advisor",
     description:
-      "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HR Integration, knowledge management, onboarding automation, and HR transformation.",
+      "Independent HR operations advisor helping organisations improve service delivery, HR technology, onboarding, governance, and scalable people operations.",
     images: ["https://vanesch.uk/og-image.jpg"],
   },
 };
@@ -54,7 +54,7 @@ const personSchema = {
   image: "https://vanesch.uk/og-image.jpg",
   jobTitle: "HR Operations & Transformation Advisor",
   description:
-    "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HR Integration, knowledge management, onboarding automation, and HR transformation.",
+    "Independent HR operations advisor helping organisations improve service delivery, HR technology, onboarding, governance, and scalable people operations.",
   sameAs: ["https://www.linkedin.com/in/greg-van-esch/"],
   email: "privacy@vanesch.uk",
   knowsAbout: [
@@ -63,7 +63,7 @@ const personSchema = {
     "HR Transformation",
     "Service Delivery",
     "Shared Services",
-    "ServiceNow HR Integration",
+    "ServiceNow HRSD",
     "HRIS",
     "Onboarding Automation",
     "M&A Integration",
@@ -77,7 +77,7 @@ const websiteSchema = {
   name: "Greg van Esch",
   url: "https://vanesch.uk",
   description:
-    "Independent advisor specialising in HR operations, service delivery, shared services, ServiceNow HR Integration, knowledge management, onboarding automation, and HR transformation.",
+    "Independent HR operations advisor helping organisations improve service delivery, HR technology, onboarding, governance, and scalable people operations.",
   publisher: {
     "@type": "Person",
     name: "Greg van Esch",
@@ -121,17 +121,17 @@ export default function RootLayout({
                 <Link href="/services" className="transition hover:text-white">
                   Services
                 </Link>
+                <Link href="/pricing" className="transition hover:text-white">
+                  Pricing
+                </Link>
                 <Link href="/approach" className="transition hover:text-white">
                   Approach
-                </Link>
-                <Link href="/case-studies" className="transition hover:text-white">
-                  Case Studies
                 </Link>
                 <Link href="/about" className="transition hover:text-white">
                   About
                 </Link>
-                <Link href="/pricing" className="transition hover:text-white">
-                  Pricing
+                <Link href="/case-studies" className="transition hover:text-white">
+                  Case Studies
                 </Link>
                 <Link href="/contact" className="transition hover:text-white">
                   Contact
