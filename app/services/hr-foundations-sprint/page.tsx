@@ -46,6 +46,12 @@ export default function HRFoundationsSprintPage() {
                 Discuss the Sprint
               </Link>
               <Link
+                href="/diagnostic"
+                className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+              >
+                Take the Diagnostic First
+              </Link>
+              <Link
                 href="/services/growing-companies"
                 className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
@@ -57,21 +63,49 @@ export default function HRFoundationsSprintPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-4xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
-            Why this exists
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            A clear starting point for growing businesses
-          </h2>
-          <p className="mt-4 text-xl leading-9 text-slate-700">
-            Many scaling businesses reach a point where HR starts to feel messy and reactive.
-            Processes exist but they are inconsistent, managers handle situations differently,
-            onboarding varies between teams, and HR spends too much time coordinating rather than
-            improving. The HR Foundations Sprint is designed to quickly diagnose the operational
-            gaps and establish the core structures that help a growing organisation run its people
-            operations more smoothly.
-          </p>
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+              Why this exists
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              A clear starting point for growing businesses
+            </h2>
+            <p className="mt-4 text-xl leading-9 text-slate-700">
+              Many scaling businesses reach a point where HR starts to feel messy and reactive.
+              Processes exist but they are inconsistent, managers handle situations differently,
+              onboarding varies between teams, and HR spends too much time coordinating rather than
+              improving. The HR Foundations Sprint is designed to quickly diagnose the operational
+              gaps and establish the core structures that help a growing organisation run its people
+              operations more smoothly.
+            </p>
+          </div>
+
+          <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+              Not sure if you need the sprint yet?
+            </p>
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              Start with the HR Operations Health Check.
+            </h3>
+            <p className="mt-4 text-lg leading-8 text-slate-700">
+              If you are still trying to understand whether the issue is isolated friction or a
+              wider operational pattern, the diagnostic is a useful first step.
+            </p>
+            <ul className="mt-4 space-y-2 text-lg leading-8 text-slate-700">
+              <li className="list-disc ml-5">A quick self-assessment of HR operational strain</li>
+              <li className="list-disc ml-5">An immediate score and high-level interpretation</li>
+              <li className="list-disc ml-5">A practical way to gauge whether deeper support may help</li>
+            </ul>
+            <div className="mt-6">
+              <Link
+                href="/diagnostic"
+                className="inline-flex rounded-xl bg-blue-600 px-5 py-3 text-base font-medium text-white transition hover:bg-blue-700"
+              >
+                Take the Diagnostic
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -184,12 +218,22 @@ export default function HRFoundationsSprintPage() {
                 Others continue into project-based support. Either way, the sprint gives the
                 business a practical and credible starting point.
               </p>
+              <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-100/90">
+                If you are still weighing up whether the sprint is the right fit, the diagnostic
+                can give you a useful first read before starting a conversation.
+              </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
                   href="/contact"
                   className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
                 >
                   Contact
+                </Link>
+                <Link
+                  href="/diagnostic"
+                  className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                >
+                  Take the Diagnostic
                 </Link>
                 <Link
                   href="/services/growing-companies"

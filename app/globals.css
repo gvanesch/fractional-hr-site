@@ -8,6 +8,7 @@
   --brand-navy-2: #0d1f3c;
   --brand-accent: #1e6fd9;
   --brand-accent-hover: #2979ff;
+  --brand-section-kicker: #1557b0;
   --brand-text-primary: #ffffff;
   --brand-text-secondary: #8aaac8;
   --brand-light-bg: #f4f6fa;
@@ -34,7 +35,7 @@ body {
 }
 
 .brand-section-kicker {
-  color: var(--brand-accent);
+  color: var(--brand-section-kicker);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.2em;

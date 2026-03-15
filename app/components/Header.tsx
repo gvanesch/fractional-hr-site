@@ -10,8 +10,6 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto max-w-7xl px-5 sm:px-6">
         <div className="flex items-center justify-between py-4">
-
-          {/* Brand */}
           <Link
             href="/"
             className="text-xl font-semibold tracking-tight text-slate-950"
@@ -19,20 +17,16 @@ export default function Header() {
             Greg van Esch
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-
-            <Link
-              href="/services"
-              className="transition hover:text-[#1E6FD9]"
-            >
+            <Link href="/services" className="transition hover:text-[#1E6FD9]">
               Services
             </Link>
 
-            <Link
-              href="/approach"
-              className="transition hover:text-[#1E6FD9]"
-            >
+            <Link href="/diagnostic" className="transition hover:text-[#1E6FD9]">
+              Diagnostic
+            </Link>
+
+            <Link href="/approach" className="transition hover:text-[#1E6FD9]">
               Approach
             </Link>
 
@@ -43,37 +37,25 @@ export default function Header() {
               Case Studies
             </Link>
 
-            <Link
-              href="/about"
-              className="transition hover:text-[#1E6FD9]"
-            >
+            <Link href="/about" className="transition hover:text-[#1E6FD9]">
               About
             </Link>
 
-            <Link
-              href="/pricing"
-              className="transition hover:text-[#1E6FD9]"
-            >
+            <Link href="/pricing" className="transition hover:text-[#1E6FD9]">
               Pricing
             </Link>
 
-            <Link
-              href="/contact"
-              className="transition hover:text-[#1E6FD9]"
-            >
+            <Link href="/contact" className="transition hover:text-[#1E6FD9]">
               Contact
             </Link>
-
           </nav>
 
-          {/* CTA + Mobile */}
           <div className="flex items-center gap-4">
-
             <Link
               href="/contact"
               className="hidden rounded-md bg-[#1E6FD9] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1557AD] md:block"
             >
-              Book Diagnostic Call
+              Book Diagnostic Conversation
             </Link>
 
             <button
@@ -85,22 +67,26 @@ export default function Header() {
             >
               Menu
             </button>
-
           </div>
-
         </div>
 
-        {/* Mobile Menu */}
         {open && (
           <div className="border-t border-slate-200 pb-6 pt-4 md:hidden">
             <nav className="flex flex-col gap-4 text-sm font-medium text-slate-700">
-
               <Link
                 href="/services"
                 onClick={() => setOpen(false)}
                 className="transition hover:text-[#1E6FD9]"
               >
                 Services
+              </Link>
+
+              <Link
+                href="/diagnostic"
+                onClick={() => setOpen(false)}
+                className="transition hover:text-[#1E6FD9]"
+              >
+                Diagnostic
               </Link>
 
               <Link
@@ -148,13 +134,11 @@ export default function Header() {
                 onClick={() => setOpen(false)}
                 className="mt-2 rounded-md bg-[#1E6FD9] px-4 py-2 text-center font-semibold text-white"
               >
-                Book Diagnostic Call
+                Book Diagnostic Conversation
               </Link>
-
             </nav>
           </div>
         )}
-
       </div>
     </header>
   );

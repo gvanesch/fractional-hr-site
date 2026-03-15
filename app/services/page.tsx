@@ -59,6 +59,21 @@ export default function HomePage() {
               frameworks, and HR technology so they can scale with more clarity, control,
               and operational confidence.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/diagnostic"
+                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+              >
+                Take the Diagnostic
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
+              >
+                Contact
+              </Link>
+            </div>
           </div>
 
           <div className="brand-card-dark rounded-[1.75rem] p-8 shadow-2xl shadow-black/20">
@@ -131,12 +146,18 @@ export default function HomePage() {
                 HR becoming reactive rather than operational.
               </p>
               <p className="brand-body mt-4">
-                I’ve set out the most common early warning signs on the HR Chaos Signals
-                page — a useful starting point for leaders trying to understand whether
-                their people operations have outgrown the current structure.
+                If that feels familiar, the best next step is often either to review the
+                common warning signs or take the HR Operations Health Check to get a quick
+                read on how much operational strain may have built up.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/diagnostic"
+                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+                >
+                  Take the HR Operations Health Check
+                </Link>
                 <Link
                   href="/services/hr-chaos-signals"
                   className="brand-button-dark rounded-xl px-6 py-3 text-base font-medium"
@@ -216,10 +237,10 @@ export default function HomePage() {
                   Learn About the Sprint
                 </Link>
                 <Link
-                  href="/contact"
+                  href="/diagnostic"
                   className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
                 >
-                  Discuss Your Situation
+                  Take the Diagnostic First
                 </Link>
               </div>
             </div>
@@ -236,7 +257,8 @@ export default function HomePage() {
             </h2>
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
               Whether the challenge is enterprise transformation or simply getting the basics
-              right in a growing business, the best place to start is a short conversation.
+              right in a growing business, you can start with a short conversation or take the
+              HR Operations Health Check first.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -244,6 +266,12 @@ export default function HomePage() {
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
               >
                 Contact
+              </Link>
+              <Link
+                href="/diagnostic"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
+              >
+                Take the Diagnostic
               </Link>
             </div>
           </div>

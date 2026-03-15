@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Pricing | Greg van Esch",
   description:
-    "Clear starting points for improving HR operations, including the HR Foundations Sprint and follow-on advisory support.",
+    "Clear starting points for improving HR operations, including the HR Foundations Sprint, an HR Operations Health Check, and follow-on advisory support.",
 };
 
 const sprintIncludes = [
@@ -54,6 +54,21 @@ export default function PricingPage() {
               engagement designed to diagnose HR operational gaps and create a
               clear improvement roadmap.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/services/hr-foundations-sprint"
+                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+              >
+                View the HR Foundations Sprint
+              </Link>
+              <Link
+                href="/diagnostic"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
+              >
+                Take the Diagnostic First
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -131,6 +146,42 @@ export default function PricingPage() {
 
             <div className="space-y-6">
               <div className="brand-surface-soft rounded-[1.75rem] p-8">
+                <p className="brand-section-kicker">Not sure if the sprint is the right starting point?</p>
+                <h3 className="brand-heading-md mt-3 text-slate-950">
+                  Start with the HR Operations Health Check
+                </h3>
+                <div className="brand-body mt-4 space-y-4">
+                  <p>
+                    If you are still trying to understand whether the issue is isolated friction
+                    or a wider operational pattern, the diagnostic is a useful lower-commitment
+                    first step.
+                  </p>
+                  <p>The diagnostic gives you:</p>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
+                    A simple HR Operations Score
+                  </div>
+                  <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
+                    An immediate maturity-style result band
+                  </div>
+                  <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
+                    A practical first read on where friction may be building
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <Link
+                    href="/diagnostic"
+                    className="brand-button-primary inline-flex rounded-xl px-5 py-3 text-base font-medium"
+                  >
+                    Take the Diagnostic
+                  </Link>
+                </div>
+              </div>
+
+              <div className="brand-surface-soft rounded-[1.75rem] p-8">
                 <p className="brand-section-kicker">What happens after the sprint?</p>
                 <h3 className="brand-heading-md mt-3 text-slate-950">
                   Follow-on implementation support
@@ -198,25 +249,31 @@ export default function PricingPage() {
       <section className="brand-dark-section py-20">
         <div className="mx-auto max-w-7xl px-6">
           <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
-            <p className="brand-kicker">Start with a conversation</p>
+            <p className="brand-kicker">Start with the right level of clarity</p>
             <h2 className="brand-heading-lg mt-3">
-              If you&apos;re unsure whether the sprint is the right starting point, a short diagnostic conversation can help.
+              If you&apos;re unsure whether the sprint is the right starting point, there are two sensible next steps.
             </h2>
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
-              A short discussion can help determine whether the HR Foundations
-              Sprint would be useful for your organisation and where the most
-              sensible starting point may be.
+              You can take the HR Operations Health Check for an immediate self-assessment,
+              or book a short diagnostic conversation to discuss whether the HR Foundations
+              Sprint would be useful for your organisation.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/contact"
+                href="/diagnostic"
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+              >
+                Take the Diagnostic
+              </Link>
+              <Link
+                href="/contact"
+                className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
               >
                 Book a Diagnostic Conversation
               </Link>
               <Link
                 href="/services/hr-foundations-sprint"
-                className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 View the HR Foundations Sprint
               </Link>

@@ -40,6 +40,15 @@ const audiencePaths = [
   },
 ];
 
+const diagnosticSignals = [
+  "Managers handle similar HR issues differently across teams",
+  "Employees are unsure where to go for HR support",
+  "Onboarding feels inconsistent or overly manual",
+  "The same HR questions keep resurfacing",
+  "HR spends too much time reacting instead of improving",
+  "Processes start to strain as the business grows",
+];
+
 export default function HomePage() {
   return (
     <>
@@ -66,6 +75,12 @@ export default function HomePage() {
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
               >
                 Explore Services
+              </Link>
+              <Link
+                href="/diagnostic"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
+              >
+                Take the Diagnostic
               </Link>
             </div>
           </div>
@@ -122,6 +137,58 @@ export default function HomePage() {
               <div className="mt-3 text-base text-slate-600">{stat.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div>
+              <p className="brand-section-kicker">Quick self-check</p>
+              <h2 className="brand-heading-lg mt-3 text-slate-950">
+                Is your HR starting to feel messy?
+              </h2>
+              <p className="brand-subheading mt-4 text-slate-700">
+                Many organisations do not start by looking for “HR transformation”.
+                What they notice first is friction: repeated questions, inconsistent
+                decisions, manual workarounds, and HR becoming increasingly reactive.
+              </p>
+              <p className="brand-body mt-4">
+                The HR Operations Health Check is a short self-assessment designed to
+                help you understand whether these are isolated frustrations or signs of
+                wider operational strain.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/diagnostic"
+                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+                >
+                  Take the HR Operations Health Check
+                </Link>
+                <Link
+                  href="/services/hr-chaos-signals"
+                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-slate-50"
+                >
+                  Read HR Chaos Signals
+                </Link>
+              </div>
+            </div>
+
+            <div className="brand-surface-soft rounded-[1.75rem] p-8">
+              <p className="brand-section-kicker">Common warning signs</p>
+              <div className="mt-6 space-y-3">
+                {diagnosticSignals.map((signal) => (
+                  <div
+                    key={signal}
+                    className="rounded-lg bg-white px-4 py-3 text-base text-slate-700"
+                  >
+                    {signal}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -186,10 +253,10 @@ export default function HomePage() {
                   Learn About the Sprint
                 </Link>
                 <Link
-                  href="/contact"
+                  href="/diagnostic"
                   className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
                 >
-                  Discuss Your Situation
+                  Take the Diagnostic First
                 </Link>
               </div>
             </div>
@@ -206,7 +273,8 @@ export default function HomePage() {
             </h2>
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
               Whether the challenge is enterprise transformation or simply getting the basics
-              right in a growing business, the best place to start is a short conversation.
+              right in a growing business, you can start with a short conversation or take the
+              HR Operations Health Check first.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -214,6 +282,12 @@ export default function HomePage() {
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
               >
                 Contact
+              </Link>
+              <Link
+                href="/diagnostic"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
+              >
+                Take the Diagnostic
               </Link>
             </div>
           </div>

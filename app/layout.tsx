@@ -63,7 +63,7 @@ const personSchema = {
     "HR Transformation",
     "Service Delivery",
     "Shared Services",
-    "ServiceNow HRSD",
+    "ServiceNow HR Integration",
     "HRIS",
     "Onboarding Automation",
     "M&A Integration",
@@ -121,17 +121,20 @@ export default function RootLayout({
                 <Link href="/services" className="transition hover:text-white">
                   Services
                 </Link>
-                <Link href="/pricing" className="transition hover:text-white">
-                  Pricing
+                <Link href="/diagnostic" className="transition hover:text-white">
+                  Diagnostic
                 </Link>
                 <Link href="/approach" className="transition hover:text-white">
                   Approach
                 </Link>
+                <Link href="/case-studies" className="transition hover:text-white">
+                  Case Studies
+                </Link>
                 <Link href="/about" className="transition hover:text-white">
                   About
                 </Link>
-                <Link href="/case-studies" className="transition hover:text-white">
-                  Case Studies
+                <Link href="/pricing" className="transition hover:text-white">
+                  Pricing
                 </Link>
                 <Link href="/contact" className="transition hover:text-white">
                   Contact
@@ -156,6 +159,9 @@ export default function RootLayout({
               </Link>
               <Link href="/terms" className="transition hover:text-white">
                 Terms of Use
+              </Link>
+              <Link href="/modern-slavery" className="transition hover:text-white">
+                Modern Slavery Statement
               </Link>
             </div>
           </div>

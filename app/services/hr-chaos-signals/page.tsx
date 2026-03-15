@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "HR Chaos Signals | Greg van Esch",
   description:
-    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies — and how an HR Foundations Sprint can help restore clarity.",
+    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies — and how an HR Operations Health Check or HR Foundations Sprint can help restore clarity.",
 };
 
 const signals = [
@@ -20,9 +20,7 @@ const signals = [
   {
     title: "Signal 2",
     heading: "Employees aren’t sure where to go for HR support",
-    text: [
-      "Questions arrive through multiple channels:",
-    ],
+    text: ["Questions arrive through multiple channels:"],
     bullets: [
       "Direct messages",
       "Emails to different HR team members",
@@ -71,9 +69,7 @@ const signals = [
   {
     title: "Signal 7",
     heading: "Operational friction becomes visible during growth moments",
-    text: [
-      "Periods of change often expose HR operational gaps:",
-    ],
+    text: ["Periods of change often expose HR operational gaps:"],
     bullets: [
       "Rapid hiring",
       "Organisational restructuring",
@@ -129,6 +125,21 @@ export default function HRChaosSignalsPage() {
               Recognising these signals early makes it far easier to stabilise HR operations before
               they become a significant organisational constraint.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/diagnostic"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+              >
+                Take the HR Operations Health Check
+              </Link>
+              <Link
+                href="/services/hr-foundations-sprint"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+              >
+                View the Sprint
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -171,24 +182,63 @@ export default function HRChaosSignalsPage() {
 
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-              What these signals usually mean
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Growth has outpaced the operational infrastructure around HR.
-            </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              These signals rarely indicate a failing HR team.
-            </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              More often, they show that the organisation has simply grown faster than the
-              operational infrastructure supporting its people processes.
-            </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              In other words, HR operations have evolved organically rather than being
-              intentionally designed.
-            </p>
+          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="max-w-4xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
+                What these signals usually mean
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                Growth has outpaced the operational infrastructure around HR.
+              </h2>
+              <p className="mt-4 text-xl leading-9 text-slate-700">
+                These signals rarely indicate a failing HR team.
+              </p>
+              <p className="mt-4 text-xl leading-9 text-slate-700">
+                More often, they show that the organisation has simply grown faster than the
+                operational infrastructure supporting its people processes.
+              </p>
+              <p className="mt-4 text-xl leading-9 text-slate-700">
+                In other words, HR operations have evolved organically rather than being
+                intentionally designed.
+              </p>
+              <p className="mt-6 text-lg leading-8 text-slate-700">
+                If you want a quick sense of how much operational strain may have built up,
+                the HR Operations Health Check provides a practical self-assessment before
+                moving into deeper support.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/diagnostic"
+                  className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+                >
+                  Take the Diagnostic
+                </Link>
+                <Link
+                  href="/contact"
+                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-slate-50"
+                >
+                  Contact
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
+                A practical next step
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                Use the diagnostic to gauge the level of operational friction.
+              </h3>
+              <p className="mt-4 text-lg leading-8 text-slate-700">
+                The HR Operations Health Check gives you:
+              </p>
+              <ul className="mt-4 space-y-2 text-lg leading-8 text-slate-700">
+                <li className="list-disc ml-5">A simple HR Operations Score</li>
+                <li className="list-disc ml-5">An immediate maturity-style result band</li>
+                <li className="list-disc ml-5">A quick sense of where friction may be building</li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>
@@ -203,7 +253,7 @@ export default function HRChaosSignalsPage() {
               HR Foundations Sprint
             </h2>
             <p className="mt-4 text-xl leading-9 text-slate-700">
-              The HR Foundations Sprint is a focused 2–4 week engagement designed for
+              The HR Foundations Sprint is a focused 4 week engagement designed for
               organisations that are starting to experience these signals.
             </p>
 
@@ -222,6 +272,21 @@ export default function HRChaosSignalsPage() {
               The goal is simple: to establish the operational structure that allows HR to support
               the organisation consistently and effectively as it grows.
             </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/services/hr-foundations-sprint"
+                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+              >
+                View the Sprint
+              </Link>
+              <Link
+                href="/diagnostic"
+                className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
+              >
+                Take the Diagnostic First
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -266,20 +331,27 @@ export default function HRChaosSignalsPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              Discuss the HR Foundations Sprint
+              Start with the right level of clarity
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              If some of these signals feel familiar, a short conversation can help.
+              If some of these signals feel familiar, the next step is straightforward.
             </h2>
             <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              A short diagnostic conversation can help determine whether the sprint would be useful
+              You can take the HR Operations Health Check for an immediate self-assessment,
+              or start with a short conversation to discuss whether the sprint would be useful
               for your organisation.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/contact"
+                href="/diagnostic"
                 className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+              >
+                Take the Diagnostic
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
               >
                 Contact
               </Link>

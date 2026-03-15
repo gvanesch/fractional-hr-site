@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { supabase } from "../../lib/supabase";
 
 type AnswerValue = 1 | 2 | 3 | 4 | 5;
 
@@ -10,6 +11,14 @@ type Question = {
   dimension: string;
   text: string;
 };
+
+type ResultBand = {
+  label: string;
+  summary: string;
+  freeInsights: string[];
+};
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const questions: Question[] = [
   {
@@ -72,7 +81,40 @@ const scaleOptions: { label: string; value: AnswerValue }[] = [
   { label: "Strongly agree", value: 5 },
 ];
 
-function scoreToBand(score: number) {
+const companySizeOptions = [
+  "1–25 employees",
+  "26–50 employees",
+  "51–100 employees",
+  "101–250 employees",
+  "251–500 employees",
+  "501–1,000 employees",
+  "1,000+ employees",
+];
+
+const industryOptions = [
+  "Technology / SaaS",
+  "Professional Services",
+  "Financial Services",
+  "Healthcare / Life Sciences",
+  "Manufacturing",
+  "Retail / Consumer",
+  "Education",
+  "Public Sector / Non-profit",
+  "Other",
+];
+
+const roleOptions = [
+  "Founder / CEO",
+  "COO / Operations Leader",
+  "CHRO / Head of People",
+  "HR / People Operations Leader",
+  "HRBP / Generalist",
+  "Manager / Department Leader",
+  "Consultant / Advisor",
+  "Other",
+];
+
+function scoreToBand(score: number): ResultBand {
   if (score <= 24) {
     return {
       label: "Operationally Chaotic",
@@ -124,7 +166,7 @@ function scoreToBand(score: number) {
   };
 }
 
-function getDimensionAverages(answers: Record<number, AnswerValue | undefined>) {
+function getDimensionScores(answers: Record<number, AnswerValue | undefined>) {
   const groups: { label: string; ids: number[] }[] = [
     { label: "Process clarity", ids: [1] },
     { label: "Consistency", ids: [2] },
@@ -140,26 +182,50 @@ function getDimensionAverages(answers: Record<number, AnswerValue | undefined>) 
 
   return groups.map((group) => {
     const values: number[] = group.ids.map((id) => Number(answers[id] ?? 0));
-
     const total = values.reduce((sum: number, value: number) => sum + value, 0);
-
     const average = total / values.length;
 
     return {
       label: group.label,
-      average,
       score: Math.round(((average - 1) / 4) * 100),
     };
   });
 }
 
-export default function DiagnosticPage() {
-  const [answers, setAnswers] = useState<
-    Record<number, AnswerValue | undefined>
-  >({});
+function getOrCreateBrowserToken(): string {
+  const storageKey = "diagnostic_browser_token";
+  const existing = window.localStorage.getItem(storageKey);
 
+  if (existing) {
+    return existing;
+  }
+
+  const newToken = `${crypto.randomUUID()}-${Date.now()}`;
+  window.localStorage.setItem(storageKey, newToken);
+  return newToken;
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export default function DiagnosticPage() {
+  const [answers, setAnswers] = useState<Record<number, AnswerValue | undefined>>(
+    {}
+  );
+  const [companySize, setCompanySize] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [role, setRole] = useState("");
+  const [countryRegion, setCountryRegion] = useState("");
+  const [email, setEmail] = useState("");
   const [acceptedNotice, setAcceptedNotice] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [submitError, setSubmitError] = useState("");
 
   const answeredCount = useMemo(
     () => Object.values(answers).filter(Boolean).length,
@@ -168,6 +234,7 @@ export default function DiagnosticPage() {
 
   const progress = Math.round((answeredCount / questions.length) * 100);
   const allAnswered = answeredCount === questions.length;
+  const contextComplete = Boolean(companySize && industry && role);
 
   const rawScore = useMemo(() => {
     if (!allAnswered) return null;
@@ -189,8 +256,10 @@ export default function DiagnosticPage() {
 
   const dimensions = useMemo(() => {
     if (!allAnswered) return [];
-    return getDimensionAverages(answers).sort((a, b) => a.score - b.score);
+    return getDimensionScores(answers).sort((a, b) => a.score - b.score);
   }, [answers, allAnswered]);
+
+  const lowestDimensions = dimensions.slice(0, 3);
 
   function updateAnswer(questionId: number, value: AnswerValue) {
     setAnswers((prev) => ({
@@ -198,53 +267,219 @@ export default function DiagnosticPage() {
       [questionId]: value,
     }));
     setShowResults(false);
+    setSubmitError("");
+    setSaveStatus("idle");
   }
 
-  function calculateScore() {
-    if (!allAnswered || !acceptedNotice) return;
+  async function calculateScore() {
+    if (!allAnswered || !acceptedNotice || !contextComplete || score === null || !band) {
+      return;
+    }
+
+    setSaveStatus("saving");
+    setSubmitError("");
+
+    const dimensionMap = getDimensionScores(answers).reduce<Record<string, number>>(
+      (acc, item) => {
+        acc[item.label] = item.score;
+        return acc;
+      },
+      {}
+    );
+
+    let abuseToken: string | null = null;
+
+    try {
+      const browserToken = getOrCreateBrowserToken();
+      const dailySalt = new Date().toISOString().slice(0, 10);
+      abuseToken = await sha256Hex(`${browserToken}:${dailySalt}`);
+    } catch (error) {
+      console.error("Abuse token generation failed:", error);
+    }
+
+    const payload = {
+      company_size: companySize,
+      industry,
+      role,
+      country_region: countryRegion || null,
+      email: email || null,
+      score,
+      band: band.label,
+      process_clarity_score: dimensionMap["Process clarity"],
+      consistency_score: dimensionMap["Consistency"],
+      service_access_score: dimensionMap["Service access"],
+      ownership_score: dimensionMap["Ownership"],
+      onboarding_score: dimensionMap["Onboarding"],
+      technology_alignment_score: dimensionMap["Technology alignment"],
+      knowledge_self_service_score: dimensionMap["Knowledge and self-service"],
+      operational_capacity_score: dimensionMap["Operational capacity"],
+      data_handoffs_score: dimensionMap["Data and handoffs"],
+      change_resilience_score: dimensionMap["Change resilience"],
+      answers,
+      abuse_token: abuseToken,
+    };
+
+    const { error } = await supabase
+      .from("diagnostic_submissions")
+      .insert(payload);
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      setSaveStatus("error");
+      setSubmitError(
+        "Your result has been calculated, but the submission could not be saved. Please check your Supabase policy and try again."
+      );
+    } else {
+      setSaveStatus("saved");
+    }
+
     setShowResults(true);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
   function resetDiagnostic() {
     setAnswers({});
+    setCompanySize("");
+    setIndustry("");
+    setRole("");
+    setCountryRegion("");
+    setEmail("");
     setAcceptedNotice(false);
     setShowResults(false);
+    setSaveStatus("idle");
+    setSubmitError("");
   }
 
   return (
     <main className="bg-[#F4F6FA] py-20">
-      <div className="mx-auto max-w-3xl px-6">
-        <h1 className="text-4xl font-bold text-[#0A1628] mb-8">
+      <div className="mx-auto max-w-4xl px-6">
+        <h1 className="mb-8 text-4xl font-bold text-[#0A1628]">
           HR Operations Health Check
         </h1>
 
-        <p className="text-slate-600 mb-10">
-          Answer 10 questions to assess potential HR operational friction.
+        <p className="mb-10 text-slate-600">
+          Answer 10 questions to assess potential HR operational friction and get an
+          immediate HR Operations Score.
         </p>
 
+        <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm">
+          <h2 className="mb-6 text-xl font-semibold text-slate-950">
+            A little context first
+          </h2>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Company size <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={companySize}
+                onChange={(e) => setCompanySize(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+              >
+                <option value="">Select company size</option>
+                {companySizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Industry <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+              >
+                <option value="">Select industry</option>
+                {industryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Your role <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+              >
+                <option value="">Select your role</option>
+                {roleOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Country / region
+              </label>
+              <input
+                type="text"
+                value={countryRegion}
+                onChange={(e) => setCountryRegion(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                placeholder="Optional"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Email address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                placeholder="Optional"
+              />
+              <p className="mt-2 text-sm text-slate-500">
+                Optional. Provide this only if you would like follow-up or a deeper
+                interpretation of the result.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-10">
-          <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-3 overflow-hidden rounded-full bg-slate-200">
             <div
               className="h-full bg-[#1E6FD9]"
               style={{ width: `${progress}%` }}
             />
           </div>
 
-          <p className="text-sm text-slate-600 mt-2">
+          <p className="mt-2 text-sm text-slate-600">
             {answeredCount} / {questions.length} questions answered
           </p>
         </div>
 
         <div className="space-y-8">
           {questions.map((q) => (
-            <div key={q.id} className="bg-white p-6 rounded-lg shadow-sm">
-              <p className="text-slate-800 font-medium mb-4">{q.text}</p>
+            <div key={q.id} className="rounded-lg bg-white p-6 shadow-sm">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
+                {q.dimension}
+              </p>
+              <p className="mb-4 text-slate-800 font-medium">{q.text}</p>
 
               <div className="space-y-2">
                 {scaleOptions.map((option) => (
                   <label
                     key={option.value}
-                    className="flex items-center gap-3 text-sm text-slate-700"
+                    className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm text-slate-700"
                   >
                     <input
                       type="radio"
@@ -260,29 +495,39 @@ export default function DiagnosticPage() {
           ))}
         </div>
 
-        <div className="mt-10 space-y-4">
+        <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
           <label className="flex items-start gap-3 text-sm text-slate-700">
             <input
               type="checkbox"
               checked={acceptedNotice}
               onChange={(e) => setAcceptedNotice(e.target.checked)}
             />
-            I understand this tool provides general informational guidance only
-            and is not legal or professional advice.
+            <span>
+              I understand this tool provides general informational guidance only and
+              is not legal, regulatory, employment, tax, or professional advice. I
+              also understand that the information I submit may be used to create
+              aggregated or anonymised benchmarking insights.
+            </span>
           </label>
 
-          <div className="flex gap-4">
+          {submitError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4">
             <button
               onClick={calculateScore}
-              disabled={!allAnswered || !acceptedNotice}
-              className="bg-[#1E6FD9] text-white px-6 py-3 rounded-lg disabled:bg-slate-400"
+              disabled={!allAnswered || !acceptedNotice || !contextComplete || saveStatus === "saving"}
+              className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
             >
-              Calculate score
+              {saveStatus === "saving" ? "Calculating..." : "Calculate score"}
             </button>
 
             <button
               onClick={resetDiagnostic}
-              className="border border-slate-300 px-6 py-3 rounded-lg"
+              className="rounded-lg border border-slate-300 px-6 py-3"
             >
               Reset
             </button>
@@ -290,14 +535,14 @@ export default function DiagnosticPage() {
         </div>
 
         {showResults && score !== null && band && (
-          <div className="mt-16 bg-white p-8 rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">
+          <div className="mt-16 rounded-lg bg-white p-8 shadow">
+            <h2 className="mb-4 text-2xl font-semibold">
               Your HR Operations Score: {score} / 100
             </h2>
 
-            <p className="font-medium text-lg mb-2">{band.label}</p>
+            <p className="mb-2 text-lg font-medium">{band.label}</p>
 
-            <p className="text-slate-700 mb-6">{band.summary}</p>
+            <p className="mb-6 text-slate-700">{band.summary}</p>
 
             <ul className="space-y-2 text-slate-700">
               {band.freeInsights.map((insight) => (
@@ -305,12 +550,51 @@ export default function DiagnosticPage() {
               ))}
             </ul>
 
-            <div className="mt-8">
+            {lowestDimensions.length > 0 && (
+              <div className="mt-8">
+                <h3 className="mb-3 text-lg font-semibold text-slate-950">
+                  Lowest-scoring areas
+                </h3>
+                <div className="space-y-3">
+                  {lowestDimensions.map((dimension) => (
+                    <div
+                      key={dimension.label}
+                      className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                    >
+                      <span>{dimension.label}</span>
+                      <span className="font-medium">{dimension.score}/100</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
+              {saveStatus === "saved" && (
+                <p>
+                  Your result has been saved and may be used in aggregated or anonymised
+                  benchmarking analysis.
+                </p>
+              )}
+              {saveStatus === "error" && (
+                <p>
+                  Your result has been calculated, but the submission could not be saved.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="inline-block bg-[#1E6FD9] text-white px-6 py-3 rounded-lg"
+                className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
               >
                 Discuss your diagnostic
+              </Link>
+              <Link
+                href="/services/hr-foundations-sprint"
+                className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
+              >
+                View the HR Foundations Sprint
               </Link>
             </div>
           </div>
