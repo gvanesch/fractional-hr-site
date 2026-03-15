@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { getSupabaseClient } from "../../lib/supabase";
 
 type AnswerValue = 1 | 2 | 3 | 4 | 5;
 
@@ -319,18 +319,28 @@ export default function DiagnosticPage() {
       abuse_token: abuseToken,
     };
 
-    const { error } = await supabase
-      .from("diagnostic_submissions")
-      .insert(payload);
+    try {
+      const supabase = getSupabaseClient();
 
-    if (error) {
-      console.error("Supabase insert error:", error);
+      const { error } = await supabase
+        .from("diagnostic_submissions")
+        .insert(payload);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        setSaveStatus("error");
+        setSubmitError(
+          "Your result has been calculated, but the submission could not be saved. Please check your Supabase configuration and try again."
+        );
+      } else {
+        setSaveStatus("saved");
+      }
+    } catch (error) {
+      console.error("Supabase client error:", error);
       setSaveStatus("error");
       setSubmitError(
-        "Your result has been calculated, but the submission could not be saved. Please check your Supabase policy and try again."
+        "Your result has been calculated, but the submission could not be saved. Please check your Supabase configuration and try again."
       );
-    } else {
-      setSaveStatus("saved");
     }
 
     setShowResults(true);
@@ -473,7 +483,7 @@ export default function DiagnosticPage() {
               <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
                 {q.dimension}
               </p>
-              <p className="mb-4 text-slate-800 font-medium">{q.text}</p>
+              <p className="mb-4 font-medium text-slate-800">{q.text}</p>
 
               <div className="space-y-2">
                 {scaleOptions.map((option) => (
@@ -519,7 +529,12 @@ export default function DiagnosticPage() {
           <div className="flex flex-wrap gap-4">
             <button
               onClick={calculateScore}
-              disabled={!allAnswered || !acceptedNotice || !contextComplete || saveStatus === "saving"}
+              disabled={
+                !allAnswered ||
+                !acceptedNotice ||
+                !contextComplete ||
+                saveStatus === "saving"
+              }
               className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
             >
               {saveStatus === "saving" ? "Calculating..." : "Calculate score"}
