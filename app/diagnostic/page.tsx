@@ -69,7 +69,7 @@ const questions: Question[] = [
   {
     id: 10,
     dimension: "Change resilience",
-    text: "When the organisation grows or changes, HR processes can adapt without becoming confusing or chaotic.",
+    text: "When the organisation grows or changes, HR processes can adapt without becoming confusing or confusing or chaotic.",
   },
 ];
 
@@ -117,54 +117,54 @@ const roleOptions = [
 function scoreToBand(score: number): ResultBand {
   if (score <= 24) {
     return {
-      label: "Operationally Chaotic",
+      label: "Emerging Foundations",
       summary:
-        "Your HR operations are likely highly reactive, inconsistent, and too dependent on individual effort or workarounds.",
+        "HR processes may still be evolving and some operational responsibilities may be handled informally. As organisations grow, this can begin to create friction for managers and employees.",
       freeInsights: [
-        "Core HR processes may not be clear or consistently followed.",
-        "Managers and employees may be getting different answers to similar issues.",
-        "Operational friction is likely becoming visible during growth, onboarding, or change.",
+        "Core HR processes may still need clearer structure or documentation.",
+        "Managers may experience inconsistency in how people processes are handled.",
+        "Strengthening operational foundations can improve consistency and reduce management overhead.",
       ],
     };
   }
 
   if (score <= 49) {
     return {
-      label: "Friction Building",
+      label: "Developing Structure",
       summary:
-        "Some HR foundations exist, but operational friction is likely increasing as the organisation grows.",
+        "The organisation likely has some HR operational foundations in place, though inconsistencies may still appear across teams or processes as the business grows.",
       freeInsights: [
-        "Managers may interpret HR processes differently.",
-        "Manual workarounds may be increasing.",
-        "Growth may be exposing gaps that previously went unnoticed.",
+        "Some processes may rely too heavily on individual judgement or workarounds.",
+        "Clearer process ownership can improve consistency across the organisation.",
+        "More structured HR service delivery can support growth more effectively.",
       ],
     };
   }
 
   if (score <= 74) {
     return {
-      label: "Partially Structured",
+      label: "Structured but Improving",
       summary:
-        "Your organisation appears to have reasonable HR foundations, though opportunities likely exist to improve consistency and scalability.",
+        "Many HR operational foundations appear to be in place. However, some areas may still benefit from refinement to improve efficiency, consistency, and resilience.",
       freeInsights: [
-        "Core structures likely exist but may be fragmented.",
-        "Some operational drag may exist in workflows.",
-        "Incremental improvements could unlock significant value.",
+        "Core structures likely exist but may not yet be fully embedded.",
+        "Some friction may still appear in handoffs, service access, or process execution.",
+        "Targeted improvements could strengthen scalability and operational confidence.",
       ],
     };
   }
 
   return {
-    label: "Operationally Strong",
+    label: "Operationally Mature",
     summary:
-      "Your HR operations appear relatively well structured and capable of supporting organisational growth.",
-    freeInsights: [
-      "Processes appear relatively structured.",
-      "Operational governance likely exists.",
-      "Targeted improvements may further optimise delivery.",
-    ],
-  };
-}
+      "HR operations appear well structured and capable of supporting organisational growth. Continued refinement can help maintain efficiency and keep HR aligned with business priorities.",
+      freeInsights: [
+        "Processes appear relatively well established and consistent.",
+        "Operational governance is likely supporting delivery effectively.",
+        "Targeted optimisation may still unlock additional value over time.",
+      ],
+    };
+  }
 
 function getDimensionScores(answers: Record<number, AnswerValue | undefined>) {
   return questions.map((q) => ({
@@ -606,10 +606,11 @@ export default function DiagnosticPage() {
 
             {lowestDimensions.length > 0 && (
               <div className="mb-10">
-                <h3 className="mb-3 text-lg font-semibold">Lowest scoring areas</h3>
+                <h3 className="mb-3 text-lg font-semibold">Areas likely to benefit from attention</h3>
 
                 <p className="mb-4 text-sm text-slate-600">
-                  These dimensions are the most likely sources of operational friction.
+                  These dimensions may be the most likely sources of operational friction
+                  or inconsistency at the moment.
                 </p>
 
                 <div className="space-y-2">
@@ -642,30 +643,24 @@ export default function DiagnosticPage() {
 
             <div className="mt-8 rounded-lg bg-slate-50 p-6">
               <h4 className="mb-2 text-lg font-semibold">
-                Want a short interpretation of your results?
+                Would a short interpretation of your results be helpful?
               </h4>
 
               <p className="mb-4 text-sm text-slate-600">
-                If you&apos;d like help interpreting what this score might mean for your
-                organisation, we can walk through the diagnostic together and identify
-                practical next steps.
+                If helpful, we can walk through your diagnostic results together and
+                discuss what they may mean for your organisation&apos;s HR operations.
+                This is a free 20-minute conversation with no obligation.
               </p>
 
               <Link
                 href="/contact"
                 className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
               >
-                Request a 20-minute interpretation
+                Book a free 20-minute interpretation
               </Link>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/contact"
-                className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
-              >
-                Discuss your diagnostic
-              </Link>
               <Link
                 href="/services/hr-foundations-sprint"
                 className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
