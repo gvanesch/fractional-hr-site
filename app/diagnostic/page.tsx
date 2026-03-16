@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { getSupabaseClient } from "../../lib/supabase";
 
 type AnswerValue = 1 | 2 | 3 | 4 | 5;
@@ -227,6 +227,8 @@ export default function DiagnosticPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [submitError, setSubmitError] = useState("");
 
+  const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
   const answeredCount = useMemo(
     () => Object.values(answers).filter(Boolean).length,
     [answers]
@@ -261,14 +263,43 @@ export default function DiagnosticPage() {
 
   const lowestDimensions = dimensions.slice(0, 3);
 
+  function scrollToNextQuestion(updatedAnswers: Record<number, AnswerValue | undefined>) {
+    const nextQuestion = questions.find((question) => !updatedAnswers[question.id]);
+
+    if (!nextQuestion) {
+      return;
+    }
+
+    const nextElement = questionRefs.current[nextQuestion.id];
+
+    if (!nextElement) {
+      return;
+    }
+
+    const headerOffset = 140;
+    const elementTop = nextElement.getBoundingClientRect().top + window.scrollY;
+    const targetTop = Math.max(elementTop - headerOffset, 0);
+
+    window.scrollTo({
+      top: targetTop,
+      behavior: "smooth",
+    });
+  }
+
   function updateAnswer(questionId: number, value: AnswerValue) {
-    setAnswers((prev) => ({
-      ...prev,
+    const updatedAnswers = {
+      ...answers,
       [questionId]: value,
-    }));
+    };
+
+    setAnswers(updatedAnswers);
     setShowResults(false);
     setSubmitError("");
     setSaveStatus("idle");
+
+    window.setTimeout(() => {
+      scrollToNextQuestion(updatedAnswers);
+    }, 120);
   }
 
   async function calculateScore() {
@@ -358,6 +389,8 @@ export default function DiagnosticPage() {
     setShowResults(false);
     setSaveStatus("idle");
     setSubmitError("");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -479,7 +512,13 @@ export default function DiagnosticPage() {
 
         <div className="space-y-8">
           {questions.map((q) => (
-            <div key={q.id} className="rounded-lg bg-white p-6 shadow-sm">
+            <div
+              key={q.id}
+              ref={(element) => {
+                questionRefs.current[q.id] = element;
+              }}
+              className="rounded-lg bg-white p-6 shadow-sm"
+            >
               <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
                 {q.dimension}
               </p>
