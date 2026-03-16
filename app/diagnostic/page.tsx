@@ -464,16 +464,16 @@ export default function DiagnosticPage() {
           </div>
         </div>
 
-        <div className="mb-10">
+        <div className="sticky top-20 z-40 mb-10 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
           <div className="h-3 overflow-hidden rounded-full bg-slate-200">
             <div
-              className="h-full bg-[#1E6FD9]"
+              className="h-full bg-[#1E6FD9] transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
 
           <p className="mt-2 text-sm text-slate-600">
-            {answeredCount} / {questions.length} questions answered
+            {answeredCount} / {questions.length} questions answered ({progress}%)
           </p>
         </div>
 
