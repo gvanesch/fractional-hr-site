@@ -167,29 +167,10 @@ function scoreToBand(score: number): ResultBand {
 }
 
 function getDimensionScores(answers: Record<number, AnswerValue | undefined>) {
-  const groups: { label: string; ids: number[] }[] = [
-    { label: "Process clarity", ids: [1] },
-    { label: "Consistency", ids: [2] },
-    { label: "Service access", ids: [3] },
-    { label: "Ownership", ids: [4] },
-    { label: "Onboarding", ids: [5] },
-    { label: "Technology alignment", ids: [6] },
-    { label: "Knowledge and self-service", ids: [7] },
-    { label: "Operational capacity", ids: [8] },
-    { label: "Data and handoffs", ids: [9] },
-    { label: "Change resilience", ids: [10] },
-  ];
-
-  return groups.map((group) => {
-    const values: number[] = group.ids.map((id) => Number(answers[id] ?? 0));
-    const total = values.reduce((sum: number, value: number) => sum + value, 0);
-    const average = total / values.length;
-
-    return {
-      label: group.label,
-      score: Math.round(((average - 1) / 4) * 100),
-    };
-  });
+  return questions.map((q) => ({
+    label: q.dimension,
+    score: Number(answers[q.id] ?? 0),
+  }));
 }
 
 function getOrCreateBrowserToken(): string {
@@ -522,6 +503,7 @@ export default function DiagnosticPage() {
               <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
                 {q.dimension}
               </p>
+
               <p className="mb-4 font-medium text-slate-800">{q.text}</p>
 
               <div className="space-y-2">
@@ -623,7 +605,7 @@ export default function DiagnosticPage() {
                       className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
                     >
                       <span>{dimension.label}</span>
-                      <span className="font-medium">{dimension.score}/100</span>
+                      <span className="font-medium">{dimension.score} / 5</span>
                     </div>
                   ))}
                 </div>
