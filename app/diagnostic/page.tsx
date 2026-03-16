@@ -572,33 +572,47 @@ export default function DiagnosticPage() {
 
         {showResults && score !== null && band && (
           <div className="mt-16 rounded-lg bg-white p-8 shadow">
-            <h2 className="mb-4 text-2xl font-semibold">
-              Your HR Operations Score: {score} / 100
+            <h2 className="mb-2 text-2xl font-semibold">
+              Your HR Operations Maturity Score: {score} / 100
             </h2>
 
-            <p className="mb-2 text-lg font-medium">{band.label}</p>
+            <p className="mb-1 text-lg font-medium text-[#1E6FD9]">{band.label}</p>
 
             <p className="mb-6 text-slate-700">{band.summary}</p>
 
-            <ul className="space-y-2 text-slate-700">
-              {band.freeInsights.map((insight) => (
-                <li key={insight}>• {insight}</li>
-              ))}
-            </ul>
+            <h3 className="mb-4 text-lg font-semibold">Operational Profile</h3>
+
+            <div className="mb-10 space-y-3">
+              {dimensions.map((dimension) => {
+                const percent = (dimension.score / 5) * 100;
+
+                return (
+                  <div key={dimension.label}>
+                    <div className="mb-1 flex justify-between text-sm text-slate-700">
+                      <span>{dimension.label}</span>
+                      <span>{dimension.score} / 5</span>
+                    </div>
+
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full bg-[#1E6FD9]"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             {lowestDimensions.length > 0 && (
-              <div className="mt-8">
-                <h3 className="mb-3 text-lg font-semibold text-slate-950">
-                  Lowest-scoring areas
-                </h3>
+              <div className="mb-10">
+                <h3 className="mb-3 text-lg font-semibold">Lowest scoring areas</h3>
 
                 <p className="mb-4 text-sm text-slate-600">
-                  These area scores reflect the individual question responses for each
-                  topic. Your overall HR Operations Score is calculated across all 10
-                  questions.
+                  These dimensions are the most likely sources of operational friction.
                 </p>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {lowestDimensions.map((dimension) => (
                     <div
                       key={dimension.label}
@@ -624,6 +638,25 @@ export default function DiagnosticPage() {
                   Your result has been calculated, but the submission could not be saved.
                 </p>
               )}
+            </div>
+
+            <div className="mt-8 rounded-lg bg-slate-50 p-6">
+              <h4 className="mb-2 text-lg font-semibold">
+                Want a short interpretation of your results?
+              </h4>
+
+              <p className="mb-4 text-sm text-slate-600">
+                If you&apos;d like help interpreting what this score might mean for your
+                organisation, we can walk through the diagnostic together and identify
+                practical next steps.
+              </p>
+
+              <Link
+                href="/contact"
+                className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
+              >
+                Request a 20-minute interpretation
+              </Link>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-4">
