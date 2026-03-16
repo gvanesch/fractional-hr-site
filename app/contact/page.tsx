@@ -6,7 +6,38 @@ export const metadata: Metadata = {
     "Contact Greg van Esch to discuss HR operations advisory, HR technology transformation, onboarding automation, and service delivery improvement.",
 };
 
-export default function ContactPage() {
+type ContactPageProps = {
+  searchParams?: Promise<{
+    topic?: string;
+    source?: string;
+  }>;
+};
+
+export default async function ContactPage({ searchParams }: ContactPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  const topicParam = resolvedSearchParams?.topic;
+  const sourceParam = resolvedSearchParams?.source;
+
+  const isDiagnosticJourney =
+    topicParam === "health-check" || sourceParam === "diagnostic";
+
+  const defaultTopic = isDiagnosticJourney
+    ? "HR Operations Health Check"
+    : "HR Operations Advisory";
+
+  const messagePlaceholder = isDiagnosticJourney
+    ? "Briefly describe any questions you have about your diagnostic result or the HR operational challenges you would like to explore."
+    : "Briefly describe your organisation or challenge.";
+
+  const introText = isDiagnosticJourney
+    ? "If you have completed the HR Operations Health Check and would like to discuss your result, feel free to continue here."
+    : "If you are exploring HR operations advisory, HR technology transformation, or building stronger HR infrastructure, feel free to get in touch.";
+
+  const subject = isDiagnosticJourney
+    ? "New HR Operations Health Check enquiry from vanesch.uk"
+    : "New enquiry from vanesch.uk";
+
   return (
     <>
       <section className="brand-hero">
@@ -15,8 +46,7 @@ export default function ContactPage() {
             <p className="brand-kicker">Contact</p>
             <h1 className="brand-heading-xl mt-3">Start a conversation</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              If you are exploring HR operations advisory, HR technology transformation, or
-              building stronger HR infrastructure, feel free to get in touch.
+              {introText}
             </p>
           </div>
         </div>
@@ -36,15 +66,16 @@ export default function ContactPage() {
                   name="access_key"
                   value="7788dde8-752d-47d1-afd8-41937cd93897"
                 />
-                <input
-                  type="hidden"
-                  name="subject"
-                  value="New enquiry from vanesch.uk"
-                />
+                <input type="hidden" name="subject" value={subject} />
                 <input
                   type="hidden"
                   name="redirect"
                   value="https://vanesch.uk/contact"
+                />
+                <input
+                  type="hidden"
+                  name="source"
+                  value={sourceParam ?? "website"}
                 />
 
                 <div>
@@ -92,8 +123,9 @@ export default function ContactPage() {
                   <select
                     name="topic"
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
-                    defaultValue="HR Operations Advisory"
+                    defaultValue={defaultTopic}
                   >
+                    <option>HR Operations Health Check</option>
                     <option>HR Operations Advisory</option>
                     <option>HR Technology Transformation</option>
                     <option>HR Foundations for Growing Companies</option>
@@ -110,7 +142,7 @@ export default function ContactPage() {
                     name="message"
                     required
                     rows={6}
-                    placeholder="Briefly describe your organisation or challenge."
+                    placeholder={messagePlaceholder}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
@@ -126,16 +158,16 @@ export default function ContactPage() {
 
             <div className="space-y-8">
               <div className="brand-surface-soft rounded-2xl p-6 sm:p-8">
-                <h2 className="brand-heading-md text-slate-900">Contact Information</h2>
+                <h2 className="brand-heading-md text-slate-900">
+                  Contact Information
+                </h2>
 
                 <div className="mt-6 space-y-5 text-slate-700">
                   <div>
                     <p className="text-sm uppercase tracking-wider text-slate-500">
                       Location
                     </p>
-                    <p className="mt-1 text-lg">
-                      Didcot, Oxfordshire, United Kingdom
-                    </p>
+                    <p className="mt-1 text-lg">Oxford, United Kingdom</p>
                   </div>
 
                   <div>
@@ -143,7 +175,8 @@ export default function ContactPage() {
                       Engagement
                     </p>
                     <p className="mt-1 text-lg leading-8">
-                      Remote advisory, transformation programmes, and selected on-site engagements.
+                      Remote advisory, transformation programmes, and selected
+                      on-site engagements.
                     </p>
                   </div>
                 </div>
@@ -151,10 +184,10 @@ export default function ContactPage() {
 
               <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
                 <iframe
-                  src="https://www.google.com/maps?q=Didcot,Oxfordshire&output=embed"
+                  src="https://www.google.com/maps?q=Oxford,United%20Kingdom&output=embed"
                   className="h-[320px] w-full border-0"
                   loading="lazy"
-                  title="Didcot map"
+                  title="Oxford map"
                 />
               </div>
             </div>

@@ -5,6 +5,7 @@ export default function DiagnosticInterpretationPage() {
     <main className="bg-[#F4F6FA] py-20">
       <div className="mx-auto max-w-3xl px-6">
         <div className="rounded-[1.5rem] bg-white p-8 shadow-sm">
+
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
             Diagnostic interpretation
           </p>
@@ -14,10 +15,10 @@ export default function DiagnosticInterpretationPage() {
           </h1>
 
           <p className="mb-6 text-lg text-slate-700">
-            Thanks for completing the HR Operations Health Check. This short
+            Thank you for completing the HR Operations Health Check. This short
             conversation is designed to help interpret your result, highlight
-            likely sources of operational friction, and discuss practical next
-            steps.
+            potential sources of operational friction, and discuss practical
+            next steps for strengthening HR operations.
           </p>
 
           <div className="mb-8 rounded-xl bg-slate-50 p-5">
@@ -39,18 +40,18 @@ export default function DiagnosticInterpretationPage() {
 
           <div className="mb-8 rounded-xl border border-slate-200 p-5">
             <h2 className="mb-3 text-lg font-semibold text-slate-900">
-              Booking options
+              Continue your enquiry
             </h2>
 
             <p className="mb-4 text-slate-700">
-              You can continue to the enquiry form now. Later, this page can be
-              upgraded to connect directly to a calendar booking tool such as
-              Calendly or Microsoft Bookings.
+              Continue to the enquiry form and we will arrange a short call to
+              walk through your diagnostic results and discuss possible next steps.
             </p>
 
             <div className="flex flex-wrap gap-4">
+
               <Link
-                href="/contact"
+                href="/contact?topic=health-check&source=diagnostic"
                 className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
               >
                 Continue to enquiry form
@@ -62,13 +63,10 @@ export default function DiagnosticInterpretationPage() {
               >
                 Back to diagnostic
               </Link>
+
             </div>
           </div>
 
-          <div className="text-sm text-slate-600">
-            Over time, this page can be upgraded to route directly into a booking
-            calendar and attach diagnostic context automatically.
-          </div>
         </div>
       </div>
     </main>
