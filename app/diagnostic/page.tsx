@@ -570,6 +570,13 @@ export default function DiagnosticPage() {
                 <h3 className="mb-3 text-lg font-semibold text-slate-950">
                   Lowest-scoring areas
                 </h3>
+
+                <p className="mb-4 text-sm text-slate-600">
+                  These area scores reflect the individual question responses for each
+                  topic. Your overall HR Operations Score is calculated across all 10
+                  questions.
+                </p>
+
                 <div className="space-y-3">
                   {lowestDimensions.map((dimension) => (
                     <div
