@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseClient } from "../../lib/supabase";
 import {
+  buildDiagnosticState,
   questions,
   scoreToBand,
   getDimensionScores,
@@ -11,8 +12,25 @@ import {
   calculatePercentageScore,
   type AnswerValue,
 } from "../../lib/diagnostic";
+import {
+  saveDiagnosticState,
+  clearDiagnosticState,
+} from "../../lib/diagnostic-storage";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+type DiagnosticDraftState = {
+  answers: Record<number, AnswerValue | undefined>;
+  companySize: string;
+  industry: string;
+  role: string;
+  countryRegion: string;
+  email: string;
+  acceptedNotice: boolean;
+  showResults: boolean;
+};
+
+const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
 
 const scaleOptions: { label: string; value: AnswerValue }[] = [
   { label: "Strongly disagree", value: 1 },
@@ -89,8 +107,32 @@ export default function DiagnosticPage() {
   const [showResults, setShowResults] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [submitError, setSubmitError] = useState("");
+  const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
 
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    try {
+      const rawDraft = window.localStorage.getItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
+
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft) as DiagnosticDraftState;
+
+        setAnswers(draft.answers ?? {});
+        setCompanySize(draft.companySize ?? "");
+        setIndustry(draft.industry ?? "");
+        setRole(draft.role ?? "");
+        setCountryRegion(draft.countryRegion ?? "");
+        setEmail(draft.email ?? "");
+        setAcceptedNotice(Boolean(draft.acceptedNotice));
+        setShowResults(Boolean(draft.showResults));
+      }
+    } catch (error) {
+      console.error("Failed to load diagnostic draft:", error);
+    } finally {
+      setHasLoadedDraft(true);
+    }
+  }, []);
 
   const answeredCount = useMemo(
     () => Object.values(answers).filter(Boolean).length,
@@ -122,6 +164,40 @@ export default function DiagnosticPage() {
   }, [answers, allAnswered]);
 
   const lowestDimensions = dimensions.slice(0, 3);
+
+  useEffect(() => {
+    if (!hasLoadedDraft) return;
+
+    const draft: DiagnosticDraftState = {
+      answers,
+      companySize,
+      industry,
+      role,
+      countryRegion,
+      email,
+      acceptedNotice,
+      showResults,
+    };
+
+    try {
+      window.localStorage.setItem(
+        DIAGNOSTIC_DRAFT_STORAGE_KEY,
+        JSON.stringify(draft)
+      );
+    } catch (error) {
+      console.error("Failed to save diagnostic draft:", error);
+    }
+  }, [
+    answers,
+    companySize,
+    industry,
+    role,
+    countryRegion,
+    email,
+    acceptedNotice,
+    showResults,
+    hasLoadedDraft,
+  ]);
 
   function scrollToNextQuestion(updatedAnswers: Record<number, AnswerValue | undefined>) {
     const nextQuestion = questions.find((question) => !updatedAnswers[question.id]);
@@ -232,6 +308,12 @@ export default function DiagnosticPage() {
       );
     }
 
+    try {
+      saveDiagnosticState(buildDiagnosticState(answers));
+    } catch (error) {
+      console.error("Failed to save diagnostic interpretation state:", error);
+    }
+
     setShowResults(true);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
@@ -247,6 +329,13 @@ export default function DiagnosticPage() {
     setShowResults(false);
     setSaveStatus("idle");
     setSubmitError("");
+
+    try {
+      window.localStorage.removeItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
+      clearDiagnosticState();
+    } catch (error) {
+      console.error("Failed to clear diagnostic storage:", error);
+    }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
