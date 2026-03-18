@@ -169,7 +169,9 @@ function buildEmailHtml(params: {
     const risksHtml = buildListHtml(advisorBrief.likelyOperationalRisks ?? []);
     const promptsHtml = buildListHtml(advisorBrief.discussionPrompts ?? []);
     const focusAreasHtml = buildListHtml(advisorBrief.suggestedFocusAreas ?? []);
-    const frictionPointsHtml = buildListHtml(advisorBrief.likelyFrictionPoints ?? []);
+    const frictionPointsHtml = buildListHtml(
+      advisorBrief.likelyFrictionPoints ?? []
+    );
     const businessImplicationsHtml = buildListHtml(
       advisorBrief.businessImplications ?? []
     );
@@ -230,10 +232,14 @@ function buildEmailHtml(params: {
       </h3>
 
       <p style="margin: 0 0 8px; color: #334155;">
-        <strong>Headline:</strong> ${escapeHtml(advisorBrief.headline || "Not available")}
+        <strong>Headline:</strong> ${escapeHtml(
+          advisorBrief.headline || "Not available"
+        )}
       </p>
       <p style="margin: 0 0 20px; color: #334155; line-height: 1.7;">
-        ${escapeHtml(advisorBrief.overallAssessment || "No overall assessment available.")}
+        ${escapeHtml(
+          advisorBrief.overallAssessment || "No overall assessment available."
+        )}
       </p>
 
       ${
@@ -501,12 +507,7 @@ export async function POST(request: Request) {
     if (resendResponse.error) {
       console.error("Resend error:", resendResponse.error);
       return NextResponse.json(
-        {
-          error:
-            resendResponse.error.message ||
-            "Failed to send enquiry email.",
-          resendError: resendResponse.error,
-        },
+        { error: "Failed to send enquiry email." },
         { status: 500 }
       );
     }
@@ -523,9 +524,6 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Unexpected error sending enquiry.";
 
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
