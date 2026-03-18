@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseClient } from "../../lib/supabase";
 import {
   buildDiagnosticState,
   questions,
@@ -72,27 +71,6 @@ const roleOptions = [
   "Consultant / Advisor",
   "Other",
 ];
-
-function getOrCreateBrowserToken(): string {
-  const storageKey = "diagnostic_browser_token";
-  const existing = window.localStorage.getItem(storageKey);
-
-  if (existing) {
-    return existing;
-  }
-
-  const newToken = `${crypto.randomUUID()}-${Date.now()}`;
-  window.localStorage.setItem(storageKey, newToken);
-  return newToken;
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 export default function DiagnosticPage() {
   const [answers, setAnswers] = useState<Record<number, AnswerValue | undefined>>(
@@ -246,72 +224,15 @@ export default function DiagnosticPage() {
     setSaveStatus("saving");
     setSubmitError("");
 
-    const dimensionMap = getDimensionScores(answers).reduce<Record<string, number>>(
-      (acc, item) => {
-        acc[item.label] = item.score;
-        return acc;
-      },
-      {}
-    );
-
-    let abuseToken: string | null = null;
-
-    try {
-      const browserToken = getOrCreateBrowserToken();
-      const dailySalt = new Date().toISOString().slice(0, 10);
-      abuseToken = await sha256Hex(`${browserToken}:${dailySalt}`);
-    } catch (error) {
-      console.error("Abuse token generation failed:", error);
-    }
-
-    const payload = {
-      company_size: companySize,
-      industry,
-      role,
-      country_region: countryRegion || null,
-      email: email || null,
-      score,
-      band: band.label,
-      process_clarity_score: dimensionMap["Process clarity"],
-      consistency_score: dimensionMap["Consistency"],
-      service_access_score: dimensionMap["Service access"],
-      ownership_score: dimensionMap["Ownership"],
-      onboarding_score: dimensionMap["Onboarding"],
-      technology_alignment_score: dimensionMap["Technology alignment"],
-      knowledge_self_service_score: dimensionMap["Knowledge and self-service"],
-      operational_capacity_score: dimensionMap["Operational capacity"],
-      data_handoffs_score: dimensionMap["Data and handoffs"],
-      change_resilience_score: dimensionMap["Change resilience"],
-      answers,
-      abuse_token: abuseToken,
-    };
-
-    try {
-      const supabase = getSupabaseClient();
-
-      const { error } = await supabase.from("diagnostic_submissions").insert(payload);
-
-      if (error) {
-        console.error("Supabase insert error:", error);
-        setSaveStatus("error");
-        setSubmitError(
-          "Your result has been calculated, but the submission could not be saved. Please check your Supabase configuration and try again."
-        );
-      } else {
-        setSaveStatus("saved");
-      }
-    } catch (error) {
-      console.error("Supabase client error:", error);
-      setSaveStatus("error");
-      setSubmitError(
-        "Your result has been calculated, but the submission could not be saved. Please check your Supabase configuration and try again."
-      );
-    }
-
     try {
       saveDiagnosticState(buildDiagnosticState(answers));
+      setSaveStatus("saved");
     } catch (error) {
       console.error("Failed to save diagnostic interpretation state:", error);
+      setSaveStatus("error");
+      setSubmitError(
+        "Your result has been calculated, but local saving failed in this browser. Please try again."
+      );
     }
 
     setShowResults(true);
@@ -598,13 +519,12 @@ export default function DiagnosticPage() {
             <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
               {saveStatus === "saved" && (
                 <p>
-                  Your result has been saved and may be used in aggregated or anonymised
-                  benchmarking analysis.
+                  Your result has been saved locally in this browser so you can continue to the interpretation and enquiry flow.
                 </p>
               )}
               {saveStatus === "error" && (
                 <p>
-                  Your result has been calculated, but the submission could not be saved.
+                  Your result has been calculated, but local saving failed in this browser.
                 </p>
               )}
             </div>

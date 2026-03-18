@@ -484,7 +484,7 @@ export async function POST(request: Request) {
         ? `${subjectPrefix} – ${result.band.label} (${result.score}/100)`
         : subjectPrefix;
 
-    const { error } = await resend.emails.send({
+    const resendResponse = await resend.emails.send({
       from: process.env.CONTACT_FROM_EMAIL,
       to: process.env.CONTACT_TO_EMAIL,
       replyTo: body.email,
@@ -498,19 +498,33 @@ export async function POST(request: Request) {
       }),
     });
 
-    if (error) {
-      console.error("Resend error:", error);
+    if (resendResponse.error) {
+      console.error("Resend error:", resendResponse.error);
       return NextResponse.json(
-        { error: "Failed to send enquiry email." },
+        {
+          error:
+            resendResponse.error.message ||
+            "Failed to send enquiry email.",
+          resendError: resendResponse.error,
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ ok: true, submissionId, advisorUrl });
+    return NextResponse.json({
+      ok: true,
+      submissionId,
+      advisorUrl,
+      resendId: resendResponse.data?.id ?? null,
+    });
   } catch (error) {
     console.error("Contact API error:", error);
+
+    const message =
+      error instanceof Error ? error.message : "Unexpected error sending enquiry.";
+
     return NextResponse.json(
-      { error: "Unexpected error sending enquiry." },
+      { error: message },
       { status: 500 }
     );
   }
