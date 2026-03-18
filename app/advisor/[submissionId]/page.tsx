@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
+export const runtime = "edge";
+
 type AdvisorBrief = {
   headline?: string;
   overallAssessment?: string;
@@ -82,7 +84,7 @@ function DetailRow({
   return (
     <div className="grid gap-1 sm:grid-cols-[140px_1fr] sm:gap-4">
       <dt className="font-medium text-slate-600">{label}</dt>
-      <dd className="text-slate-800 break-words">{value || "—"}</dd>
+      <dd className="break-words text-slate-800">{value || "—"}</dd>
     </div>
   );
 }
