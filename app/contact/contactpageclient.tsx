@@ -1,6 +1,35 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { loadDiagnosticState } from "../../lib/diagnostic-storage";
+
+type DiagnosticDraftState = {
+  answers: Record<number, 1 | 2 | 3 | 4 | 5 | undefined>;
+  companySize: string;
+  industry: string;
+  role: string;
+  countryRegion: string;
+  email: string;
+  acceptedNotice: boolean;
+  showResults: boolean;
+};
+
+const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
+
+function loadDiagnosticDraft(): DiagnosticDraftState | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+
+    return JSON.parse(raw) as DiagnosticDraftState;
+  } catch (error) {
+    console.error("Failed to load diagnostic draft:", error);
+    return null;
+  }
+}
 
 export default function ContactPageClient() {
   const searchParams = useSearchParams();
@@ -23,9 +52,82 @@ export default function ContactPageClient() {
     ? "If you have completed the HR Operations Health Check and would like to discuss your result, feel free to continue here."
     : "If you are exploring HR operations advisory, HR technology transformation, or building stronger HR infrastructure, feel free to get in touch.";
 
-  const subject = isDiagnosticJourney
-    ? "New HR Operations Health Check enquiry from vanesch.uk"
-    : "New enquiry from vanesch.uk";
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+
+    setIsSubmitting(true);
+    setStatus("idle");
+
+    const formData = new FormData(form);
+
+    const payload: {
+      name: FormDataEntryValue | null;
+      email: FormDataEntryValue | null;
+      company: FormDataEntryValue | null;
+      topic: FormDataEntryValue | null;
+      message: FormDataEntryValue | null;
+      source: string;
+      diagnosticAnswers?: ReturnType<typeof loadDiagnosticState> extends infer T
+        ? T extends { answers: infer A }
+          ? A
+          : never
+        : never;
+      companySize?: string;
+      industry?: string;
+      role?: string;
+      countryRegion?: string;
+    } = {
+      name: formData.get("name"),
+      email: formData.get("email"),
+      company: formData.get("company"),
+      topic: formData.get("topic"),
+      message: formData.get("message"),
+      source: sourceParam ?? "website",
+    };
+
+    if (isDiagnosticJourney) {
+      const saved = loadDiagnosticState();
+      const draft = loadDiagnosticDraft();
+
+      if (saved) {
+        payload.diagnosticAnswers = saved.answers;
+      }
+
+      if (draft) {
+        payload.companySize = draft.companySize || undefined;
+        payload.industry = draft.industry || undefined;
+        payload.role = draft.role || undefined;
+        payload.countryRegion = draft.countryRegion || undefined;
+      }
+    }
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to submit");
+      }
+
+      setStatus("success");
+      form.reset();
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -45,28 +147,7 @@ export default function ContactPageClient() {
         <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
             <div className="brand-surface-soft rounded-2xl p-6 sm:p-8">
-              <form
-                action="https://api.web3forms.com/submit"
-                method="POST"
-                className="space-y-6"
-              >
-                <input
-                  type="hidden"
-                  name="access_key"
-                  value="7788dde8-752d-47d1-afd8-41937cd93897"
-                />
-                <input type="hidden" name="subject" value={subject} />
-                <input
-                  type="hidden"
-                  name="redirect"
-                  value="https://vanesch.uk/contact"
-                />
-                <input
-                  type="hidden"
-                  name="source"
-                  value={sourceParam ?? "website"}
-                />
-
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-2 block text-base font-medium text-slate-700">
                     Name
@@ -76,7 +157,7 @@ export default function ContactPageClient() {
                     name="name"
                     required
                     placeholder="Your name"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   />
                 </div>
 
@@ -89,7 +170,7 @@ export default function ContactPageClient() {
                     name="email"
                     required
                     placeholder="you@company.com"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   />
                 </div>
 
@@ -101,7 +182,7 @@ export default function ContactPageClient() {
                     type="text"
                     name="company"
                     placeholder="Company name"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   />
                 </div>
 
@@ -111,8 +192,8 @@ export default function ContactPageClient() {
                   </label>
                   <select
                     name="topic"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
                     defaultValue={defaultTopic}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   >
                     <option>HR Operations Health Check</option>
                     <option>HR Operations Advisory</option>
@@ -132,16 +213,29 @@ export default function ContactPageClient() {
                     required
                     rows={6}
                     placeholder={messagePlaceholder}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   />
                 </div>
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="brand-button-primary w-full rounded-xl py-3 text-base font-medium"
                 >
-                  Send Enquiry
+                  {isSubmitting ? "Sending..." : "Send Enquiry"}
                 </button>
+
+                {status === "success" && (
+                  <p className="text-sm text-green-600">
+                    Your message has been sent successfully.
+                  </p>
+                )}
+
+                {status === "error" && (
+                  <p className="text-sm text-red-600">
+                    Something went wrong. Please try again.
+                  </p>
+                )}
               </form>
             </div>
 
