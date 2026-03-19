@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { calculateDiagnosticResult } from "../../../lib/diagnostic";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 type SubmissionRow = {
