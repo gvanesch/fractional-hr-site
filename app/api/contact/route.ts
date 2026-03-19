@@ -11,13 +11,6 @@ import {
 
 export const runtime = "edge";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 type ContactRequestBody = {
   name: string;
   email: string;
@@ -48,6 +41,31 @@ function isValidEmail(email: string): boolean {
 function buildAdvisorUrl(submissionId: string): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   return `${siteUrl.replace(/\/$/, "")}/advisor/${submissionId}`;
+}
+
+function getResendClient(): Resend {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY environment variable.");
+  }
+
+  return new Resend(apiKey);
+}
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.");
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
 }
 
 function getDimensionInsight(label: string): string {
@@ -83,6 +101,7 @@ async function createLeadSubmission(params: {
   advisorBrief: AdvisorBrief | null;
 }) {
   const { body, result, advisorBrief } = params;
+  const supabase = getSupabaseClient();
 
   const rowToInsert = {
     contact_name: body.name,
@@ -442,13 +461,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!process.env.RESEND_API_KEY) {
-      return NextResponse.json(
-        { error: "Missing RESEND_API_KEY environment variable." },
-        { status: 500 }
-      );
-    }
-
     if (!process.env.CONTACT_TO_EMAIL) {
       return NextResponse.json(
         { error: "Missing CONTACT_TO_EMAIL environment variable." },
@@ -459,13 +471,6 @@ export async function POST(request: Request) {
     if (!process.env.CONTACT_FROM_EMAIL) {
       return NextResponse.json(
         { error: "Missing CONTACT_FROM_EMAIL environment variable." },
-        { status: 500 }
-      );
-    }
-
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json(
-        { error: "Missing SUPABASE_SERVICE_ROLE_KEY environment variable." },
         { status: 500 }
       );
     }
@@ -493,6 +498,8 @@ export async function POST(request: Request) {
       result && body.source === "diagnostic"
         ? `${subjectPrefix} – ${result.band.label} (${result.score}/100)`
         : subjectPrefix;
+
+    const resend = getResendClient();
 
     const resendResponse = await resend.emails.send({
       from: process.env.CONTACT_FROM_EMAIL,
