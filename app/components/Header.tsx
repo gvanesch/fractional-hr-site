@@ -23,43 +23,43 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="brand-container">
-        <div className="flex items-center justify-between gap-8 py-5">
+        <div className="flex items-center justify-between gap-3 py-3 sm:gap-4 sm:py-4">
           <Link
             href="/"
-            className="flex shrink-0 items-center"
+            className="flex min-w-0 shrink items-center"
             aria-label="Van Esch home"
             onClick={handleCloseMenu}
           >
             <img
               src="/brand/logo-header.svg"
               alt="Van Esch"
-              className="h-auto w-[220px] sm:w-[260px] lg:w-[300px]"
+              className="h-auto w-[120px] max-w-full sm:w-[150px] md:w-[180px] lg:w-[220px] xl:w-[260px]"
             />
           </Link>
 
-          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
+          <nav className="hidden items-center gap-5 text-sm font-medium text-slate-700 lg:flex xl:gap-6">
             {navigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="transition hover:text-[#1E6FD9]"
+                className="whitespace-nowrap transition hover:text-[#1E6FD9]"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/contact"
-              className="brand-button-primary hidden px-4 py-2 text-sm font-semibold md:inline-flex"
+              className="brand-button-primary hidden whitespace-nowrap px-4 py-2 text-sm font-semibold xl:inline-flex"
             >
               Book Diagnostic Conversation
             </Link>
 
             <button
               type="button"
-              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 md:hidden"
+              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 lg:hidden"
               onClick={() => setOpen((prev) => !prev)}
               aria-label="Toggle menu"
               aria-expanded={open}
@@ -70,7 +70,7 @@ export default function Header() {
         </div>
 
         {open ? (
-          <div className="border-t border-slate-200 pb-6 pt-4 md:hidden">
+          <div className="border-t border-slate-200 pb-5 pt-4 lg:hidden">
             <nav className="flex flex-col gap-2">
               {navigation.map((item) => (
                 <Link

@@ -12,9 +12,6 @@ export const metadata: Metadata = {
   },
   description:
     "HR Operations, Service Delivery, and Transformation Advisory for scaling organisations.",
-  icons: {
-    icon: "/favicon.svg",
-  },
   openGraph: {
     title: "Van Esch Advisory",
     description:

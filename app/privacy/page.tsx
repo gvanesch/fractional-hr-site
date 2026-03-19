@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Privacy Policy | Van Esch Advisory Ltd",
   description:
-    "Privacy Policy for vanesch.uk, explaining how personal information is collected, used, stored, and protected.",
+    "Privacy Policy for https://vanesch.uk, explaining how personal information is collected, used, stored, and protected.",
 };
 
 export default function PrivacyPage() {
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
             <h1 className="brand-heading-xl mt-3">Privacy Policy</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               This Privacy Policy explains how personal information may be collected,
-              used, stored, and protected when you visit vanesch.uk, contact me through
+              used, stored, and protected when you visit https://vanesch.uk, contact Van Esch Advisory Ltd through
               the website, or use the HR Operations Health Check.
             </p>
           </div>
@@ -146,7 +146,7 @@ export default function PrivacyPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Like most websites, vanesch.uk may generate technical logs and other
+                  Like most websites, https://vanesch.uk may generate technical logs and other
                   information needed for security, troubleshooting, and performance
                   monitoring.
                 </p>
@@ -250,7 +250,7 @@ export default function PrivacyPage() {
                   </a>
                 </p>
                 <p>
-                  You may also contact Van Esch Advisory using the{" "}
+                  You may also contact Van Esch Advisory Ltd using the{" "}
                   <Link href="/contact" className="brand-link font-medium">
                     website contact form
                   </Link>.

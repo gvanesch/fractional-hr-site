@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Modern Slavery Statement | Van Esch Advisory Ltd",
   description:
-    "Voluntary Modern Slavery Statement for vanesch.uk and Van Esch Advisory Ltd.",
+    "Voluntary Modern Slavery Statement for https://vanesch.uk and Van Esch Advisory Ltd.",
 };
 
 export default function ModernSlaveryPage() {
@@ -15,7 +15,7 @@ export default function ModernSlaveryPage() {
             <p className="brand-kicker">Modern Slavery Statement</p>
             <h1 className="brand-heading-xl mt-3">Modern Slavery Statement</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              This is a voluntary statement setting out Van Esch Advisor Ltd&apos;s approach
+              This is a voluntary statement setting out Van Esch Advisory Ltd&apos;s approach
               to modern slavery, forced labour, and human trafficking in connection
               with the operation of vanesch.uk and related advisory services.
             </p>

@@ -18,7 +18,7 @@ export default function CookiesPage() {
               Cookie Policy
             </h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              This Cookie Policy explains how cookies and similar technologies may be used on vanesch.uk.
+              This Cookie Policy explains how cookies and similar technologies may be used on https://vanesch.uk.
             </p>
           </div>
         </div>
