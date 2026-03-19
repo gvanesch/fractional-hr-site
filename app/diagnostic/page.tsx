@@ -17,6 +17,7 @@ import {
 } from "../../lib/diagnostic-storage";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+type CompletionEmailStatus = "idle" | "sending" | "sent" | "error";
 
 type DiagnosticDraftState = {
   answers: Record<number, AnswerValue | undefined>;
@@ -84,6 +85,8 @@ export default function DiagnosticPage() {
   const [acceptedNotice, setAcceptedNotice] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [completionEmailStatus, setCompletionEmailStatus] =
+    useState<CompletionEmailStatus>("idle");
   const [submitError, setSubmitError] = useState("");
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
 
@@ -177,7 +180,9 @@ export default function DiagnosticPage() {
     hasLoadedDraft,
   ]);
 
-  function scrollToNextQuestion(updatedAnswers: Record<number, AnswerValue | undefined>) {
+  function scrollToNextQuestion(
+    updatedAnswers: Record<number, AnswerValue | undefined>
+  ) {
     const nextQuestion = questions.find((question) => !updatedAnswers[question.id]);
 
     if (!nextQuestion) {
@@ -210,10 +215,50 @@ export default function DiagnosticPage() {
     setShowResults(false);
     setSubmitError("");
     setSaveStatus("idle");
+    setCompletionEmailStatus("idle");
 
     window.setTimeout(() => {
       scrollToNextQuestion(updatedAnswers);
     }, 120);
+  }
+
+  async function sendDiagnosticCompletionEmail() {
+    if (!allAnswered || score === null || !band) {
+      return;
+    }
+
+    if (completionEmailStatus === "sent") {
+      return;
+    }
+
+    setCompletionEmailStatus("sending");
+
+    const response = await fetch("/api/diagnostic-complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        answers,
+        companySize,
+        industry,
+        role,
+        countryRegion,
+        email: email.trim(),
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null;
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error || "Failed to send diagnostic completion email."
+      );
+    }
+
+    setCompletionEmailStatus("sent");
   }
 
   async function calculateScore() {
@@ -235,6 +280,16 @@ export default function DiagnosticPage() {
       );
     }
 
+    try {
+      await sendDiagnosticCompletionEmail();
+    } catch (error) {
+      console.error("Failed to send diagnostic completion email:", error);
+      setCompletionEmailStatus("error");
+      setSubmitError(
+        "Your score has been calculated, but the diagnostic completion notification could not be sent."
+      );
+    }
+
     setShowResults(true);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
@@ -249,6 +304,7 @@ export default function DiagnosticPage() {
     setAcceptedNotice(false);
     setShowResults(false);
     setSaveStatus("idle");
+    setCompletionEmailStatus("idle");
     setSubmitError("");
 
     try {
@@ -285,7 +341,10 @@ export default function DiagnosticPage() {
               </label>
               <select
                 value={companySize}
-                onChange={(e) => setCompanySize(e.target.value)}
+                onChange={(e) => {
+                  setCompanySize(e.target.value);
+                  setCompletionEmailStatus("idle");
+                }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
               >
                 <option value="">Select company size</option>
@@ -303,7 +362,10 @@ export default function DiagnosticPage() {
               </label>
               <select
                 value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
+                onChange={(e) => {
+                  setIndustry(e.target.value);
+                  setCompletionEmailStatus("idle");
+                }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
               >
                 <option value="">Select industry</option>
@@ -321,7 +383,10 @@ export default function DiagnosticPage() {
               </label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => {
+                  setRole(e.target.value);
+                  setCompletionEmailStatus("idle");
+                }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
               >
                 <option value="">Select your role</option>
@@ -340,7 +405,10 @@ export default function DiagnosticPage() {
               <input
                 type="text"
                 value={countryRegion}
-                onChange={(e) => setCountryRegion(e.target.value)}
+                onChange={(e) => {
+                  setCountryRegion(e.target.value);
+                  setCompletionEmailStatus("idle");
+                }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
                 placeholder="Optional"
               />
@@ -353,7 +421,10 @@ export default function DiagnosticPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setCompletionEmailStatus("idle");
+                }}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
                 placeholder="Optional"
               />
@@ -418,7 +489,10 @@ export default function DiagnosticPage() {
             <input
               type="checkbox"
               checked={acceptedNotice}
-              onChange={(e) => setAcceptedNotice(e.target.checked)}
+              onChange={(e) => {
+                setAcceptedNotice(e.target.checked);
+                setCompletionEmailStatus("idle");
+              }}
             />
             <span>
               I understand this tool provides general informational guidance only and
@@ -441,11 +515,14 @@ export default function DiagnosticPage() {
                 !allAnswered ||
                 !acceptedNotice ||
                 !contextComplete ||
-                saveStatus === "saving"
+                saveStatus === "saving" ||
+                completionEmailStatus === "sending"
               }
               className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
             >
-              {saveStatus === "saving" ? "Calculating..." : "Calculate score"}
+              {saveStatus === "saving" || completionEmailStatus === "sending"
+                ? "Calculating..."
+                : "Calculate score"}
             </button>
 
             <button
@@ -517,9 +594,19 @@ export default function DiagnosticPage() {
             )}
 
             <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
-              {saveStatus === "saved" && (
+              {saveStatus === "saved" && completionEmailStatus === "sent" && (
+                <p>
+                  Your result has been saved locally in this browser and your diagnostic completion has been recorded.
+                </p>
+              )}
+              {saveStatus === "saved" && completionEmailStatus === "idle" && (
                 <p>
                   Your result has been saved locally in this browser so you can continue to the interpretation and enquiry flow.
+                </p>
+              )}
+              {saveStatus === "saved" && completionEmailStatus === "error" && (
+                <p>
+                  Your result has been saved locally in this browser, but the diagnostic completion notification could not be sent.
                 </p>
               )}
               {saveStatus === "error" && (
