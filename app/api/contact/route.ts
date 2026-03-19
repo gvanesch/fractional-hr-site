@@ -376,12 +376,16 @@ function buildEmailHtml(params: {
     <div style="font-family: Arial, Helvetica, sans-serif; background: #F8FAFC; padding: 32px;">
       <div style="max-width: 720px; margin: 0 auto; background: #FFFFFF; border-radius: 16px; padding: 32px; border: 1px solid #E2E8F0;">
         <p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #1E6FD9;">
-          Van Esch HR Operations Advisory
+          Van Esch
         </p>
 
-        <h1 style="margin: 0 0 16px; font-size: 28px; line-height: 1.2; color: #0A1628;">
+        <h1 style="margin: 0 0 8px; font-size: 28px; line-height: 1.2; color: #0A1628;">
           New website enquiry
         </h1>
+
+        <p style="margin: 0 0 24px; color: #64748B;">
+          HR Operations &amp; Transformation Advisory
+        </p>
 
         <p style="margin: 0 0 16px; color: #334155;">
           <strong>Submission ID:</strong> ${safeSubmissionId}
