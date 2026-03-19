@@ -3,65 +3,64 @@
 import Link from "next/link";
 import { useState } from "react";
 
+const navigation = [
+  { href: "/services", label: "Services" },
+  { href: "/diagnostic", label: "Diagnostic" },
+  { href: "/approach", label: "Approach" },
+  { href: "/case-studies", label: "Case Studies" },
+  { href: "/about", label: "About" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/contact", label: "Contact" },
+];
+
 export default function Header() {
   const [open, setOpen] = useState(false);
 
+  function handleCloseMenu() {
+    setOpen(false);
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto max-w-7xl px-5 sm:px-6">
-        <div className="flex items-center justify-between py-4">
+      <div className="brand-container">
+        <div className="flex items-center justify-between gap-8 py-5">
           <Link
             href="/"
-            className="text-xl font-semibold tracking-tight text-slate-950"
+            className="flex shrink-0 items-center"
+            aria-label="Van Esch home"
+            onClick={handleCloseMenu}
           >
-            Greg van Esch
+            <img
+              src="/brand/logo-header.svg"
+              alt="Van Esch"
+              className="h-auto w-[220px] sm:w-[260px] lg:w-[300px]"
+            />
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-700 md:flex">
-            <Link href="/services" className="transition hover:text-[#1E6FD9]">
-              Services
-            </Link>
-
-            <Link href="/diagnostic" className="transition hover:text-[#1E6FD9]">
-              Diagnostic
-            </Link>
-
-            <Link href="/approach" className="transition hover:text-[#1E6FD9]">
-              Approach
-            </Link>
-
-            <Link
-              href="/case-studies"
-              className="transition hover:text-[#1E6FD9]"
-            >
-              Case Studies
-            </Link>
-
-            <Link href="/about" className="transition hover:text-[#1E6FD9]">
-              About
-            </Link>
-
-            <Link href="/pricing" className="transition hover:text-[#1E6FD9]">
-              Pricing
-            </Link>
-
-            <Link href="/contact" className="transition hover:text-[#1E6FD9]">
-              Contact
-            </Link>
+          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="transition hover:text-[#1E6FD9]"
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-4">
             <Link
               href="/contact"
-              className="hidden rounded-md bg-[#1E6FD9] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1557AD] md:block"
+              className="brand-button-primary hidden px-4 py-2 text-sm font-semibold md:inline-flex"
             >
               Book Diagnostic Conversation
             </Link>
 
             <button
               type="button"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 md:hidden"
-              onClick={() => setOpen(!open)}
+              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 md:hidden"
+              onClick={() => setOpen((prev) => !prev)}
               aria-label="Toggle menu"
               aria-expanded={open}
             >
@@ -70,75 +69,30 @@ export default function Header() {
           </div>
         </div>
 
-        {open && (
+        {open ? (
           <div className="border-t border-slate-200 pb-6 pt-4 md:hidden">
-            <nav className="flex flex-col gap-4 text-sm font-medium text-slate-700">
-              <Link
-                href="/services"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Services
-              </Link>
-
-              <Link
-                href="/diagnostic"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Diagnostic
-              </Link>
-
-              <Link
-                href="/approach"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Approach
-              </Link>
-
-              <Link
-                href="/case-studies"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Case Studies
-              </Link>
-
-              <Link
-                href="/about"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                About
-              </Link>
-
-              <Link
-                href="/pricing"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Pricing
-              </Link>
+            <nav className="flex flex-col gap-2">
+              {navigation.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={handleCloseMenu}
+                  className="rounded-lg px-2 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-[#1E6FD9]"
+                >
+                  {item.label}
+                </Link>
+              ))}
 
               <Link
                 href="/contact"
-                onClick={() => setOpen(false)}
-                className="transition hover:text-[#1E6FD9]"
-              >
-                Contact
-              </Link>
-
-              <Link
-                href="/contact"
-                onClick={() => setOpen(false)}
-                className="mt-2 rounded-md bg-[#1E6FD9] px-4 py-2 text-center font-semibold text-white"
+                onClick={handleCloseMenu}
+                className="brand-button-primary mt-3 justify-center px-4 py-2 text-sm font-semibold"
               >
                 Book Diagnostic Conversation
               </Link>
             </nav>
           </div>
-        )}
+        ) : null}
       </div>
     </header>
   );
