@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Modern Slavery Statement | Greg van Esch",
+  title: "Modern Slavery Statement | Van Esch Advisory Ltd",
   description:
-    "Voluntary Modern Slavery Statement for vanesch.uk and Greg van Esch HR Operations & Transformation Advisory.",
+    "Voluntary Modern Slavery Statement for vanesch.uk and Van Esch Advisory Ltd.",
 };
 
 export default function ModernSlaveryPage() {
@@ -15,7 +15,7 @@ export default function ModernSlaveryPage() {
             <p className="brand-kicker">Modern Slavery Statement</p>
             <h1 className="brand-heading-xl mt-3">Modern Slavery Statement</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              This is a voluntary statement setting out Greg van Esch&apos;s approach
+              This is a voluntary statement setting out Van Esch Advisor Ltd&apos;s approach
               to modern slavery, forced labour, and human trafficking in connection
               with the operation of vanesch.uk and related advisory services.
             </p>
@@ -33,7 +33,7 @@ export default function ModernSlaveryPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Although Greg van Esch is not currently required by law to publish
+                  Although Van Esch Advisory Ltd is not currently required by law to publish
                   a modern slavery statement, there is a clear commitment to acting
                   ethically, conducting business with integrity, and opposing modern
                   slavery and human trafficking in all forms.
@@ -48,7 +48,7 @@ export default function ModernSlaveryPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  vanesch.uk supports boutique HR operations and transformation
+                  Van Esch Advisory Ltd supports boutique HR operations and transformation
                   advisory services. The business model is low-volume, professional,
                   and service-based, with limited supply-chain complexity compared with
                   larger organisations operating physical production, logistics, or

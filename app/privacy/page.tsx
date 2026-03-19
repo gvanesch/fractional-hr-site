@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Greg van Esch",
+  title: "Privacy Policy | Van Esch Advisory Ltd",
   description:
     "Privacy Policy for vanesch.uk, explaining how personal information is collected, used, stored, and protected.",
 };
@@ -32,8 +32,8 @@ export default function PrivacyPage() {
               <h2 className="brand-heading-md mt-3 text-slate-950">Data controller</h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  This website is operated by Greg van Esch. For the purposes of
-                  applicable data protection law, Greg van Esch acts as the data
+                  This website is operated by Van Esch Advisory Ltd. For the purposes of
+                  applicable data protection law, Van Esch Advisory Ltd acts as the data
                   controller for personal data collected through this website.
                 </p>
               </div>
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
                 What information may be collected
               </h2>
               <div className="brand-body mt-4 space-y-4">
-                <p>Depending on how you use the website, I may collect:</p>
+                <p>Depending on how you use the website, the following may be collected:</p>
                 <ul className="list-disc space-y-2 pl-6">
                   <li>Your name</li>
                   <li>Your email address</li>
@@ -250,7 +250,7 @@ export default function PrivacyPage() {
                   </a>
                 </p>
                 <p>
-                  You may also contact me using the{" "}
+                  You may also contact Van Esch Advisory using the{" "}
                   <Link href="/contact" className="brand-link font-medium">
                     website contact form
                   </Link>.
