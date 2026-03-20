@@ -19,7 +19,7 @@ const commonSigns = [
 export default function GrowingCompaniesPage() {
   return (
     <>
-      <section className="brand-hero pt-24 lg:pt-28">
+      <section className="brand-hero">
         <div className="brand-hero-content mx-auto max-w-7xl px-6 py-24 lg:py-28">
           <div className="max-w-4xl">
             <p className="brand-kicker">Growing Companies & Mid-Market</p>

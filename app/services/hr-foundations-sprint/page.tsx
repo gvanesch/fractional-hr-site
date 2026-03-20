@@ -25,7 +25,7 @@ const idealFor = [
 export default function HRFoundationsSprintPage() {
   return (
     <>
-      <section className="bg-[#123a63] pt-24 text-white lg:pt-28">
+      <section className="bg-[#123a63] text-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">

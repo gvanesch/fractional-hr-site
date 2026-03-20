@@ -44,6 +44,11 @@ body {
   }
 }
 
+.site-header-spacer {
+  height: var(--site-header-height);
+  flex: none;
+}
+
 /* Global layout helpers */
 .brand-container {
   width: 100%;

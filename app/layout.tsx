@@ -19,6 +19,7 @@ export default function RootLayout({
       <body className="bg-[#0A1628] text-white antialiased overflow-x-hidden">
         <div className="min-h-screen flex flex-col">
           <Header />
+          <div className="site-header-spacer" aria-hidden="true" />
 
           <main className="flex-1 w-full overflow-x-hidden">{children}</main>
 
