@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
 import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
@@ -25,6 +23,15 @@ type ContactRequestBody = {
   countryRegion?: string;
 };
 
+type ResendSendResponse = {
+  id?: string;
+  object?: string;
+  error?: {
+    message?: string;
+    name?: string;
+  };
+};
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -41,31 +48,6 @@ function isValidEmail(email: string): boolean {
 function buildAdvisorUrl(submissionId: string): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   return `${siteUrl.replace(/\/$/, "")}/advisor/${submissionId}`;
-}
-
-function getResendClient(): Resend {
-  const apiKey = process.env.RESEND_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing RESEND_API_KEY environment variable.");
-  }
-
-  return new Resend(apiKey);
-}
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.");
-  }
-
-  if (!serviceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey);
 }
 
 function getDimensionInsight(label: string): string {
@@ -101,7 +83,17 @@ async function createLeadSubmission(params: {
   advisorBrief: AdvisorBrief | null;
 }) {
   const { body, result, advisorBrief } = params;
-  const supabase = getSupabaseClient();
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
 
   const rowToInsert = {
     contact_name: body.name,
@@ -121,17 +113,29 @@ async function createLeadSubmission(params: {
     contact_submitted_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
-    .from("diagnostic_submissions")
-    .insert(rowToInsert)
-    .select("submission_id")
-    .single();
+  const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(rowToInsert),
+  });
 
-  if (error) {
-    throw new Error(`Supabase insert failed: ${error.message}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
-  return data.submission_id as string;
+  const data = await response.json();
+
+  if (!Array.isArray(data) || !data[0]?.submission_id) {
+    throw new Error("Supabase insert succeeded but no submission_id returned.");
+  }
+
+  return data[0].submission_id as string;
 }
 
 function buildListHtml(items: string[]): string {
@@ -443,6 +447,71 @@ function buildEmailHtml(params: {
   `;
 }
 
+async function sendEnquiryEmail(params: {
+  body: ContactRequestBody;
+  submissionId: string;
+  advisorUrl: string;
+  result: DiagnosticResult | null;
+  advisorBrief: AdvisorBrief | null;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.CONTACT_FROM_EMAIL;
+  const toEmail = process.env.CONTACT_TO_EMAIL;
+
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY environment variable.");
+  }
+
+  if (!fromEmail) {
+    throw new Error("Missing CONTACT_FROM_EMAIL environment variable.");
+  }
+
+  if (!toEmail) {
+    throw new Error("Missing CONTACT_TO_EMAIL environment variable.");
+  }
+
+  const subjectPrefix =
+    params.body.source === "diagnostic"
+      ? "New HR Operations Diagnostic enquiry"
+      : "New website enquiry";
+
+  const enrichedSubject =
+    params.result && params.body.source === "diagnostic"
+      ? `${subjectPrefix} – ${params.result.band.label} (${params.result.score}/100)`
+      : subjectPrefix;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [toEmail],
+      reply_to: params.body.email,
+      subject: enrichedSubject,
+      html: buildEmailHtml({
+        body: params.body,
+        submissionId: params.submissionId,
+        advisorUrl: params.advisorUrl,
+        result: params.result,
+        advisorBrief: params.advisorBrief,
+      }),
+    }),
+  });
+
+  const result = (await response.json()) as ResendSendResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      result?.error?.message || "Failed to send enquiry email."
+    );
+  }
+
+  return result;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ContactRequestBody;
@@ -461,20 +530,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!process.env.CONTACT_TO_EMAIL) {
-      return NextResponse.json(
-        { error: "Missing CONTACT_TO_EMAIL environment variable." },
-        { status: 500 }
-      );
-    }
-
-    if (!process.env.CONTACT_FROM_EMAIL) {
-      return NextResponse.json(
-        { error: "Missing CONTACT_FROM_EMAIL environment variable." },
-        { status: 500 }
-      );
-    }
-
     const result = body.diagnosticAnswers
       ? calculateDiagnosticResult(body.diagnosticAnswers)
       : null;
@@ -489,45 +544,19 @@ export async function POST(request: Request) {
 
     const advisorUrl = buildAdvisorUrl(submissionId);
 
-    const subjectPrefix =
-      body.source === "diagnostic"
-        ? "New HR Operations Diagnostic enquiry"
-        : "New website enquiry";
-
-    const enrichedSubject =
-      result && body.source === "diagnostic"
-        ? `${subjectPrefix} – ${result.band.label} (${result.score}/100)`
-        : subjectPrefix;
-
-    const resend = getResendClient();
-
-    const resendResponse = await resend.emails.send({
-      from: process.env.CONTACT_FROM_EMAIL,
-      to: process.env.CONTACT_TO_EMAIL,
-      replyTo: body.email,
-      subject: enrichedSubject,
-      html: buildEmailHtml({
-        body,
-        submissionId,
-        advisorUrl,
-        result,
-        advisorBrief,
-      }),
+    const resendResponse = await sendEnquiryEmail({
+      body,
+      submissionId,
+      advisorUrl,
+      result,
+      advisorBrief,
     });
-
-    if (resendResponse.error) {
-      console.error("Resend error:", resendResponse.error);
-      return NextResponse.json(
-        { error: "Failed to send enquiry email." },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({
       ok: true,
       submissionId,
       advisorUrl,
-      resendId: resendResponse.data?.id ?? null,
+      resendId: resendResponse.id ?? null,
     });
   } catch (error) {
     console.error("Contact API error:", error);
