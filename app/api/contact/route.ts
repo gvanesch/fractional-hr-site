@@ -118,7 +118,6 @@ async function createLeadSubmission(params: {
     headers: {
       "Content-Type": "application/json",
       apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
       Prefer: "return=representation",
     },
     body: JSON.stringify(rowToInsert),
