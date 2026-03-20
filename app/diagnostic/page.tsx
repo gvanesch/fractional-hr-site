@@ -195,7 +195,7 @@ export default function DiagnosticPage() {
       return;
     }
 
-    const headerOffset = 140;
+    const headerOffset = 150;
     const elementTop = nextElement.getBoundingClientRect().top + window.scrollY;
     const targetTop = Math.max(elementTop - headerOffset, 0);
 
@@ -217,9 +217,11 @@ export default function DiagnosticPage() {
     setSaveStatus("idle");
     setCompletionEmailStatus("idle");
 
-    window.setTimeout(() => {
-      scrollToNextQuestion(updatedAnswers);
-    }, 120);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        scrollToNextQuestion(updatedAnswers);
+      });
+    });
   }
 
   async function sendDiagnosticCompletionEmail() {
@@ -291,7 +293,12 @@ export default function DiagnosticPage() {
     }
 
     setShowResults(true);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      });
+    });
   }
 
   function resetDiagnostic() {
@@ -319,7 +326,7 @@ export default function DiagnosticPage() {
 
   return (
     <main className="bg-[#F4F6FA] py-20">
-      <div className="mx-auto max-w-4xl px-6">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
         <h1 className="mb-8 text-4xl font-bold text-[#0A1628]">
           HR Operations Health Check
         </h1>
@@ -436,17 +443,19 @@ export default function DiagnosticPage() {
           </div>
         </div>
 
-        <div className="sticky top-20 z-40 mb-10 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-          <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full bg-[#1E6FD9] transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+        <div className="sticky top-24 z-50 mb-10">
+          <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full bg-[#1E6FD9] transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
 
-          <p className="mt-2 text-sm text-slate-600">
-            {answeredCount} / {questions.length} questions answered ({progress}%)
-          </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {answeredCount} / {questions.length} questions answered ({progress}%)
+            </p>
+          </div>
         </div>
 
         <div className="space-y-8">
@@ -456,7 +465,7 @@ export default function DiagnosticPage() {
               ref={(element) => {
                 questionRefs.current[q.id] = element;
               }}
-              className="rounded-lg bg-white p-6 shadow-sm"
+              className="scroll-mt-40 rounded-lg bg-white p-6 shadow-sm"
             >
               <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
                 {q.dimension}
@@ -618,20 +627,20 @@ export default function DiagnosticPage() {
 
             <div className="mt-8 rounded-lg bg-slate-50 p-6">
               <h4 className="mb-2 text-lg font-semibold">
-                Would a short interpretation of your results be helpful?
+                View a deeper interpretation of your result
               </h4>
 
               <p className="mb-4 text-sm text-slate-600">
-                If helpful, we can walk through your diagnostic results together and
-                discuss what they may mean for your organisation&apos;s HR operations.
-                This is a free 20-minute conversation with no obligation.
+                Click through to see a more detailed interpretation of your score and,
+                if helpful, book a free 20-minute conversation to talk through what it
+                may mean for your organisation&apos;s HR operations.
               </p>
 
               <Link
                 href="/contact/diagnostic-interpretation"
                 className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
               >
-                Book a free 20-minute interpretation
+                View detailed interpretation
               </Link>
             </div>
 
