@@ -19,15 +19,10 @@ const commonSigns = [
 export default function GrowingCompaniesPage() {
   return (
     <>
-      {/* HERO */}
-
-      <section className="brand-hero">
+      <section className="brand-hero pt-24 lg:pt-28">
         <div className="brand-hero-content mx-auto max-w-7xl px-6 py-24 lg:py-28">
           <div className="max-w-4xl">
-
-            <p className="brand-kicker">
-              Growing Companies & Mid-Market
-            </p>
+            <p className="brand-kicker">Growing Companies & Mid-Market</p>
 
             <h1 className="brand-heading-xl mt-3">
               HR foundations that support growth — without unnecessary bureaucracy.
@@ -41,10 +36,7 @@ export default function GrowingCompaniesPage() {
               fits the reality of the business and supports sustainable growth.
             </p>
 
-            {/* HERO BUTTONS */}
-
             <div className="mt-8 flex flex-wrap gap-4">
-
               <Link
                 href="/services/hr-chaos-signals"
                 className="rounded-xl border border-white/25 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
@@ -60,27 +52,20 @@ export default function GrowingCompaniesPage() {
               </Link>
 
               <Link
-                href="/contact"
+                href="/contact?topic=HR%20Foundations%20for%20Growing%20Companies"
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
               >
                 Discuss Your Situation
               </Link>
-
             </div>
           </div>
         </div>
       </section>
 
-      {/* COMMON SIGNS */}
-
       <section className="brand-light-section">
         <div className="mx-auto max-w-7xl px-6 py-20">
-
           <div className="max-w-3xl">
-
-            <p className="brand-section-kicker">
-              Common Signs
-            </p>
+            <p className="brand-section-kicker">Common Signs</p>
 
             <h2 className="brand-heading-lg mt-3 text-slate-950">
               Signals that HR foundations may need strengthening
@@ -90,11 +75,9 @@ export default function GrowingCompaniesPage() {
               Many growing companies start to notice operational friction before
               they formally decide to invest in HR infrastructure.
             </p>
-
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-
             {commonSigns.map((sign) => (
               <div
                 key={sign}
@@ -103,30 +86,20 @@ export default function GrowingCompaniesPage() {
                 {sign}
               </div>
             ))}
-
           </div>
-
         </div>
       </section>
 
-      {/* HR FOUNDATIONS EXPLANATION */}
-
       <section className="border-y border-slate-200 bg-white">
-
         <div className="mx-auto max-w-7xl px-6 py-20">
-
           <div className="max-w-4xl">
-
-            <p className="brand-section-kicker">
-              What HR Foundations Means
-            </p>
+            <p className="brand-section-kicker">What HR Foundations Means</p>
 
             <h2 className="brand-heading-lg mt-3 text-slate-950">
               Building HR structure without slowing the business down.
             </h2>
 
             <div className="brand-body brand-body-lg mt-4 space-y-4">
-
               <p>
                 HR foundations are not about creating large HR departments or
                 adding unnecessary process. They are about ensuring the core
@@ -140,26 +113,15 @@ export default function GrowingCompaniesPage() {
                 and leadership gains better visibility and control over how the
                 organisation operates.
               </p>
-
             </div>
-
           </div>
-
         </div>
-
       </section>
 
-      {/* CTA SECTION */}
-
       <section className="brand-dark-section py-20">
-
         <div className="mx-auto max-w-7xl px-6">
-
           <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
-
-            <p className="brand-kicker">
-              Next Step
-            </p>
+            <p className="brand-kicker">Next Step</p>
 
             <h2 className="brand-heading-lg mt-3">
               Want to stabilise HR operations before growth creates bigger problems?
@@ -172,7 +134,6 @@ export default function GrowingCompaniesPage() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-
               <Link
                 href="/services/hr-foundations-sprint"
                 className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
@@ -181,18 +142,14 @@ export default function GrowingCompaniesPage() {
               </Link>
 
               <Link
-                href="/contact"
+                href="/contact?topic=HR%20Foundations%20for%20Growing%20Companies"
                 className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
               >
                 Discuss Your Situation
               </Link>
-
             </div>
-
           </div>
-
         </div>
-
       </section>
     </>
   );

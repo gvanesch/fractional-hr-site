@@ -21,9 +21,9 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="brand-container">
-        <div className="flex items-center justify-between gap-3 py-3 sm:gap-4 sm:py-4">
+        <div className="flex min-h-[var(--site-header-height)] items-center justify-between gap-3 py-3 sm:gap-4 sm:py-4">
           <Link
             href="/"
             className="flex min-w-0 shrink items-center"

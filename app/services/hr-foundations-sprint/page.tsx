@@ -25,7 +25,7 @@ const idealFor = [
 export default function HRFoundationsSprintPage() {
   return (
     <>
-      <section className="bg-[#123a63] text-white">
+      <section className="bg-[#123a63] pt-24 text-white lg:pt-28">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200">
@@ -40,7 +40,7 @@ export default function HRFoundationsSprintPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/contact"
+                href="/contact?topic=HR%20Foundations%20for%20Growing%20Companies"
                 className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
               >
                 Discuss the Sprint
@@ -93,9 +93,9 @@ export default function HRFoundationsSprintPage() {
               wider operational pattern, the diagnostic is a useful first step.
             </p>
             <ul className="mt-4 space-y-2 text-lg leading-8 text-slate-700">
-              <li className="list-disc ml-5">A quick self-assessment of HR operational strain</li>
-              <li className="list-disc ml-5">An immediate score and high-level interpretation</li>
-              <li className="list-disc ml-5">A practical way to gauge whether deeper support may help</li>
+              <li className="ml-5 list-disc">A quick self-assessment of HR operational strain</li>
+              <li className="ml-5 list-disc">An immediate score and high-level interpretation</li>
+              <li className="ml-5 list-disc">A practical way to gauge whether deeper support may help</li>
             </ul>
             <div className="mt-6">
               <Link
@@ -224,7 +224,7 @@ export default function HRFoundationsSprintPage() {
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
-                  href="/contact"
+                  href="/contact?topic=HR%20Foundations%20for%20Growing%20Companies"
                   className="rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-700"
                 >
                   Contact

@@ -24,6 +24,7 @@
   --brand-radius-xl: 1.25rem;
   --brand-radius-2xl: 1.5rem;
   --brand-max-width: 80rem;
+  --site-header-height: 5.5rem;
 }
 
 html {
@@ -35,6 +36,12 @@ body {
   color: var(--foreground);
   font-feature-settings: "liga" 1, "kern" 1;
   text-rendering: optimizeLegibility;
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --site-header-height: 5rem;
+  }
 }
 
 /* Global layout helpers */

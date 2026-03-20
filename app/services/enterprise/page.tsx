@@ -53,7 +53,7 @@ const enterpriseServices = [
 export default function EnterprisePage() {
   return (
     <>
-      <section className="bg-[#0A1628] text-white">
+      <section className="bg-[#0A1628] pt-24 text-white lg:pt-28">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
@@ -71,7 +71,7 @@ export default function EnterprisePage() {
             </p>
             <div className="mt-8">
               <Link
-                href="/contact"
+                href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
                 className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Discuss Your Situation
@@ -127,7 +127,7 @@ export default function EnterprisePage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/contact"
+                href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
                 className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
               >
                 Contact Me

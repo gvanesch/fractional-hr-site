@@ -137,20 +137,22 @@ export default function ServicesPage() {
             {servicePaths.map((path) => (
               <div
                 key={path.title}
-                className="brand-surface rounded-[1.75rem] p-8"
+                className="brand-surface flex h-full flex-col rounded-[1.75rem] p-8"
               >
-                <h3 className="brand-heading-md text-slate-950">{path.title}</h3>
-                <p className="brand-body mt-4">{path.text}</p>
+                <div className="flex-1">
+                  <h3 className="brand-heading-md text-slate-950">{path.title}</h3>
+                  <p className="brand-body mt-4">{path.text}</p>
 
-                <ul className="mt-6 space-y-3 text-base text-slate-700">
-                  {path.bullets.map((bullet) => (
-                    <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
-                      {bullet}
-                    </li>
-                  ))}
-                </ul>
+                  <ul className="mt-6 space-y-3 text-base text-slate-700">
+                    {path.bullets.map((bullet) => (
+                      <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-                <div className="mt-6">
+                <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
                   <Link
                     href={path.href}
                     className="brand-button-dark inline-flex rounded-xl px-5 py-3 text-base font-medium"
