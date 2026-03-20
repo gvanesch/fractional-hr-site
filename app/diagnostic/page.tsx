@@ -91,6 +91,7 @@ export default function DiagnosticPage() {
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
 
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const resultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -179,6 +180,26 @@ export default function DiagnosticPage() {
     showResults,
     hasLoadedDraft,
   ]);
+
+  useEffect(() => {
+    if (!showResults || !resultsRef.current) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const headerOffset = 130;
+        const elementTop =
+          resultsRef.current!.getBoundingClientRect().top + window.scrollY;
+        const targetTop = Math.max(elementTop - headerOffset, 0);
+
+        window.scrollTo({
+          top: targetTop,
+          behavior: "smooth",
+        });
+      });
+    });
+  }, [showResults]);
 
   function scrollToNextQuestion(
     updatedAnswers: Record<number, AnswerValue | undefined>
@@ -293,12 +314,6 @@ export default function DiagnosticPage() {
     }
 
     setShowResults(true);
-
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-      });
-    });
   }
 
   function resetDiagnostic() {
@@ -554,7 +569,7 @@ export default function DiagnosticPage() {
           </div>
 
           {showResults && score !== null && band && (
-            <div className="mt-16 rounded-lg bg-white p-8 shadow">
+            <div ref={resultsRef} className="mt-16 rounded-lg bg-white p-8 shadow">
               <h2 className="mb-2 text-2xl font-semibold text-slate-950">
                 Your HR Operations Maturity Score: {score} / 100
               </h2>
