@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import {
   calculatePercentageScore,
   calculateRawScore,
@@ -8,7 +7,7 @@ import {
   type AnswerValue,
 } from "../../../lib/diagnostic";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 type DiagnosticCompleteRequestBody = {
   answers: Record<number, AnswerValue | undefined>;
@@ -19,15 +18,14 @@ type DiagnosticCompleteRequestBody = {
   email?: string;
 };
 
-function getResendClient(): Resend {
-  const apiKey = process.env.RESEND_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing RESEND_API_KEY environment variable.");
-  }
-
-  return new Resend(apiKey);
-}
+type ResendSendResponse = {
+  id?: string;
+  object?: string;
+  error?: {
+    message?: string;
+    name?: string;
+  };
+};
 
 function escapeHtml(value: string): string {
   return value
@@ -183,23 +181,72 @@ function buildEmailHtml(params: {
   `;
 }
 
+async function sendDiagnosticEmail(params: {
+  score: number;
+  bandLabel: string;
+  bandSummary: string;
+  companySize?: string;
+  industry?: string;
+  role?: string;
+  countryRegion?: string;
+  email?: string;
+  answers: Record<number, AnswerValue | undefined>;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.CONTACT_FROM_EMAIL;
+  const toEmail = process.env.CONTACT_TO_EMAIL;
+
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY environment variable.");
+  }
+
+  if (!fromEmail) {
+    throw new Error("Missing CONTACT_FROM_EMAIL environment variable.");
+  }
+
+  if (!toEmail) {
+    throw new Error("Missing CONTACT_TO_EMAIL environment variable.");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [toEmail],
+      reply_to: params.email || undefined,
+      subject: `New HR Diagnostic Submission – ${params.bandLabel} (${params.score}/100)`,
+      html: buildEmailHtml({
+        score: params.score,
+        bandLabel: params.bandLabel,
+        bandSummary: params.bandSummary,
+        companySize: params.companySize,
+        industry: params.industry,
+        role: params.role,
+        countryRegion: params.countryRegion,
+        email: params.email,
+        answers: params.answers,
+      }),
+    }),
+  });
+
+  const result = (await response.json()) as ResendSendResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      result?.error?.message || "Failed to send diagnostic completion email."
+    );
+  }
+
+  return result;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as DiagnosticCompleteRequestBody;
-
-    if (!process.env.CONTACT_TO_EMAIL) {
-      return NextResponse.json(
-        { error: "Missing CONTACT_TO_EMAIL environment variable." },
-        { status: 500 }
-      );
-    }
-
-    if (!process.env.CONTACT_FROM_EMAIL) {
-      return NextResponse.json(
-        { error: "Missing CONTACT_FROM_EMAIL environment variable." },
-        { status: 500 }
-      );
-    }
 
     const answers = normaliseAnswers(body.answers || {});
     const answeredCount = getAnsweredCount(answers);
@@ -218,48 +265,23 @@ export async function POST(request: Request) {
     const score = calculatePercentageScore(rawScore);
     const band = scoreToBand(score);
 
-    const resend = getResendClient();
-
-    const resendResponse = await resend.emails.send({
-      from: process.env.CONTACT_FROM_EMAIL,
-      to: process.env.CONTACT_TO_EMAIL,
-      replyTo: safeEmail || undefined,
-      subject: `New HR Diagnostic Submission – ${band.label} (${score}/100)`,
-      html: buildEmailHtml({
-        score,
-        bandLabel: band.label,
-        bandSummary: band.summary,
-        companySize: body.companySize,
-        industry: body.industry,
-        role: body.role,
-        countryRegion: body.countryRegion,
-        email: safeEmail,
-        answers,
-      }),
+    const resendResponse = await sendDiagnosticEmail({
+      score,
+      bandLabel: band.label,
+      bandSummary: band.summary,
+      companySize: body.companySize,
+      industry: body.industry,
+      role: body.role,
+      countryRegion: body.countryRegion,
+      email: safeEmail,
+      answers,
     });
-
-    if (resendResponse.error) {
-      console.error("Resend diagnostic-complete error:", resendResponse.error);
-
-      return NextResponse.json(
-        {
-          error: "Failed to send diagnostic completion email.",
-          details:
-            typeof resendResponse.error === "object" &&
-            resendResponse.error !== null &&
-            "message" in resendResponse.error
-              ? String(resendResponse.error.message)
-              : "Unknown Resend error.",
-        },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({
       ok: true,
       score,
       band: band.label,
-      resendId: resendResponse.data?.id ?? null,
+      resendId: resendResponse.id ?? null,
     });
   } catch (error) {
     console.error("Diagnostic complete API error:", error);
