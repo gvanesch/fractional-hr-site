@@ -40,7 +40,14 @@ const audiencePaths = [
   },
 ];
 
-export default function HomePage() {
+const flexibleSupportBullets = [
+  "Ad hoc strategic HR operations support",
+  "Recurring senior advisory input without full-time overhead",
+  "Project-based delivery for specific operational priorities",
+  "Interim support during growth, transition, or leadership gaps",
+];
+
+export default function ServicesPage() {
   return (
     <>
       <section className="brand-hero">
@@ -51,7 +58,7 @@ export default function HomePage() {
             </div>
 
             <h1 className="brand-heading-xl max-w-4xl">
-              Building HR operations that scale with growth, complexity, and change.
+              Practical HR operations support for growing and complex organisations.
             </h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
@@ -74,6 +81,11 @@ export default function HomePage() {
                 Contact
               </Link>
             </div>
+
+            <p className="mt-4 text-sm text-[#8AAAC8]">
+              The diagnostic gives you an immediate score and a more detailed interpretation
+              pathway if you want to explore the result further.
+            </p>
           </div>
 
           <div className="brand-card-dark rounded-[1.75rem] p-8 shadow-2xl shadow-black/20">
@@ -94,6 +106,104 @@ export default function HomePage() {
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 Governance, controls, and audit-ready operations
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="max-w-3xl">
+            <p className="brand-section-kicker">
+              Choose the path that fits your organisation
+            </p>
+            <h2 className="brand-heading-lg mt-3 text-slate-950">
+              Different organisations need different kinds of HR support.
+            </h2>
+            <p className="brand-subheading mt-4 text-slate-700">
+              A growing business building its HR foundations has very different needs
+              from a global organisation redesigning service delivery or navigating
+              complex change. Choose the path that best reflects where your organisation
+              is today.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            {audiencePaths.map((path) => (
+              <div
+                key={path.title}
+                className="brand-surface rounded-[1.75rem] p-8"
+              >
+                <h3 className="brand-heading-md text-slate-950">{path.title}</h3>
+                <p className="brand-body mt-4">{path.text}</p>
+
+                <ul className="mt-6 space-y-3 text-base text-slate-700">
+                  {path.bullets.map((bullet) => (
+                    <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6">
+                  <Link
+                    href={path.href}
+                    className="brand-button-dark inline-flex rounded-xl px-5 py-3 text-base font-medium"
+                  >
+                    {path.cta}
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="brand-surface-soft rounded-[2rem] p-8">
+            <div className="max-w-4xl">
+              <p className="brand-section-kicker">Flexible support model</p>
+              <h2 className="brand-heading-lg mt-3 text-slate-950">
+                Not every organisation needs a full-time HR leader.
+              </h2>
+              <p className="brand-subheading mt-4 text-slate-700">
+                Some organisations need senior HR operations support, but not on a
+                permanent full-time basis. In those situations, support can be provided
+                on an ad hoc, recurring, interim, or project basis depending on the need.
+              </p>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
+                {flexibleSupportBullets.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm font-medium text-slate-700 shadow-sm"
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <p className="brand-body mt-6">
+                This can work well for growing organisations, founder-led businesses,
+                teams in transition, or businesses with a specific operational priority
+                to solve without taking on a permanent headcount commitment.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/contact?topic=Flexible%20Support"
+                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
+                >
+                  Discuss Flexible Support
+                </Link>
+                <Link
+                  href="/diagnostic"
+                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
+                >
+                  Take the Diagnostic First
+                </Link>
               </div>
             </div>
           </div>
@@ -137,18 +247,18 @@ export default function HomePage() {
             <div className="max-w-4xl">
               <p className="brand-section-kicker">A common growth-stage pattern</p>
               <h2 className="brand-heading-lg mt-3 text-slate-950">
-                Is your HR starting to feel messy?
+                Is your HR starting to feel inconsistent or reactive?
               </h2>
               <p className="brand-subheading mt-4 text-slate-700">
-                Many organisations do not suddenly decide they need HR transformation.
-                What they notice instead is friction: inconsistent onboarding, managers
-                handling people situations differently, too many manual workarounds, and
-                HR becoming reactive rather than operational.
+                Many organisations do not begin by asking for transformation. What they
+                notice first is friction: inconsistent onboarding, unclear ownership,
+                manual workarounds, fragmented manager practice, and HR becoming more
+                reactive than operational.
               </p>
               <p className="brand-body mt-4">
-                If that feels familiar, the best next step is often either to review the
-                common warning signs or take the HR Operations Health Check to get a quick
-                read on how much operational strain may have built up.
+                If that feels familiar, a useful next step is either to review the common
+                warning signs or take the HR Operations Health Check for a quick read on
+                where operational strain may be building.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4">
@@ -164,56 +274,9 @@ export default function HomePage() {
                 >
                   Read HR Chaos Signals
                 </Link>
-                <Link
-                  href="/services/hr-foundations-sprint"
-                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
-                >
-                  Explore the HR Foundations Sprint
-                </Link>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="max-w-3xl">
-          <p className="brand-section-kicker">Choose the path that fits your organisation</p>
-          <h2 className="brand-heading-lg mt-3 text-slate-950">
-            Different organisations need different kinds of HR support.
-          </h2>
-          <p className="brand-subheading mt-4 text-slate-700">
-            A growing business building its HR foundations has very different needs from a global
-            organisation redesigning service delivery or navigating complex change. Choose the path
-            that best reflects where your organisation is today.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          {audiencePaths.map((path) => (
-            <div
-              key={path.title}
-              className="brand-surface rounded-[1.75rem] p-8"
-            >
-              <h3 className="brand-heading-md text-slate-950">{path.title}</h3>
-              <p className="brand-body mt-4">{path.text}</p>
-              <ul className="mt-6 space-y-3 text-base text-slate-700">
-                {path.bullets.map((bullet) => (
-                  <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
-                    {bullet}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6">
-                <Link
-                  href={path.href}
-                  className="brand-button-dark inline-flex rounded-xl px-5 py-3 text-base font-medium"
-                >
-                  {path.cta}
-                </Link>
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -221,14 +284,16 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-6 py-20">
           <div className="brand-surface-soft rounded-[2rem] p-8">
             <div className="max-w-4xl">
-              <p className="brand-section-kicker">Signature Offer for Growing Companies</p>
+              <p className="brand-section-kicker">Signature offer for growing companies</p>
               <h2 className="brand-heading-lg mt-3 text-slate-950">
                 HR Foundations Sprint
               </h2>
               <p className="brand-subheading mt-4 text-slate-700">
-                A focused 4 week engagement for growing organisations that need stronger HR
-                foundations, clearer processes, and a practical plan for what to fix first.
+                A focused 4 week engagement for growing organisations that need stronger
+                HR foundations, clearer processes, and a practical plan for what to fix
+                first.
               </p>
+
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
                   href="/services/hr-foundations-sprint"
@@ -256,10 +321,11 @@ export default function HomePage() {
               Need stronger HR operations, better service delivery, or more scalable infrastructure?
             </h2>
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
-              Whether the challenge is enterprise transformation or simply getting the basics
-              right in a growing business, you can start with a short conversation or take the
-              HR Operations Health Check first.
+              Whether the challenge is growth-stage operational clarity, enterprise
+              transformation, or flexible senior support without full-time overhead, you
+              can start with a short conversation or take the HR Operations Health Check first.
             </p>
+
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/contact"
