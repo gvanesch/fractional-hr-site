@@ -8,7 +8,7 @@ import {
   type AnswerValue,
 } from "../../../lib/diagnostic";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 type DiagnosticCompleteRequestBody = {
   answers: Record<number, AnswerValue | undefined>;
@@ -207,7 +207,9 @@ export async function POST(request: Request) {
 
     if (answeredCount !== questions.length) {
       return NextResponse.json(
-        { error: "All diagnostic questions must be answered." },
+        {
+          error: `All diagnostic questions must be answered. Received ${answeredCount} of ${questions.length}.`,
+        },
         { status: 400 }
       );
     }
@@ -240,7 +242,15 @@ export async function POST(request: Request) {
       console.error("Resend diagnostic-complete error:", resendResponse.error);
 
       return NextResponse.json(
-        { error: "Failed to send diagnostic completion email." },
+        {
+          error: "Failed to send diagnostic completion email.",
+          details:
+            typeof resendResponse.error === "object" &&
+            resendResponse.error !== null &&
+            "message" in resendResponse.error
+              ? String(resendResponse.error.message)
+              : "Unknown Resend error.",
+        },
         { status: 500 }
       );
     }
