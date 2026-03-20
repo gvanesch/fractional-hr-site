@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { loadDiagnosticState } from "../../lib/diagnostic-storage";
 
 type DiagnosticDraftState = {
@@ -17,6 +17,19 @@ type DiagnosticDraftState = {
 
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
 
+const topicOptions = [
+  "HR Operations Health Check",
+  "HR Operations Advisory",
+  "HR Technology Transformation",
+  "HR Foundations for Growing Companies",
+  "Enterprise HR Operations & Transformation",
+  "Flexible Support",
+  "M&A Integration",
+  "Other",
+] as const;
+
+type TopicOption = (typeof topicOptions)[number];
+
 function loadDiagnosticDraft(): DiagnosticDraftState | null {
   if (typeof window === "undefined") return null;
 
@@ -31,6 +44,77 @@ function loadDiagnosticDraft(): DiagnosticDraftState | null {
   }
 }
 
+function normaliseTopic(topicParam: string | null, isDiagnosticJourney: boolean): TopicOption {
+  if (isDiagnosticJourney) {
+    return "HR Operations Health Check";
+  }
+
+  switch ((topicParam || "").trim().toLowerCase()) {
+    case "flexible support":
+      return "Flexible Support";
+    case "hr operations advisory":
+      return "HR Operations Advisory";
+    case "hr technology transformation":
+      return "HR Technology Transformation";
+    case "hr foundations for growing companies":
+      return "HR Foundations for Growing Companies";
+    case "enterprise hr operations & transformation":
+      return "Enterprise HR Operations & Transformation";
+    case "m&a integration":
+      return "M&A Integration";
+    case "other":
+      return "Other";
+    default:
+      return "HR Operations Advisory";
+  }
+}
+
+function getIntroText(topic: TopicOption, isDiagnosticJourney: boolean): string {
+  if (isDiagnosticJourney) {
+    return "If you have completed the HR Operations Health Check and would like to explore your result in more detail, you can continue here.";
+  }
+
+  switch (topic) {
+    case "Flexible Support":
+      return "If you need senior HR operations support without a full-time headcount commitment, feel free to get in touch to discuss ad hoc, recurring, interim, or project-based support.";
+    case "HR Foundations for Growing Companies":
+      return "If your organisation is growing and needs stronger HR foundations, clearer processes, and more operational consistency, feel free to get in touch.";
+    case "Enterprise HR Operations & Transformation":
+      return "If you are exploring enterprise HR operations improvement, service delivery redesign, or broader transformation support, feel free to get in touch.";
+    case "HR Technology Transformation":
+      return "If you are exploring HR technology transformation, workflow redesign, or operational automation, feel free to get in touch.";
+    case "M&A Integration":
+      return "If you are navigating M&A integration, harmonisation, or post-deal HR operational change, feel free to get in touch.";
+    case "Other":
+      return "If you would like to discuss an HR operations, service delivery, or transformation challenge, feel free to get in touch.";
+    default:
+      return "If you are exploring HR operations advisory, HR technology transformation, or building stronger HR infrastructure, feel free to get in touch.";
+  }
+}
+
+function getMessagePlaceholder(topic: TopicOption, isDiagnosticJourney: boolean): string {
+  if (isDiagnosticJourney) {
+    return "Briefly describe any questions you have about your diagnostic result, what stood out to you, or the HR operational challenges you would like to explore further.";
+  }
+
+  switch (topic) {
+    case "Flexible Support":
+      return "Briefly describe the type of support you are looking for (for example ad hoc, recurring, interim, or project-based), your current situation, and what would be most useful.";
+    case "HR Foundations for Growing Companies":
+      return "Briefly describe where your HR foundations currently feel unclear, inconsistent, or stretched, and what you would like to improve.";
+    case "Enterprise HR Operations & Transformation":
+      return "Briefly describe the organisational context, the operational or service delivery challenge, and the type of transformation support you are exploring.";
+    case "HR Technology Transformation":
+      return "Briefly describe your current systems, workflow, or automation challenge and the change you are trying to make.";
+    case "M&A Integration":
+      return "Briefly describe the transaction or integration context and the HR operational challenges you are working through.";
+    case "Other":
+      return "Briefly describe your organisation, challenge, or what prompted you to get in touch.";
+    default:
+      return "Briefly describe your organisation, the HR operations challenge you are facing, and what kind of support you are exploring.";
+  }
+}
+
 export default function ContactPageClient() {
   const searchParams = useSearchParams();
 
@@ -40,20 +124,24 @@ export default function ContactPageClient() {
   const isDiagnosticJourney =
     topicParam === "health-check" || sourceParam === "diagnostic";
 
-  const defaultTopic = isDiagnosticJourney
-    ? "HR Operations Health Check"
-    : "HR Operations Advisory";
+  const defaultTopic = useMemo(
+    () => normaliseTopic(topicParam, isDiagnosticJourney),
+    [topicParam, isDiagnosticJourney]
+  );
 
-  const messagePlaceholder = isDiagnosticJourney
-    ? "Briefly describe any questions you have about your diagnostic result or the HR operational challenges you would like to explore."
-    : "Briefly describe your organisation or challenge.";
-
-  const introText = isDiagnosticJourney
-    ? "If you have completed the HR Operations Health Check and would like to discuss your result, feel free to continue here."
-    : "If you are exploring HR operations advisory, HR technology transformation, or building stronger HR infrastructure, feel free to get in touch.";
-
+  const [selectedTopic, setSelectedTopic] = useState<TopicOption>(defaultTopic);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+
+  const introText = useMemo(
+    () => getIntroText(selectedTopic, isDiagnosticJourney),
+    [selectedTopic, isDiagnosticJourney]
+  );
+
+  const messagePlaceholder = useMemo(
+    () => getMessagePlaceholder(selectedTopic, isDiagnosticJourney),
+    [selectedTopic, isDiagnosticJourney]
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,6 +209,7 @@ export default function ContactPageClient() {
 
       setStatus("success");
       form.reset();
+      setSelectedTopic(defaultTopic);
     } catch (err) {
       console.error(err);
       setStatus("error");
@@ -192,15 +281,15 @@ export default function ContactPageClient() {
                   </label>
                   <select
                     name="topic"
-                    defaultValue={defaultTopic}
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value as TopicOption)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   >
-                    <option>HR Operations Health Check</option>
-                    <option>HR Operations Advisory</option>
-                    <option>HR Technology Transformation</option>
-                    <option>HR Foundations for Growing Companies</option>
-                    <option>M&amp;A Integration</option>
-                    <option>Other</option>
+                    {topicOptions.map((topic) => (
+                      <option key={topic} value={topic}>
+                        {topic}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -258,8 +347,8 @@ export default function ContactPageClient() {
                       Engagement
                     </p>
                     <p className="mt-1 text-lg leading-8">
-                      Remote advisory, transformation programmes, and selected
-                      on-site engagements.
+                      Remote advisory, transformation programmes, flexible support,
+                      and selected on-site engagements.
                     </p>
                   </div>
                 </div>
