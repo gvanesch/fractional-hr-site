@@ -13,7 +13,7 @@ const proofPoints = [
   "M&A integration and harmonisation",
 ];
 
-const audiencePaths = [
+const servicePaths = [
   {
     title: "Growing Companies & Mid-Market",
     text: "For scaling businesses that need stronger HR foundations, clearer processes, better onboarding, and systems that support growth without unnecessary bureaucracy.",
@@ -38,13 +38,18 @@ const audiencePaths = [
     href: "/services/enterprise",
     cta: "Enterprise Organisations",
   },
-];
-
-const flexibleSupportBullets = [
-  "Ad hoc strategic HR operations support",
-  "Recurring senior advisory input without full-time overhead",
-  "Project-based delivery for specific operational priorities",
-  "Interim support during growth, transition, or leadership gaps",
+  {
+    title: "Flexible Support",
+    text: "For organisations that need senior HR operations support, but do not need or want a full-time hire. Support can be provided on an ad hoc, recurring, interim, or project basis.",
+    bullets: [
+      "Ad hoc strategic HR operations support",
+      "Recurring senior advisory input",
+      "Project-based delivery for specific priorities",
+      "Interim support during growth or transition",
+    ],
+    href: "/contact?topic=Flexible%20Support",
+    cta: "Discuss Flexible Support",
+  },
 ];
 
 export default function ServicesPage() {
@@ -119,18 +124,17 @@ export default function ServicesPage() {
               Choose the path that fits your organisation
             </p>
             <h2 className="brand-heading-lg mt-3 text-slate-950">
-              Different organisations need different kinds of HR support.
+              Three ways to engage, depending on what your organisation needs.
             </h2>
             <p className="brand-subheading mt-4 text-slate-700">
-              A growing business building its HR foundations has very different needs
-              from a global organisation redesigning service delivery or navigating
-              complex change. Choose the path that best reflects where your organisation
-              is today.
+              Some organisations need stronger HR foundations. Some need enterprise-scale
+              transformation support. Others need flexible senior HR operations input
+              without the cost or commitment of a full-time hire.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {audiencePaths.map((path) => (
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {servicePaths.map((path) => (
               <div
                 key={path.title}
                 className="brand-surface rounded-[1.75rem] p-8"
@@ -156,56 +160,6 @@ export default function ServicesPage() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="brand-surface-soft rounded-[2rem] p-8">
-            <div className="max-w-4xl">
-              <p className="brand-section-kicker">Flexible support model</p>
-              <h2 className="brand-heading-lg mt-3 text-slate-950">
-                Not every organisation needs a full-time HR leader.
-              </h2>
-              <p className="brand-subheading mt-4 text-slate-700">
-                Some organisations need senior HR operations support, but not on a
-                permanent full-time basis. In those situations, support can be provided
-                on an ad hoc, recurring, interim, or project basis depending on the need.
-              </p>
-
-              <div className="mt-8 grid gap-4 md:grid-cols-2">
-                {flexibleSupportBullets.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm font-medium text-slate-700 shadow-sm"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-
-              <p className="brand-body mt-6">
-                This can work well for growing organisations, founder-led businesses,
-                teams in transition, or businesses with a specific operational priority
-                to solve without taking on a permanent headcount commitment.
-              </p>
-
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  href="/contact?topic=Flexible%20Support"
-                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-                >
-                  Discuss Flexible Support
-                </Link>
-                <Link
-                  href="/diagnostic"
-                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
-                >
-                  Take the Diagnostic First
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
       </section>
