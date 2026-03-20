@@ -325,336 +325,349 @@ export default function DiagnosticPage() {
   }
 
   return (
-    <main className="bg-[#F4F6FA] py-20">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <h1 className="mb-8 text-4xl font-bold text-[#0A1628]">
-          HR Operations Health Check
-        </h1>
-
-        <p className="mb-10 text-slate-600">
-          Answer 10 questions to assess potential HR operational friction and get an
-          immediate HR Operations Score.
-        </p>
-
-        <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm">
-          <h2 className="mb-6 text-xl font-semibold text-slate-950">
-            A little context first
-          </h2>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Company size <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={companySize}
-                onChange={(e) => {
-                  setCompanySize(e.target.value);
-                  setCompletionEmailStatus("idle");
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-              >
-                <option value="">Select company size</option>
-                {companySizeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Industry <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={industry}
-                onChange={(e) => {
-                  setIndustry(e.target.value);
-                  setCompletionEmailStatus("idle");
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-              >
-                <option value="">Select industry</option>
-                {industryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Your role <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setCompletionEmailStatus("idle");
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-              >
-                <option value="">Select your role</option>
-                {roleOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Country / region
-              </label>
-              <input
-                type="text"
-                value={countryRegion}
-                onChange={(e) => {
-                  setCountryRegion(e.target.value);
-                  setCompletionEmailStatus("idle");
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                placeholder="Optional"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Email address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setCompletionEmailStatus("idle");
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                placeholder="Optional"
-              />
-              <p className="mt-2 text-sm text-slate-500">
-                Optional. Provide this only if you would like follow-up or a deeper
-                interpretation of the result.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="sticky top-24 z-50 mb-10">
-          <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
-            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full bg-[#1E6FD9] transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-
-            <p className="mt-2 text-sm text-slate-600">
-              {answeredCount} / {questions.length} questions answered ({progress}%)
+    <>
+      <section className="brand-hero">
+        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
+          <div className="max-w-4xl">
+            <p className="brand-kicker">Diagnostic</p>
+            <h1 className="brand-heading-xl mt-3">HR Operations Health Check</h1>
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
+              Answer 10 questions to assess potential HR operational friction and get
+              an immediate HR Operations Score.
+            </p>
+            <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
+              This is designed as a quick diagnostic tool to help identify whether
+              operational strain may be building across HR processes, onboarding,
+              service delivery, ownership, and day-to-day execution.
             </p>
           </div>
         </div>
+      </section>
 
-        <div className="space-y-8">
-          {questions.map((q) => (
-            <div
-              key={q.id}
-              ref={(element) => {
-                questionRefs.current[q.id] = element;
-              }}
-              className="scroll-mt-40 rounded-lg bg-white p-6 shadow-sm"
-            >
-              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
-                {q.dimension}
-              </p>
-
-              <p className="mb-4 font-medium text-slate-800">{q.text}</p>
-
-              <div className="space-y-2">
-                {scaleOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm text-slate-700"
-                  >
-                    <input
-                      type="radio"
-                      name={`q-${q.id}`}
-                      checked={answers[q.id] === option.value}
-                      onChange={() => updateAnswer(q.id, option.value)}
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
-          <label className="flex items-start gap-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={acceptedNotice}
-              onChange={(e) => {
-                setAcceptedNotice(e.target.checked);
-                setCompletionEmailStatus("idle");
-              }}
-            />
-            <span>
-              I understand this tool provides general informational guidance only and
-              is not legal, regulatory, employment, tax, or professional advice. I
-              also understand that the information I submit may be used to create
-              aggregated or anonymised benchmarking insights.
-            </span>
-          </label>
-
-          {submitError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {submitError}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-4">
-            <button
-              onClick={calculateScore}
-              disabled={
-                !allAnswered ||
-                !acceptedNotice ||
-                !contextComplete ||
-                saveStatus === "saving" ||
-                completionEmailStatus === "sending"
-              }
-              className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
-            >
-              {saveStatus === "saving" || completionEmailStatus === "sending"
-                ? "Calculating..."
-                : "Calculate score"}
-            </button>
-
-            <button
-              onClick={resetDiagnostic}
-              className="rounded-lg border border-slate-300 px-6 py-3"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        {showResults && score !== null && band && (
-          <div className="mt-16 rounded-lg bg-white p-8 shadow">
-            <h2 className="mb-2 text-2xl font-semibold">
-              Your HR Operations Maturity Score: {score} / 100
+      <section className="brand-light-section">
+        <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16 lg:py-20">
+          <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm">
+            <h2 className="mb-6 text-xl font-semibold text-slate-950">
+              A little context first
             </h2>
 
-            <p className="mb-1 text-lg font-medium text-[#1E6FD9]">{band.label}</p>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Company size <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={companySize}
+                  onChange={(e) => {
+                    setCompanySize(e.target.value);
+                    setCompletionEmailStatus("idle");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                >
+                  <option value="">Select company size</option>
+                  {companySizeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <p className="mb-6 text-slate-700">{band.summary}</p>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Industry <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={industry}
+                  onChange={(e) => {
+                    setIndustry(e.target.value);
+                    setCompletionEmailStatus("idle");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                >
+                  <option value="">Select industry</option>
+                  {industryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <h3 className="mb-4 text-lg font-semibold">Operational Profile</h3>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Your role <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={role}
+                  onChange={(e) => {
+                    setRole(e.target.value);
+                    setCompletionEmailStatus("idle");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                >
+                  <option value="">Select your role</option>
+                  {roleOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="mb-10 space-y-3">
-              {dimensions.map((dimension) => {
-                const percent = (dimension.score / 5) * 100;
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Country / region
+                </label>
+                <input
+                  type="text"
+                  value={countryRegion}
+                  onChange={(e) => {
+                    setCountryRegion(e.target.value);
+                    setCompletionEmailStatus("idle");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                  placeholder="Optional"
+                />
+              </div>
 
-                return (
-                  <div key={dimension.label}>
-                    <div className="mb-1 flex justify-between text-sm text-slate-700">
-                      <span>{dimension.label}</span>
-                      <span>{dimension.score} / 5</span>
-                    </div>
-
-                    <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className="h-full bg-[#1E6FD9]"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setCompletionEmailStatus("idle");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                  placeholder="Optional"
+                />
+                <p className="mt-2 text-sm text-slate-500">
+                  Optional. Provide this only if you would like follow-up or a deeper
+                  interpretation of the result.
+                </p>
+              </div>
             </div>
+          </div>
 
-            {lowestDimensions.length > 0 && (
-              <div className="mb-10">
-                <h3 className="mb-3 text-lg font-semibold">
-                  Areas likely to benefit from attention
-                </h3>
+          <div className="sticky top-24 z-40 mb-10">
+            <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+              <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full bg-[#1E6FD9] transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
 
-                <p className="mb-4 text-sm text-slate-600">
-                  These dimensions may be the most likely sources of operational friction
-                  or inconsistency at the moment.
+              <p className="mt-2 text-sm text-slate-600">
+                {answeredCount} / {questions.length} questions answered ({progress}%)
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-8">
+            {questions.map((q) => (
+              <div
+                key={q.id}
+                ref={(element) => {
+                  questionRefs.current[q.id] = element;
+                }}
+                className="scroll-mt-40 rounded-lg bg-white p-6 shadow-sm"
+              >
+                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
+                  {q.dimension}
                 </p>
 
+                <p className="mb-4 font-medium text-slate-800">{q.text}</p>
+
                 <div className="space-y-2">
-                  {lowestDimensions.map((dimension) => (
-                    <div
-                      key={dimension.label}
-                      className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                  {scaleOptions.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm text-slate-700"
                     >
-                      <span>{dimension.label}</span>
-                      <span className="font-medium">{dimension.score} / 5</span>
-                    </div>
+                      <input
+                        type="radio"
+                        name={`q-${q.id}`}
+                        checked={answers[q.id] === option.value}
+                        onChange={() => updateAnswer(q.id, option.value)}
+                      />
+                      {option.label}
+                    </label>
                   ))}
                 </div>
               </div>
+            ))}
+          </div>
+
+          <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
+            <label className="flex items-start gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={acceptedNotice}
+                onChange={(e) => {
+                  setAcceptedNotice(e.target.checked);
+                  setCompletionEmailStatus("idle");
+                }}
+              />
+              <span>
+                I understand this tool provides general informational guidance only and
+                is not legal, regulatory, employment, tax, or professional advice. I
+                also understand that the information I submit may be used to create
+                aggregated or anonymised benchmarking insights.
+              </span>
+            </label>
+
+            {submitError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
             )}
 
-            <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
-              {saveStatus === "saved" && completionEmailStatus === "sent" && (
-                <p>
-                  Your result has been saved locally in this browser and your diagnostic completion has been recorded.
-                </p>
-              )}
-              {saveStatus === "saved" && completionEmailStatus === "idle" && (
-                <p>
-                  Your result has been saved locally in this browser so you can continue to the interpretation and enquiry flow.
-                </p>
-              )}
-              {saveStatus === "saved" && completionEmailStatus === "error" && (
-                <p>
-                  Your result has been saved locally in this browser, but the diagnostic completion notification could not be sent.
-                </p>
-              )}
-              {saveStatus === "error" && (
-                <p>
-                  Your result has been calculated, but local saving failed in this browser.
-                </p>
-              )}
-            </div>
-
-            <div className="mt-8 rounded-lg bg-slate-50 p-6">
-              <h4 className="mb-2 text-lg font-semibold">
-                View a deeper interpretation of your result
-              </h4>
-
-              <p className="mb-4 text-sm text-slate-600">
-                Click through to see a more detailed interpretation of your score and,
-                if helpful, book a free 20-minute conversation to talk through what it
-                may mean for your organisation&apos;s HR operations.
-              </p>
-
-              <Link
-                href="/contact/diagnostic-interpretation"
-                className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
+            <div className="flex flex-wrap gap-4">
+              <button
+                onClick={calculateScore}
+                disabled={
+                  !allAnswered ||
+                  !acceptedNotice ||
+                  !contextComplete ||
+                  saveStatus === "saving" ||
+                  completionEmailStatus === "sending"
+                }
+                className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
               >
-                View detailed interpretation
-              </Link>
-            </div>
+                {saveStatus === "saving" || completionEmailStatus === "sending"
+                  ? "Calculating..."
+                  : "Calculate score"}
+              </button>
 
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
+              <button
+                onClick={resetDiagnostic}
+                className="rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
               >
-                View the HR Foundations Sprint
-              </Link>
+                Reset
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </main>
+
+          {showResults && score !== null && band && (
+            <div className="mt-16 rounded-lg bg-white p-8 shadow">
+              <h2 className="mb-2 text-2xl font-semibold text-slate-950">
+                Your HR Operations Maturity Score: {score} / 100
+              </h2>
+
+              <p className="mb-1 text-lg font-medium text-[#1E6FD9]">{band.label}</p>
+
+              <p className="mb-6 text-slate-700">{band.summary}</p>
+
+              <h3 className="mb-4 text-lg font-semibold text-slate-950">
+                Operational Profile
+              </h3>
+
+              <div className="mb-10 space-y-3">
+                {dimensions.map((dimension) => {
+                  const percent = (dimension.score / 5) * 100;
+
+                  return (
+                    <div key={dimension.label}>
+                      <div className="mb-1 flex justify-between text-sm text-slate-700">
+                        <span>{dimension.label}</span>
+                        <span>{dimension.score} / 5</span>
+                      </div>
+
+                      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full bg-[#1E6FD9]"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {lowestDimensions.length > 0 && (
+                <div className="mb-10">
+                  <h3 className="mb-3 text-lg font-semibold text-slate-950">
+                    Areas likely to benefit from attention
+                  </h3>
+
+                  <p className="mb-4 text-sm text-slate-600">
+                    These dimensions may be the most likely sources of operational friction
+                    or inconsistency at the moment.
+                  </p>
+
+                  <div className="space-y-2">
+                    {lowestDimensions.map((dimension) => (
+                      <div
+                        key={dimension.label}
+                        className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                      >
+                        <span>{dimension.label}</span>
+                        <span className="font-medium">{dimension.score} / 5</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
+                {saveStatus === "saved" && completionEmailStatus === "sent" && (
+                  <p>
+                    Your result has been saved locally in this browser and your diagnostic completion has been recorded.
+                  </p>
+                )}
+                {saveStatus === "saved" && completionEmailStatus === "idle" && (
+                  <p>
+                    Your result has been saved locally in this browser so you can continue to the interpretation and enquiry flow.
+                  </p>
+                )}
+                {saveStatus === "saved" && completionEmailStatus === "error" && (
+                  <p>
+                    Your result has been saved locally in this browser, but the diagnostic completion notification could not be sent.
+                  </p>
+                )}
+                {saveStatus === "error" && (
+                  <p>
+                    Your result has been calculated, but local saving failed in this browser.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-8 rounded-lg bg-slate-50 p-6">
+                <h4 className="mb-2 text-lg font-semibold text-slate-950">
+                  View a deeper interpretation of your result
+                </h4>
+
+                <p className="mb-4 text-sm text-slate-600">
+                  Click through to see a more detailed interpretation of your score and,
+                  if helpful, book a free 20-minute conversation to talk through what it
+                  may mean for your organisation&apos;s HR operations.
+                </p>
+
+                <Link
+                  href="/contact/diagnostic-interpretation"
+                  className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
+                >
+                  View detailed interpretation
+                </Link>
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/services/hr-foundations-sprint"
+                  className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
+                >
+                  View the HR Foundations Sprint
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
