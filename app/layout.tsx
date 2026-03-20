@@ -28,7 +28,7 @@ export default function RootLayout({
 
           <div className="site-header-spacer" aria-hidden="true" />
 
-          <main className="flex-1 w-full overflow-x-hidden">{children}</main>
+          <main className="flex-1 w-full">{children}</main>
 
           <Footer />
         </div>

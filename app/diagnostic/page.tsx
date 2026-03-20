@@ -468,7 +468,7 @@ export default function DiagnosticPage() {
             </div>
           </div>
 
-          <div className="sticky top-24 z-40 mb-10">
+          <div className="sticky top-[calc(var(--site-header-height)+1rem)] z-40 mb-10">
             <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
               <div className="h-3 overflow-hidden rounded-full bg-slate-200">
                 <div
