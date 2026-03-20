@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -20,7 +21,11 @@ export default function RootLayout({
       <body className="bg-[#0A1628] text-white antialiased overflow-x-hidden">
         <div className="min-h-screen flex flex-col">
           <Header />
-          <ScrollToTopOnRouteChange />
+
+          <Suspense fallback={null}>
+            <ScrollToTopOnRouteChange />
+          </Suspense>
+
           <div className="site-header-spacer" aria-hidden="true" />
 
           <main className="flex-1 w-full overflow-x-hidden">{children}</main>
