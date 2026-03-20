@@ -25,6 +25,7 @@ type ResendSendResponse = {
     message?: string;
     name?: string;
   };
+  message?: string;
 };
 
 function escapeHtml(value: string): string {
@@ -237,7 +238,9 @@ async function sendDiagnosticEmail(params: {
 
   if (!response.ok) {
     throw new Error(
-      result?.error?.message || "Failed to send diagnostic completion email."
+      result?.error?.message ||
+        result?.message ||
+        `Resend request failed with status ${response.status}`
     );
   }
 
@@ -291,6 +294,11 @@ export async function POST(request: Request) {
         ? error.message
         : "Unexpected error sending diagnostic completion email.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: message,
+      },
+      { status: 500 }
+    );
   }
 }
