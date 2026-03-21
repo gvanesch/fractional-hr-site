@@ -16,6 +16,7 @@ type DiagnosticCompleteRequestBody = {
   role?: string;
   countryRegion?: string;
   email?: string;
+  website?: string;
 };
 
 type ResendSendResponse = {
@@ -28,6 +29,21 @@ type ResendSendResponse = {
   message?: string;
 };
 
+const MAX_CONTEXT_LENGTH = 120;
+const MAX_EMAIL_LENGTH = 320;
+
+function jsonResponse(
+  body: Record<string, unknown>,
+  status = 200
+): NextResponse {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -38,21 +54,58 @@ function escapeHtml(value: string): string {
 }
 
 function isValidEmail(email: string): boolean {
+  if (email.length > MAX_EMAIL_LENGTH) {
+    return false;
+  }
+
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function normaliseOptionalEmail(email?: string): string {
-  const trimmed = (email || "").trim();
-  return isValidEmail(trimmed) ? trimmed : "";
+function normaliseOptionalString(
+  value: unknown,
+  maxLength: number
+): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.slice(0, maxLength);
 }
 
-function normaliseAnswers(
-  rawAnswers: Record<number, AnswerValue | undefined>
-): Record<number, AnswerValue | undefined> {
+function normaliseOptionalEmail(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (!isValidEmail(trimmed)) {
+    throw new Error("A valid email address is required.");
+  }
+
+  return trimmed;
+}
+
+function normaliseAnswers(value: unknown): Record<number, AnswerValue | undefined> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Diagnostic answers are invalid.");
+  }
+
+  const rawAnswers = value as Record<string, unknown>;
   const normalised: Record<number, AnswerValue | undefined> = {};
 
   for (const question of questions) {
-    const rawValue = rawAnswers[question.id];
+    const rawValue = rawAnswers[String(question.id)];
 
     if (
       rawValue === 1 ||
@@ -62,7 +115,14 @@ function normaliseAnswers(
       rawValue === 5
     ) {
       normalised[question.id] = rawValue;
+      continue;
     }
+
+    if (rawValue == null) {
+      continue;
+    }
+
+    throw new Error("Diagnostic answers are invalid.");
   }
 
   return normalised;
@@ -71,7 +131,9 @@ function normaliseAnswers(
 function getAnsweredCount(
   answers: Record<number, AnswerValue | undefined>
 ): number {
-  return Object.values(answers).filter(Boolean).length;
+  return Object.values(answers).filter(
+    (value): value is AnswerValue => value !== undefined
+  ).length;
 }
 
 function buildAnswersHtml(
@@ -182,6 +244,24 @@ function buildEmailHtml(params: {
   `;
 }
 
+function parseRequestBody(input: unknown): DiagnosticCompleteRequestBody {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Invalid request body.");
+  }
+
+  const raw = input as Record<string, unknown>;
+
+  return {
+    answers: normaliseAnswers(raw.answers),
+    companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
+    industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
+    role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
+    countryRegion: normaliseOptionalString(raw.countryRegion, MAX_CONTEXT_LENGTH),
+    email: normaliseOptionalEmail(raw.email),
+    website: normaliseOptionalString(raw.website, 200),
+  };
+}
+
 async function sendDiagnosticEmail(params: {
   score: number;
   bandLabel: string;
@@ -249,22 +329,25 @@ async function sendDiagnosticEmail(params: {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as DiagnosticCompleteRequestBody;
+    const rawBody = (await request.json()) as unknown;
+    const body = parseRequestBody(rawBody);
 
-    const answers = normaliseAnswers(body.answers || {});
-    const answeredCount = getAnsweredCount(answers);
-    const safeEmail = normaliseOptionalEmail(body.email);
+    if (body.website) {
+      return jsonResponse({ ok: true }, 200);
+    }
+
+    const answeredCount = getAnsweredCount(body.answers);
 
     if (answeredCount !== questions.length) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: `All diagnostic questions must be answered. Received ${answeredCount} of ${questions.length}.`,
         },
-        { status: 400 }
+        400
       );
     }
 
-    const rawScore = calculateRawScore(answers);
+    const rawScore = calculateRawScore(body.answers);
     const score = calculatePercentageScore(rawScore);
     const band = scoreToBand(score);
 
@@ -276,11 +359,11 @@ export async function POST(request: Request) {
       industry: body.industry,
       role: body.role,
       countryRegion: body.countryRegion,
-      email: safeEmail,
-      answers,
+      email: body.email,
+      answers: body.answers,
     });
 
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       score,
       band: band.label,
@@ -289,16 +372,21 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Diagnostic complete API error:", error);
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unexpected error sending diagnostic completion email.";
+    const isValidationError =
+      error instanceof Error &&
+      (
+        error.message === "Invalid request body." ||
+        error.message === "Diagnostic answers are invalid." ||
+        error.message === "A valid email address is required."
+      );
 
-    return NextResponse.json(
-      {
-        error: message,
-      },
-      { status: 500 }
+    if (isValidationError && error instanceof Error) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+
+    return jsonResponse(
+      { error: "Unable to process diagnostic submission at the moment." },
+      500
     );
   }
 }
