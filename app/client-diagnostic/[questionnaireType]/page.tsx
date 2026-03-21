@@ -5,6 +5,8 @@ import {
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
 
+export const runtime = "edge";
+
 type PageProps = {
   params: Promise<{
     questionnaireType: string;

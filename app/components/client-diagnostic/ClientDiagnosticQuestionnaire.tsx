@@ -70,12 +70,14 @@ export default function ClientDiagnosticQuestionnaire({
   const [isHydrated, setIsHydrated] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [submitMessage, setSubmitMessage] = useState<string>("");
+  const [showReview, setShowReview] = useState(false);
 
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const dimensionHeaderRefs = useRef<Record<DimensionKey, HTMLDivElement | null>>(
     {} as Record<DimensionKey, HTMLDivElement | null>,
   );
   const stickyPanelRef = useRef<HTMLDivElement | null>(null);
+  const reviewSectionRef = useRef<HTMLDivElement | null>(null);
 
   const projectId = searchParams.get("projectId");
   const participantId = searchParams.get("participantId");
@@ -219,6 +221,15 @@ export default function ClientDiagnosticQuestionnaire({
     scrollElementToTargetTop(nextQuestionElement, stickyCoverageHeight + 32);
   }
 
+  function scrollToReviewSection() {
+    if (!reviewSectionRef.current) {
+      return;
+    }
+
+    const stickyCoverageHeight = getStickyCoverageHeight();
+    scrollElementToTargetTop(reviewSectionRef.current, stickyCoverageHeight + 32);
+  }
+
   function handleScoreChange(questionId: string, value: ScoreAnswerValue) {
     setScoreAnswers((current) => ({
       ...current,
@@ -276,8 +287,14 @@ export default function ClientDiagnosticQuestionnaire({
   }
 
   function handleReviewSubmission() {
-    setPreparedSubmission(buildPreparedSubmission());
+    const submission = buildPreparedSubmission();
+    setPreparedSubmission(submission);
+    setShowReview(true);
     setSubmitMessage("");
+
+    window.setTimeout(() => {
+      scrollToReviewSection();
+    }, 120);
   }
 
   async function handleSubmitDiagnostic() {
@@ -333,6 +350,7 @@ export default function ClientDiagnosticQuestionnaire({
       }
 
       setSubmitState("success");
+      setShowReview(true);
       setSubmitMessage(
         result.message ??
           `Submission saved successfully${result.savedResponseCount ? ` (${result.savedResponseCount} responses).` : "."}`,
@@ -356,10 +374,41 @@ export default function ClientDiagnosticQuestionnaire({
     setScoreAnswers({});
     setProbeAnswers({});
     setPreparedSubmission(null);
+    setShowReview(false);
     setSubmitState("idle");
     setSubmitMessage("");
     window.localStorage.removeItem(draftStorageKey);
   }
+
+  const scoreCountByDimension = useMemo(() => {
+    const result = new Map<DimensionKey, number>();
+
+    for (const response of preparedSubmission?.responses ?? []) {
+      if (response.kind !== "score") {
+        continue;
+      }
+
+      const currentCount = result.get(response.dimension) ?? 0;
+      result.set(response.dimension, currentCount + 1);
+    }
+
+    return result;
+  }, [preparedSubmission]);
+
+  const commentCountByDimension = useMemo(() => {
+    const result = new Map<DimensionKey, number>();
+
+    for (const response of preparedSubmission?.responses ?? []) {
+      if (response.kind !== "probe") {
+        continue;
+      }
+
+      const currentCount = result.get(response.dimension) ?? 0;
+      result.set(response.dimension, currentCount + 1);
+    }
+
+    return result;
+  }, [preparedSubmission]);
 
   return (
     <section className="brand-light-section">
@@ -512,20 +561,54 @@ export default function ClientDiagnosticQuestionnaire({
           })}
         </div>
 
-        <div className="mt-10 rounded-2xl border border-slate-800 bg-[var(--brand-navy-1)] p-6 text-white shadow-[var(--brand-shadow-card)] sm:p-8">
-          <p className="brand-kicker">Submission preview</p>
+        <div ref={reviewSectionRef} className="mt-12">
+          {showReview ? (
+            <div className="brand-surface-card p-6 sm:p-8">
+              <p className="brand-section-kicker">Review</p>
 
-          <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
-            This section shows a structured preview of the current draft
-            submission. It is also the payload that will be sent to the storage
-            and analysis workflow when submitted.
-          </p>
+              <h3 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                Review your responses
+              </h3>
 
-          <pre className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4 text-xs leading-6 text-slate-200">
-            {preparedSubmission
-              ? JSON.stringify(preparedSubmission, null, 2)
-              : "No submission preview generated yet."}
-          </pre>
+              <p className="brand-body-sm mt-4 max-w-3xl">
+                Your draft has been prepared and is ready to submit. This summary
+                confirms that responses have been captured across the
+                questionnaire before submission.
+              </p>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {dimensionDefinitions.map((dimension) => {
+                  const scoreCount = scoreCountByDimension.get(dimension.key) ?? 0;
+                  const commentCount =
+                    commentCountByDimension.get(dimension.key) ?? 0;
+
+                  return (
+                    <div key={dimension.key} className="brand-surface-soft p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                        {dimension.label}
+                      </p>
+
+                      <div className="mt-3 space-y-2 text-sm text-slate-700">
+                        <p>
+                          <span className="font-semibold text-slate-900">
+                            Scored answers:
+                          </span>{" "}
+                          {scoreCount}/3
+                        </p>
+
+                        <p>
+                          <span className="font-semibold text-slate-900">
+                            Optional comments:
+                          </span>{" "}
+                          {commentCount > 0 ? "Included" : "None"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

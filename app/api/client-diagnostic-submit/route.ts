@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 type ResponseKind = "score" | "probe";
@@ -59,7 +59,9 @@ function getSupabaseAdminClient() {
 
 function validateRequestBody(
   body: unknown,
-): { isValid: true; data: ClientDiagnosticSubmitRequestBody } | { isValid: false; message: string } {
+):
+  | { isValid: true; data: ClientDiagnosticSubmitRequestBody }
+  | { isValid: false; message: string } {
   if (!body || typeof body !== "object") {
     return {
       isValid: false,
@@ -139,10 +141,7 @@ function validateRequestBody(
       };
     }
 
-    if (
-      typedResponse.kind !== "score" &&
-      typedResponse.kind !== "probe"
-    ) {
+    if (typedResponse.kind !== "score" && typedResponse.kind !== "probe") {
       return {
         isValid: false,
         message: "Each response kind must be 'score' or 'probe'.",
@@ -320,7 +319,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Responses were saved, but participant status could not be updated.",
+          error:
+            "Responses were saved, but participant status could not be updated.",
           details: updateParticipantError.message,
         },
         { status: 500 },
@@ -341,7 +341,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Unexpected server error while saving client diagnostic submission.",
+        error:
+          "Unexpected server error while saving client diagnostic submission.",
       },
       { status: 500 },
     );
