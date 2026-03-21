@@ -183,6 +183,49 @@ function validateRequestBody(
   };
 }
 
+function buildDimensionScoreRows(params: {
+  projectId: string;
+  questionnaireType: QuestionnaireType;
+  responses: SubmittedResponse[];
+  nowIso: string;
+}) {
+  const { projectId, questionnaireType, responses, nowIso } = params;
+
+  const scoreResponses = responses.filter(
+    (response): response is SubmittedResponse & { kind: "score"; value: number } =>
+      response.kind === "score" && typeof response.value === "number",
+  );
+
+  const dimensionMap: Record<
+    string,
+    {
+      total: number;
+      count: number;
+    }
+  > = {};
+
+  for (const response of scoreResponses) {
+    if (!dimensionMap[response.dimension]) {
+      dimensionMap[response.dimension] = {
+        total: 0,
+        count: 0,
+      };
+    }
+
+    dimensionMap[response.dimension].total += response.value;
+    dimensionMap[response.dimension].count += 1;
+  }
+
+  return Object.entries(dimensionMap).map(([dimension, aggregate]) => ({
+    project_id: projectId,
+    questionnaire_type: questionnaireType,
+    dimension_key: dimension,
+    average_score: Number((aggregate.total / aggregate.count).toFixed(2)),
+    response_count: aggregate.count,
+    updated_at: nowIso,
+  }));
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -294,6 +337,47 @@ export async function POST(request: Request) {
       );
     }
 
+    const { error: deleteExistingDimensionScoresError } = await supabase
+      .from("client_dimension_scores")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("questionnaire_type", questionnaireType);
+
+    if (deleteExistingDimensionScoresError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Responses were saved, but previous dimension scores could not be cleared.",
+          details: deleteExistingDimensionScoresError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    const dimensionScoreRows = buildDimensionScoreRows({
+      projectId,
+      questionnaireType,
+      responses,
+      nowIso,
+    });
+
+    if (dimensionScoreRows.length > 0) {
+      const { error: insertDimensionScoresError } = await supabase
+        .from("client_dimension_scores")
+        .insert(dimensionScoreRows);
+
+      if (insertDimensionScoresError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Responses were saved, but dimension scores could not be created.",
+            details: insertDimensionScoresError.message,
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     const participantUpdate: {
       participant_status: string;
       updated_at: string;
@@ -333,6 +417,7 @@ export async function POST(request: Request) {
       participantId,
       questionnaireType,
       savedResponseCount: responseRows.length,
+      dimensionScoresCreated: dimensionScoreRows.length,
       message: "Client diagnostic submission saved successfully.",
     });
   } catch (error) {
