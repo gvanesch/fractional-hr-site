@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useState } from "react";
 
 const STORAGE_KEY = "vanesch_cookie_notice_acknowledged";
 
+function getInitialVisibility(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(STORAGE_KEY) !== "true";
+}
+
 export default function CookieBanner() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const acknowledged =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(STORAGE_KEY) === "true";
-
-    if (!acknowledged) {
-      setVisible(true);
-    }
-  }, []);
+  const [visible, setVisible] = useState<boolean>(getInitialVisibility);
 
   const handleAccept = () => {
     window.localStorage.setItem(STORAGE_KEY, "true");
@@ -37,11 +35,17 @@ export default function CookieBanner() {
               This website is intended to use only essential technologies needed for
               basic functionality unless additional tools are introduced later.
               You can read more in the{" "}
-              <Link href="/cookies" className="font-medium text-white underline underline-offset-4">
+              <Link
+                href="/cookies"
+                className="font-medium text-white underline underline-offset-4"
+              >
                 Cookie Policy
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="font-medium text-white underline underline-offset-4">
+              <Link
+                href="/privacy"
+                className="font-medium text-white underline underline-offset-4"
+              >
                 Privacy Policy
               </Link>.
             </p>

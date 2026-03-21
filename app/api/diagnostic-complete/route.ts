@@ -89,11 +89,7 @@ function normaliseOptionalEmail(value: unknown): string | undefined {
     return undefined;
   }
 
-  if (!isValidEmail(trimmed)) {
-    throw new Error("A valid email address is required.");
-  }
-
-  return trimmed;
+  return isValidEmail(trimmed) ? trimmed : undefined;
 }
 
 function normaliseAnswers(
@@ -258,7 +254,10 @@ function parseRequestBody(input: unknown): DiagnosticCompleteRequestBody {
     companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
     industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
     role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
-    countryRegion: normaliseOptionalString(raw.countryRegion, MAX_CONTEXT_LENGTH),
+    countryRegion: normaliseOptionalString(
+      raw.countryRegion,
+      MAX_CONTEXT_LENGTH
+    ),
     email: normaliseOptionalEmail(raw.email),
     website: normaliseOptionalString(raw.website, 200),
   };
@@ -376,11 +375,8 @@ export async function POST(request: Request) {
 
     const isValidationError =
       error instanceof Error &&
-      (
-        error.message === "Invalid request body." ||
-        error.message === "Diagnostic answers are invalid." ||
-        error.message === "A valid email address is required."
-      );
+      (error.message === "Invalid request body." ||
+        error.message === "Diagnostic answers are invalid.");
 
     if (isValidationError && error instanceof Error) {
       return jsonResponse({ error: error.message }, 400);

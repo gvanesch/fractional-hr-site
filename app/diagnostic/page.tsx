@@ -308,9 +308,19 @@ export default function DiagnosticPage() {
     } catch (error) {
       console.error("Failed to send diagnostic completion email:", error);
       setCompletionEmailStatus("error");
-      setSubmitError(
-        "Your score has been calculated, but the diagnostic completion notification could not be sent."
-      );
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to send diagnostic completion email.";
+
+      if (errorMessage === "A valid email address is required.") {
+        setSubmitError(
+          "Your score has been calculated. The diagnostic notification could not be sent because the optional email address entered appears to be invalid."
+        );
+      } else {
+        setSubmitError(
+          "Your score has been calculated, but the diagnostic completion notification could not be sent."
+        );
+      }
     }
 
     setShowResults(true);

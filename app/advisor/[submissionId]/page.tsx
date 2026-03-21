@@ -1,9 +1,30 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { calculateDiagnosticResult } from "../../../lib/diagnostic";
+import { calculateDiagnosticResult, type DiagnosticAnswers } from "../../../lib/diagnostic";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
+type AdvisorBrief = {
+  headline?: string;
+  overallAssessment?: string;
+  executiveReadout?: string;
+  recommendedCallAngle?: string;
+  keyThemes?: string[];
+  likelyFrictionPoints?: string[];
+  businessImplications?: string[];
+  likelyOperationalRisks?: string[];
+  whatTypicallyHappensNext?: string[];
+  first30DayPriorities?: string[];
+  discussionPrompts?: string[];
+  suggestedFocusAreas?: string[];
+};
 
 type SubmissionRow = {
   submission_id: string;
@@ -17,10 +38,10 @@ type SubmissionRow = {
   industry: string | null;
   role: string | null;
   country_region: string | null;
-  answers: any;
+  answers: JsonValue;
   score: number | null;
   band: string | null;
-  advisor_brief: any;
+  advisor_brief: JsonValue;
   contact_submitted_at: string | null;
 };
 
@@ -29,6 +50,8 @@ type AdvisorPageProps = {
     submissionId: string;
   }>;
 };
+
+type DiagnosticResult = ReturnType<typeof calculateDiagnosticResult>;
 
 function getInsight(label: string): string {
   switch (label) {
@@ -57,7 +80,7 @@ function getInsight(label: string): string {
   }
 }
 
-function buildNarrative(result: any, submission: SubmissionRow): string {
+function buildNarrative(result: DiagnosticResult, submission: SubmissionRow): string {
   const size = submission.company_size || "a growing organisation";
 
   if (result.score < 40) {
@@ -71,7 +94,7 @@ function buildNarrative(result: any, submission: SubmissionRow): string {
   return "This reflects a relatively mature HR operation. The focus is likely optimisation, scalability, and alignment with future growth.";
 }
 
-function buildImpact(result: any): string {
+function buildImpact(result: DiagnosticResult): string {
   if (result.score < 40) {
     return "High management overhead, inconsistent employee experience, and growing operational risk as the organisation scales.";
   }
@@ -83,7 +106,7 @@ function buildImpact(result: any): string {
   return "Opportunities to optimise efficiency, reduce cost-to-serve, and improve scalability.";
 }
 
-function buildPriorities(result: any): string[] {
+function buildPriorities(result: DiagnosticResult): string[] {
   if (result.score < 40) {
     return [
       "Define and document core HR processes",
@@ -107,7 +130,7 @@ function buildPriorities(result: any): string[] {
   ];
 }
 
-function buildCallOpener(result: any, submission: SubmissionRow): string {
+function buildCallOpener(result: DiagnosticResult, submission: SubmissionRow): string {
   const size = submission.company_size || "your organisation";
 
   if (result.score < 40) {
@@ -184,20 +207,82 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
   return data as SubmissionRow;
 }
 
-function asObject(value: any): Record<string, any> | null {
+function asObject(value: JsonValue): JsonObject | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
-  return value;
+  return value as JsonObject;
 }
 
-function asStringArray(value: any): string[] {
+function asString(value: JsonValue | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asStringArray(value: JsonValue | undefined): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value.filter((item) => typeof item === "string");
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
+  const objectValue = asObject(value);
+
+  if (!objectValue) {
+    return null;
+  }
+
+  return {
+    headline: asString(objectValue.headline),
+    overallAssessment: asString(objectValue.overallAssessment),
+    executiveReadout: asString(objectValue.executiveReadout),
+    recommendedCallAngle: asString(objectValue.recommendedCallAngle),
+    keyThemes: asStringArray(objectValue.keyThemes),
+    likelyFrictionPoints: asStringArray(objectValue.likelyFrictionPoints),
+    businessImplications: asStringArray(objectValue.businessImplications),
+    likelyOperationalRisks: asStringArray(objectValue.likelyOperationalRisks),
+    whatTypicallyHappensNext: asStringArray(objectValue.whatTypicallyHappensNext),
+    first30DayPriorities: asStringArray(objectValue.first30DayPriorities),
+    discussionPrompts: asStringArray(objectValue.discussionPrompts),
+    suggestedFocusAreas: asStringArray(objectValue.suggestedFocusAreas),
+  };
+}
+
+function asDiagnosticAnswers(value: JsonValue): DiagnosticAnswers | null {
+  const objectValue = asObject(value);
+
+  if (!objectValue) {
+    return null;
+  }
+
+  const parsed: Record<number, 1 | 2 | 3 | 4 | 5 | undefined> = {};
+
+  for (const [key, rawValue] of Object.entries(objectValue)) {
+    const questionId = Number(key);
+
+    if (!Number.isInteger(questionId)) {
+      return null;
+    }
+
+    if (
+      rawValue === 1 ||
+      rawValue === 2 ||
+      rawValue === 3 ||
+      rawValue === 4 ||
+      rawValue === 5
+    ) {
+      parsed[questionId] = rawValue;
+      continue;
+    }
+
+    if (rawValue !== null && rawValue !== undefined) {
+      return null;
+    }
+  }
+
+  return parsed as DiagnosticAnswers;
 }
 
 function renderList(items: string[]) {
@@ -224,26 +309,21 @@ export default async function AdvisorSubmissionPage({
     notFound();
   }
 
-  const result = submission.answers
-    ? calculateDiagnosticResult(submission.answers as any)
+  const diagnosticAnswers = asDiagnosticAnswers(submission.answers);
+  const result = diagnosticAnswers
+    ? calculateDiagnosticResult(diagnosticAnswers)
     : null;
 
-  const advisorBrief = asObject(submission.advisor_brief);
+  const advisorBrief = asAdvisorBrief(submission.advisor_brief);
 
-  const keyThemes = asStringArray(advisorBrief?.keyThemes);
-  const likelyFrictionPoints = asStringArray(advisorBrief?.likelyFrictionPoints);
-  const businessImplications = asStringArray(advisorBrief?.businessImplications);
-  const likelyOperationalRisks = asStringArray(
-    advisorBrief?.likelyOperationalRisks
-  );
-  const whatTypicallyHappensNext = asStringArray(
-    advisorBrief?.whatTypicallyHappensNext
-  );
-  const first30DayPriorities = asStringArray(
-    advisorBrief?.first30DayPriorities
-  );
-  const discussionPrompts = asStringArray(advisorBrief?.discussionPrompts);
-  const suggestedFocusAreas = asStringArray(advisorBrief?.suggestedFocusAreas);
+  const keyThemes = advisorBrief?.keyThemes ?? [];
+  const likelyFrictionPoints = advisorBrief?.likelyFrictionPoints ?? [];
+  const businessImplications = advisorBrief?.businessImplications ?? [];
+  const likelyOperationalRisks = advisorBrief?.likelyOperationalRisks ?? [];
+  const whatTypicallyHappensNext = advisorBrief?.whatTypicallyHappensNext ?? [];
+  const first30DayPriorities = advisorBrief?.first30DayPriorities ?? [];
+  const discussionPrompts = advisorBrief?.discussionPrompts ?? [];
+  const suggestedFocusAreas = advisorBrief?.suggestedFocusAreas ?? [];
 
   return (
     <main className="min-h-screen bg-[#F4F6FA] px-6 py-16">
@@ -418,7 +498,7 @@ export default async function AdvisorSubmissionPage({
                 Lowest scoring areas
               </h2>
               <div className="space-y-4">
-                {result.lowestDimensions.map((dimension: any) => (
+                {result.lowestDimensions.map((dimension) => (
                   <div
                     key={dimension.label}
                     className="rounded-xl border border-slate-200 bg-slate-50 p-4"
