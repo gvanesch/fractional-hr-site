@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 
 const navigation = [
@@ -30,11 +31,20 @@ export default function Header() {
             aria-label="Van Esch home"
             onClick={handleCloseMenu}
           >
-            <img
-              src="/brand/logo-header.svg"
-              alt="Van Esch"
-              className="h-auto w-[120px] max-w-full sm:w-[150px] md:w-[180px] lg:w-[220px] xl:w-[260px]"
-            />
+            <div className="relative w-[120px] sm:w-[150px] md:w-[180px] lg:w-[220px] xl:w-[260px] h-[32px] sm:h-[36px] md:h-[40px] lg:h-[48px] xl:h-[56px]">
+              <Image
+                src="/brand/logo-header.svg"
+                alt="Van Esch"
+                fill
+                priority
+                sizes="(max-width: 640px) 120px,
+                       (max-width: 768px) 150px,
+                       (max-width: 1024px) 180px,
+                       (max-width: 1280px) 220px,
+                       260px"
+                className="object-contain"
+              />
+            </div>
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm font-medium text-slate-700 lg:flex xl:gap-6">
