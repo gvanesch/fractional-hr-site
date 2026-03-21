@@ -21,6 +21,7 @@ type ContactRequestBody = {
   industry?: string;
   role?: string;
   countryRegion?: string;
+  website?: string;
 };
 
 type ResendSendResponse = {
@@ -32,6 +33,25 @@ type ResendSendResponse = {
   };
 };
 
+const MAX_NAME_LENGTH = 120;
+const MAX_EMAIL_LENGTH = 320;
+const MAX_COMPANY_LENGTH = 160;
+const MAX_TOPIC_LENGTH = 160;
+const MAX_MESSAGE_LENGTH = 5000;
+const MAX_CONTEXT_LENGTH = 120;
+
+function jsonResponse(
+  body: Record<string, unknown>,
+  status = 200
+): NextResponse {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -41,7 +61,50 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function normaliseOptionalString(
+  value: unknown,
+  maxLength: number
+): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.slice(0, maxLength);
+}
+
+function normaliseRequiredString(
+  value: unknown,
+  fieldName: string,
+  maxLength: number
+): string {
+  if (typeof value !== "string") {
+    throw new Error(`${fieldName} is required.`);
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new Error(`${fieldName} is required.`);
+  }
+
+  return trimmed.slice(0, maxLength);
+}
+
 function isValidEmail(email: string): boolean {
+  if (email.length > MAX_EMAIL_LENGTH) {
+    return false;
+  }
+
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
@@ -75,6 +138,87 @@ function getDimensionInsight(label: string): string {
     default:
       return "This area may be contributing to operational friction.";
   }
+}
+
+function normaliseDiagnosticAnswers(value: unknown): DiagnosticAnswers | undefined {
+  if (value == null) {
+    return undefined;
+  }
+
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Diagnostic answers are invalid.");
+  }
+
+  const entries = Object.entries(value);
+
+  if (entries.length === 0) {
+    throw new Error("Diagnostic answers are invalid.");
+  }
+
+  const normalised: Record<number, 1 | 2 | 3 | 4 | 5> = {};
+
+  for (const [rawKey, rawValue] of entries) {
+    const numericKey = Number(rawKey);
+
+    if (!Number.isInteger(numericKey) || numericKey < 1 || numericKey > 10) {
+      throw new Error("Diagnostic answers are invalid.");
+    }
+
+    if (
+      rawValue !== 1 &&
+      rawValue !== 2 &&
+      rawValue !== 3 &&
+      rawValue !== 4 &&
+      rawValue !== 5
+    ) {
+      throw new Error("Diagnostic answers are invalid.");
+    }
+
+    normalised[numericKey] = rawValue;
+  }
+
+  return normalised as DiagnosticAnswers;
+}
+
+function parseRequestBody(input: unknown): ContactRequestBody {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Invalid request body.");
+  }
+
+  const raw = input as Record<string, unknown>;
+
+  const name = normaliseRequiredString(raw.name, "Name", MAX_NAME_LENGTH);
+  const email = normaliseRequiredString(raw.email, "Email", MAX_EMAIL_LENGTH).toLowerCase();
+  const message = normaliseRequiredString(
+    raw.message,
+    "Message",
+    MAX_MESSAGE_LENGTH
+  );
+
+  if (!isValidEmail(email)) {
+    throw new Error("A valid email address is required.");
+  }
+
+  if (message.length < 10) {
+    throw new Error("Message must be at least 10 characters.");
+  }
+
+  const website = normaliseOptionalString(raw.website, 200);
+
+  return {
+    name,
+    email,
+    message,
+    company: normaliseOptionalString(raw.company, MAX_COMPANY_LENGTH),
+    topic: normaliseOptionalString(raw.topic, MAX_TOPIC_LENGTH),
+    source: normaliseOptionalString(raw.source, MAX_TOPIC_LENGTH) || "website",
+    companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
+    industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
+    role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
+    countryRegion: normaliseOptionalString(raw.countryRegion, MAX_CONTEXT_LENGTH),
+    diagnosticAnswers: normaliseDiagnosticAnswers(raw.diagnosticAnswers),
+    website,
+  };
 }
 
 async function createLeadSubmission(params: {
@@ -118,6 +262,7 @@ async function createLeadSubmission(params: {
     headers: {
       "Content-Type": "application/json",
       apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
       Prefer: "return=representation",
     },
     body: JSON.stringify(rowToInsert),
@@ -513,20 +658,11 @@ async function sendEnquiryEmail(params: {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ContactRequestBody;
+    const rawBody = (await request.json()) as unknown;
+    const body = parseRequestBody(rawBody);
 
-    if (!body.name || !body.email || !body.message) {
-      return NextResponse.json(
-        { error: "Name, email, and message are required." },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidEmail(body.email)) {
-      return NextResponse.json(
-        { error: "A valid email address is required." },
-        { status: 400 }
-      );
+    if (isNonEmptyString(body.website)) {
+      return jsonResponse({ ok: true }, 200);
     }
 
     const result = body.diagnosticAnswers
@@ -551,7 +687,7 @@ export async function POST(request: Request) {
       advisorBrief,
     });
 
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       submissionId,
       advisorUrl,
@@ -560,9 +696,25 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Contact API error:", error);
 
-    const message =
-      error instanceof Error ? error.message : "Unexpected error sending enquiry.";
+    const isValidationError =
+      error instanceof Error &&
+      (
+        error.message === "Invalid request body." ||
+        error.message === "Name is required." ||
+        error.message === "Email is required." ||
+        error.message === "Message is required." ||
+        error.message === "A valid email address is required." ||
+        error.message === "Message must be at least 10 characters." ||
+        error.message === "Diagnostic answers are invalid."
+      );
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (isValidationError && error instanceof Error) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+
+    return jsonResponse(
+      { error: "Unable to process enquiry at the moment." },
+      500
+    );
   }
 }
