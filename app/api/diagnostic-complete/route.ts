@@ -96,7 +96,9 @@ function normaliseOptionalEmail(value: unknown): string | undefined {
   return trimmed;
 }
 
-function normaliseAnswers(value: unknown): Record<number, AnswerValue | undefined> {
+function normaliseAnswers(
+  value: unknown
+): Record<number, AnswerValue | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Diagnostic answers are invalid.");
   }
