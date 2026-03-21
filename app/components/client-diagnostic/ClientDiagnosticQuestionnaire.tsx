@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   dimensionDefinitions,
   getQuestionsForDimension,
@@ -36,9 +37,30 @@ type PreparedSubmission = {
   responses: PreparedResponse[];
 };
 
+type SubmitState = "idle" | "submitting" | "success" | "error";
+
+type SubmitResult = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  savedResponseCount?: number;
+};
+
+function isUuid(value: string | null): value is string {
+  if (!value) {
+    return false;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export default function ClientDiagnosticQuestionnaire({
   questionnaireType,
 }: ClientDiagnosticQuestionnaireProps) {
+  const searchParams = useSearchParams();
+
   const [scoreAnswers, setScoreAnswers] = useState<
     Record<string, ScoreAnswerValue | undefined>
   >({});
@@ -46,6 +68,8 @@ export default function ClientDiagnosticQuestionnaire({
   const [preparedSubmission, setPreparedSubmission] =
     useState<PreparedSubmission | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [submitMessage, setSubmitMessage] = useState<string>("");
 
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const dimensionHeaderRefs = useRef<Record<DimensionKey, HTMLDivElement | null>>(
@@ -53,7 +77,13 @@ export default function ClientDiagnosticQuestionnaire({
   );
   const stickyPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const draftStorageKey = `client-diagnostic-draft:${questionnaireType}`;
+  const projectId = searchParams.get("projectId");
+  const participantId = searchParams.get("participantId");
+
+  const hasValidSubmissionContext =
+    isUuid(projectId) && isUuid(participantId);
+
+  const draftStorageKey = `client-diagnostic-draft:${questionnaireType}:${projectId ?? "unknown"}:${participantId ?? "unknown"}`;
 
   const allQuestions = useMemo(() => {
     return dimensionDefinitions.flatMap((dimension) =>
@@ -88,6 +118,9 @@ export default function ClientDiagnosticQuestionnaire({
 
         setScoreAnswers(parsed.scoreAnswers ?? {});
         setProbeAnswers(parsed.probeAnswers ?? {});
+      } else {
+        setScoreAnswers({});
+        setProbeAnswers({});
       }
     } catch (error) {
       console.error("Unable to load questionnaire draft.", error);
@@ -244,12 +277,87 @@ export default function ClientDiagnosticQuestionnaire({
 
   function handleReviewSubmission() {
     setPreparedSubmission(buildPreparedSubmission());
+    setSubmitMessage("");
+  }
+
+  async function handleSubmitDiagnostic() {
+    setSubmitMessage("");
+
+    if (!hasValidSubmissionContext || !projectId || !participantId) {
+      setSubmitState("error");
+      setSubmitMessage(
+        "This questionnaire link is missing a valid project or participant reference.",
+      );
+      return;
+    }
+
+    const submission = buildPreparedSubmission();
+    setPreparedSubmission(submission);
+
+    const scoreResponseCount = submission.responses.filter(
+      (response) => response.kind === "score",
+    ).length;
+
+    if (scoreResponseCount !== scoreQuestions.length) {
+      setSubmitState("error");
+      setSubmitMessage(
+        "Please complete all scored questions before submitting.",
+      );
+      return;
+    }
+
+    setSubmitState("submitting");
+
+    try {
+      const response = await fetch("/api/client-diagnostic-submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId,
+          participantId,
+          questionnaireType,
+          responses: submission.responses,
+        }),
+      });
+
+      const result = (await response.json()) as SubmitResult;
+
+      if (!response.ok || !result.success) {
+        setSubmitState("error");
+        setSubmitMessage(
+          result.error ?? "Unable to submit the diagnostic at this time.",
+        );
+        return;
+      }
+
+      setSubmitState("success");
+      setSubmitMessage(
+        result.message ??
+          `Submission saved successfully${result.savedResponseCount ? ` (${result.savedResponseCount} responses).` : "."}`,
+      );
+
+      try {
+        window.localStorage.removeItem(draftStorageKey);
+      } catch (error) {
+        console.error("Unable to clear local draft after submission.", error);
+      }
+    } catch (error) {
+      console.error("Client diagnostic submission failed.", error);
+      setSubmitState("error");
+      setSubmitMessage(
+        "Unexpected error while submitting the diagnostic. Please try again.",
+      );
+    }
   }
 
   function handleClearDraft() {
     setScoreAnswers({});
     setProbeAnswers({});
     setPreparedSubmission(null);
+    setSubmitState("idle");
+    setSubmitMessage("");
     window.localStorage.removeItem(draftStorageKey);
   }
 
@@ -272,6 +380,13 @@ export default function ClientDiagnosticQuestionnaire({
                 {completedRequiredCount} of {scoreQuestions.length} scored
                 questions completed
               </p>
+
+              {!hasValidSubmissionContext ? (
+                <p className="mt-3 text-sm leading-6 text-amber-700">
+                  Submission link is missing a valid project or participant ID.
+                  Review mode works, but submission is currently disabled.
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -285,6 +400,19 @@ export default function ClientDiagnosticQuestionnaire({
 
               <button
                 type="button"
+                onClick={handleSubmitDiagnostic}
+                disabled={
+                  submitState === "submitting" || !hasValidSubmissionContext
+                }
+                className="inline-flex min-h-[2.9rem] items-center justify-center rounded-[0.85rem] bg-[var(--brand-navy-2)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-navy-1)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitState === "submitting"
+                  ? "Submitting..."
+                  : "Submit diagnostic"}
+              </button>
+
+              <button
+                type="button"
                 onClick={handleClearDraft}
                 className="inline-flex min-h-[2.9rem] items-center justify-center rounded-[0.85rem] border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
@@ -292,6 +420,20 @@ export default function ClientDiagnosticQuestionnaire({
               </button>
             </div>
           </div>
+
+          {submitMessage ? (
+            <div
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm leading-6 ${
+                submitState === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : submitState === "error"
+                    ? "border-rose-200 bg-rose-50 text-rose-800"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+              }`}
+            >
+              {submitMessage}
+            </div>
+          ) : null}
 
           <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-200">
             <div
@@ -375,8 +517,8 @@ export default function ClientDiagnosticQuestionnaire({
 
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
             This section shows a structured preview of the current draft
-            submission. In the next phase, this will feed the response storage
-            and analysis workflow.
+            submission. It is also the payload that will be sent to the storage
+            and analysis workflow when submitted.
           </p>
 
           <pre className="mt-5 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-4 text-xs leading-6 text-slate-200">
