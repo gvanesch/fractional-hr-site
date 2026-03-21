@@ -468,24 +468,22 @@ export default function DiagnosticPage() {
             </div>
           </div>
 
-          <div className="mb-10 h-[88px]" aria-hidden="true" />
-
-          <div className="fixed left-1/2 top-[calc(var(--site-header-height)+1rem)] z-40 w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 px-4 sm:px-6 lg:px-0">
-            <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
-              <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full bg-[#1E6FD9] transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              <p className="mt-2 text-sm text-slate-600">
-                {answeredCount} / {questions.length} questions answered ({progress}%)
-              </p>
-            </div>
-          </div>
-
           <div className="space-y-8">
+            <div className="sticky top-[calc(var(--site-header-height)+1rem)] z-30">
+              <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full bg-[#1E6FD9] transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {answeredCount} / {questions.length} questions answered ({progress}%)
+                </p>
+              </div>
+            </div>
+
             {questions.map((q) => (
               <div
                 key={q.id}
