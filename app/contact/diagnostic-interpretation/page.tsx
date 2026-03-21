@@ -101,7 +101,6 @@ export default function DiagnosticInterpretationPage() {
 
           {result ? (
             <>
-              {/* SCORE BLOCK */}
               <div className="mb-8 rounded-xl bg-slate-50 p-5">
                 <h2 className="mb-3 text-lg font-semibold text-slate-900">
                   Overall profile
@@ -124,7 +123,6 @@ export default function DiagnosticInterpretationPage() {
                 </p>
               </div>
 
-              {/* BENCHMARK STYLE */}
               <div className="mb-8 rounded-xl border border-slate-200 p-5">
                 <h2 className="mb-3 text-lg font-semibold text-slate-900">
                   How this typically shows up
@@ -138,7 +136,6 @@ export default function DiagnosticInterpretationPage() {
                 </p>
               </div>
 
-              {/* FRICTION AREAS */}
               {lowestDimensions.length > 0 && (
                 <div className="mb-8 rounded-xl border border-slate-200 p-5">
                   <h2 className="mb-3 text-lg font-semibold text-slate-900">
@@ -146,7 +143,7 @@ export default function DiagnosticInterpretationPage() {
                   </h2>
 
                   <div className="space-y-4">
-                    {lowestDimensions.map((d, i) => (
+                    {lowestDimensions.map((d) => (
                       <div key={d.label}>
                         <p className="font-medium text-slate-900">
                           {d.label} ({d.score} / 5)
@@ -160,7 +157,6 @@ export default function DiagnosticInterpretationPage() {
                 </div>
               )}
 
-              {/* IMPROVEMENT DIRECTION */}
               <div className="mb-8 rounded-xl bg-slate-50 p-5">
                 <h2 className="mb-3 text-lg font-semibold text-slate-900">
                   Potential focus areas
@@ -191,7 +187,6 @@ export default function DiagnosticInterpretationPage() {
             </div>
           )}
 
-          {/* CTA */}
           <div className="rounded-xl border border-slate-200 p-5">
             <h2 className="mb-3 text-lg font-semibold text-slate-900">
               Discuss your result
