@@ -305,46 +305,81 @@ function buildInsightSummary(dimensionInsights: DimensionInsight[]) {
   };
 }
 
-function buildExecutiveOverview(
-  companyName: string,
-  insightSummary: ClientDiagnosticReportResponse["report"]["insightSummary"],
-  strengthsCount: number,
-  gapsCount: number,
-): string {
-  const statusParts: string[] = [];
+function buildExecutiveSummary({
+  insights,
+  completionPercentage,
+  completedRespondentGroups,
+  totalRespondentGroups,
+}: {
+  insights: DimensionInsight[];
+  completionPercentage: number;
+  completedRespondentGroups: number;
+  totalRespondentGroups: number;
+}): string {
+  const strong = insights.filter((insight) => insight.status === "strong").length;
+  const weak = insights.filter((insight) => insight.status === "weak").length;
 
-  if (insightSummary.status.strong > 0) {
-    statusParts.push(`${insightSummary.status.strong} strong`);
+  const significantGaps = insights.filter(
+    (insight) => insight.alignment === "significant_gap",
+  ).length;
+
+  const emergingGaps = insights.filter(
+    (insight) => insight.alignment === "emerging_gap",
+  ).length;
+
+  let maturityStatement = "";
+
+  if (strong >= weak + 2) {
+    maturityStatement =
+      "HR operations appear relatively well established, with several areas of strength across the assessed dimensions.";
+  } else if (weak >= strong + 2) {
+    maturityStatement =
+      "HR operations appear to be under strain, with multiple dimensions indicating weaker or inconsistent execution.";
+  } else {
+    maturityStatement =
+      "HR operations show a mixed level of maturity, with strengths in some areas but clear opportunities for improvement in others.";
   }
 
-  if (insightSummary.status.moderate > 0) {
-    statusParts.push(`${insightSummary.status.moderate} moderate`);
+  let alignmentStatement = "";
+
+  if (significantGaps > 0) {
+    alignmentStatement =
+      "There are clear differences in how HR, managers, and leadership experience people operations, suggesting inconsistency in how processes are understood or applied.";
+  } else if (emergingGaps > 0) {
+    alignmentStatement =
+      "There are early signs of variation between respondent groups, indicating that some processes may not be consistently experienced across the organisation.";
+  } else {
+    alignmentStatement =
+      "Perceptions across HR, managers, and leadership are broadly aligned, suggesting that processes are generally understood and applied consistently.";
   }
 
-  if (insightSummary.status.weak > 0) {
-    statusParts.push(`${insightSummary.status.weak} weak`);
+  let completenessStatement = "";
+
+  if (completionPercentage < 50) {
+    completenessStatement =
+      "This view is based on a limited response set and should be treated as directional rather than definitive.";
+  } else if (completedRespondentGroups < totalRespondentGroups) {
+    completenessStatement =
+      "Not all respondent groups are fully represented, so some areas may benefit from additional input to confirm these patterns.";
+  } else {
+    completenessStatement =
+      "The response set provides a well-rounded view across respondent groups, giving a reliable picture of current operations.";
   }
 
-  const statusSentence =
-    statusParts.length > 0
-      ? `Across the scored dimensions, ${companyName} currently shows ${statusParts.join(
-          ", ",
-        )} areas of maturity.`
-      : `A scored maturity profile is not yet available for ${companyName}.`;
+  let directionStatement = "";
 
-  const alignmentSentence =
-    insightSummary.alignment.significantGap > 0
-      ? `There are ${insightSummary.alignment.significantGap} dimensions with significant cross-group gaps, suggesting material differences in how HR, managers, and leaders experience the current operating model.`
-      : insightSummary.alignment.emergingGap > 0
-        ? `There are ${insightSummary.alignment.emergingGap} dimensions showing emerging cross-group gaps, indicating some differences in perspective across HR, managers, and leaders.`
-        : `The scored respondent groups are broadly aligned across the assessed dimensions.`;
+  if (significantGaps > 0) {
+    directionStatement =
+      "The most valuable next step is to focus on areas with the greatest variation, aligning expectations, clarifying ownership, and standardising how key processes are delivered.";
+  } else if (weak > strong) {
+    directionStatement =
+      "The priority should be strengthening core operational foundations, ensuring that key processes are clearly defined, consistently applied, and well supported.";
+  } else {
+    directionStatement =
+      "The next step is to build on existing strengths while addressing targeted areas of inconsistency before they become larger operational constraints.";
+  }
 
-  const prioritySentence =
-    strengthsCount > 0 || gapsCount > 0
-      ? `The report highlights ${strengthsCount} relative strength${strengthsCount === 1 ? "" : "s"} and ${gapsCount} priority gap${gapsCount === 1 ? "" : "s"} to support focused follow-up and advisory discussion.`
-      : `Priority strengths and gaps will become clearer as more scored responses are completed.`;
-
-  return `${statusSentence} ${alignmentSentence} ${prioritySentence}`;
+  return `${maturityStatement} ${alignmentStatement} ${completenessStatement} ${directionStatement}`;
 }
 
 async function fetchProjectSummary(
@@ -431,12 +466,15 @@ export async function GET(
         group.questionnaireType !== "client_fact_pack" && group.completed > 0,
     ).length;
 
-    const executiveOverview = buildExecutiveOverview(
-      summary.project.companyName,
-      clientSafeInsightSummary,
-      strengths.length,
-      gaps.length,
-    );
+    const completionPercentage = summary.completion.completionPercentage;
+    const totalRespondentGroups = SCORED_QUESTIONNAIRE_TYPES.length;
+
+    const executiveOverview = buildExecutiveSummary({
+      insights: clientSafeInsights,
+      completionPercentage,
+      completedRespondentGroups,
+      totalRespondentGroups,
+    });
 
     return NextResponse.json({
       success: true,
@@ -449,9 +487,9 @@ export async function GET(
         },
         executiveSummary: {
           overview: executiveOverview,
-          completionPercentage: summary.completion.completionPercentage,
+          completionPercentage,
           completedRespondentGroups,
-          totalRespondentGroups: SCORED_QUESTIONNAIRE_TYPES.length,
+          totalRespondentGroups,
         },
         insightSummary: clientSafeInsightSummary,
         priorityDimensions: {
