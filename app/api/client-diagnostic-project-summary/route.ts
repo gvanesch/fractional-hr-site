@@ -5,6 +5,10 @@ import {
   type DimensionInsight,
 } from "@/lib/client-diagnostic/insight-engine";
 import {
+  buildDimensionNarratives,
+  type DimensionNarrative,
+} from "@/lib/client-diagnostic/narrative-engine";
+import {
   dimensionDefinitions,
   questionnaireTypes,
   type QuestionnaireType,
@@ -121,6 +125,9 @@ type ProjectSummaryResponse = {
         insufficient: number;
       };
     };
+  };
+  narratives: {
+    dimensions: DimensionNarrative[];
   };
 };
 
@@ -424,6 +431,7 @@ export async function GET(
     const respondentGroups = buildRespondentGroups(participantRows);
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
     const dimensionInsights = buildDimensionInsights(dimensions);
+    const dimensionNarratives = buildDimensionNarratives(dimensionInsights);
     const insightSummary = buildInsightSummary(dimensionInsights);
 
     const strongestAlignment = sortDimensionsByGap(
@@ -471,6 +479,9 @@ export async function GET(
       insights: {
         dimensions: dimensionInsights,
         summary: insightSummary,
+      },
+      narratives: {
+        dimensions: dimensionNarratives,
       },
     });
   } catch (error) {

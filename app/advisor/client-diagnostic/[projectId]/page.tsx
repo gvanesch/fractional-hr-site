@@ -5,6 +5,10 @@ import {
   type DimensionInsight,
 } from "@/lib/client-diagnostic/insight-engine";
 import {
+  buildDimensionNarratives,
+  type DimensionNarrative,
+} from "@/lib/client-diagnostic/narrative-engine";
+import {
   dimensionDefinitions,
   questionnaireTypes,
   type QuestionnaireType,
@@ -259,6 +263,21 @@ function getInsightCompletenessTone(
   }
 }
 
+function getNarrativeConfidenceTone(
+  confidence: DimensionNarrative["confidence"],
+) {
+  switch (confidence) {
+    case "high":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "medium":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "low":
+      return "border-slate-200 bg-slate-50 text-slate-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
 function formatInsightStatus(status: DimensionInsight["status"]): string {
   switch (status) {
     case "strong":
@@ -295,6 +314,19 @@ function formatCompleteness(
       return "Partial";
     case "insufficient":
       return "Insufficient";
+    default:
+      return "—";
+  }
+}
+
+function formatConfidence(confidence: DimensionNarrative["confidence"]): string {
+  switch (confidence) {
+    case "high":
+      return "High confidence";
+    case "medium":
+      return "Medium confidence";
+    case "low":
+      return "Low confidence";
     default:
       return "—";
   }
@@ -400,8 +432,7 @@ function getPriorityDimensions(
         return 3;
       };
 
-      const statusDiff =
-        statusWeight(a.status) - statusWeight(b.status);
+      const statusDiff = statusWeight(a.status) - statusWeight(b.status);
 
       if (statusDiff !== 0) {
         return statusDiff;
@@ -428,6 +459,23 @@ function getPriorityDimensions(
       return averageA - averageB;
     })
     .slice(0, 5);
+}
+
+function getPriorityNarratives(
+  dimensionInsights: DimensionInsight[],
+  dimensionNarratives: DimensionNarrative[],
+): Array<{
+  insight: DimensionInsight;
+  narrative: DimensionNarrative | undefined;
+}> {
+  const priorityInsights = getPriorityDimensions(dimensionInsights);
+
+  return priorityInsights.map((insight) => ({
+    insight,
+    narrative: dimensionNarratives.find(
+      (narrative) => narrative.dimensionKey === insight.dimensionKey,
+    ),
+  }));
 }
 
 export default async function ClientDiagnosticProjectDashboardPage({
@@ -492,8 +540,13 @@ export default async function ClientDiagnosticProjectDashboardPage({
   const dimensionScoreRows = dimensionScores ?? [];
   const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
   const dimensionInsights = buildDimensionInsights(dimensionSummaries);
-  const insightSummary = buildInsightSummary(dimensionInsights);
+  const dimensionNarratives = buildDimensionNarratives(dimensionInsights);
   const priorityDimensions = getPriorityDimensions(dimensionInsights);
+  const priorityNarratives = getPriorityNarratives(
+    dimensionInsights,
+    dimensionNarratives,
+  );
+  const insightSummary = buildInsightSummary(dimensionInsights);
   const respondentGroups = buildRespondentGroups(participantRows);
 
   const completedParticipants = participantRows.filter(
@@ -661,27 +714,63 @@ export default async function ClientDiagnosticProjectDashboardPage({
               <InsightSummaryPanel
                 title="Dimension status"
                 items={[
-                  { label: "Strong", value: insightSummary.status.strong, tone: "emerald" },
-                  { label: "Moderate", value: insightSummary.status.moderate, tone: "amber" },
-                  { label: "Weak", value: insightSummary.status.weak, tone: "rose" },
+                  {
+                    label: "Strong",
+                    value: insightSummary.status.strong,
+                    tone: "emerald",
+                  },
+                  {
+                    label: "Moderate",
+                    value: insightSummary.status.moderate,
+                    tone: "amber",
+                  },
+                  {
+                    label: "Weak",
+                    value: insightSummary.status.weak,
+                    tone: "rose",
+                  },
                 ]}
               />
 
               <InsightSummaryPanel
                 title="Role alignment"
                 items={[
-                  { label: "Aligned", value: insightSummary.alignment.aligned, tone: "emerald" },
-                  { label: "Emerging gap", value: insightSummary.alignment.emergingGap, tone: "amber" },
-                  { label: "Significant gap", value: insightSummary.alignment.significantGap, tone: "rose" },
+                  {
+                    label: "Aligned",
+                    value: insightSummary.alignment.aligned,
+                    tone: "emerald",
+                  },
+                  {
+                    label: "Emerging gap",
+                    value: insightSummary.alignment.emergingGap,
+                    tone: "amber",
+                  },
+                  {
+                    label: "Significant gap",
+                    value: insightSummary.alignment.significantGap,
+                    tone: "rose",
+                  },
                 ]}
               />
 
               <InsightSummaryPanel
                 title="Data completeness"
                 items={[
-                  { label: "Sufficient", value: insightSummary.completeness.sufficient, tone: "emerald" },
-                  { label: "Partial", value: insightSummary.completeness.partial, tone: "amber" },
-                  { label: "Insufficient", value: insightSummary.completeness.insufficient, tone: "slate" },
+                  {
+                    label: "Sufficient",
+                    value: insightSummary.completeness.sufficient,
+                    tone: "emerald",
+                  },
+                  {
+                    label: "Partial",
+                    value: insightSummary.completeness.partial,
+                    tone: "amber",
+                  },
+                  {
+                    label: "Insufficient",
+                    value: insightSummary.completeness.insufficient,
+                    tone: "slate",
+                  },
                 ]}
               />
             </div>
@@ -711,6 +800,33 @@ export default async function ClientDiagnosticProjectDashboardPage({
           </div>
 
           <div className="brand-surface-card mt-8 p-6 sm:p-8">
+            <p className="brand-section-kicker">Advisory narrative</p>
+
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Structured observations and recommended next steps
+            </h2>
+
+            <p className="brand-body-sm mt-4 max-w-3xl">
+              These narrative outputs are generated from the current
+              rules-based insight model. They are designed to support internal
+              advisory preparation before a client-facing reporting layer is
+              introduced.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {priorityNarratives.map(({ insight, narrative }) =>
+                narrative ? (
+                  <NarrativeCard
+                    key={narrative.dimensionKey}
+                    insight={insight}
+                    narrative={narrative}
+                  />
+                ) : null,
+              )}
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-8 p-6 sm:p-8">
             <p className="brand-section-kicker">Outstanding responses</p>
 
             <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
@@ -724,7 +840,10 @@ export default async function ClientDiagnosticProjectDashboardPage({
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               {respondentGroups.map((group) => (
-                <OutstandingGroupCard key={group.questionnaireType} group={group} />
+                <OutstandingGroupCard
+                  key={group.questionnaireType}
+                  group={group}
+                />
               ))}
             </div>
           </div>
@@ -738,7 +857,10 @@ export default async function ClientDiagnosticProjectDashboardPage({
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {respondentGroups.map((group) => (
-                <RespondentSummaryCard key={group.questionnaireType} group={group} />
+                <RespondentSummaryCard
+                  key={group.questionnaireType}
+                  group={group}
+                />
               ))}
             </div>
 
@@ -778,7 +900,9 @@ export default async function ClientDiagnosticProjectDashboardPage({
                             participant.participant_status,
                           )}`}
                         >
-                          {formatParticipantStatus(participant.participant_status)}
+                          {formatParticipantStatus(
+                            participant.participant_status,
+                          )}
                         </span>
                       </td>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
@@ -850,9 +974,9 @@ export default async function ClientDiagnosticProjectDashboardPage({
             </h2>
 
             <p className="brand-body-sm mt-4 max-w-3xl">
-              This table shows current average scores by role for each dimension.
-              Missing groups indicate questionnaires that have not yet been
-              completed.
+              This table shows current average scores by role for each
+              dimension. Missing groups indicate questionnaires that have not
+              yet been completed.
             </p>
 
             <div className="mt-6 overflow-x-auto">
@@ -900,7 +1024,9 @@ export default async function ClientDiagnosticProjectDashboardPage({
                             dimension.gap,
                           )}`}
                         >
-                          {dimension.gap !== null ? dimension.gap.toFixed(2) : "—"}
+                          {dimension.gap !== null
+                            ? dimension.gap.toFixed(2)
+                            : "—"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
                           {dimension.missingQuestionnaireTypes.length > 0
@@ -1093,6 +1219,78 @@ function PriorityDimensionCard({
           value={`${dimension.completedQuestionnaireTypes.length}/${questionnaireTypes.length}`}
         />
       </div>
+    </div>
+  );
+}
+
+function NarrativeCard({
+  insight,
+  narrative,
+}: {
+  insight: DimensionInsight;
+  narrative: DimensionNarrative;
+}) {
+  return (
+    <div className="brand-surface-soft p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-base font-semibold text-slate-900">
+            {narrative.dimensionLabel}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {insight.dimensionDescription}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getNarrativeConfidenceTone(
+              narrative.confidence,
+            )}`}
+          >
+            {formatConfidence(narrative.confidence)}
+          </span>
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightStatusTone(
+              insight.status,
+            )}`}
+          >
+            {formatInsightStatus(insight.status)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+        <NarrativeBlock
+          title="Observation"
+          body={narrative.observation}
+        />
+        <NarrativeBlock
+          title="Implication"
+          body={narrative.implication}
+        />
+        <NarrativeBlock
+          title="Recommended next step"
+          body={narrative.recommendedNextStep}
+        />
+      </div>
+    </div>
+  );
+}
+
+function NarrativeBlock({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {title}
+      </p>
+      <p className="mt-3 text-sm leading-6 text-slate-700">{body}</p>
     </div>
   );
 }
