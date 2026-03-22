@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  buildDimensionInsights,
+  type DimensionInsight,
+} from "@/lib/client-diagnostic/insight-engine";
+import {
   dimensionDefinitions,
   questionnaireTypes,
   type QuestionnaireType,
@@ -98,6 +102,26 @@ type ProjectSummaryResponse = {
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
+  insights: {
+    dimensions: DimensionInsight[];
+    summary: {
+      status: {
+        strong: number;
+        moderate: number;
+        weak: number;
+      };
+      alignment: {
+        aligned: number;
+        emergingGap: number;
+        significantGap: number;
+      };
+      completeness: {
+        sufficient: number;
+        partial: number;
+        insufficient: number;
+      };
+    };
+  };
 };
 
 type ErrorResponse = {
@@ -264,6 +288,42 @@ function sortDimensionsByGap(
   });
 }
 
+function buildInsightSummary(dimensionInsights: DimensionInsight[]) {
+  return {
+    status: {
+      strong: dimensionInsights.filter((insight) => insight.status === "strong")
+        .length,
+      moderate: dimensionInsights.filter(
+        (insight) => insight.status === "moderate",
+      ).length,
+      weak: dimensionInsights.filter((insight) => insight.status === "weak")
+        .length,
+    },
+    alignment: {
+      aligned: dimensionInsights.filter(
+        (insight) => insight.alignment === "aligned",
+      ).length,
+      emergingGap: dimensionInsights.filter(
+        (insight) => insight.alignment === "emerging_gap",
+      ).length,
+      significantGap: dimensionInsights.filter(
+        (insight) => insight.alignment === "significant_gap",
+      ).length,
+    },
+    completeness: {
+      sufficient: dimensionInsights.filter(
+        (insight) => insight.completeness === "sufficient",
+      ).length,
+      partial: dimensionInsights.filter(
+        (insight) => insight.completeness === "partial",
+      ).length,
+      insufficient: dimensionInsights.filter(
+        (insight) => insight.completeness === "insufficient",
+      ).length,
+    },
+  };
+}
+
 export async function GET(
   request: Request,
 ): Promise<NextResponse<ProjectSummaryResponse | ErrorResponse>> {
@@ -362,8 +422,9 @@ export async function GET(
     const outstanding = Math.max(totalInvited - completed, 0);
 
     const respondentGroups = buildRespondentGroups(participantRows);
-
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
+    const dimensionInsights = buildDimensionInsights(dimensions);
+    const insightSummary = buildInsightSummary(dimensionInsights);
 
     const strongestAlignment = sortDimensionsByGap(
       dimensions.filter((dimension) => dimension.gap !== null),
@@ -407,6 +468,10 @@ export async function GET(
       dimensions,
       strongestAlignment,
       biggestGaps,
+      insights: {
+        dimensions: dimensionInsights,
+        summary: insightSummary,
+      },
     });
   } catch (error) {
     console.error("Unable to build client diagnostic project summary.", error);

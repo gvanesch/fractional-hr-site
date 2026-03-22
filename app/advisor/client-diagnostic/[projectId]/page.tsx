@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import {
+  buildDimensionInsights,
+  type DimensionInsight,
+} from "@/lib/client-diagnostic/insight-engine";
+import {
   dimensionDefinitions,
   questionnaireTypes,
   type QuestionnaireType,
@@ -214,6 +218,88 @@ function getGapToneClasses(gap: number | null): string {
   return "text-emerald-700";
 }
 
+function getInsightStatusTone(status: DimensionInsight["status"]) {
+  switch (status) {
+    case "strong":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "moderate":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "weak":
+      return "border-rose-200 bg-rose-50 text-rose-800";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function getInsightAlignmentTone(alignment: DimensionInsight["alignment"]) {
+  switch (alignment) {
+    case "aligned":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "emerging_gap":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "significant_gap":
+      return "border-rose-200 bg-rose-50 text-rose-800";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function getInsightCompletenessTone(
+  completeness: DimensionInsight["completeness"],
+) {
+  switch (completeness) {
+    case "sufficient":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "partial":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "insufficient":
+      return "border-slate-200 bg-slate-50 text-slate-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function formatInsightStatus(status: DimensionInsight["status"]): string {
+  switch (status) {
+    case "strong":
+      return "Strong";
+    case "moderate":
+      return "Moderate";
+    case "weak":
+      return "Weak";
+    default:
+      return "—";
+  }
+}
+
+function formatAlignment(alignment: DimensionInsight["alignment"]): string {
+  switch (alignment) {
+    case "aligned":
+      return "Aligned";
+    case "emerging_gap":
+      return "Emerging gap";
+    case "significant_gap":
+      return "Significant gap";
+    default:
+      return "—";
+  }
+}
+
+function formatCompleteness(
+  completeness: DimensionInsight["completeness"],
+): string {
+  switch (completeness) {
+    case "sufficient":
+      return "Sufficient";
+    case "partial":
+      return "Partial";
+    case "insufficient":
+      return "Insufficient";
+    default:
+      return "—";
+  }
+}
+
 function buildRespondentGroups(
   participantRows: ParticipantRow[],
 ): RespondentGroupSummary[] {
@@ -249,6 +335,99 @@ function buildRespondentGroups(
       outstandingParticipants,
     };
   });
+}
+
+function buildInsightSummary(dimensionInsights: DimensionInsight[]) {
+  return {
+    status: {
+      strong: dimensionInsights.filter((insight) => insight.status === "strong")
+        .length,
+      moderate: dimensionInsights.filter(
+        (insight) => insight.status === "moderate",
+      ).length,
+      weak: dimensionInsights.filter((insight) => insight.status === "weak")
+        .length,
+    },
+    alignment: {
+      aligned: dimensionInsights.filter(
+        (insight) => insight.alignment === "aligned",
+      ).length,
+      emergingGap: dimensionInsights.filter(
+        (insight) => insight.alignment === "emerging_gap",
+      ).length,
+      significantGap: dimensionInsights.filter(
+        (insight) => insight.alignment === "significant_gap",
+      ).length,
+    },
+    completeness: {
+      sufficient: dimensionInsights.filter(
+        (insight) => insight.completeness === "sufficient",
+      ).length,
+      partial: dimensionInsights.filter(
+        (insight) => insight.completeness === "partial",
+      ).length,
+      insufficient: dimensionInsights.filter(
+        (insight) => insight.completeness === "insufficient",
+      ).length,
+    },
+  };
+}
+
+function getPriorityDimensions(
+  dimensionInsights: DimensionInsight[],
+): DimensionInsight[] {
+  return [...dimensionInsights]
+    .sort((a, b) => {
+      const statusWeight = (status: DimensionInsight["status"]) => {
+        if (status === "weak") return 0;
+        if (status === "moderate") return 1;
+        if (status === "strong") return 2;
+        return 3;
+      };
+
+      const completenessWeight = (
+        completeness: DimensionInsight["completeness"],
+      ) => {
+        if (completeness === "sufficient") return 0;
+        if (completeness === "partial") return 1;
+        return 2;
+      };
+
+      const alignmentWeight = (alignment: DimensionInsight["alignment"]) => {
+        if (alignment === "significant_gap") return 0;
+        if (alignment === "emerging_gap") return 1;
+        if (alignment === "aligned") return 2;
+        return 3;
+      };
+
+      const statusDiff =
+        statusWeight(a.status) - statusWeight(b.status);
+
+      if (statusDiff !== 0) {
+        return statusDiff;
+      }
+
+      const alignmentDiff =
+        alignmentWeight(a.alignment) - alignmentWeight(b.alignment);
+
+      if (alignmentDiff !== 0) {
+        return alignmentDiff;
+      }
+
+      const completenessDiff =
+        completenessWeight(a.completeness) -
+        completenessWeight(b.completeness);
+
+      if (completenessDiff !== 0) {
+        return completenessDiff;
+      }
+
+      const averageA = a.averageScore ?? 999;
+      const averageB = b.averageScore ?? 999;
+
+      return averageA - averageB;
+    })
+    .slice(0, 5);
 }
 
 export default async function ClientDiagnosticProjectDashboardPage({
@@ -312,6 +491,9 @@ export default async function ClientDiagnosticProjectDashboardPage({
 
   const dimensionScoreRows = dimensionScores ?? [];
   const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
+  const dimensionInsights = buildDimensionInsights(dimensionSummaries);
+  const insightSummary = buildInsightSummary(dimensionInsights);
+  const priorityDimensions = getPriorityDimensions(dimensionInsights);
   const respondentGroups = buildRespondentGroups(participantRows);
 
   const completedParticipants = participantRows.filter(
@@ -458,6 +640,73 @@ export default async function ClientDiagnosticProjectDashboardPage({
                 tracking. Interpretation should be based on a sufficiently
                 complete response set rather than early partial returns.
               </p>
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-8 p-6 sm:p-8">
+            <p className="brand-section-kicker">Insight summary</p>
+
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Structured diagnostic interpretation
+            </h2>
+
+            <p className="brand-body-sm mt-4 max-w-3xl">
+              This section applies deterministic rules to the current dimension
+              scores to classify status, alignment, and data completeness. It is
+              intended as an internal interpretation layer before narrative
+              reporting is introduced.
+            </p>
+
+            <div className="mt-6 grid gap-6 xl:grid-cols-3">
+              <InsightSummaryPanel
+                title="Dimension status"
+                items={[
+                  { label: "Strong", value: insightSummary.status.strong, tone: "emerald" },
+                  { label: "Moderate", value: insightSummary.status.moderate, tone: "amber" },
+                  { label: "Weak", value: insightSummary.status.weak, tone: "rose" },
+                ]}
+              />
+
+              <InsightSummaryPanel
+                title="Role alignment"
+                items={[
+                  { label: "Aligned", value: insightSummary.alignment.aligned, tone: "emerald" },
+                  { label: "Emerging gap", value: insightSummary.alignment.emergingGap, tone: "amber" },
+                  { label: "Significant gap", value: insightSummary.alignment.significantGap, tone: "rose" },
+                ]}
+              />
+
+              <InsightSummaryPanel
+                title="Data completeness"
+                items={[
+                  { label: "Sufficient", value: insightSummary.completeness.sufficient, tone: "emerald" },
+                  { label: "Partial", value: insightSummary.completeness.partial, tone: "amber" },
+                  { label: "Insufficient", value: insightSummary.completeness.insufficient, tone: "slate" },
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-8 p-6 sm:p-8">
+            <p className="brand-section-kicker">Priority dimensions</p>
+
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Weakest and least mature areas first
+            </h2>
+
+            <p className="brand-body-sm mt-4 max-w-3xl">
+              These dimensions are prioritised using the current rules-based
+              model, weighting weaker scores first, then larger alignment gaps,
+              then lower completeness.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {priorityDimensions.map((dimension) => (
+                <PriorityDimensionCard
+                  key={dimension.dimensionKey}
+                  dimension={dimension}
+                />
+              ))}
             </div>
           </div>
 
@@ -730,6 +979,137 @@ function StageSummaryRow({
     <div className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <span className={`text-sm font-semibold ${toneClasses}`}>{value}</span>
+    </div>
+  );
+}
+
+function InsightSummaryPanel({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{
+    label: string;
+    value: number;
+    tone: "emerald" | "amber" | "rose" | "slate";
+  }>;
+}) {
+  return (
+    <div className="brand-surface-soft p-5">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => {
+          const toneClasses =
+            item.tone === "emerald"
+              ? "text-emerald-700"
+              : item.tone === "amber"
+                ? "text-amber-700"
+                : item.tone === "rose"
+                  ? "text-rose-700"
+                  : "text-slate-700";
+
+          return (
+            <div
+              key={item.label}
+              className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3"
+            >
+              <span className="text-sm font-medium text-slate-700">
+                {item.label}
+              </span>
+              <span className={`text-sm font-semibold ${toneClasses}`}>
+                {item.value}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PriorityDimensionCard({
+  dimension,
+}: {
+  dimension: DimensionInsight;
+}) {
+  return (
+    <div className="brand-surface-soft p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-base font-semibold text-slate-900">
+            {dimension.dimensionLabel}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {dimension.dimensionDescription}
+          </p>
+        </div>
+
+        <div className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-900">
+          {dimension.averageScore !== null
+            ? dimension.averageScore.toFixed(2)
+            : "—"}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span
+          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightStatusTone(
+            dimension.status,
+          )}`}
+        >
+          {formatInsightStatus(dimension.status)}
+        </span>
+        <span
+          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightAlignmentTone(
+            dimension.alignment,
+          )}`}
+        >
+          {formatAlignment(dimension.alignment)}
+        </span>
+        <span
+          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightCompletenessTone(
+            dimension.completeness,
+          )}`}
+        >
+          {formatCompleteness(dimension.completeness)}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <MetricMiniCard
+          label="Average score"
+          value={
+            dimension.averageScore !== null
+              ? dimension.averageScore.toFixed(2)
+              : "—"
+          }
+        />
+        <MetricMiniCard
+          label="Gap"
+          value={dimension.gap !== null ? dimension.gap.toFixed(2) : "—"}
+        />
+        <MetricMiniCard
+          label="Coverage"
+          value={`${dimension.completedQuestionnaireTypes.length}/${questionnaireTypes.length}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MetricMiniCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
