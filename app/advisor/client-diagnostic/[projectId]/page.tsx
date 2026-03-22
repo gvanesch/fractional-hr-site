@@ -302,7 +302,15 @@ export default async function ClientDiagnosticProjectDashboardPage({
     throw new Error("Unable to load project dimension scores.");
   }
 
-  const participantRows = participants ?? [];
+  const participantRows = (participants ?? []).sort((a, b) => {
+  // sort by questionnaire type first
+  if (a.questionnaire_type !== b.questionnaire_type) {
+    return a.questionnaire_type.localeCompare(b.questionnaire_type);
+  }
+
+  // then by role label
+  return a.role_label.localeCompare(b.role_label);
+});
   const dimensionScoreRows = dimensionScores ?? [];
   const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
   const respondentGroups = buildRespondentGroups(participantRows);
