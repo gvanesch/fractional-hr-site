@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+export const runtime = "edge";
+
 type ScoredQuestionnaireType = "hr" | "manager" | "leadership";
 type QuestionnaireType =
   | "hr"
