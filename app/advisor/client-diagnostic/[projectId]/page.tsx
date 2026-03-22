@@ -303,14 +303,13 @@ export default async function ClientDiagnosticProjectDashboardPage({
   }
 
   const participantRows = (participants ?? []).sort((a, b) => {
-  // sort by questionnaire type first
-  if (a.questionnaire_type !== b.questionnaire_type) {
-    return a.questionnaire_type.localeCompare(b.questionnaire_type);
-  }
+    if (a.questionnaire_type !== b.questionnaire_type) {
+      return a.questionnaire_type.localeCompare(b.questionnaire_type);
+    }
 
-  // then by role label
-  return a.role_label.localeCompare(b.role_label);
-});
+    return a.role_label.localeCompare(b.role_label);
+  });
+
   const dimensionScoreRows = dimensionScores ?? [];
   const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
   const respondentGroups = buildRespondentGroups(participantRows);
@@ -487,6 +486,12 @@ export default async function ClientDiagnosticProjectDashboardPage({
             <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
               Requested participant stages
             </h2>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {respondentGroups.map((group) => (
+                <RespondentSummaryCard key={group.questionnaireType} group={group} />
+              ))}
+            </div>
 
             <div className="mt-6 overflow-x-auto">
               <table className="min-w-full border-separate border-spacing-0">
@@ -725,6 +730,39 @@ function StageSummaryRow({
     <div className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <span className={`text-sm font-semibold ${toneClasses}`}>{value}</span>
+    </div>
+  );
+}
+
+function RespondentSummaryCard({
+  group,
+}: {
+  group: RespondentGroupSummary;
+}) {
+  return (
+    <div className="brand-surface-soft p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {group.label}
+      </p>
+      <div className="mt-3 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-2xl font-semibold text-slate-900">
+            {group.completed}/{group.totalInvited}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            completed responses
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="text-sm font-semibold text-amber-700">
+            {group.outstanding} outstanding
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {group.totalInvited} invited
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
