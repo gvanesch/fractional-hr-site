@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import {
-  dimensionDefinitions,
-  questionnaireTypes,
-} from "@/lib/client-diagnostic/question-bank";
+import { questionnaireTypes } from "@/lib/client-diagnostic/question-bank";
 
 export const runtime = "edge";
 
@@ -14,31 +11,28 @@ type ClientProjectRow = {
   project_status: string;
 };
 
-type DimensionScoreRow = {
-  project_id: string;
+type ParticipantRow = {
   questionnaire_type: string;
-  dimension_key: string;
-  average_score: number;
-  response_count: number;
+  participant_status: string;
 };
 
-type ParticipantRow = {
-  participant_status: string;
+type RespondentProgressRow = {
+  questionnaireType: string;
+  label: string;
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
 };
 
 type SummaryProjectResult = {
   projectId: string;
   companyName: string;
   projectStatus: string;
-  totalParticipants: number;
-  completedParticipants: number;
-  invitedParticipants: number;
-  inProgressParticipants: number;
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
   completionPercentage: number;
-  biggestGaps: Array<{
-    label: string;
-    gap: number | null;
-  }>;
+  respondentProgress: RespondentProgressRow[];
   dashboardUrl: string | null;
 };
 
@@ -93,66 +87,64 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function buildDimensionSummary(scores: DimensionScoreRow[]) {
-  return dimensionDefinitions.map((dimension) => {
-    const rows = scores.filter((row) => row.dimension_key === dimension.key);
-
-    const roleScores: Record<string, number> = {};
-
-    for (const questionnaireType of questionnaireTypes) {
-      const match = rows.find(
-        (row) => row.questionnaire_type === questionnaireType,
-      );
-
-      if (match) {
-        roleScores[questionnaireType] = Number(match.average_score);
-      }
-    }
-
-    const values = Object.values(roleScores);
-
-    if (values.length < 2) {
-      return {
-        label: dimension.label,
-        gap: null,
-      };
-    }
-
-    const gap = Math.max(...values) - Math.min(...values);
-
-    return {
-      label: dimension.label,
-      gap: Number(gap.toFixed(2)),
-    };
-  });
+function formatQuestionnaireTypeLabel(questionnaireType: string): string {
+  switch (questionnaireType) {
+    case "hr":
+      return "HR";
+    case "manager":
+      return "Manager";
+    case "leadership":
+      return "Leadership";
+    case "client_fact_pack":
+      return "Client Fact Pack";
+    default:
+      return questionnaireType
+        .split("_")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+  }
 }
 
 function getCompletionMetrics(participants: ParticipantRow[]) {
-  const totalParticipants = participants.length;
-  const completedParticipants = participants.filter(
+  const totalInvited = participants.length;
+  const completed = participants.filter(
     (participant) => participant.participant_status === "completed",
   ).length;
-  const invitedParticipants = participants.filter(
-    (participant) => participant.participant_status === "invited",
-  ).length;
-  const inProgressParticipants = participants.filter(
-    (participant) =>
-      participant.participant_status !== "completed" &&
-      participant.participant_status !== "invited",
-  ).length;
+  const outstanding = Math.max(totalInvited - completed, 0);
 
   const completionPercentage =
-    totalParticipants === 0
-      ? 0
-      : Math.round((completedParticipants / totalParticipants) * 100);
+    totalInvited === 0 ? 0 : Math.round((completed / totalInvited) * 100);
 
   return {
-    totalParticipants,
-    completedParticipants,
-    invitedParticipants,
-    inProgressParticipants,
+    totalInvited,
+    outstanding,
+    completed,
     completionPercentage,
   };
+}
+
+function buildRespondentProgress(
+  participants: ParticipantRow[],
+): RespondentProgressRow[] {
+  return questionnaireTypes.map((questionnaireType) => {
+    const matchingParticipants = participants.filter(
+      (participant) => participant.questionnaire_type === questionnaireType,
+    );
+
+    const totalInvited = matchingParticipants.length;
+    const completed = matchingParticipants.filter(
+      (participant) => participant.participant_status === "completed",
+    ).length;
+    const outstanding = Math.max(totalInvited - completed, 0);
+
+    return {
+      questionnaireType,
+      label: formatQuestionnaireTypeLabel(questionnaireType),
+      totalInvited,
+      outstanding,
+      completed,
+    };
+  });
 }
 
 function buildDashboardUrl(
@@ -166,24 +158,42 @@ function buildDashboardUrl(
   return `${appBaseUrl}/advisor/client-diagnostic/${projectId}`;
 }
 
+function buildRespondentProgressTable(
+  respondentProgress: RespondentProgressRow[],
+) {
+  const rowsHtml = respondentProgress
+    .map((row) => {
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628;">${escapeHtml(row.label)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #334155; text-align: center;">${row.totalInvited}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #334155; text-align: center;">${row.outstanding}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #334155; text-align: center;">${row.completed}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <table style="width: 100%; border-collapse: collapse; margin-top: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
+      <thead>
+        <tr style="background: #F8FAFC;">
+          <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Respondent group</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: center;">Total invited</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: center;">Outstanding</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: center;">Completed</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  `;
+}
+
 function buildEmailHtml(projects: SummaryProjectResult[]) {
   const projectSections = projects
     .map((project) => {
-      const biggestGapsHtml =
-        project.biggestGaps.length > 0
-          ? project.biggestGaps
-              .map((gap) => {
-                if (gap.gap === null) {
-                  return "";
-                }
-
-                return `<li style="margin: 0 0 6px 0;">${escapeHtml(
-                  gap.label,
-                )} — gap ${gap.gap}</li>`;
-              })
-              .join("")
-          : `<li style="margin: 0 0 6px 0;">Awaiting multiple respondent groups</li>`;
-
       const dashboardLinkHtml = project.dashboardUrl
         ? `<p style="margin: 12px 0 0 0;"><a href="${escapeHtml(
             project.dashboardUrl,
@@ -200,18 +210,18 @@ function buildEmailHtml(projects: SummaryProjectResult[]) {
             <strong>Status:</strong> ${escapeHtml(project.projectStatus)}
           </p>
           <p style="margin: 0 0 8px 0; color: #334155;">
-            <strong>Completion:</strong> ${project.completionPercentage}% (${project.completedParticipants}/${project.totalParticipants})
+            <strong>Overall completion:</strong> ${project.completionPercentage}% (${project.completed}/${project.totalInvited})
           </p>
           <p style="margin: 0 0 12px 0; color: #334155;">
-            <strong>Invited:</strong> ${project.invitedParticipants}
+            <strong>Total invited:</strong> ${project.totalInvited}
             &nbsp;|&nbsp;
-            <strong>In progress:</strong> ${project.inProgressParticipants}
+            <strong>Outstanding:</strong> ${project.outstanding}
+            &nbsp;|&nbsp;
+            <strong>Completed:</strong> ${project.completed}
           </p>
 
-          <p style="margin: 0 0 8px 0; color: #0A1628;"><strong>Top gaps</strong></p>
-          <ul style="margin: 0; padding-left: 20px; color: #334155;">
-            ${biggestGapsHtml}
-          </ul>
+          <p style="margin: 0 0 8px 0; color: #0A1628;"><strong>Respondent progress</strong></p>
+          ${buildRespondentProgressTable(project.respondentProgress)}
 
           ${dashboardLinkHtml}
         </section>
@@ -226,7 +236,7 @@ function buildEmailHtml(projects: SummaryProjectResult[]) {
           Client Diagnostic Daily Summary
         </h2>
         <p style="margin: 0 0 24px 0; color: #64748B;">
-          Active project overview for Van Esch Advisory.
+          Active project participation overview for Van Esch Advisory.
         </p>
 
         ${projectSections}
@@ -258,23 +268,11 @@ async function buildProjectResult(
 ): Promise<SummaryProjectResult> {
   const supabase = getSupabaseAdminClient();
 
-  const [
-    { data: participants, error: participantsError },
-    { data: scores, error: scoresError },
-  ] = await Promise.all([
-    supabase
-      .from("client_participants")
-      .select("participant_status")
-      .eq("project_id", project.project_id)
-      .returns<ParticipantRow[]>(),
-    supabase
-      .from("client_dimension_scores")
-      .select(
-        "project_id, questionnaire_type, dimension_key, average_score, response_count",
-      )
-      .eq("project_id", project.project_id)
-      .returns<DimensionScoreRow[]>(),
-  ]);
+  const { data: participants, error: participantsError } = await supabase
+    .from("client_participants")
+    .select("questionnaire_type, participant_status")
+    .eq("project_id", project.project_id)
+    .returns<ParticipantRow[]>();
 
   if (participantsError) {
     throw new Error(
@@ -282,38 +280,20 @@ async function buildProjectResult(
     );
   }
 
-  if (scoresError) {
-    throw new Error(
-      `Failed to load dimension scores for project ${project.project_id}: ${scoresError.message}`,
-    );
-  }
-
   const participantRows = participants ?? [];
-  const scoreRows = scores ?? [];
 
-  const {
-    totalParticipants,
-    completedParticipants,
-    invitedParticipants,
-    inProgressParticipants,
-    completionPercentage,
-  } = getCompletionMetrics(participantRows);
-
-  const biggestGaps = buildDimensionSummary(scoreRows)
-    .filter((dimension) => dimension.gap !== null)
-    .sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0))
-    .slice(0, 2);
+  const { totalInvited, outstanding, completed, completionPercentage } =
+    getCompletionMetrics(participantRows);
 
   return {
     projectId: project.project_id,
     companyName: project.company_name,
     projectStatus: project.project_status,
-    totalParticipants,
-    completedParticipants,
-    invitedParticipants,
-    inProgressParticipants,
+    totalInvited,
+    outstanding,
+    completed,
     completionPercentage,
-    biggestGaps,
+    respondentProgress: buildRespondentProgress(participantRows),
     dashboardUrl: buildDashboardUrl(appBaseUrl, project.project_id),
   };
 }
