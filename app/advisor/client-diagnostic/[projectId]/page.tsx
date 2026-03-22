@@ -59,6 +59,22 @@ type DimensionSummary = {
   gap: number | null;
 };
 
+type RespondentGroupSummary = {
+  questionnaireType: QuestionnaireType;
+  label: string;
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
+  outstandingParticipants: Array<{
+    participantId: string;
+    roleLabel: string;
+    participantStatus: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    updatedAt: string;
+  }>;
+};
+
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -198,6 +214,43 @@ function getGapToneClasses(gap: number | null): string {
   return "text-emerald-700";
 }
 
+function buildRespondentGroups(
+  participantRows: ParticipantRow[],
+): RespondentGroupSummary[] {
+  return questionnaireTypes.map((questionnaireType) => {
+    const matchingParticipants = participantRows.filter(
+      (participant) => participant.questionnaire_type === questionnaireType,
+    );
+
+    const completed = matchingParticipants.filter(
+      (participant) => participant.participant_status === "completed",
+    ).length;
+
+    const totalInvited = matchingParticipants.length;
+    const outstanding = Math.max(totalInvited - completed, 0);
+
+    const outstandingParticipants = matchingParticipants
+      .filter((participant) => participant.participant_status !== "completed")
+      .map((participant) => ({
+        participantId: participant.participant_id,
+        roleLabel: participant.role_label,
+        participantStatus: participant.participant_status,
+        startedAt: participant.started_at,
+        completedAt: participant.completed_at,
+        updatedAt: participant.updated_at,
+      }));
+
+    return {
+      questionnaireType,
+      label: formatQuestionnaireType(questionnaireType),
+      totalInvited,
+      outstanding,
+      completed,
+      outstandingParticipants,
+    };
+  });
+}
+
 export default async function ClientDiagnosticProjectDashboardPage({
   params,
 }: PageProps) {
@@ -252,25 +305,22 @@ export default async function ClientDiagnosticProjectDashboardPage({
   const participantRows = participants ?? [];
   const dimensionScoreRows = dimensionScores ?? [];
   const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
+  const respondentGroups = buildRespondentGroups(participantRows);
 
   const completedParticipants = participantRows.filter(
     (participant) => participant.participant_status === "completed",
   ).length;
 
-  const invitedParticipants = participantRows.filter(
-    (participant) => participant.participant_status === "invited",
-  ).length;
-
-  const inProgressParticipants = participantRows.filter(
-    (participant) =>
-      participant.participant_status !== "completed" &&
-      participant.participant_status !== "invited",
-  ).length;
+  const totalInvitedParticipants = participantRows.length;
+  const outstandingParticipants = Math.max(
+    totalInvitedParticipants - completedParticipants,
+    0,
+  );
 
   const completionPercentage =
-    participantRows.length === 0
+    totalInvitedParticipants === 0
       ? 0
-      : Math.round((completedParticipants / participantRows.length) * 100);
+      : Math.round((completedParticipants / totalInvitedParticipants) * 100);
 
   const strongestAlignment = [...dimensionSummaries]
     .filter((dimension) => dimension.gap !== null)
@@ -305,7 +355,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
               />
               <DashboardHeroStat
                 label="Participants requested"
-                value={String(participantRows.length)}
+                value={String(totalInvitedParticipants)}
               />
               <DashboardHeroStat
                 label="Submissions completed"
@@ -343,13 +393,13 @@ export default async function ClientDiagnosticProjectDashboardPage({
                 />
                 <InfoCard
                   label="Completed submissions"
-                  value={`${completedParticipants} of ${participantRows.length}`}
+                  value={`${completedParticipants} of ${totalInvitedParticipants}`}
                   secondary={`${completionPercentage}% complete`}
                 />
                 <InfoCard
                   label="Outstanding responses"
-                  value={String(invitedParticipants + inProgressParticipants)}
-                  secondary={`${invitedParticipants} invited · ${inProgressParticipants} in progress`}
+                  value={String(outstandingParticipants)}
+                  secondary={`${totalInvitedParticipants} invited · ${completedParticipants} completed`}
                 />
               </div>
 
@@ -368,7 +418,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
               <p className="brand-section-kicker">Daily oversight</p>
 
               <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Participant stage summary
+                Participation summary
               </h2>
 
               <div className="mt-6 space-y-4">
@@ -378,13 +428,13 @@ export default async function ClientDiagnosticProjectDashboardPage({
                   tone="emerald"
                 />
                 <StageSummaryRow
-                  label="Invited"
-                  value={invitedParticipants}
+                  label="Outstanding"
+                  value={outstandingParticipants}
                   tone="amber"
                 />
                 <StageSummaryRow
-                  label="In progress"
-                  value={inProgressParticipants}
+                  label="Total invited"
+                  value={totalInvitedParticipants}
                   tone="slate"
                 />
               </div>
@@ -397,10 +447,29 @@ export default async function ClientDiagnosticProjectDashboardPage({
               </div>
 
               <p className="mt-3 text-sm leading-6 text-[var(--brand-text-muted)]">
-                This dashboard is the right base for a daily email summary. Once
-                you are happy with the view and language here, we can send this
-                same snapshot to you automatically each day for active projects.
+                This view is intended to support follow-up and completion
+                tracking. Interpretation should be based on a sufficiently
+                complete response set rather than early partial returns.
               </p>
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-8 p-6 sm:p-8">
+            <p className="brand-section-kicker">Outstanding responses</p>
+
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Follow-up by respondent group
+            </h2>
+
+            <p className="brand-body-sm mt-4 max-w-3xl">
+              Use this section to see which respondent groups still have
+              outstanding responses and who specifically may need follow-up.
+            </p>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {respondentGroups.map((group) => (
+                <OutstandingGroupCard key={group.questionnaireType} group={group} />
+              ))}
             </div>
           </div>
 
@@ -463,7 +532,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
             </div>
           </div>
 
-          <div className="grid gap-6 mt-8 xl:grid-cols-2">
+          <div className="mt-8 grid gap-6 xl:grid-cols-2">
             <div className="brand-surface-card p-6 sm:p-8">
               <p className="brand-section-kicker">Strongest alignment</p>
 
@@ -648,6 +717,64 @@ function StageSummaryRow({
     <div className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <span className={`text-sm font-semibold ${toneClasses}`}>{value}</span>
+    </div>
+  );
+}
+
+function OutstandingGroupCard({
+  group,
+}: {
+  group: RespondentGroupSummary;
+}) {
+  return (
+    <div className="brand-surface-soft p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-base font-semibold text-slate-900">{group.label}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {group.totalInvited} invited · {group.outstanding} outstanding ·{" "}
+            {group.completed} completed
+          </p>
+        </div>
+
+        <div className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-900">
+          {group.outstanding} outstanding
+        </div>
+      </div>
+
+      <div className="mt-4">
+        {group.outstandingParticipants.length > 0 ? (
+          <div className="space-y-3">
+            {group.outstandingParticipants.map((participant) => (
+              <div
+                key={participant.participantId}
+                className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {participant.roleLabel}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Last updated {formatDateTime(participant.updatedAt)}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${getStatusPillClasses(
+                      participant.participantStatus,
+                    )}`}
+                  >
+                    {formatParticipantStatus(participant.participantStatus)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyStateCard message="All requested participants in this group have completed their response." />
+        )}
+      </div>
     </div>
   );
 }

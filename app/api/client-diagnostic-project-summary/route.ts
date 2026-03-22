@@ -53,6 +53,22 @@ type DimensionSummary = {
   gap: number | null;
 };
 
+type RespondentGroupSummary = {
+  questionnaireType: QuestionnaireType;
+  label: string;
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
+  outstandingParticipants: Array<{
+    participantId: string;
+    roleLabel: string;
+    participantStatus: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    updatedAt: string;
+  }>;
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -64,10 +80,9 @@ type ProjectSummaryResponse = {
     notes: string | null;
   };
   completion: {
-    totalParticipants: number;
-    completedParticipants: number;
-    invitedParticipants: number;
-    inProgressParticipants: number;
+    totalInvited: number;
+    outstanding: number;
+    completed: number;
     completionPercentage: number;
     participants: Array<{
       participantId: string;
@@ -78,6 +93,7 @@ type ProjectSummaryResponse = {
       completedAt: string | null;
       updatedAt: string;
     }>;
+    respondentGroups: RespondentGroupSummary[];
   };
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
@@ -116,14 +132,68 @@ function isUuid(value: string): boolean {
 }
 
 function getCompletionPercentage(
-  completedParticipants: number,
-  totalParticipants: number,
+  completed: number,
+  totalInvited: number,
 ): number {
-  if (totalParticipants === 0) {
+  if (totalInvited === 0) {
     return 0;
   }
 
-  return Math.round((completedParticipants / totalParticipants) * 100);
+  return Math.round((completed / totalInvited) * 100);
+}
+
+function formatQuestionnaireTypeLabel(
+  questionnaireType: QuestionnaireType,
+): string {
+  switch (questionnaireType) {
+    case "hr":
+      return "HR";
+    case "manager":
+      return "Manager";
+    case "leadership":
+      return "Leadership";
+    case "client_fact_pack":
+      return "Client Fact Pack";
+    default:
+      return questionnaireType;
+  }
+}
+
+function buildRespondentGroups(
+  participantRows: ParticipantRow[],
+): RespondentGroupSummary[] {
+  return questionnaireTypes.map((questionnaireType) => {
+    const matchingParticipants = participantRows.filter(
+      (participant) => participant.questionnaire_type === questionnaireType,
+    );
+
+    const completed = matchingParticipants.filter(
+      (participant) => participant.participant_status === "completed",
+    ).length;
+
+    const totalInvited = matchingParticipants.length;
+    const outstanding = Math.max(totalInvited - completed, 0);
+
+    const outstandingParticipants = matchingParticipants
+      .filter((participant) => participant.participant_status !== "completed")
+      .map((participant) => ({
+        participantId: participant.participant_id,
+        roleLabel: participant.role_label,
+        participantStatus: participant.participant_status,
+        startedAt: participant.started_at,
+        completedAt: participant.completed_at,
+        updatedAt: participant.updated_at,
+      }));
+
+    return {
+      questionnaireType,
+      label: formatQuestionnaireTypeLabel(questionnaireType),
+      totalInvited,
+      outstanding,
+      completed,
+      outstandingParticipants,
+    };
+  });
 }
 
 function buildDimensionSummaries(
@@ -223,30 +293,33 @@ export async function GET(
 
     const supabase = getSupabaseAdminClient();
 
-    const [{ data: project, error: projectError }, { data: participants, error: participantsError }, { data: scoreRows, error: scoresError }] =
-      await Promise.all([
-        supabase
-          .from("client_projects")
-          .select(
-            "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
-          )
-          .eq("project_id", projectId)
-          .single<ProjectRow>(),
-        supabase
-          .from("client_participants")
-          .select(
-            "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
-          )
-          .eq("project_id", projectId)
-          .returns<ParticipantRow[]>(),
-        supabase
-          .from("client_dimension_scores")
-          .select(
-            "score_id, project_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-          )
-          .eq("project_id", projectId)
-          .returns<DimensionScoreRow[]>(),
-      ]);
+    const [
+      { data: project, error: projectError },
+      { data: participants, error: participantsError },
+      { data: scoreRows, error: scoresError },
+    ] = await Promise.all([
+      supabase
+        .from("client_projects")
+        .select(
+          "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .single<ProjectRow>(),
+      supabase
+        .from("client_participants")
+        .select(
+          "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .returns<ParticipantRow[]>(),
+      supabase
+        .from("client_dimension_scores")
+        .select(
+          "score_id, project_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
+        )
+        .eq("project_id", projectId)
+        .returns<DimensionScoreRow[]>(),
+    ]);
 
     if (projectError || !project) {
       return NextResponse.json(
@@ -281,19 +354,14 @@ export async function GET(
     const participantRows = participants ?? [];
     const dimensionScoreRows = scoreRows ?? [];
 
-    const completedParticipants = participantRows.filter(
+    const completed = participantRows.filter(
       (participant) => participant.participant_status === "completed",
     ).length;
 
-    const invitedParticipants = participantRows.filter(
-      (participant) => participant.participant_status === "invited",
-    ).length;
+    const totalInvited = participantRows.length;
+    const outstanding = Math.max(totalInvited - completed, 0);
 
-    const inProgressParticipants = participantRows.filter(
-      (participant) =>
-        participant.participant_status !== "completed" &&
-        participant.participant_status !== "invited",
-    ).length;
+    const respondentGroups = buildRespondentGroups(participantRows);
 
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
 
@@ -318,13 +386,12 @@ export async function GET(
         notes: project.notes,
       },
       completion: {
-        totalParticipants: participantRows.length,
-        completedParticipants,
-        invitedParticipants,
-        inProgressParticipants,
+        totalInvited,
+        outstanding,
+        completed,
         completionPercentage: getCompletionPercentage(
-          completedParticipants,
-          participantRows.length,
+          completed,
+          totalInvited,
         ),
         participants: participantRows.map((participant) => ({
           participantId: participant.participant_id,
@@ -335,6 +402,7 @@ export async function GET(
           completedAt: participant.completed_at,
           updatedAt: participant.updated_at,
         })),
+        respondentGroups,
       },
       dimensions,
       strongestAlignment,
