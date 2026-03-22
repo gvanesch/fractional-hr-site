@@ -1,0 +1,25 @@
+name: Client Diagnostic Daily Summary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "5 7 * * *"
+      timezone: "Europe/London"
+
+permissions:
+  contents: read
+
+jobs:
+  send-daily-summary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger daily summary endpoint
+        env:
+          DAILY_SUMMARY_URL: ${{ secrets.DAILY_SUMMARY_URL }}
+          DAILY_SUMMARY_ENDPOINT_SECRET: ${{ secrets.DAILY_SUMMARY_ENDPOINT_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$DAILY_SUMMARY_URL" \
+            --header "Authorization: Bearer $DAILY_SUMMARY_ENDPOINT_SECRET"
