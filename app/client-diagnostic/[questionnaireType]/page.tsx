@@ -74,7 +74,7 @@ export default async function ClientDiagnosticQuestionnairePage({
             </p>
 
             <div className="brand-card-dark mt-8 max-w-3xl p-6 sm:p-7">
-              <div className="space-y-4">
+             <div className="space-y-4">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
                   Guidance
                 </p>
