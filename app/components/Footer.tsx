@@ -16,7 +16,7 @@ const legalLinks = [
   { href: "/cookies", label: "Cookie Policy" },
   { href: "/modern-slavery", label: "Modern Slavery Statement" },
   {
-    href: "https://www.linkedin.com",
+    href: "https://www.linkedin.com/in/greg-van-esch/",
     label: "LinkedIn",
     external: true,
   },

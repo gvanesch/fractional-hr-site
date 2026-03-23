@@ -95,7 +95,7 @@ export default function ServicesPage() {
                   {[
                     "HR foundations for scaling businesses and mid-market organisations",
                     "Global HR operating models and shared services",
-                    "HR technology, workflow automation, and ServiceNow HR integration",
+                    "HR technology, workflow automation, and ServiceNow HRIS integration and automation",
                     "Knowledge management and employee self-service",
                     "Governance, controls, and audit-ready operations",
                   ].map((item) => (
