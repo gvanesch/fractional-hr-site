@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "HR Chaos Signals | Greg van Esch",
+  title: "HR Chaos Signals | Van Esch Advisory Ltd",
   description:
     "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies — and how an HR Operations Health Check or HR Foundations Sprint can help restore clarity.",
 };
@@ -90,52 +90,58 @@ const sprintFit = [
 
 export default function HRChaosSignalsPage() {
   return (
-    <>
-      <section className="bg-[#0A1628] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              HR Chaos Signals
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-              When growing companies start to feel HR friction
-            </h1>
-            <p className="mt-6 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              Most organisations don’t decide one day that they need “HR transformation.”
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              What actually happens is more subtle.
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              As companies grow, HR processes evolve informally. Systems are introduced gradually,
-              managers develop their own ways of handling people situations, and operational work
-              increases faster than the structure around it.
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              For a while this works.
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              Then small operational cracks begin to appear.
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              Below are some of the most common signals that HR operations are starting to become
-              messy, reactive, or inconsistent.
-            </p>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              Recognising these signals early makes it far easier to stabilise HR operations before
-              they become a significant organisational constraint.
-            </p>
+    <main>
+      <section className="brand-hero">
+        <div className="brand-hero-content brand-container brand-section">
+          <div className="max-w-4xl brand-stack-md">
+            <div className="brand-stack-sm">
+              <p className="brand-kicker">HR Chaos Signals</p>
+              <h1 className="brand-heading-lg">
+                When growing companies start to feel HR friction
+              </h1>
+            </div>
 
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="max-w-3xl brand-stack-sm">
+              <p className="brand-subheading brand-body-on-dark">
+                Most organisations do not decide one day that they need “HR
+                transformation.”
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                What actually happens is more subtle.
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                As companies grow, HR processes evolve informally. Systems are
+                introduced gradually, managers develop their own ways of
+                handling people situations, and operational work increases
+                faster than the structure around it.
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                For a while this works.
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                Then small operational cracks begin to appear.
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                Below are some of the most common signals that HR operations are
+                starting to become messy, reactive, or inconsistent.
+              </p>
+              <p className="brand-subheading brand-body-on-dark">
+                Recognising these signals early makes it far easier to
+                stabilise HR operations before they become a significant
+                organisational constraint.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4 pt-2">
               <Link
                 href="/diagnostic"
-                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+                className="brand-button-primary px-6 py-3 text-base font-medium"
               >
                 Take the HR Operations Health Check
               </Link>
               <Link
                 href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
               >
                 View the Sprint
               </Link>
@@ -144,227 +150,258 @@ export default function HRChaosSignalsPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="space-y-8">
-          {signals.map((signal) => (
-            <div
-              key={signal.title}
-              className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm"
-            >
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-                {signal.title}
-              </p>
-              <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-                {signal.heading}
-              </h2>
+      <section className="bg-white">
+        <div className="brand-container brand-section">
+          <div className="space-y-8">
+            {signals.map((signal) => (
+              <div
+                key={signal.title}
+                className="brand-surface-card p-8"
+              >
+                <p className="brand-section-kicker">{signal.title}</p>
+                <h2 className="brand-heading-md mt-3 text-slate-950">
+                  {signal.heading}
+                </h2>
 
-              <div className="mt-4 space-y-4 text-lg leading-8 text-slate-700">
-                {signal.text.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
+                <div className="mt-4 space-y-4 text-lg leading-8 text-slate-700">
+                  {signal.text.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
 
-                {signal.bullets && (
-                  <ul className="space-y-2 pl-5">
-                    {signal.bullets.map((bullet) => (
-                      <li key={bullet} className="list-disc">
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                  {signal.bullets ? (
+                    <ul className="space-y-2 pl-5">
+                      {signal.bullets.map((bullet) => (
+                        <li key={bullet} className="list-disc">
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
 
-                {signal.closing && <p>{signal.closing}</p>}
+                  {signal.closing ? <p>{signal.closing}</p> : null}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
+        <div className="brand-container brand-section">
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="max-w-4xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
+            <div className="max-w-4xl brand-stack-sm">
+              <p className="brand-section-kicker">
                 What these signals usually mean
               </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              <h2 className="brand-heading-lg text-slate-950">
                 Growth has outpaced the operational infrastructure around HR.
               </h2>
-              <p className="mt-4 text-xl leading-9 text-slate-700">
+              <p className="brand-subheading text-slate-700">
                 These signals rarely indicate a failing HR team.
               </p>
-              <p className="mt-4 text-xl leading-9 text-slate-700">
-                More often, they show that the organisation has simply grown faster than the
-                operational infrastructure supporting its people processes.
+              <p className="brand-subheading text-slate-700">
+                More often, they show that the organisation has simply grown
+                faster than the operational infrastructure supporting its people
+                processes.
               </p>
-              <p className="mt-4 text-xl leading-9 text-slate-700">
-                In other words, HR operations have evolved organically rather than being
-                intentionally designed.
+              <p className="brand-subheading text-slate-700">
+                In other words, HR operations have evolved organically rather
+                than being intentionally designed.
               </p>
-              <p className="mt-6 text-lg leading-8 text-slate-700">
-                If you want a quick sense of how much operational strain may have built up,
-                the HR Operations Health Check provides a practical self-assessment before
-                moving into deeper support.
+              <p className="brand-body">
+                If you want a quick sense of how much operational strain may
+                have built up, the HR Operations Health Check provides a
+                practical self-assessment before moving into deeper support.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 pt-2">
                 <Link
                   href="/diagnostic"
-                  className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
                   Take the Diagnostic
                 </Link>
                 <Link
                   href="/contact"
-                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-slate-50"
+                  className="brand-button-dark px-6 py-3 text-base font-medium"
                 >
                   Contact
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-                A practical next step
-              </p>
-              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                Use the diagnostic to gauge the level of operational friction.
-              </h3>
-              <p className="mt-4 text-lg leading-8 text-slate-700">
-                The HR Operations Health Check gives you:
-              </p>
-              <ul className="mt-4 space-y-2 text-lg leading-8 text-slate-700">
-                <li className="list-disc ml-5">A simple HR Operations Score</li>
-                <li className="list-disc ml-5">An immediate maturity-style result band</li>
-                <li className="list-disc ml-5">A quick sense of where friction may be building</li>
-              </ul>
+            <div className="brand-surface-soft p-8">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">
+                  A practical next step
+                </p>
+                <h3 className="brand-heading-md text-slate-950">
+                  Use the diagnostic to gauge the level of operational friction.
+                </h3>
+                <p className="brand-body">
+                  The HR Operations Health Check gives you:
+                </p>
+                <ul className="space-y-2 text-base leading-8 text-slate-700">
+                  <li className="ml-5 list-disc">
+                    A simple HR Operations Score
+                  </li>
+                  <li className="ml-5 list-disc">
+                    An immediate maturity-style result band
+                  </li>
+                  <li className="ml-5 list-disc">
+                    A quick sense of where friction may be building
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
-              A practical way to reset HR foundations
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              HR Foundations Sprint
-            </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              The HR Foundations Sprint is a focused 4 week engagement designed for
-              organisations that are starting to experience these signals.
-            </p>
+      <section className="bg-white">
+        <div className="brand-container brand-section">
+          <div className="brand-surface-soft rounded-[2rem] p-8">
+            <div className="max-w-4xl brand-stack-sm">
+              <p className="brand-section-kicker">
+                A practical way to reset HR foundations
+              </p>
+              <h2 className="brand-heading-lg text-slate-950">
+                HR Foundations Sprint
+              </h2>
+              <p className="brand-subheading text-slate-700">
+                The HR Foundations Sprint is a focused four-week engagement
+                designed for organisations that are starting to experience these
+                signals.
+              </p>
 
-            <p className="mt-6 text-lg font-medium text-slate-900">During the sprint we:</p>
-            <ul className="mt-4 space-y-2 text-lg leading-8 text-slate-700">
-              <li className="list-disc ml-5">Understand how HR currently operates</li>
-              <li className="list-disc ml-5">Map key employee lifecycle processes</li>
-              <li className="list-disc ml-5">Identify operational friction and gaps</li>
-              <li className="list-disc ml-5">Prioritise improvements</li>
-              <li className="list-disc ml-5">
-                Deliver practical recommendations and a clear roadmap
-              </li>
-            </ul>
+              <p className="text-lg font-medium text-slate-900">
+                During the sprint we:
+              </p>
+              <ul className="space-y-2 text-lg leading-8 text-slate-700">
+                <li className="ml-5 list-disc">
+                  Understand how HR currently operates
+                </li>
+                <li className="ml-5 list-disc">
+                  Map key employee lifecycle processes
+                </li>
+                <li className="ml-5 list-disc">
+                  Identify operational friction and gaps
+                </li>
+                <li className="ml-5 list-disc">
+                  Prioritise improvements
+                </li>
+                <li className="ml-5 list-disc">
+                  Deliver practical recommendations and a clear roadmap
+                </li>
+              </ul>
 
-            <p className="mt-6 text-xl leading-9 text-slate-700">
-              The goal is simple: to establish the operational structure that allows HR to support
-              the organisation consistently and effectively as it grows.
-            </p>
+              <p className="brand-subheading text-slate-700">
+                The goal is simple: to establish the operational structure that
+                allows HR to support the organisation consistently and
+                effectively as it grows.
+              </p>
 
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
-              >
-                View the Sprint
-              </Link>
-              <Link
-                href="/diagnostic"
-                className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800 transition hover:bg-white"
-              >
-                Take the Diagnostic First
-              </Link>
+              <div className="flex flex-wrap gap-4 pt-2">
+                <Link
+                  href="/services/hr-foundations-sprint"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
+                >
+                  View the Sprint
+                </Link>
+                <Link
+                  href="/diagnostic"
+                  className="brand-button-dark px-6 py-3 text-base font-medium"
+                >
+                  Take the Diagnostic First
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1E6FD9]">
+        <div className="brand-container brand-section">
+          <div className="max-w-4xl brand-stack-sm">
+            <p className="brand-section-kicker">
               When organisations typically use the sprint
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+            <h2 className="brand-heading-lg text-slate-950">
               A structured starting point for growing organisations
             </h2>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
+            <p className="brand-subheading text-slate-700">
               The sprint is particularly useful for organisations that:
             </p>
 
             <div className="mt-8 space-y-3 text-base text-slate-700">
               {sprintFit.map((item) => (
-                <div key={item} className="rounded-lg bg-slate-50 px-4 py-3">
+                <div
+                  key={item}
+                  className="rounded-lg bg-slate-50 px-4 py-3"
+                >
                   {item}
                 </div>
               ))}
             </div>
 
-            <p className="mt-8 text-xl leading-9 text-slate-700">
-              Some organisations use the sprint to create clarity and implement improvements
-              internally.
+            <p className="brand-subheading text-slate-700">
+              Some organisations use the sprint to create clarity and implement
+              improvements internally.
             </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
+            <p className="brand-subheading text-slate-700">
               Others continue into deeper operational transformation work.
             </p>
-            <p className="mt-4 text-xl leading-9 text-slate-700">
-              Either way, the sprint provides a clear and credible starting point for strengthening
-              HR operations.
+            <p className="brand-subheading text-slate-700">
+              Either way, the sprint provides a clear and credible starting
+              point for strengthening HR operations.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-[#0D1F3C] py-20 text-white">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="max-w-4xl rounded-[2rem] border border-white/10 bg-white/5 p-10 shadow-2xl shadow-black/20">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8AAAC8]">
-              Start with the right level of clarity
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              If some of these signals feel familiar, the next step is straightforward.
-            </h2>
-            <p className="mt-4 max-w-3xl text-xl leading-9 text-[#8AAAC8]">
-              You can take the HR Operations Health Check for an immediate self-assessment,
-              or start with a short conversation to discuss whether the sprint would be useful
-              for your organisation.
-            </p>
+      <section className="brand-dark-section">
+        <div className="brand-container brand-section">
+          <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-kicker">
+                  Start with the right level of clarity
+                </p>
+                <h2 className="brand-heading-lg">
+                  If some of these signals feel familiar, the next step is
+                  straightforward.
+                </h2>
+                <p className="brand-subheading brand-body-on-dark max-w-3xl">
+                  You can take the HR Operations Health Check for an immediate
+                  self-assessment, or start with a short conversation to discuss
+                  whether the sprint would be useful for your organisation.
+                </p>
+              </div>
 
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/diagnostic"
-                className="rounded-xl bg-[#1E6FD9] px-6 py-3 text-base font-medium text-white transition hover:bg-[#2979FF]"
-              >
-                Take the Diagnostic
-              </Link>
-              <Link
-                href="/contact"
-                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
-              >
-                Contact
-              </Link>
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
-              >
-                View the Sprint
-              </Link>
+              <div className="flex flex-wrap gap-4 pt-2">
+                <Link
+                  href="/diagnostic"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
+                >
+                  Take the Diagnostic
+                </Link>
+                <Link
+                  href="/contact"
+                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+                >
+                  Contact
+                </Link>
+                <Link
+                  href="/services/hr-foundations-sprint"
+                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+                >
+                  View the Sprint
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
-    </>
+    </main>
   );
 }

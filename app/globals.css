@@ -24,7 +24,9 @@
   --brand-radius-xl: 1.25rem;
   --brand-radius-2xl: 1.5rem;
   --brand-max-width: 80rem;
-  --site-header-height: 5.5rem;
+
+  --site-header-height: 5.75rem;
+  --hero-content-offset: 4rem;
 }
 
 html {
@@ -40,13 +42,9 @@ body {
 
 @media (max-width: 1023px) {
   :root {
-    --site-header-height: 5rem;
+    --site-header-height: 5.25rem;
+    --hero-content-offset: 3.25rem;
   }
-}
-
-.site-header-spacer {
-  height: var(--site-header-height);
-  flex: none;
 }
 
 /* Global layout helpers */
@@ -252,6 +250,17 @@ body {
 .brand-hero-content {
   position: relative;
   z-index: 1;
+  padding-top: calc(var(--site-header-height) + var(--hero-content-offset));
+}
+
+.brand-dark-section .brand-container.brand-section {
+  padding-top: calc(4.5rem + 1rem);
+}
+
+@media (min-width: 768px) {
+  .brand-dark-section .brand-container.brand-section {
+    padding-top: calc(6rem + 1rem);
+  }
 }
 
 .brand-card-dark {

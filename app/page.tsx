@@ -38,7 +38,7 @@ const diagnosticSignals = [
 
 export default function HomePage() {
   return (
-    <>
+    <main>
       <section className="brand-hero">
         <div className="brand-hero-content brand-container brand-section">
           <div className="grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
@@ -190,7 +190,10 @@ export default function HomePage() {
 
                   <ul className="space-y-3 text-base text-slate-700">
                     {path.bullets.map((bullet) => (
-                      <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
+                      <li
+                        key={bullet}
+                        className="rounded-lg bg-slate-50 px-4 py-3"
+                      >
                         {bullet}
                       </li>
                     ))}
@@ -284,6 +287,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-    </>
+    </main>
   );
 }
