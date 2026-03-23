@@ -1,18 +1,5 @@
 import Link from "next/link";
 
-const stats = [
-  { value: "17+", label: "Years in HR Operations" },
-  { value: "30+", label: "Countries Supported" },
-  { value: "4,000+", label: "Employees Supported" },
-];
-
-const proofPoints = [
-  "Global HR operations and service delivery leadership",
-  "HR technology, workflow, and ServiceNow transformation",
-  "Operational governance, controls, and process discipline",
-  "Transformation support across growth, complexity, and change",
-];
-
 const audiencePaths = [
   {
     title: "Growing Companies & Mid-Market",
@@ -113,39 +100,6 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container py-8">
-          <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-[#F4F6FA] p-6 md:grid-cols-2 lg:grid-cols-4">
-            {proofPoints.map((point) => (
-              <div
-                key={point}
-                className="brand-surface rounded-xl px-4 py-4 text-sm font-medium text-slate-700"
-              >
-                {point}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container py-10">
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="brand-surface-soft p-6 text-center"
-              >
-                <div className="text-3xl font-semibold tracking-tight text-slate-950">
-                  {stat.value}
-                </div>
-                <div className="mt-3 text-base text-slate-600">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
