@@ -7,33 +7,33 @@ const stats = [
 ];
 
 const proofPoints = [
-  "Global People Operations leadership",
-  "ServiceNow HR integration and workflow transformation",
-  "Shared services, controls, and governance",
-  "M&A integration and harmonisation",
+  "Global HR operations and service delivery leadership",
+  "HR technology, workflow, and ServiceNow transformation",
+  "Operational governance, controls, and process discipline",
+  "Transformation support across growth, complexity, and change",
 ];
 
 const audiencePaths = [
   {
     title: "Growing Companies & Mid-Market",
-    text: "For scaling businesses that need stronger HR foundations, clearer processes, better onboarding, and systems that support growth without unnecessary bureaucracy.",
+    text: "For organisations building stronger HR foundations, clearer operating rhythms, and more scalable processes before complexity starts to slow the business down.",
     bullets: [
       "HR foundations and operational clarity",
       "Onboarding and employee lifecycle design",
-      "Manager-friendly workflows and documentation",
-      "HR systems improvement and practical automation",
+      "Manager-friendly processes and guidance",
+      "Practical HR systems improvement and automation",
     ],
     href: "/services/growing-companies",
     cta: "For Growing Companies",
   },
   {
     title: "Enterprise & Complex Organisations",
-    text: "For organisations navigating global operations, shared services, HR technology programmes, regulatory complexity, and transformation across multiple markets or entities.",
+    text: "For organisations refining global HR operations, strengthening service delivery, improving governance, and navigating transformation across multiple markets, teams, or systems.",
     bullets: [
       "HR operations transformation",
-      "Service delivery and shared services",
+      "Shared services and service delivery design",
       "HR technology and workflow redesign",
-      "M&A integration and harmonisation",
+      "Governance, controls, and operating discipline",
     ],
     href: "/services/enterprise",
     cta: "Enterprise Organisations",
@@ -42,11 +42,11 @@ const audiencePaths = [
 
 const diagnosticSignals = [
   "Managers handle similar HR issues differently across teams",
-  "Employees are unsure where to go for HR support",
+  "Employees are unclear on where to go for support",
   "Onboarding feels inconsistent or overly manual",
-  "The same HR questions keep resurfacing",
-  "HR spends too much time reacting instead of improving",
-  "Processes start to strain as the business grows",
+  "The same HR questions continue to resurface",
+  "HR spends too much time reacting rather than improving",
+  "Processes begin to strain as the organisation grows",
 ];
 
 export default function HomePage() {
@@ -57,18 +57,19 @@ export default function HomePage() {
           <div className="grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="brand-stack-md">
               <div className="inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-[#8AAAC8]">
-                HR Operations • Service Delivery • Transformation Advisory
+                Van Esch Advisory Ltd • HR Operations • Service Delivery • Transformation Advisory
               </div>
 
               <div className="brand-stack-sm">
                 <h1 className="brand-heading-xl max-w-4xl">
-                  Building HR operations that scale with growth, complexity, and change.
+                  HR operations that stand up to growth, complexity, and change.
                 </h1>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  I help organisations strengthen HR operations, service delivery,
-                  knowledge frameworks, and HR technology so they can scale with
-                  more clarity, control, and operational confidence.
+                  Van Esch Advisory helps organisations strengthen HR operations,
+                  service delivery, process discipline, and supporting
+                  infrastructure so people processes remain clear, credible, and
+                  scalable as the organisation evolves.
                 </p>
               </div>
 
@@ -90,15 +91,15 @@ export default function HomePage() {
 
             <div className="brand-card-dark p-8 lg:p-9">
               <div className="brand-stack-md">
-                <p className="brand-kicker">Where I typically help</p>
+                <p className="brand-kicker">Where the firm typically helps</p>
 
                 <div className="space-y-4 text-lg text-white">
                   {[
-                    "HR foundations for scaling businesses and mid-market organisations",
-                    "Global HR operating models and shared services",
-                    "HR technology, workflow automation, and ServiceNow HR integration",
-                    "Knowledge management and employee self-service",
-                    "Governance, controls, and audit-ready operations",
+                    "Strengthening HR operating models as organisations scale",
+                    "Improving service delivery, shared services, and support design",
+                    "Redesigning workflows, controls, and HR process execution",
+                    "Making HR technology more useful in practice, not just on paper",
+                    "Creating greater consistency across teams, markets, and manager experience",
                   ].map((item) => (
                     <div
                       key={item}
@@ -152,20 +153,20 @@ export default function HomePage() {
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
-                <p className="brand-section-kicker">Quick self-check</p>
+                <p className="brand-section-kicker">Operational self-check</p>
                 <h2 className="brand-heading-lg text-slate-950">
-                  Is your HR starting to feel messy?
+                  Is HR still working, but no longer working cleanly?
                 </h2>
                 <p className="brand-subheading text-slate-700">
-                  Many organisations do not start by looking for “HR transformation”.
-                  What they notice first is friction: repeated questions,
-                  inconsistent decisions, manual workarounds, and HR becoming
-                  increasingly reactive.
+                  Many organisations do not begin by looking for “transformation”.
+                  They begin by noticing friction: repeated questions,
+                  inconsistent manager handling, manual workarounds, and HR
+                  becoming more reactive as complexity increases.
                 </p>
                 <p className="brand-body">
-                  The HR Operations Health Check is a short self-assessment designed
-                  to help you understand whether these are isolated frustrations or
-                  signs of wider operational strain.
+                  The HR Operations Health Check is designed to help you assess
+                  whether those signs are isolated irritations or indicators of a
+                  wider operating model issue that now needs attention.
                 </p>
               </div>
 
@@ -187,7 +188,7 @@ export default function HomePage() {
 
             <div className="brand-surface-soft p-8">
               <div className="brand-stack-md">
-                <p className="brand-section-kicker">Common warning signs</p>
+                <p className="brand-section-kicker">Common signals</p>
                 <div className="space-y-3">
                   {diagnosticSignals.map((signal) => (
                     <div
@@ -208,16 +209,15 @@ export default function HomePage() {
         <div className="brand-container brand-section">
           <div className="max-w-3xl brand-stack-sm">
             <p className="brand-section-kicker">
-              Choose the path that fits your organisation
+              Advisory support shaped to organisational context
             </p>
             <h2 className="brand-heading-lg text-slate-950">
-              Different organisations need different kinds of HR support.
+              Different organisations face different HR operational pressures.
             </h2>
             <p className="brand-subheading text-slate-700">
-              A growing business building its HR foundations has very different
-              needs from a global organisation redesigning service delivery or
-              navigating complex change. Choose the path that best reflects where
-              your organisation is today.
+              A growing business putting stronger foundations in place needs a
+              different operating response from a more complex organisation
+              refining service delivery, governance, and execution across scale.
             </p>
           </div>
 
@@ -261,15 +261,15 @@ export default function HomePage() {
             <div className="max-w-4xl brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-section-kicker">
-                  Signature Offer for Growing Companies
+                  Signature offer for growing organisations
                 </p>
                 <h2 className="brand-heading-lg text-slate-950">
                   HR Foundations Sprint
                 </h2>
                 <p className="brand-subheading text-slate-700">
-                  A focused 4 week engagement for growing organisations that need
-                  stronger HR foundations, clearer processes, and a practical plan
-                  for what to fix first.
+                  A focused four-week engagement for organisations that need
+                  stronger HR operating foundations, clearer process discipline,
+                  and a practical view of what to stabilise first.
                 </p>
               </div>
 
@@ -297,16 +297,16 @@ export default function HomePage() {
           <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
-                <p className="brand-kicker">Start here</p>
+                <p className="brand-kicker">Start the conversation</p>
                 <h2 className="brand-heading-lg">
-                  Need stronger HR operations, better service delivery, or more
-                  scalable infrastructure?
+                  If HR operations are becoming harder to manage, the answer is
+                  usually not more effort. It is better operating clarity.
                 </h2>
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  Whether the challenge is enterprise transformation or simply
-                  getting the basics right in a growing business, you can start
-                  with a short conversation or take the HR Operations Health Check
-                  first.
+                  Whether the need is stronger foundations, better service
+                  delivery, tighter process discipline, or clearer transformation
+                  priorities, the next step can begin with a short conversation
+                  or the HR Operations Health Check.
                 </p>
               </div>
 
