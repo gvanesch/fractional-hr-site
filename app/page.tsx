@@ -57,19 +57,21 @@ export default function HomePage() {
           <div className="grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="brand-stack-md">
               <div className="inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-[#8AAAC8]">
-                Van Esch Advisory Ltd • HR Operations • Service Delivery • Transformation Advisory
+                Van Esch Advisory Ltd • HR Operations • Service Delivery •
+                Transformation Advisory
               </div>
 
               <div className="brand-stack-sm">
                 <h1 className="brand-heading-xl max-w-4xl">
-                  HR operations that stand up to growth, complexity, and change.
+                  Designing and strengthening HR operations for organisations
+                  that need to scale with clarity and control.
                 </h1>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  Van Esch Advisory helps organisations strengthen HR operations,
-                  service delivery, process discipline, and supporting
-                  infrastructure so people processes remain clear, credible, and
-                  scalable as the organisation evolves.
+                  Van Esch Advisory Ltd works with growing and complex
+                  organisations to improve HR service delivery, operating models,
+                  and technology foundations — ensuring people operations are
+                  consistent, scalable, and able to support business execution.
                 </p>
               </div>
 
@@ -158,10 +160,10 @@ export default function HomePage() {
                   Is HR still working, but no longer working cleanly?
                 </h2>
                 <p className="brand-subheading text-slate-700">
-                  Many organisations do not begin by looking for “transformation”.
-                  They begin by noticing friction: repeated questions,
-                  inconsistent manager handling, manual workarounds, and HR
-                  becoming more reactive as complexity increases.
+                  Many organisations do not begin by looking for
+                  “transformation”. They begin by noticing friction: repeated
+                  questions, inconsistent manager handling, manual workarounds,
+                  and HR becoming more reactive as complexity increases.
                 </p>
                 <p className="brand-body">
                   The HR Operations Health Check is designed to help you assess
