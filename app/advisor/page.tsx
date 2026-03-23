@@ -1,3 +1,9 @@
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 export default function AdvisorIndexPage() {
   return (
     <main className="min-h-screen bg-[#F4F6FA] px-6 py-16">

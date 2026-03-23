@@ -1,3 +1,9 @@
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 import { notFound } from "next/navigation";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
 import {

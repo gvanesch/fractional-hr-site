@@ -1,14 +1,29 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import "./globals.css";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import ScrollToTopOnRouteChange from "./components/ScrollToTopOnRouteChange";
 
 export const metadata: Metadata = {
-  title: "Van Esch Advisory Ltd",
+  metadataBase: new URL("https://vanesch.uk"),
+
+  title: {
+    default: "Van Esch Advisory Ltd",
+    template: "%s | Van Esch Advisory Ltd",
+  },
+
   description:
-    "HR Operations, Service Delivery, and Transformation Advisory for scaling organisations.",
+    "HR Operations, Service Delivery, and Transformation Advisory for scaling and complex organisations.",
+
+  alternates: {
+    canonical: "/",
+  },
+
+  openGraph: {
+    title: "Van Esch Advisory Ltd",
+    description:
+      "HR Operations, Service Delivery, and Transformation Advisory.",
+    url: "https://vanesch.uk",
+    siteName: "Van Esch Advisory Ltd",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -18,21 +33,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#0A1628] text-white antialiased overflow-x-hidden">
-        <div className="min-h-screen flex flex-col">
-          <Header />
-
-          <Suspense fallback={null}>
-            <ScrollToTopOnRouteChange />
-          </Suspense>
-
-          <div className="site-header-spacer" aria-hidden="true" />
-
-          <main className="flex-1 w-full">{children}</main>
-
-          <Footer />
-        </div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

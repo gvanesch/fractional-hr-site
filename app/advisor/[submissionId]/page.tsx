@@ -1,3 +1,9 @@
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { calculateDiagnosticResult, type DiagnosticAnswers } from "../../../lib/diagnostic";
