@@ -202,7 +202,7 @@ export default function DiagnosticInterpretationPage() {
                 href="/contact?topic=health-check&source=diagnostic"
                 className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
               >
-                Book a 20-minute interpretation
+                Book a 30-minute interpretation
               </Link>
 
               <Link

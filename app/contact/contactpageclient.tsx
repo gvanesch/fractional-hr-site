@@ -16,6 +16,7 @@ type DiagnosticDraftState = {
 };
 
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
+const calendlyUrl = "https://calendly.com/greg-vanesch/30min";
 
 const topicOptions = [
   "HR Operations Health Check",
@@ -44,7 +45,10 @@ function loadDiagnosticDraft(): DiagnosticDraftState | null {
   }
 }
 
-function normaliseTopic(topicParam: string | null, isDiagnosticJourney: boolean): TopicOption {
+function normaliseTopic(
+  topicParam: string | null,
+  isDiagnosticJourney: boolean
+): TopicOption {
   if (isDiagnosticJourney) {
     return "HR Operations Health Check";
   }
@@ -92,14 +96,17 @@ function getIntroText(topic: TopicOption, isDiagnosticJourney: boolean): string 
   }
 }
 
-function getMessagePlaceholder(topic: TopicOption, isDiagnosticJourney: boolean): string {
+function getMessagePlaceholder(
+  topic: TopicOption,
+  isDiagnosticJourney: boolean
+): string {
   if (isDiagnosticJourney) {
     return "Briefly describe any questions you have about your diagnostic result, what stood out to you, or the HR operational challenges you would like to explore further.";
   }
 
   switch (topic) {
     case "Flexible Support":
-      return "Briefly describe the type of support you are looking for (for example ad hoc, recurring, interim, or project-based), your current situation, and what would be most useful.";
+      return "Briefly describe the type of support you are looking for, for example ad hoc, recurring, interim, or project-based, your current situation, and what would be most useful.";
     case "HR Foundations for Growing Companies":
       return "Briefly describe where your HR foundations currently feel unclear, inconsistent, or stretched, and what you would like to improve.";
     case "Enterprise HR Operations & Transformation":
@@ -221,10 +228,12 @@ export default function ContactPageClient() {
   return (
     <>
       <section className="brand-hero">
-        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
+        <div className="brand-hero-content brand-container brand-section">
           <div className="max-w-4xl">
             <p className="brand-kicker">Contact</p>
-            <h1 className="brand-heading-xl mt-3">Start a conversation</h1>
+            <h1 className="brand-heading-xl mt-3">
+              Start with a short diagnostic conversation
+            </h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               {introText}
             </p>
@@ -232,10 +241,70 @@ export default function ContactPageClient() {
         </div>
       </section>
 
+      <section className="border-b border-slate-200 bg-white">
+        <div className="brand-container py-14 sm:py-16 lg:py-20">
+          <div className="brand-surface-soft rounded-2xl p-6 sm:p-8 lg:p-10">
+            <div className="max-w-3xl">
+              <p className="brand-section-kicker">Book a conversation</p>
+              <h2 className="brand-heading-md mt-3 text-slate-950">
+                Book a 30-minute diagnostic conversation
+              </h2>
+              <p className="brand-body mt-4">
+                This is a practical discussion focused on your situation. We can
+                walk through current challenges, diagnostic results, or where
+                operational friction may be building.
+              </p>
+
+              <ul className="mt-6 space-y-2 text-base text-slate-700">
+                <li className="ml-5 list-disc">No preparation required</li>
+                <li className="ml-5 list-disc">
+                  Focused, practical discussion
+                </li>
+                <li className="ml-5 list-disc">
+                  Clear next-step guidance
+                </li>
+              </ul>
+
+              <div className="mt-8">
+                <a
+                  href={calendlyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
+                >
+                  Book a 30-Minute Diagnostic Conversation
+                </a>
+              </div>
+
+              <p className="mt-4 text-sm text-slate-500">
+                I typically respond to enquiries within 24 hours if you would
+                prefer to send a message instead.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="brand-light-section">
-        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
+        <div className="brand-container px-5 py-14 sm:px-6 sm:py-16 lg:py-20">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
             <div className="brand-surface-soft rounded-2xl p-6 sm:p-8">
+              <div className="mb-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Prefer to send a message?
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold text-slate-950">
+                  Send an enquiry
+                </h2>
+
+                {isDiagnosticJourney ? (
+                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    Following your HR Operations Health Check. Your submitted
+                    diagnostic context will be included with your enquiry email.
+                  </div>
+                ) : null}
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-2 block text-base font-medium text-slate-700">
@@ -282,7 +351,9 @@ export default function ContactPageClient() {
                   <select
                     name="topic"
                     value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value as TopicOption)}
+                    onChange={(e) =>
+                      setSelectedTopic(e.target.value as TopicOption)
+                    }
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   >
                     {topicOptions.map((topic) => (
@@ -347,8 +418,8 @@ export default function ContactPageClient() {
                       Engagement
                     </p>
                     <p className="mt-1 text-lg leading-8">
-                      Remote advisory, transformation programmes, flexible support,
-                      and selected on-site engagements.
+                      Remote advisory, transformation programmes, flexible
+                      support, and selected on-site engagements.
                     </p>
                   </div>
                 </div>

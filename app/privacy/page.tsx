@@ -233,13 +233,15 @@ export default function PrivacyPage() {
                 </p>
                 <p>These providers may include:</p>
                 <ul className="list-disc space-y-2 pl-6">
-                  <li>Supabase, for database and application data storage</li>
-                  <li>Resend, for email delivery</li>
-                  <li>
-                    Cloudflare, for website delivery, security, and performance
-                  </li>
-                  <li>GitHub, for code hosting and deployment workflows</li>
+                  <li>Supabase - database and application data storage</li>
+                  <li>Resend - email delivery</li>
+                  <li>Calendly - meeting scheduling</li>
+                  <li>Cloudflare - website delivery, security, and performance</li>
+                  <li>GitHub - code hosting and deployment workflows</li>
                 </ul>
+                <p>
+                    These providers process data only as necessary to perform their services and are expected to operate with appropriate security and data protection safeguards.
+                </p>
                 <p>
                   Information is not sold to third parties.
                 </p>
@@ -354,6 +356,9 @@ export default function PrivacyPage() {
                   This policy may be updated from time to time to reflect
                   changes to the website, services, diagnostic features, or
                   legal requirements.
+                </p>
+                <p>
+                  Some third-party tools used on this website, such as scheduling platforms, may use cookies or similar technologies when you interact with them. Where this applies, those tools operate under their own privacy and cookie policies.
                 </p>
               </div>
             </section>

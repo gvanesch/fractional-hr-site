@@ -171,6 +171,9 @@ export default function TermsPage() {
                   convenience or reference.
                 </p>
                 <p>
+                  This website may use third-party services such as scheduling platforms to facilitate communication and service delivery. Use of those services is subject to their own terms and policies.
+                </p>
+                <p>
                   Van Esch Advisory Ltd is not responsible for the content,
                   availability, security, or privacy practices of external
                   sites.
