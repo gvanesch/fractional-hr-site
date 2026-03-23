@@ -14,6 +14,8 @@ const navigation = [
   { href: "/contact", label: "Contact" },
 ];
 
+const calendlyUrl = "https://calendly.com/greg-vanesch/30min";
+
 export default function Header() {
   const [open, setOpen] = useState(false);
 
@@ -54,12 +56,14 @@ export default function Header() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link
-              href="/contact"
+            <a
+              href={calendlyUrl}
+              target="_blank"
+              rel="noreferrer"
               className="brand-button-primary hidden whitespace-nowrap px-4 py-2 text-sm font-semibold xl:inline-flex"
             >
-              Book Diagnostic Conversation
-            </Link>
+              Book a 30-Minute Diagnostic Conversation
+            </a>
 
             <button
               type="button"
@@ -87,13 +91,15 @@ export default function Header() {
                 </Link>
               ))}
 
-              <Link
-                href="/contact"
+              <a
+                href={calendlyUrl}
+                target="_blank"
+                rel="noreferrer"
                 onClick={handleCloseMenu}
                 className="brand-button-primary mt-3 justify-center px-4 py-2 text-sm font-semibold"
               >
-                Book Diagnostic Conversation
-              </Link>
+                Book a 30-Minute Diagnostic Conversation
+              </a>
             </nav>
           </div>
         ) : null}
