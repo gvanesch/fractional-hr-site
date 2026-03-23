@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { loadDiagnosticState } from "../../lib/diagnostic-storage";
 
@@ -13,6 +12,11 @@ type DiagnosticDraftState = {
   email: string;
   acceptedNotice: boolean;
   showResults: boolean;
+};
+
+type ContactPageClientProps = {
+  topicParam: string | null;
+  sourceParam: string | null;
 };
 
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
@@ -122,12 +126,10 @@ function getMessagePlaceholder(
   }
 }
 
-export default function ContactPageClient() {
-  const searchParams = useSearchParams();
-
-  const topicParam = searchParams.get("topic");
-  const sourceParam = searchParams.get("source");
-
+export default function ContactPageClient({
+  topicParam,
+  sourceParam,
+}: ContactPageClientProps) {
   const isDiagnosticJourney =
     topicParam === "health-check" || sourceParam === "diagnostic";
 

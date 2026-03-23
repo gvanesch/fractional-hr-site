@@ -7,6 +7,22 @@ export const metadata: Metadata = {
     "Book a diagnostic conversation or get in touch to discuss HR operations advisory, service delivery, and transformation support.",
 };
 
-export default function ContactPage() {
-  return <ContactPageClient />;
+type ContactPageProps = {
+  searchParams?: Promise<{
+    topic?: string;
+    source?: string;
+  }>;
+};
+
+export default async function ContactPage({
+  searchParams,
+}: ContactPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  return (
+    <ContactPageClient
+      topicParam={resolvedSearchParams?.topic ?? null}
+      sourceParam={resolvedSearchParams?.source ?? null}
+    />
+  );
 }
