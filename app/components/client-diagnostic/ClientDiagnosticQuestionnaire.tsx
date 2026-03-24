@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   dimensionDefinitions,
   getQuestionsForDimension,
@@ -15,6 +14,8 @@ type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 
 type ClientDiagnosticQuestionnaireProps = {
   questionnaireType: QuestionnaireType;
+  projectId?: string;
+  participantId?: string;
 };
 
 type PreparedResponse =
@@ -46,7 +47,7 @@ type SubmitResult = {
   savedResponseCount?: number;
 };
 
-function isUuid(value: string | null): value is string {
+function isUuid(value: string | undefined): value is string {
   if (!value) {
     return false;
   }
@@ -58,9 +59,9 @@ function isUuid(value: string | null): value is string {
 
 export default function ClientDiagnosticQuestionnaire({
   questionnaireType,
+  projectId,
+  participantId,
 }: ClientDiagnosticQuestionnaireProps) {
-  const searchParams = useSearchParams();
-
   const [scoreAnswers, setScoreAnswers] = useState<
     Record<string, ScoreAnswerValue | undefined>
   >({});
@@ -78,9 +79,6 @@ export default function ClientDiagnosticQuestionnaire({
   );
   const stickyPanelRef = useRef<HTMLDivElement | null>(null);
   const reviewSectionRef = useRef<HTMLDivElement | null>(null);
-
-  const projectId = searchParams.get("projectId");
-  const participantId = searchParams.get("participantId");
 
   const hasValidSubmissionContext =
     isUuid(projectId) && isUuid(participantId);
@@ -263,19 +261,19 @@ export default function ClientDiagnosticQuestionnaire({
             value,
           });
         }
+
+        continue;
       }
 
-      if (question.kind === "probe") {
-        const value = (probeAnswers[question.id] ?? "").trim();
+      const probeValue = probeAnswers[question.id]?.trim();
 
-        if (value.length > 0) {
-          responses.push({
-            questionId: question.id,
-            dimension: question.dimension,
-            kind: "probe",
-            value,
-          });
-        }
+      if (probeValue) {
+        responses.push({
+          questionId: question.id,
+          dimension: question.dimension,
+          kind: "probe",
+          value: probeValue,
+        });
       }
     }
 
@@ -286,44 +284,29 @@ export default function ClientDiagnosticQuestionnaire({
     };
   }
 
-  function handleReviewSubmission() {
-    const submission = buildPreparedSubmission();
-    setPreparedSubmission(submission);
+  function handlePrepareReview() {
+    setPreparedSubmission(buildPreparedSubmission());
     setShowReview(true);
-    setSubmitMessage("");
 
     window.setTimeout(() => {
       scrollToReviewSection();
-    }, 120);
+    }, 80);
   }
 
   async function handleSubmitDiagnostic() {
-    setSubmitMessage("");
-
-    if (!hasValidSubmissionContext || !projectId || !participantId) {
+    if (!hasValidSubmissionContext) {
       setSubmitState("error");
       setSubmitMessage(
-        "This questionnaire link is missing a valid project or participant reference.",
+        "This diagnostic link is missing the required project or participant context.",
       );
       return;
     }
 
     const submission = buildPreparedSubmission();
+
     setPreparedSubmission(submission);
-
-    const scoreResponseCount = submission.responses.filter(
-      (response) => response.kind === "score",
-    ).length;
-
-    if (scoreResponseCount !== scoreQuestions.length) {
-      setSubmitState("error");
-      setSubmitMessage(
-        "Please complete all scored questions before submitting.",
-      );
-      return;
-    }
-
     setSubmitState("submitting");
+    setSubmitMessage("");
 
     try {
       const response = await fetch("/api/client-diagnostic-submit", {
@@ -335,177 +318,78 @@ export default function ClientDiagnosticQuestionnaire({
           projectId,
           participantId,
           questionnaireType,
-          responses: submission.responses,
+          submission,
         }),
       });
 
       const result = (await response.json()) as SubmitResult;
 
       if (!response.ok || !result.success) {
-        setSubmitState("error");
-        setSubmitMessage(
-          result.error ?? "Unable to submit the diagnostic at this time.",
-        );
-        return;
+        throw new Error(result.error || "Unable to submit diagnostic.");
       }
-
-      setSubmitState("success");
-      setShowReview(true);
-      setSubmitMessage(
-        result.message ??
-          `Submission saved successfully${result.savedResponseCount ? ` (${result.savedResponseCount} responses).` : "."}`,
-      );
 
       try {
         window.localStorage.removeItem(draftStorageKey);
       } catch (error) {
-        console.error("Unable to clear local draft after submission.", error);
+        console.error("Unable to clear questionnaire draft.", error);
       }
+
+      setSubmitState("success");
+      setSubmitMessage(
+        result.message ||
+          "Thank you. Your responses have been submitted successfully.",
+      );
     } catch (error) {
-      console.error("Client diagnostic submission failed.", error);
       setSubmitState("error");
       setSubmitMessage(
-        "Unexpected error while submitting the diagnostic. Please try again.",
+        error instanceof Error
+          ? error.message
+          : "Unable to submit diagnostic.",
       );
     }
   }
-
-  function handleClearDraft() {
-    setScoreAnswers({});
-    setProbeAnswers({});
-    setPreparedSubmission(null);
-    setShowReview(false);
-    setSubmitState("idle");
-    setSubmitMessage("");
-    window.localStorage.removeItem(draftStorageKey);
-  }
-
-  const scoreCountByDimension = useMemo(() => {
-    const result = new Map<DimensionKey, number>();
-
-    for (const response of preparedSubmission?.responses ?? []) {
-      if (response.kind !== "score") {
-        continue;
-      }
-
-      const currentCount = result.get(response.dimension) ?? 0;
-      result.set(response.dimension, currentCount + 1);
-    }
-
-    return result;
-  }, [preparedSubmission]);
-
-  const commentCountByDimension = useMemo(() => {
-    const result = new Map<DimensionKey, number>();
-
-    for (const response of preparedSubmission?.responses ?? []) {
-      if (response.kind !== "probe") {
-        continue;
-      }
-
-      const currentCount = result.get(response.dimension) ?? 0;
-      result.set(response.dimension, currentCount + 1);
-    }
-
-    return result;
-  }, [preparedSubmission]);
 
   return (
     <section className="brand-light-section">
       <div className="brand-container py-10 sm:py-12">
         <div
           ref={stickyPanelRef}
-          className="sticky top-[calc(var(--site-header-height)+1rem)] z-30 mb-8 rounded-2xl border border-[var(--brand-border)] bg-white/95 p-5 shadow-[var(--brand-shadow-card)] backdrop-blur sm:p-6"
+          className="sticky top-[var(--site-header-height)] z-20 mb-8 rounded-2xl border border-[var(--brand-border)] bg-white/95 p-5 shadow-sm backdrop-blur"
         >
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="brand-section-kicker">Completion progress</p>
-
-              <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-                {completionPercentage}% complete
+              <p className="text-sm font-semibold text-slate-900">
+                Completion progress
               </p>
-
-              <p className="mt-2 text-sm leading-6 text-[var(--brand-text-muted)]">
-                {completedRequiredCount} of {scoreQuestions.length} scored
-                questions completed
+              <p className="mt-1 text-sm text-slate-600">
+                {completedRequiredCount} of {scoreQuestions.length} scored questions answered
               </p>
-
-              {!hasValidSubmissionContext ? (
-                <p className="mt-3 text-sm leading-6 text-amber-700">
-                  Submission link is missing a valid project or participant ID.
-                  Review mode works, but submission is currently disabled.
-                </p>
-              ) : null}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleReviewSubmission}
-                className="brand-button-primary"
-              >
-                Review submission
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSubmitDiagnostic}
-                disabled={
-                  submitState === "submitting" || !hasValidSubmissionContext
-                }
-                className="inline-flex min-h-[2.9rem] items-center justify-center rounded-[0.85rem] bg-[var(--brand-navy-2)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-navy-1)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitState === "submitting"
-                  ? "Submitting..."
-                  : "Submit diagnostic"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClearDraft}
-                className="inline-flex min-h-[2.9rem] items-center justify-center rounded-[0.85rem] border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Clear draft
-              </button>
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-40 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-[var(--brand-accent)]"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold text-slate-900">
+                {completionPercentage}%
+              </span>
             </div>
-          </div>
-
-          {submitMessage ? (
-            <div
-              className={`mt-4 rounded-xl border px-4 py-3 text-sm leading-6 ${
-                submitState === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : submitState === "error"
-                    ? "border-rose-200 bg-rose-50 text-rose-800"
-                    : "border-slate-200 bg-slate-50 text-slate-700"
-              }`}
-            >
-              {submitMessage}
-            </div>
-          ) : null}
-
-          <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full rounded-full bg-[var(--brand-accent)] transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
           </div>
         </div>
 
-        <div className="space-y-8">
-          {dimensionDefinitions.map((dimension, dimensionIndex) => {
+        <div className="space-y-10">
+          {dimensionDefinitions.map((dimension) => {
             const questions = getQuestionsForDimension(
               questionnaireType,
               dimension.key,
             );
 
-            const scoreItems = questions.filter(
-              (question): question is ScoreQuestion => question.kind === "score",
-            );
-
-            const probeItem = questions.find(
-              (question): question is ProbeQuestion => question.kind === "probe",
-            );
+            if (questions.length === 0) {
+              return null;
+            }
 
             return (
               <section
@@ -516,204 +400,166 @@ export default function ClientDiagnosticQuestionnaire({
                   ref={(element) => {
                     dimensionHeaderRefs.current[dimension.key] = element;
                   }}
-                  className="mb-6 border-b border-[var(--brand-border)] pb-5"
                 >
-                  <p className="brand-section-kicker">
-                    Dimension {dimensionIndex + 1}
-                  </p>
-
+                  <p className="brand-section-kicker">{dimension.label}</p>
                   <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    {dimension.label}
-                  </h2>
-
-                  <p className="brand-body-sm mt-3 max-w-3xl">
                     {dimension.description}
-                  </p>
+                  </h2>
                 </div>
 
-                <div className="space-y-6">
-                  {scoreItems.map((question, questionIndex) => (
-                    <div
-                      key={question.id}
-                      ref={(element) => {
-                        questionRefs.current[question.id] = element;
-                      }}
-                    >
-                      <ScoreQuestionCard
-                        question={question}
-                        questionNumber={questionIndex + 1}
-                        selectedValue={scoreAnswers[question.id]}
-                        onChange={handleScoreChange}
-                      />
-                    </div>
-                  ))}
+                <div className="mt-8 space-y-6">
+                  {questions.map((question) =>
+                    question.kind === "score" ? (
+                      <div
+                        key={question.id}
+                        ref={(element) => {
+                          questionRefs.current[question.id] = element;
+                        }}
+                        className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
+                      >
+                        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                          Question {question.order}
+                        </p>
+                        <p className="mt-3 text-base leading-7 text-slate-900">
+                          {question.prompt}
+                        </p>
 
-                  {probeItem ? (
-                    <ProbeQuestionCard
-                      question={probeItem}
-                      value={probeAnswers[probeItem.id] ?? ""}
-                      onChange={handleProbeChange}
-                    />
-                  ) : null}
+                        <div className="mt-5 grid grid-cols-5 gap-3">
+                          {[1, 2, 3, 4, 5].map((value) => {
+                            const isSelected = scoreAnswers[question.id] === value;
+
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() =>
+                                  handleScoreChange(
+                                    question.id,
+                                    value as ScoreAnswerValue,
+                                  )
+                                }
+                                className={`rounded-xl border px-4 py-4 text-sm font-semibold transition ${
+                                  isSelected
+                                    ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white"
+                                    : "border-[var(--brand-border)] bg-[var(--brand-surface-soft)] text-slate-700 hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)]"
+                                }`}
+                              >
+                                {value}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <ProbeQuestionCard
+                        key={question.id}
+                        question={question}
+                        value={probeAnswers[question.id] ?? ""}
+                        onChange={handleProbeChange}
+                      />
+                    ),
+                  )}
                 </div>
               </section>
             );
           })}
         </div>
 
-        <div ref={reviewSectionRef} className="mt-12">
-          {showReview ? (
-            <div className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Review</p>
+        <section
+          ref={reviewSectionRef}
+          className="brand-surface-card mt-10 p-6 sm:p-8"
+        >
+          <p className="brand-section-kicker">Review and submit</p>
+          <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+            Final check
+          </h2>
 
-              <h3 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Review your responses
-              </h3>
+          <p className="brand-body-sm mt-4 max-w-3xl">
+            Once submitted, your responses will be saved against the project and
+            used in the diagnostic reporting and advisor views.
+          </p>
 
-              <p className="brand-body-sm mt-4 max-w-3xl">
-                Your draft has been prepared and is ready to submit. This summary
-                confirms that responses have been captured across the
-                questionnaire before submission.
-              </p>
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+            <button
+              type="button"
+              onClick={handlePrepareReview}
+              className="brand-button-dark"
+            >
+              Review submission
+            </button>
 
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {dimensionDefinitions.map((dimension) => {
-                  const scoreCount = scoreCountByDimension.get(dimension.key) ?? 0;
-                  const commentCount =
-                    commentCountByDimension.get(dimension.key) ?? 0;
+            <button
+              type="button"
+              onClick={handleSubmitDiagnostic}
+              disabled={!hasValidSubmissionContext || submitState === "submitting"}
+              className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitState === "submitting"
+                ? "Submitting..."
+                : "Submit diagnostic"}
+            </button>
+          </div>
 
-                  return (
-                    <div key={dimension.key} className="brand-surface-soft p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                        {dimension.label}
-                      </p>
-
-                      <div className="mt-3 space-y-2 text-sm text-slate-700">
-                        <p>
-                          <span className="font-semibold text-slate-900">
-                            Scored answers:
-                          </span>{" "}
-                          {scoreCount}/3
-                        </p>
-
-                        <p>
-                          <span className="font-semibold text-slate-900">
-                            Optional comments:
-                          </span>{" "}
-                          {commentCount > 0 ? "Included" : "None"}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {!hasValidSubmissionContext ? (
+            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              This diagnostic link is missing valid project or participant identifiers.
             </div>
           ) : null}
-        </div>
+
+          {submitState === "success" ? (
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {submitMessage}
+            </div>
+          ) : null}
+
+          {submitState === "error" ? (
+            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {submitMessage}
+            </div>
+          ) : null}
+
+          {showReview && preparedSubmission ? (
+            <div className="mt-8 rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] p-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                Prepared submission
+              </p>
+
+              <p className="mt-3 text-sm text-slate-700">
+                {preparedSubmission.responses.length} responses prepared for submission.
+              </p>
+            </div>
+          ) : null}
+        </section>
       </div>
     </section>
   );
 }
 
-type ScoreQuestionCardProps = {
-  question: ScoreQuestion;
-  questionNumber: number;
-  selectedValue?: ScoreAnswerValue;
-  onChange: (questionId: string, value: ScoreAnswerValue) => void;
-};
-
-function ScoreQuestionCard({
-  question,
-  questionNumber,
-  selectedValue,
-  onChange,
-}: ScoreQuestionCardProps) {
-  return (
-    <div className="brand-surface-soft p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-        Score question {questionNumber}
-      </p>
-
-      <h3 className="mt-2 text-base font-medium leading-7 text-slate-900">
-        {question.prompt}
-      </h3>
-
-      {question.helpText ? (
-        <p className="mt-2 text-sm leading-6 text-[var(--brand-text-body)]">
-          {question.helpText}
-        </p>
-      ) : null}
-
-      <div className="mt-5 grid grid-cols-5 gap-2 sm:gap-3">
-        {[1, 2, 3, 4, 5].map((value) => {
-          const typedValue = value as ScoreAnswerValue;
-          const isSelected = selectedValue === typedValue;
-
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onChange(question.id, typedValue)}
-              className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
-                isSelected
-                  ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white"
-                  : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-100"
-              }`}
-              aria-pressed={isSelected}
-            >
-              {value}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex justify-between text-xs text-[var(--brand-text-muted)]">
-        <span>Strongly disagree</span>
-        <span>Strongly agree</span>
-      </div>
-    </div>
-  );
-}
-
-type ProbeQuestionCardProps = {
-  question: ProbeQuestion;
-  value: string;
-  onChange: (questionId: string, value: string) => void;
-};
-
 function ProbeQuestionCard({
   question,
   value,
   onChange,
-}: ProbeQuestionCardProps) {
+}: {
+  question: ProbeQuestion;
+  value: string;
+  onChange: (questionId: string, value: string) => void;
+}) {
   return (
-    <div className="rounded-xl border border-dashed border-[var(--brand-border)] bg-white p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-        Optional context
+    <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-5">
+      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        Optional detail
       </p>
-
-      <h3 className="mt-2 text-base font-medium leading-7 text-slate-900">
+      <p className="mt-3 text-base leading-7 text-slate-900">
         {question.prompt}
-      </h3>
-
-      {question.helpText ? (
-        <p className="mt-2 text-sm leading-6 text-[var(--brand-text-body)]">
-          {question.helpText}
-        </p>
-      ) : null}
+      </p>
 
       <textarea
         value={value}
         onChange={(event) => onChange(question.id, event.target.value)}
         rows={5}
-        maxLength={question.maxLength ?? 1200}
-        className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-accent)] focus:ring-4 focus:ring-blue-100"
-        placeholder="Add optional context here..."
+        className="mt-5 w-full rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[var(--brand-accent)]"
+        placeholder="Add any relevant context here..."
       />
-
-      <div className="mt-2 text-right text-xs text-[var(--brand-text-muted)]">
-        {value.length}/{question.maxLength ?? 1200}
-      </div>
     </div>
   );
 }

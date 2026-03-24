@@ -4,23 +4,43 @@ export const metadata = {
     follow: false,
   },
 };
+
 import { notFound } from "next/navigation";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
-import {
-  questionnaireTypes,
-  type QuestionnaireType,
-} from "@/lib/client-diagnostic/question-bank";
 
 export const runtime = "edge";
+
+type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 
 type PageProps = {
   params: Promise<{
     questionnaireType: string;
   }>;
+  searchParams?: Promise<{
+    projectId?: string | string[];
+    participantId?: string | string[];
+  }>;
 };
 
+const QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+  "client_fact_pack",
+];
+
 function isQuestionnaireType(value: string): value is QuestionnaireType {
-  return questionnaireTypes.includes(value as QuestionnaireType);
+  return QUESTIONNAIRE_TYPES.includes(value as QuestionnaireType);
+}
+
+function getSingleValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
 }
 
 function getQuestionnaireTitle(questionnaireType: QuestionnaireType): string {
@@ -55,12 +75,17 @@ function getQuestionnaireIntro(questionnaireType: QuestionnaireType): string {
 
 export default async function ClientDiagnosticQuestionnairePage({
   params,
+  searchParams,
 }: PageProps) {
   const { questionnaireType } = await params;
 
   if (!isQuestionnaireType(questionnaireType)) {
     notFound();
   }
+
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const projectId = getSingleValue(resolvedSearchParams.projectId);
+  const participantId = getSingleValue(resolvedSearchParams.participantId);
 
   return (
     <main className="brand-light-section min-h-screen">
@@ -80,7 +105,7 @@ export default async function ClientDiagnosticQuestionnairePage({
             </p>
 
             <div className="brand-card-dark mt-8 max-w-3xl p-6 sm:p-7">
-             <div className="space-y-4">
+              <div className="space-y-4">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
                   Guidance
                 </p>
@@ -101,7 +126,11 @@ export default async function ClientDiagnosticQuestionnairePage({
         </div>
       </section>
 
-      <ClientDiagnosticQuestionnaire questionnaireType={questionnaireType} />
+      <ClientDiagnosticQuestionnaire
+        questionnaireType={questionnaireType}
+        projectId={projectId}
+        participantId={participantId}
+      />
     </main>
   );
 }
