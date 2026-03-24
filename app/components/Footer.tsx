@@ -28,8 +28,8 @@ export default function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-[#F4F6FA]">
       <div className="brand-container py-14">
-        <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
-          <div className="brand-stack-sm">
+        <div className="grid gap-10 md:grid-cols-3 md:items-start">
+          <div className="space-y-5">
             <Link
               href="/"
               className="inline-flex items-center"
@@ -52,8 +52,9 @@ export default function Footer() {
             </p>
           </div>
 
-          <div className="brand-stack-sm">
+          <div className="space-y-5">
             <h3 className="text-base font-semibold text-slate-900">Explore</h3>
+
             <nav className="flex flex-col gap-3">
               {exploreLinks.map((item) => (
                 <Link
@@ -67,8 +68,9 @@ export default function Footer() {
             </nav>
           </div>
 
-          <div className="brand-stack-sm">
+          <div className="space-y-5">
             <h3 className="text-base font-semibold text-slate-900">Legal</h3>
+
             <nav className="flex flex-col gap-3">
               {legalLinks.map((item) =>
                 item.external ? (

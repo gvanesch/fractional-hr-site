@@ -4,21 +4,9 @@ export const metadata = {
     follow: false,
   },
 };
+
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import {
-  buildDimensionInsights,
-  type DimensionInsight,
-} from "@/lib/client-diagnostic/insight-engine";
-import {
-  buildDimensionNarratives,
-  type DimensionNarrative,
-} from "@/lib/client-diagnostic/narrative-engine";
-import {
-  dimensionDefinitions,
-  questionnaireTypes,
-  type QuestionnaireType,
-} from "@/lib/client-diagnostic/question-bank";
 
 export const runtime = "edge";
 
@@ -28,44 +16,34 @@ type PageProps = {
   }>;
 };
 
-type ParticipantRow = {
-  participant_id: string;
-  questionnaire_type: QuestionnaireType;
-  role_label: string;
-  participant_status: string;
-  started_at: string | null;
-  completed_at: string | null;
-  updated_at: string;
+type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
+
+type DimensionInsight = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  dimensionDescription: string;
+  status: "strong" | "moderate" | "weak";
+  alignment: "aligned" | "emerging_gap" | "significant_gap";
+  completeness: "sufficient" | "partial" | "insufficient";
+  averageScore: number | null;
+  gap: number | null;
+  completedQuestionnaireTypes: QuestionnaireType[];
 };
 
-type DimensionScoreRow = {
-  score_id: string;
-  project_id: string;
-  questionnaire_type: QuestionnaireType;
-  dimension_key: string;
-  average_score: number;
-  response_count: number;
-  updated_at: string;
+type DimensionNarrative = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  observation: string;
+  implication: string;
+  recommendedNextStep: string;
+  confidence: "high" | "medium" | "low";
 };
-
-type ProjectRow = {
-  project_id: string;
-  company_name: string;
-  primary_contact_name: string;
-  primary_contact_email: string;
-  project_status: string;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
 
 type DimensionSummary = {
   dimensionKey: string;
   dimensionLabel: string;
   dimensionDescription: string;
-  scores: QuestionnaireTypeScores;
+  scores: Partial<Record<QuestionnaireType, number>>;
   completedQuestionnaireTypes: QuestionnaireType[];
   missingQuestionnaireTypes: QuestionnaireType[];
   maxScore: number | null;
@@ -89,82 +67,76 @@ type RespondentGroupSummary = {
   }>;
 };
 
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+type ProjectSummaryResponse = {
+  success: true;
+  project: {
+    projectId: string;
+    companyName: string;
+    primaryContactName: string;
+    primaryContactEmail: string;
+    projectStatus: string;
+    notes: string | null;
+  };
+  completion: {
+    totalInvited: number;
+    outstanding: number;
+    completed: number;
+    completionPercentage: number;
+    participants: Array<{
+      participantId: string;
+      questionnaireType: QuestionnaireType;
+      roleLabel: string;
+      participantStatus: string;
+      startedAt: string | null;
+      completedAt: string | null;
+      updatedAt: string;
+    }>;
+    respondentGroups: RespondentGroupSummary[];
+  };
+  dimensions: DimensionSummary[];
+  strongestAlignment: DimensionSummary[];
+  biggestGaps: DimensionSummary[];
+  insights: {
+    dimensions: DimensionInsight[];
+    summary: {
+      status: {
+        strong: number;
+        moderate: number;
+        weak: number;
+      };
+      alignment: {
+        aligned: number;
+        emergingGap: number;
+        significantGap: number;
+      };
+      completeness: {
+        sufficient: number;
+        partial: number;
+        insufficient: number;
+      };
+    };
+  };
+  narratives: {
+    dimensions: DimensionNarrative[];
+  };
+};
 
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.");
-  }
+type ErrorResponse = {
+  success: false;
+  error: string;
+};
 
-  if (!supabaseServiceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
+const QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+  "client_fact_pack",
+];
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function buildDimensionSummaries(
-  scoreRows: DimensionScoreRow[],
-): DimensionSummary[] {
-  return dimensionDefinitions.map((dimension) => {
-    const matchingRows = scoreRows.filter(
-      (row) => row.dimension_key === dimension.key,
-    );
-
-    const scores: QuestionnaireTypeScores = {};
-    const completedQuestionnaireTypes: QuestionnaireType[] = [];
-    const missingQuestionnaireTypes: QuestionnaireType[] = [];
-
-    for (const questionnaireType of questionnaireTypes) {
-      const match = matchingRows.find(
-        (row) => row.questionnaire_type === questionnaireType,
-      );
-
-      if (match) {
-        scores[questionnaireType] = Number(match.average_score);
-        completedQuestionnaireTypes.push(questionnaireType);
-      } else {
-        missingQuestionnaireTypes.push(questionnaireType);
-      }
-    }
-
-    const numericScores = Object.values(scores).filter(
-      (value): value is number => typeof value === "number",
-    );
-
-    const maxScore =
-      numericScores.length > 0 ? Math.max(...numericScores) : null;
-    const minScore =
-      numericScores.length > 0 ? Math.min(...numericScores) : null;
-    const gap =
-      maxScore !== null && minScore !== null
-        ? Number((maxScore - minScore).toFixed(2))
-        : null;
-
-    return {
-      dimensionKey: dimension.key,
-      dimensionLabel: dimension.label,
-      dimensionDescription: dimension.description,
-      scores,
-      completedQuestionnaireTypes,
-      missingQuestionnaireTypes,
-      maxScore,
-      minScore,
-      gap,
-    };
-  });
 }
 
 function formatQuestionnaireType(questionnaireType: QuestionnaireType): string {
@@ -338,79 +310,6 @@ function formatConfidence(confidence: DimensionNarrative["confidence"]): string 
   }
 }
 
-function buildRespondentGroups(
-  participantRows: ParticipantRow[],
-): RespondentGroupSummary[] {
-  return questionnaireTypes.map((questionnaireType) => {
-    const matchingParticipants = participantRows.filter(
-      (participant) => participant.questionnaire_type === questionnaireType,
-    );
-
-    const completed = matchingParticipants.filter(
-      (participant) => participant.participant_status === "completed",
-    ).length;
-
-    const totalInvited = matchingParticipants.length;
-    const outstanding = Math.max(totalInvited - completed, 0);
-
-    const outstandingParticipants = matchingParticipants
-      .filter((participant) => participant.participant_status !== "completed")
-      .map((participant) => ({
-        participantId: participant.participant_id,
-        roleLabel: participant.role_label,
-        participantStatus: participant.participant_status,
-        startedAt: participant.started_at,
-        completedAt: participant.completed_at,
-        updatedAt: participant.updated_at,
-      }));
-
-    return {
-      questionnaireType,
-      label: formatQuestionnaireType(questionnaireType),
-      totalInvited,
-      outstanding,
-      completed,
-      outstandingParticipants,
-    };
-  });
-}
-
-function buildInsightSummary(dimensionInsights: DimensionInsight[]) {
-  return {
-    status: {
-      strong: dimensionInsights.filter((insight) => insight.status === "strong")
-        .length,
-      moderate: dimensionInsights.filter(
-        (insight) => insight.status === "moderate",
-      ).length,
-      weak: dimensionInsights.filter((insight) => insight.status === "weak")
-        .length,
-    },
-    alignment: {
-      aligned: dimensionInsights.filter(
-        (insight) => insight.alignment === "aligned",
-      ).length,
-      emergingGap: dimensionInsights.filter(
-        (insight) => insight.alignment === "emerging_gap",
-      ).length,
-      significantGap: dimensionInsights.filter(
-        (insight) => insight.alignment === "significant_gap",
-      ).length,
-    },
-    completeness: {
-      sufficient: dimensionInsights.filter(
-        (insight) => insight.completeness === "sufficient",
-      ).length,
-      partial: dimensionInsights.filter(
-        (insight) => insight.completeness === "partial",
-      ).length,
-      insufficient: dimensionInsights.filter(
-        (insight) => insight.completeness === "insufficient",
-      ).length,
-    },
-  };
-}
-
 function getPriorityDimensions(
   dimensionInsights: DimensionInsight[],
 ): DimensionInsight[] {
@@ -484,6 +383,59 @@ function getPriorityNarratives(
   }));
 }
 
+async function getBaseUrl(): Promise<string> {
+  const envSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+
+  if (envSiteUrl) {
+    return envSiteUrl.replace(/\/$/, "");
+  }
+
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("host");
+
+  if (!host) {
+    throw new Error("Unable to determine site host.");
+  }
+
+  const protocol =
+    host.includes("localhost") || host.startsWith("127.0.0.1")
+      ? "http"
+      : "https";
+
+  return `${protocol}://${host}`;
+}
+
+async function getProjectSummary(
+  projectId: string,
+): Promise<ProjectSummaryResponse> {
+  const baseUrl = await getBaseUrl();
+
+  const response = await fetch(
+    `${baseUrl}/api/client-diagnostic-project-summary?projectId=${encodeURIComponent(
+      projectId,
+    )}`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  if (response.status === 404) {
+    notFound();
+  }
+
+  const data = (await response.json()) as
+    | ProjectSummaryResponse
+    | ErrorResponse;
+
+  if (!response.ok || !data.success) {
+    throw new Error(
+      "Unable to load client diagnostic project summary.",
+    );
+  }
+
+  return data;
+}
+
 export default async function ClientDiagnosticProjectDashboardPage({
   params,
 }: PageProps) {
@@ -493,92 +445,34 @@ export default async function ClientDiagnosticProjectDashboardPage({
     notFound();
   }
 
-  const supabase = getSupabaseAdminClient();
+  const summary = await getProjectSummary(projectId);
 
-  const [
-    { data: project, error: projectError },
-    { data: participants, error: participantsError },
-    { data: dimensionScores, error: dimensionScoresError },
-  ] = await Promise.all([
-    supabase
-      .from("client_projects")
-      .select(
-        "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .single<ProjectRow>(),
-    supabase
-      .from("client_participants")
-      .select(
-        "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .returns<ParticipantRow[]>(),
-    supabase
-      .from("client_dimension_scores")
-      .select(
-        "score_id, project_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-      )
-      .eq("project_id", projectId)
-      .returns<DimensionScoreRow[]>(),
-  ]);
-
-  if (projectError || !project) {
-    notFound();
-  }
-
-  if (participantsError) {
-    throw new Error("Unable to load project participants.");
-  }
-
-  if (dimensionScoresError) {
-    throw new Error("Unable to load project dimension scores.");
-  }
-
-  const participantRows = (participants ?? []).sort((a, b) => {
-    if (a.questionnaire_type !== b.questionnaire_type) {
-      return a.questionnaire_type.localeCompare(b.questionnaire_type);
+  const project = summary.project;
+  const participantRows = [...summary.completion.participants].sort((a, b) => {
+    if (a.questionnaireType !== b.questionnaireType) {
+      return a.questionnaireType.localeCompare(b.questionnaireType);
     }
 
-    return a.role_label.localeCompare(b.role_label);
+    return a.roleLabel.localeCompare(b.roleLabel);
   });
 
-  const dimensionScoreRows = dimensionScores ?? [];
-  const dimensionSummaries = buildDimensionSummaries(dimensionScoreRows);
-  const dimensionInsights = buildDimensionInsights(dimensionSummaries);
-  const dimensionNarratives = buildDimensionNarratives(dimensionInsights);
+  const dimensionSummaries = summary.dimensions;
+  const dimensionInsights = summary.insights.dimensions;
+  const dimensionNarratives = summary.narratives.dimensions;
   const priorityDimensions = getPriorityDimensions(dimensionInsights);
   const priorityNarratives = getPriorityNarratives(
     dimensionInsights,
     dimensionNarratives,
   );
-  const insightSummary = buildInsightSummary(dimensionInsights);
-  const respondentGroups = buildRespondentGroups(participantRows);
+  const insightSummary = summary.insights.summary;
+  const respondentGroups = summary.completion.respondentGroups;
 
-  const completedParticipants = participantRows.filter(
-    (participant) => participant.participant_status === "completed",
-  ).length;
-
-  const totalInvitedParticipants = participantRows.length;
-  const outstandingParticipants = Math.max(
-    totalInvitedParticipants - completedParticipants,
-    0,
-  );
-
-  const completionPercentage =
-    totalInvitedParticipants === 0
-      ? 0
-      : Math.round((completedParticipants / totalInvitedParticipants) * 100);
-
-  const strongestAlignment = [...dimensionSummaries]
-    .filter((dimension) => dimension.gap !== null)
-    .sort((a, b) => (a.gap ?? 999) - (b.gap ?? 999))
-    .slice(0, 3);
-
-  const biggestGaps = [...dimensionSummaries]
-    .filter((dimension) => dimension.gap !== null)
-    .sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1))
-    .slice(0, 3);
+  const completedParticipants = summary.completion.completed;
+  const totalInvitedParticipants = summary.completion.totalInvited;
+  const outstandingParticipants = summary.completion.outstanding;
+  const completionPercentage = summary.completion.completionPercentage;
+  const strongestAlignment = summary.strongestAlignment;
+  const biggestGaps = summary.biggestGaps;
 
   return (
     <main className="brand-light-section min-h-screen">
@@ -588,7 +482,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
             <p className="brand-kicker">Client diagnostic dashboard</p>
 
             <h1 className="brand-heading-lg mt-5 text-white">
-              {project.company_name}
+              {project.companyName}
             </h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
@@ -599,7 +493,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
             <div className="brand-card-dark mt-8 grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
               <DashboardHeroStat
                 label="Project status"
-                value={project.project_status}
+                value={project.projectStatus}
               />
               <DashboardHeroStat
                 label="Participants requested"
@@ -631,13 +525,13 @@ export default async function ClientDiagnosticProjectDashboardPage({
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <InfoCard
                   label="Primary contact"
-                  value={project.primary_contact_name}
-                  secondary={project.primary_contact_email}
+                  value={project.primaryContactName}
+                  secondary={project.primaryContactEmail}
                 />
                 <InfoCard
                   label="Project status"
-                  value={project.project_status}
-                  secondary={`Last updated ${formatDateTime(project.updated_at)}`}
+                  value={project.projectStatus}
+                  secondary="Live internal dashboard"
                 />
                 <InfoCard
                   label="Completed submissions"
@@ -893,29 +787,29 @@ export default async function ClientDiagnosticProjectDashboardPage({
                 </thead>
                 <tbody>
                   {participantRows.map((participant) => (
-                    <tr key={participant.participant_id}>
+                    <tr key={participant.participantId}>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm font-semibold text-slate-900">
-                        {participant.role_label}
+                        {participant.roleLabel}
                       </td>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatQuestionnaireType(participant.questionnaire_type)}
+                        {formatQuestionnaireType(participant.questionnaireType)}
                       </td>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm">
                         <span
                           className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusPillClasses(
-                            participant.participant_status,
+                            participant.participantStatus,
                           )}`}
                         >
                           {formatParticipantStatus(
-                            participant.participant_status,
+                            participant.participantStatus,
                           )}
                         </span>
                       </td>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatDateTime(participant.started_at)}
+                        {formatDateTime(participant.startedAt)}
                       </td>
                       <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatDateTime(participant.completed_at)}
+                        {formatDateTime(participant.completedAt)}
                       </td>
                     </tr>
                   ))}
@@ -1222,7 +1116,7 @@ function PriorityDimensionCard({
         />
         <MetricMiniCard
           label="Coverage"
-          value={`${dimension.completedQuestionnaireTypes.length}/${questionnaireTypes.length}`}
+          value={`${dimension.completedQuestionnaireTypes.length}/${QUESTIONNAIRE_TYPES.length}`}
         />
       </div>
     </div>
@@ -1267,14 +1161,8 @@ function NarrativeCard({
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
-        <NarrativeBlock
-          title="Observation"
-          body={narrative.observation}
-        />
-        <NarrativeBlock
-          title="Implication"
-          body={narrative.implication}
-        />
+        <NarrativeBlock title="Observation" body={narrative.observation} />
+        <NarrativeBlock title="Implication" body={narrative.implication} />
         <NarrativeBlock
           title="Recommended next step"
           body={narrative.recommendedNextStep}
