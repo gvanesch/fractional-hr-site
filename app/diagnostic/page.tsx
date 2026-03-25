@@ -73,6 +73,25 @@ const roleOptions = [
   "Other",
 ];
 
+const healthCheckDeliverables = [
+  {
+    title: "Overall assessment",
+    text: "A clear view of current HR operational maturity and whether the function appears stable, developing, or under strain.",
+  },
+  {
+    title: "10-dimension insight",
+    text: "A structured read across process clarity, ownership, service access, systems enablement, handoffs, and delivery consistency.",
+  },
+  {
+    title: "Likely friction points",
+    text: "Early signals of where operational drag may be building, including inconsistent practice, unclear ownership, or overly manual work.",
+  },
+  {
+    title: "Practical focus areas",
+    text: "A first indication of which areas are most likely to benefit from closer attention before issues become more embedded.",
+  },
+];
+
 export default function DiagnosticPage() {
   const [answers, setAnswers] = useState<Record<number, AnswerValue | undefined>>(
     {}
@@ -89,6 +108,9 @@ export default function DiagnosticPage() {
     useState<CompletionEmailStatus>("idle");
   const [submitError, setSubmitError] = useState("");
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+  const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<
+    number | null
+  >(null);
 
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -201,30 +223,40 @@ export default function DiagnosticPage() {
     });
   }, [showResults]);
 
-  function scrollToNextQuestion(
-    updatedAnswers: Record<number, AnswerValue | undefined>
-  ) {
-    const nextQuestion = questions.find((question) => !updatedAnswers[question.id]);
-
-    if (!nextQuestion) {
+  useEffect(() => {
+    if (pendingScrollQuestionId === null) {
       return;
     }
 
-    const nextElement = questionRefs.current[nextQuestion.id];
+    const nextElement = questionRefs.current[pendingScrollQuestionId];
 
     if (!nextElement) {
+      setPendingScrollQuestionId(null);
       return;
     }
 
-    const headerOffset = 150;
-    const elementTop = nextElement.getBoundingClientRect().top + window.scrollY;
-    const targetTop = Math.max(elementTop - headerOffset, 0);
+    if (
+      typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      document.activeElement.blur();
+    }
 
-    window.scrollTo({
-      top: targetTop,
-      behavior: "smooth",
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const headerOffset = 150;
+        const elementTop = nextElement.getBoundingClientRect().top + window.scrollY;
+        const targetTop = Math.max(elementTop - headerOffset, 0);
+
+        window.scrollTo({
+          top: targetTop,
+          behavior: "smooth",
+        });
+
+        setPendingScrollQuestionId(null);
+      });
     });
-  }
+  }, [pendingScrollQuestionId, answers]);
 
   function updateAnswer(questionId: number, value: AnswerValue) {
     const updatedAnswers = {
@@ -232,17 +264,14 @@ export default function DiagnosticPage() {
       [questionId]: value,
     };
 
+    const nextQuestion = questions.find((question) => !updatedAnswers[question.id]);
+
     setAnswers(updatedAnswers);
     setShowResults(false);
     setSubmitError("");
     setSaveStatus("idle");
     setCompletionEmailStatus("idle");
-
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        scrollToNextQuestion(updatedAnswers);
-      });
-    });
+    setPendingScrollQuestionId(nextQuestion?.id ?? null);
   }
 
   async function sendDiagnosticCompletionEmail() {
@@ -285,7 +314,13 @@ export default function DiagnosticPage() {
   }
 
   async function calculateScore() {
-    if (!allAnswered || !acceptedNotice || !contextComplete || score === null || !band) {
+    if (
+      !allAnswered ||
+      !acceptedNotice ||
+      !contextComplete ||
+      score === null ||
+      !band
+    ) {
       return;
     }
 
@@ -310,7 +345,9 @@ export default function DiagnosticPage() {
       setCompletionEmailStatus("error");
 
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to send diagnostic completion email.";
+        error instanceof Error
+          ? error.message
+          : "Failed to send diagnostic completion email.";
 
       if (errorMessage === "A valid email address is required.") {
         setSubmitError(
@@ -338,6 +375,7 @@ export default function DiagnosticPage() {
     setSaveStatus("idle");
     setCompletionEmailStatus("idle");
     setSubmitError("");
+    setPendingScrollQuestionId(null);
 
     try {
       window.localStorage.removeItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
@@ -354,16 +392,24 @@ export default function DiagnosticPage() {
       <section className="brand-hero">
         <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
           <div className="max-w-4xl">
-            <p className="brand-kicker">Diagnostic</p>
-            <h1 className="brand-heading-xl mt-3">HR Operations Health Check</h1>
+            <p className="brand-kicker">HR Operations Health Check</p>
+            <h1 className="brand-heading-xl mt-3">
+              Identify where HR operations may be starting to strain
+            </h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Answer 10 questions to assess potential HR operational friction and get
-              an immediate HR Operations Score.
+              Answer 10 questions to assess how HR is operating across process
+              clarity, ownership, service access, and delivery consistency.
             </p>
             <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              This is designed as a quick diagnostic tool to help identify whether
-              operational strain may be building across HR processes, onboarding,
-              service delivery, ownership, and day-to-day execution.
+              This is not a generic survey. It is designed to surface how HR
+              actually functions in practice and where operational friction may
+              be building.
+            </p>
+            <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
+              The result provides a structured view of potential strain. For
+              organisations that need a deeper perspective, it can lead into the
+              HR Operations Diagnostic Assessment across leadership, managers,
+              and HR.
             </p>
           </div>
         </div>
@@ -371,7 +417,64 @@ export default function DiagnosticPage() {
 
       <section className="brand-light-section">
         <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16 lg:py-20">
-          <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm">
+          <div className="mb-10 rounded-[1.75rem] bg-white p-6 shadow-sm sm:p-8">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <h2 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
+                  What you will receive
+                </h2>
+                <p className="text-base leading-7 text-slate-700">
+                  The Health Check is designed to do more than produce a score.
+                  It gives you an initial operational read on how HR appears to
+                  be functioning in practice, where strain may be accumulating,
+                  and which issues are more likely to reflect systemic patterns
+                  rather than isolated frustrations.
+                </p>
+                <p className="text-base leading-7 text-slate-700">
+                  It is intended as a structured first layer of clarity. For
+                  some organisations, that will be enough to sharpen internal
+                  priorities. For others, it will indicate where a deeper
+                  diagnostic is likely to be worthwhile.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {healthCheckDeliverables.map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+                  >
+                    <h3 className="text-base font-semibold text-slate-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-5">
+                <h3 className="text-lg font-semibold text-slate-950">
+                  How this is used
+                </h3>
+                <p className="mt-3 text-sm leading-7 text-slate-700">
+                  The Health Check is the starting point. It helps identify
+                  whether the issues you are seeing are isolated or part of a
+                  wider operational pattern.
+                </p>
+                <p className="mt-3 text-sm leading-7 text-slate-700">
+                  For organisations that need a deeper view, this can lead into
+                  the HR Operations Diagnostic Assessment. That next step gathers
+                  structured input across leadership, managers, and HR to build
+                  a more complete picture of how work actually flows through the
+                  organisation and where gaps are most likely to matter.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm sm:p-8">
             <h2 className="mb-6 text-xl font-semibold text-slate-950">
               A little context first
             </h2>
@@ -471,8 +574,9 @@ export default function DiagnosticPage() {
                   placeholder="Optional"
                 />
                 <p className="mt-2 text-sm text-slate-500">
-                  Optional. Provide this only if you would like follow-up or a deeper
-                  interpretation of the result.
+                  Optional. You will not be added to a mailing list or contacted
+                  without context. If you choose to provide your email, it is
+                  only used to share your result or respond to a specific enquiry.
                 </p>
               </div>
             </div>
@@ -529,6 +633,12 @@ export default function DiagnosticPage() {
           </div>
 
           <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
+            <p className="text-sm leading-7 text-slate-600">
+              If helpful, results can also be discussed in a short follow-up
+              conversation to interpret the findings and talk through what they
+              may mean in practice.
+            </p>
+
             <label className="flex items-start gap-3 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -539,10 +649,11 @@ export default function DiagnosticPage() {
                 }}
               />
               <span>
-                I understand this tool provides general informational guidance only and
-                is not legal, regulatory, employment, tax, or professional advice. I
-                also understand that the information I submit may be used to create
-                aggregated or anonymised benchmarking insights.
+                I understand this assessment provides general informational
+                guidance only and is not legal, regulatory, employment, tax, or
+                professional advice. I also understand that the information I
+                submit may be used to create aggregated or anonymised
+                benchmarking insights.
               </span>
             </label>
 
@@ -566,7 +677,7 @@ export default function DiagnosticPage() {
               >
                 {saveStatus === "saving" || completionEmailStatus === "sending"
                   ? "Calculating..."
-                  : "Calculate score"}
+                  : "Get My Diagnostic Result"}
               </button>
 
               <button
@@ -668,9 +779,10 @@ export default function DiagnosticPage() {
                 </h4>
 
                 <p className="mb-4 text-sm text-slate-600">
-                  Click through to see a more detailed interpretation of your score and,
-                  if helpful, book a free 20-minute conversation to talk through what it
-                  may mean for your organisation&apos;s HR operations.
+                  Click through to see a more detailed interpretation of your
+                  score and, if helpful, book a free 20-minute conversation to
+                  talk through what it may mean for your organisation&apos;s HR
+                  operations.
                 </p>
 
                 <Link
@@ -678,15 +790,6 @@ export default function DiagnosticPage() {
                   className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
                 >
                   View detailed interpretation
-                </Link>
-              </div>
-
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  href="/services/hr-foundations-sprint"
-                  className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
-                >
-                  View the HR Foundations Sprint
                 </Link>
               </div>
             </div>

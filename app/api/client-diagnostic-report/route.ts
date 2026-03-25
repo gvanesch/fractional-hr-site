@@ -40,6 +40,30 @@ type ClientSafeDimensionSummary = {
   gap: number | null;
 };
 
+type QualitativeThemeSummary = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+type DimensionQualitativeSummary = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  commentCount: number;
+  respondentGroupsWithComments: QuestionnaireType[];
+  keyThemes: QualitativeThemeSummary[];
+  advisoryRead: string | null;
+  illustrativeSignals: string[];
+  confidence: "high" | "medium" | "low";
+};
+
+type OverallQualitativeSummary = {
+  totalCommentCount: number;
+  respondentGroupsWithComments: QuestionnaireType[];
+  crossCuttingThemes: QualitativeThemeSummary[];
+  summary: string | null;
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -106,6 +130,10 @@ type ProjectSummaryResponse = {
   narratives: {
     dimensions: DimensionNarrative[];
   };
+  qualitative: {
+    overall: OverallQualitativeSummary;
+    dimensions: DimensionQualitativeSummary[];
+  };
 };
 
 type ClientDiagnosticReportResponse = {
@@ -151,6 +179,24 @@ type ClientDiagnosticReportResponse = {
     narratives: {
       dimensions: DimensionNarrative[];
     };
+    qualitative: {
+      overall: {
+        totalCommentCount: number;
+        respondentGroupsWithComments: ScoredQuestionnaireType[];
+        crossCuttingThemes: QualitativeThemeSummary[];
+        summary: string | null;
+      };
+      dimensions: Array<{
+        dimensionKey: string;
+        dimensionLabel: string;
+        commentCount: number;
+        respondentGroupsWithComments: ScoredQuestionnaireType[];
+        keyThemes: QualitativeThemeSummary[];
+        advisoryRead: string | null;
+        illustrativeSignals: string[];
+        confidence: "high" | "medium" | "low";
+      }>;
+    };
     methodology: {
       scoredQuestionnaireTypes: ScoredQuestionnaireType[];
       contextualQuestionnaireTypesExcluded: QuestionnaireType[];
@@ -179,13 +225,18 @@ function isUuid(value: string): boolean {
 }
 
 function getBaseUrl(request: Request): string {
+  const requestUrl = new URL(request.url);
+
+  if (process.env.NODE_ENV !== "production") {
+    return requestUrl.origin;
+  }
+
   const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
   if (configuredSiteUrl) {
     return configuredSiteUrl.replace(/\/$/, "");
   }
 
-  const requestUrl = new URL(request.url);
   return requestUrl.origin;
 }
 
@@ -202,6 +253,12 @@ function getQuestionnaireTypeLabel(
     default:
       return questionnaireType;
   }
+}
+
+function isScoredQuestionnaireType(
+  value: QuestionnaireType,
+): value is ScoredQuestionnaireType {
+  return SCORED_QUESTIONNAIRE_TYPES.includes(value as ScoredQuestionnaireType);
 }
 
 function buildClientSafeDimensionSummary(
@@ -382,6 +439,34 @@ function buildExecutiveSummary({
   return `${maturityStatement} ${alignmentStatement} ${completenessStatement} ${directionStatement}`;
 }
 
+function buildClientSafeQualitativeSummary(
+  summary: ProjectSummaryResponse["qualitative"],
+): ClientDiagnosticReportResponse["report"]["qualitative"] {
+  return {
+    overall: {
+      totalCommentCount: summary.overall.totalCommentCount,
+      respondentGroupsWithComments:
+        summary.overall.respondentGroupsWithComments.filter(
+          isScoredQuestionnaireType,
+        ),
+      crossCuttingThemes: summary.overall.crossCuttingThemes,
+      summary: summary.overall.summary,
+    },
+    dimensions: summary.dimensions.map((dimension) => ({
+      dimensionKey: dimension.dimensionKey,
+      dimensionLabel: dimension.dimensionLabel,
+      commentCount: dimension.commentCount,
+      respondentGroupsWithComments: dimension.respondentGroupsWithComments.filter(
+        isScoredQuestionnaireType,
+      ),
+      keyThemes: dimension.keyThemes,
+      advisoryRead: dimension.advisoryRead,
+      illustrativeSignals: dimension.illustrativeSignals,
+      confidence: dimension.confidence,
+    })),
+  };
+}
+
 async function fetchProjectSummary(
   request: Request,
   projectId: string,
@@ -450,6 +535,9 @@ export async function GET(
     const clientSafeInsights = buildDimensionInsights(clientSafeDimensions);
     const clientSafeNarratives = buildDimensionNarratives(clientSafeInsights);
     const clientSafeInsightSummary = buildInsightSummary(clientSafeInsights);
+    const clientSafeQualitative = buildClientSafeQualitativeSummary(
+      summary.qualitative,
+    );
 
     const strengths = sortDimensionsByGap(
       clientSafeDimensions.filter((dimension) => dimension.gap !== null),
@@ -503,6 +591,7 @@ export async function GET(
         narratives: {
           dimensions: clientSafeNarratives,
         },
+        qualitative: clientSafeQualitative,
         methodology: {
           scoredQuestionnaireTypes: SCORED_QUESTIONNAIRE_TYPES,
           contextualQuestionnaireTypesExcluded: EXCLUDED_CONTEXTUAL_TYPES,

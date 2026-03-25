@@ -1,0 +1,21 @@
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    box-shadow: none !important;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  article {
+    page-break-inside: avoid;
+  }
+}

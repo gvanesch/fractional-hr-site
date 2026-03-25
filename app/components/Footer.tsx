@@ -3,7 +3,8 @@ import Link from "next/link";
 
 const exploreLinks = [
   { href: "/services", label: "Services" },
-  { href: "/diagnostic", label: "Diagnostic" },
+  { href: "/diagnostic", label: "HR Health Check" },
+  { href: "/diagnostic-assessment", label: "Diagnostic Assessment" },
   { href: "/approach", label: "Approach" },
   { href: "/about", label: "About" },
   { href: "/pricing", label: "Pricing" },
@@ -48,7 +49,7 @@ export default function Footer() {
 
             <p className="max-w-xs text-sm leading-7 text-slate-500">
               HR Operations, Service Delivery, and Transformation Advisory for
-              scaling organisations.
+              Scaling Organisations.
             </p>
           </div>
 

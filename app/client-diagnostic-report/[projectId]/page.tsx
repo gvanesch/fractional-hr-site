@@ -48,6 +48,30 @@ type ClientSafeDimensionSummary = {
   gap: number | null;
 };
 
+type QualitativeThemeSummary = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+type DimensionQualitativeSummary = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  commentCount: number;
+  respondentGroupsWithComments: ScoredQuestionnaireType[];
+  keyThemes: QualitativeThemeSummary[];
+  advisoryRead: string | null;
+  illustrativeSignals: string[];
+  confidence: "high" | "medium" | "low";
+};
+
+type OverallQualitativeSummary = {
+  totalCommentCount: number;
+  respondentGroupsWithComments: ScoredQuestionnaireType[];
+  crossCuttingThemes: QualitativeThemeSummary[];
+  summary: string | null;
+};
+
 type ClientDiagnosticReportResponse = {
   success: true;
   report: {
@@ -90,6 +114,10 @@ type ClientDiagnosticReportResponse = {
     };
     narratives: {
       dimensions: DimensionNarrative[];
+    };
+    qualitative: {
+      overall: OverallQualitativeSummary;
+      dimensions: DimensionQualitativeSummary[];
     };
     methodology: {
       scoredQuestionnaireTypes: ScoredQuestionnaireType[];
@@ -320,6 +348,19 @@ async function fetchClientDiagnosticReport(
   return json.report;
 }
 
+function ThemePill({
+  theme,
+}: {
+  theme: QualitativeThemeSummary;
+}) {
+  return (
+    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700">
+      {theme.label}
+      <span className="ml-2 text-slate-400">({theme.count})</span>
+    </span>
+  );
+}
+
 export default async function ClientDiagnosticReportPage({
   params,
 }: PageProps) {
@@ -346,6 +387,13 @@ export default async function ClientDiagnosticReportPage({
     report.narratives.dimensions.map((narrative) => [
       narrative.dimensionKey,
       narrative,
+    ]),
+  );
+
+  const qualitativeMap = new Map(
+    report.qualitative.dimensions.map((dimension) => [
+      dimension.dimensionKey,
+      dimension,
     ]),
   );
 
@@ -432,6 +480,14 @@ export default async function ClientDiagnosticReportPage({
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
                   Back to Advisor Dashboard
+                </Link>
+
+                <Link
+                  href={`/client-diagnostic-report/${report.project.projectId}/export`}
+                  target="_blank"
+                  className="brand-button-dark px-6 py-3 text-base font-medium"
+                >
+                  Export / Print
                 </Link>
               </div>
             </div>
@@ -589,6 +645,80 @@ export default async function ClientDiagnosticReportPage({
               </div>
             </div>
           </div>
+
+          <div className="brand-surface-card mt-6 p-8">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">What respondents are saying</p>
+                <h2 className="brand-heading-md text-slate-950">
+                  Qualitative themes across the response set
+                </h2>
+                <p className="brand-body max-w-4xl">
+                  This section highlights the written signals sitting behind the
+                  scores. It helps distinguish issues that are visible in daily
+                  operating practice from those that appear only in quantitative
+                  scoring.
+                </p>
+              </div>
+
+              <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Overall qualitative read
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">
+                        {report.qualitative.overall.totalCommentCount} written
+                        comments
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {report.qualitative.overall.respondentGroupsWithComments.map(
+                        (group) => (
+                          <span
+                            key={`qual-group-${group}`}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700"
+                          >
+                            {formatQuestionnaireTypeLabel(group)}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm leading-7 text-slate-700">
+                    {report.qualitative.overall.summary ||
+                      "No overall qualitative summary is available yet."}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Cross-cutting themes
+                  </p>
+
+                  {report.qualitative.overall.crossCuttingThemes.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {report.qualitative.overall.crossCuttingThemes.map(
+                        (theme) => (
+                          <ThemePill
+                            key={`cross-theme-${theme.key}`}
+                            theme={theme}
+                          />
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm leading-7 text-slate-600">
+                      No cross-cutting written themes are available yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -695,8 +825,8 @@ export default async function ClientDiagnosticReportPage({
             </h2>
             <p className="brand-subheading text-slate-700">
               Each dimension below shows scored input from HR, managers, and
-              leadership, together with the current interpretation and
-              recommended next step.
+              leadership, together with the current interpretation, qualitative
+              signal, and recommended next step.
             </p>
           </div>
 
@@ -704,6 +834,7 @@ export default async function ClientDiagnosticReportPage({
             {report.dimensions.map((dimension) => {
               const insight = insightMap.get(dimension.dimensionKey);
               const narrative = narrativeMap.get(dimension.dimensionKey);
+              const qualitative = qualitativeMap.get(dimension.dimensionKey);
 
               return (
                 <article
@@ -777,6 +908,104 @@ export default async function ClientDiagnosticReportPage({
                       </div>
                     </div>
                   </div>
+
+                  {qualitative ? (
+                    <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-[#F8FAFC] p-6">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-3xl">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Qualitative signal
+                          </p>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            {qualitative.advisoryRead ||
+                              "No written qualitative summary is available for this dimension yet."}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700">
+                            {qualitative.commentCount} comment
+                            {qualitative.commentCount === 1 ? "" : "s"}
+                          </span>
+                          <span
+                            className={`rounded-full border px-3 py-1 text-sm font-medium ${getConfidenceBadgeClasses(
+                              qualitative.confidence,
+                            )}`}
+                          >
+                            {formatConfidenceLabel(qualitative.confidence)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+                        <div className="rounded-xl bg-white p-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Key themes
+                          </p>
+
+                          {qualitative.keyThemes.length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {qualitative.keyThemes.map((theme) => (
+                                <ThemePill
+                                  key={`${dimension.dimensionKey}-${theme.key}`}
+                                  theme={theme}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm leading-7 text-slate-600">
+                              No specific written themes have been grouped for
+                              this dimension yet.
+                            </p>
+                          )}
+
+                          <div className="mt-5">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Respondent groups represented
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {qualitative.respondentGroupsWithComments.map(
+                                (group) => (
+                                  <span
+                                    key={`${dimension.dimensionKey}-${group}`}
+                                    className="rounded-full border border-slate-200 bg-[#F8FAFC] px-3 py-1 text-sm font-medium text-slate-700"
+                                  >
+                                    {formatQuestionnaireTypeLabel(group)}
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Illustrative signals
+                          </p>
+
+                          {qualitative.illustrativeSignals.length > 0 ? (
+                            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-700">
+                              {qualitative.illustrativeSignals
+                                .slice(0, 3)
+                                .map((signal) => (
+                                  <li
+                                    key={`${dimension.dimensionKey}-${signal}`}
+                                    className="rounded-lg border border-slate-200 bg-[#F8FAFC] px-4 py-3"
+                                  >
+                                    {signal}
+                                  </li>
+                                ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-4 text-sm leading-7 text-slate-600">
+                              No illustrative written signals are available for
+                              this dimension yet.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {narrative ? (
                     <div className="mt-6 grid gap-4 lg:grid-cols-3">

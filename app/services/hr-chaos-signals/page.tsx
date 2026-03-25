@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "HR Chaos Signals | Van Esch Advisory Ltd",
   description:
-    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies — and how an HR Operations Health Check or HR Foundations Sprint can help restore clarity.",
+    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies, and how the HR Operations Health Check, HR Operations Diagnostic Assessment, or HR Foundations Sprint can help restore clarity.",
 };
 
 const signals = [
@@ -12,7 +12,7 @@ const signals = [
     title: "Signal 1",
     heading: "Managers handle HR situations differently",
     text: [
-      "Two managers deal with the same situation — performance concerns, employee requests, onboarding decisions — and approach it in completely different ways.",
+      "Two managers deal with the same situation, performance concerns, employee requests, onboarding decisions, and approach it in completely different ways.",
       "This usually means the underlying HR processes are unclear or undocumented.",
       "When this happens repeatedly, HR teams spend increasing time mediating situations that should be handled consistently.",
     ],
@@ -81,11 +81,28 @@ const signals = [
   },
 ];
 
-const sprintFit = [
-  "Have grown quickly to 50–500 employees",
-  "Feel HR has become reactive or operationally messy",
-  "Are preparing for funding, expansion, or operational change",
-  "Want clearer HR processes and responsibilities",
+const nextStepOptions = [
+  {
+    kicker: "Quick signal",
+    title: "HR Operations Health Check",
+    text: "A short self-assessment to identify whether operational strain may be building and whether the issue appears isolated or more systemic.",
+    href: "/diagnostic",
+    cta: "Take the Health Check",
+  },
+  {
+    kicker: "Structured diagnostic",
+    title: "HR Operations Diagnostic Assessment",
+    text: "A deeper, multi-perspective diagnostic across HR, managers, and leadership to show where friction is rooted and what should be prioritised first.",
+    href: "/diagnostic-assessment",
+    cta: "Explore the Diagnostic Assessment",
+  },
+  {
+    kicker: "Focused action",
+    title: "HR Foundations Sprint",
+    text: "A four-week engagement for organisations where the pattern is already clear and structured action is needed to improve the highest-impact gaps.",
+    href: "/services/hr-foundations-sprint",
+    cta: "View the Sprint",
+  },
 ];
 
 export default function HRChaosSignalsPage() {
@@ -97,38 +114,22 @@ export default function HRChaosSignalsPage() {
             <div className="brand-stack-sm">
               <p className="brand-kicker">HR Chaos Signals</p>
               <h1 className="brand-heading-lg">
-                When growing companies start to feel HR friction
+                Seven signs HR operations are starting to strain
               </h1>
             </div>
 
             <div className="max-w-3xl brand-stack-sm">
               <p className="brand-subheading brand-body-on-dark">
-                Most organisations do not decide one day that they need “HR
-                transformation.”
+                HR rarely becomes messy all at once.
               </p>
               <p className="brand-subheading brand-body-on-dark">
-                What actually happens is more subtle.
+                The usual pattern is gradual: inconsistent decisions, unclear
+                ownership, manual workarounds, and more time spent coordinating
+                than improving.
               </p>
               <p className="brand-subheading brand-body-on-dark">
-                As companies grow, HR processes evolve informally. Systems are
-                introduced gradually, managers develop their own ways of
-                handling people situations, and operational work increases
-                faster than the structure around it.
-              </p>
-              <p className="brand-subheading brand-body-on-dark">
-                For a while this works.
-              </p>
-              <p className="brand-subheading brand-body-on-dark">
-                Then small operational cracks begin to appear.
-              </p>
-              <p className="brand-subheading brand-body-on-dark">
-                Below are some of the most common signals that HR operations are
-                starting to become messy, reactive, or inconsistent.
-              </p>
-              <p className="brand-subheading brand-body-on-dark">
-                Recognising these signals early makes it far easier to
-                stabilise HR operations before they become a significant
-                organisational constraint.
+                These signals are often the first indication that growth has
+                outpaced the operational structure around HR.
               </p>
             </div>
 
@@ -140,10 +141,10 @@ export default function HRChaosSignalsPage() {
                 Take the HR Operations Health Check
               </Link>
               <Link
-                href="/services/hr-foundations-sprint"
+                href="/diagnostic-assessment"
                 className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
               >
-                View the Sprint
+                View the Diagnostic Assessment
               </Link>
             </div>
           </div>
@@ -154,10 +155,7 @@ export default function HRChaosSignalsPage() {
         <div className="brand-container brand-section">
           <div className="space-y-8">
             {signals.map((signal) => (
-              <div
-                key={signal.title}
-                className="brand-surface-card p-8"
-              >
+              <div key={signal.title} className="brand-surface-card p-8">
                 <p className="brand-section-kicker">{signal.title}</p>
                 <h2 className="brand-heading-md mt-3 text-slate-950">
                   {signal.heading}
@@ -188,172 +186,73 @@ export default function HRChaosSignalsPage() {
 
       <section className="border-y border-slate-200 bg-white">
         <div className="brand-container brand-section">
-          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="max-w-4xl brand-stack-sm">
-              <p className="brand-section-kicker">
-                What these signals usually mean
-              </p>
-              <h2 className="brand-heading-lg text-slate-950">
-                Growth has outpaced the operational infrastructure around HR.
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                These signals rarely indicate a failing HR team.
-              </p>
-              <p className="brand-subheading text-slate-700">
-                More often, they show that the organisation has simply grown
-                faster than the operational infrastructure supporting its people
-                processes.
-              </p>
-              <p className="brand-subheading text-slate-700">
-                In other words, HR operations have evolved organically rather
-                than being intentionally designed.
-              </p>
-              <p className="brand-body">
-                If you want a quick sense of how much operational strain may
-                have built up, the HR Operations Health Check provides a
-                practical self-assessment before moving into deeper support.
-              </p>
-
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Link
-                  href="/diagnostic"
-                  className="brand-button-primary px-6 py-3 text-base font-medium"
-                >
-                  Take the Diagnostic
-                </Link>
-                <Link
-                  href="/contact"
-                  className="brand-button-dark px-6 py-3 text-base font-medium"
-                >
-                  Contact
-                </Link>
-              </div>
-            </div>
-
-            <div className="brand-surface-soft p-8">
-              <div className="brand-stack-sm">
-                <p className="brand-section-kicker">
-                  A practical next step
-                </p>
-                <h3 className="brand-heading-md text-slate-950">
-                  Use the diagnostic to gauge the level of operational friction.
-                </h3>
-                <p className="brand-body">
-                  The HR Operations Health Check gives you:
-                </p>
-                <ul className="space-y-2 text-base leading-8 text-slate-700">
-                  <li className="ml-5 list-disc">
-                    A simple HR Operations Score
-                  </li>
-                  <li className="ml-5 list-disc">
-                    An immediate maturity-style result band
-                  </li>
-                  <li className="ml-5 list-disc">
-                    A quick sense of where friction may be building
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white">
-        <div className="brand-container brand-section">
-          <div className="brand-surface-soft rounded-[2rem] p-8">
-            <div className="max-w-4xl brand-stack-sm">
-              <p className="brand-section-kicker">
-                A practical way to reset HR foundations
-              </p>
-              <h2 className="brand-heading-lg text-slate-950">
-                HR Foundations Sprint
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                The HR Foundations Sprint is a focused four-week engagement
-                designed for organisations that are starting to experience these
-                signals.
-              </p>
-
-              <p className="text-lg font-medium text-slate-900">
-                During the sprint we:
-              </p>
-              <ul className="space-y-2 text-lg leading-8 text-slate-700">
-                <li className="ml-5 list-disc">
-                  Understand how HR currently operates
-                </li>
-                <li className="ml-5 list-disc">
-                  Map key employee lifecycle processes
-                </li>
-                <li className="ml-5 list-disc">
-                  Identify operational friction and gaps
-                </li>
-                <li className="ml-5 list-disc">
-                  Prioritise improvements
-                </li>
-                <li className="ml-5 list-disc">
-                  Deliver practical recommendations and a clear roadmap
-                </li>
-              </ul>
-
-              <p className="brand-subheading text-slate-700">
-                The goal is simple: to establish the operational structure that
-                allows HR to support the organisation consistently and
-                effectively as it grows.
-              </p>
-
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Link
-                  href="/services/hr-foundations-sprint"
-                  className="brand-button-primary px-6 py-3 text-base font-medium"
-                >
-                  View the Sprint
-                </Link>
-                <Link
-                  href="/diagnostic"
-                  className="brand-button-dark px-6 py-3 text-base font-medium"
-                >
-                  Take the Diagnostic First
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-white">
-        <div className="brand-container brand-section">
-          <div className="max-w-4xl brand-stack-sm">
+          <div className="brand-stack-sm">
             <p className="brand-section-kicker">
-              When organisations typically use the sprint
+              What these signals usually mean
             </p>
             <h2 className="brand-heading-lg text-slate-950">
-              A structured starting point for growing organisations
+              Growth has outpaced HR operational structure.
             </h2>
             <p className="brand-subheading text-slate-700">
-              The sprint is particularly useful for organisations that:
+              These signals rarely indicate a failing HR team.
             </p>
+            <p className="brand-body">
+              More often, they show that the organisation has grown faster than
+              the operational structure supporting its people processes. This is
+              when inconsistency, rework, and day-to-day friction start to
+              become normal.
+            </p>
+            <p className="brand-body">
+              In practical terms, HR operations have evolved organically rather
+              than being designed deliberately.
+            </p>
+          </div>
 
-            <div className="mt-8 space-y-3 text-base text-slate-700">
-              {sprintFit.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-lg bg-slate-50 px-4 py-3"
-                >
-                  {item}
+          <div className="mt-12 brand-stack-sm">
+            <p className="brand-section-kicker">Choose the right next step</p>
+            <h2 className="brand-heading-lg text-slate-950">
+              Move from signal to clarity, then into action if needed.
+            </h2>
+            <p className="brand-subheading text-slate-700">
+              The right next step depends on how much clarity you already have.
+              Some organisations need a quick read. Others need a deeper
+              diagnostic before deciding what should happen next. Where the
+              pattern is already clear, the priority is structured action.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {nextStepOptions.map((option) => (
+              <div
+                key={option.title}
+                className="brand-surface-card flex h-full flex-col p-8"
+              >
+                <div className="flex-1 brand-stack-sm">
+                  <p className="brand-section-kicker">{option.kicker}</p>
+                  <h3 className="brand-heading-md text-slate-950">
+                    {option.title}
+                  </h3>
+                  <p className="brand-body">{option.text}</p>
                 </div>
-              ))}
-            </div>
 
-            <p className="brand-subheading text-slate-700">
-              Some organisations use the sprint to create clarity and implement
-              improvements internally.
-            </p>
-            <p className="brand-subheading text-slate-700">
-              Others continue into deeper operational transformation work.
-            </p>
-            <p className="brand-subheading text-slate-700">
-              Either way, the sprint provides a clear and credible starting
-              point for strengthening HR operations.
+                <div className="pt-6">
+                  <Link
+                    href={option.href}
+                    className="brand-button-dark px-5 py-3 text-base font-medium"
+                  >
+                    {option.cta}
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-6 py-5">
+            <p className="text-sm leading-7 text-slate-700">
+              Some organisations start with the Health Check. Others move
+              directly into the Diagnostic Assessment when the pattern is
+              already clear. The Sprint is the right next step where structured
+              action is needed.
             </p>
           </div>
         </div>
@@ -372,9 +271,11 @@ export default function HRChaosSignalsPage() {
                   straightforward.
                 </h2>
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can take the HR Operations Health Check for an immediate
-                  self-assessment, or start with a short conversation to discuss
-                  whether the sprint would be useful for your organisation.
+                  You can start with the HR Operations Health Check for an
+                  immediate self-assessment, move into the Diagnostic Assessment
+                  for a deeper view, or start with a short conversation if you
+                  already know that structured improvement support is likely to
+                  be needed.
                 </p>
               </div>
 
@@ -383,19 +284,19 @@ export default function HRChaosSignalsPage() {
                   href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic
+                  Take the Health Check
+                </Link>
+                <Link
+                  href="/diagnostic-assessment"
+                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+                >
+                  View the Diagnostic Assessment
                 </Link>
                 <Link
                   href="/contact"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
                   Contact
-                </Link>
-                <Link
-                  href="/services/hr-foundations-sprint"
-                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
-                >
-                  View the Sprint
                 </Link>
               </div>
             </div>

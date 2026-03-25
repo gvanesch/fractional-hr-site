@@ -39,6 +39,25 @@ const servicePaths = [
   },
 ];
 
+const sprintSteps = [
+  {
+    title: "1. Diagnostic Insight",
+    text: "Start with the HR Operations Diagnostic Assessment to establish where friction sits across HR, managers, and leadership.",
+  },
+  {
+    title: "2. Focused Analysis",
+    text: "Assess the areas creating the most drag, inconsistency, or delivery risk rather than reopening every part of the operating model.",
+  },
+  {
+    title: "3. Prioritisation & Design",
+    text: "Define what needs to change first, where ownership should sit, and how processes, workflows, and controls should operate.",
+  },
+  {
+    title: "4. Roadmap",
+    text: "Translate diagnostic insight into a practical, sequenced plan for implementation over the next phase of growth.",
+  },
+];
+
 export default function ServicesPage() {
   return (
     <main>
@@ -70,7 +89,7 @@ export default function ServicesPage() {
                   href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic
+                  Take the Health Check
                 </Link>
                 <Link
                   href="/contact"
@@ -81,9 +100,9 @@ export default function ServicesPage() {
               </div>
 
               <p className="text-sm text-[#8AAAC8]">
-                The diagnostic provides an immediate score and a more detailed
-                interpretation pathway if you want to explore the result
-                further.
+                Start with the HR Operations Health Check, then move into the HR
+                Operations Diagnostic Assessment if you need a more structured
+                view of how HR actually operates across the organisation.
               </p>
             </div>
 
@@ -174,6 +193,68 @@ export default function ServicesPage() {
         <div className="brand-container brand-section">
           <div className="brand-surface-soft rounded-[2rem] p-8">
             <div className="max-w-4xl brand-stack-sm">
+              <p className="brand-section-kicker">How the journey works</p>
+              <h2 className="brand-heading-lg text-slate-950">
+                A structured path from identifying friction to improving how HR
+                operates.
+              </h2>
+              <p className="brand-subheading text-slate-700">
+                The model is designed to move from a quick initial read to a
+                more structured diagnosis, then into focused execution.
+              </p>
+
+              <div className="grid gap-4 pt-4 md:grid-cols-3">
+                {[
+                  {
+                    title: "1. Health Check",
+                    text: "A quick self-assessment to identify where operational strain may be building.",
+                  },
+                  {
+                    title: "2. Diagnostic Assessment",
+                    text: "A structured, multi-perspective diagnostic of how HR actually operates across your organisation.",
+                  },
+                  {
+                    title: "3. HR Foundations Sprint",
+                    text: "A focused engagement to act on diagnostic insight and improve what matters first.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-2xl border border-slate-200 bg-white p-6"
+                  >
+                    <h3 className="brand-heading-sm text-slate-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-3 text-base leading-7 text-slate-700">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-4 pt-2">
+                <Link
+                  href="/diagnostic"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
+                >
+                  Start with the Health Check
+                </Link>
+                <Link
+                  href="/diagnostic-assessment"
+                  className="brand-button-dark px-6 py-3 text-base font-medium"
+                >
+                  View Diagnostic Assessment
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="brand-container brand-section">
+          <div className="brand-surface-soft rounded-[2rem] p-8">
+            <div className="max-w-4xl brand-stack-sm">
               <p className="brand-section-kicker">
                 A common growth-stage pattern
               </p>
@@ -187,9 +268,10 @@ export default function ServicesPage() {
                 practice, and HR becoming more reactive than operational.
               </p>
               <p className="brand-body">
-                If that feels familiar, a useful next step is either to review
-                the common warning signs or take the HR Operations Health Check
-                for a quick read on where operational strain may be building.
+                If that feels familiar, a useful next step is either to
+                identify the common warning signs or take the HR Operations
+                Health Check for a quick read on where operational strain may be
+                building.
               </p>
 
               <div className="flex flex-wrap gap-4 pt-2">
@@ -214,18 +296,42 @@ export default function ServicesPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="brand-container brand-section">
           <div className="brand-surface-soft rounded-[2rem] p-8">
-            <div className="max-w-4xl brand-stack-sm">
-              <p className="brand-section-kicker">
-                Signature offer for growing companies
-              </p>
-              <h2 className="brand-heading-lg text-slate-950">
-                HR Foundations Sprint
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                A focused four-week engagement for growing organisations that
-                need stronger HR foundations, clearer processes, and a practical
-                plan for what to fix first.
-              </p>
+            <div className="max-w-5xl brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">
+                  Signature offer for growing companies
+                </p>
+                <h2 className="brand-heading-lg text-slate-950">
+                  HR Foundations Sprint
+                </h2>
+                <p className="brand-subheading text-slate-700">
+                  A focused four-week engagement for growing organisations that
+                  need stronger HR foundations, clearer processes, and a
+                  practical plan for improving what matters first.
+                </p>
+                <p className="brand-body">
+                  The Sprint is designed as diagnostic-informed execution. It
+                  builds on the HR Operations Diagnostic Assessment to turn
+                  structured insight into focused analysis, prioritised design,
+                  and a clear roadmap for action.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {sprintSteps.map((step) => (
+                  <div
+                    key={step.title}
+                    className="rounded-2xl border border-slate-200 bg-white p-6"
+                  >
+                    <h3 className="brand-heading-sm text-slate-950">
+                      {step.title}
+                    </h3>
+                    <p className="mt-3 text-base leading-7 text-slate-700">
+                      {step.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
 
               <div className="flex flex-wrap gap-4 pt-2">
                 <Link
@@ -235,10 +341,10 @@ export default function ServicesPage() {
                   Learn About the Sprint
                 </Link>
                 <Link
-                  href="/diagnostic"
+                  href="/diagnostic-assessment"
                   className="brand-button-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic First
+                  View Diagnostic Assessment
                 </Link>
               </div>
             </div>
@@ -259,8 +365,9 @@ export default function ServicesPage() {
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
                   Whether the challenge is growth-stage operational clarity,
                   enterprise transformation, or flexible senior support without
-                  full-time overhead, you can start with a short conversation or
-                  take the HR Operations Health Check first.
+                  full-time overhead, start with the HR Operations Health Check
+                  or move straight to a conversation about the HR Operations
+                  Diagnostic Assessment.
                 </p>
               </div>
 
@@ -275,7 +382,7 @@ export default function ServicesPage() {
                   href="/diagnostic"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic
+                  Take the Health Check
                 </Link>
               </div>
             </div>

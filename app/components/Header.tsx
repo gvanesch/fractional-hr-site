@@ -6,15 +6,14 @@ import { useState } from "react";
 
 const navigation = [
   { href: "/services", label: "Services" },
-  { href: "/diagnostic", label: "Diagnostic" },
+  { href: "/diagnostic", label: "HR Health Check" },
+  { href: "/diagnostic-assessment", label: "Diagnostic Assessment" },
   { href: "/approach", label: "Approach" },
   { href: "/case-studies", label: "Case Studies" },
   { href: "/about", label: "About" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
 ];
-
-const calendlyUrl = "https://calendly.com/greg-vanesch/30min";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -39,7 +38,8 @@ export default function Header() {
               width={260}
               height={56}
               priority
-              className="h-[32px] w-auto sm:h-[36px] md:h-[40px] lg:h-[48px] xl:h-[56px]"
+              style={{ width: "auto" }}
+              className="h-[32px] sm:h-[36px] md:h-[40px] lg:h-[48px] xl:h-[56px]"
             />
           </Link>
 
@@ -55,26 +55,15 @@ export default function Header() {
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <a
-              href={calendlyUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="brand-button-primary hidden whitespace-nowrap px-4 py-2 text-sm font-semibold xl:inline-flex"
-            >
-              Book a 30-Minute Diagnostic Conversation
-            </a>
-
-            <button
-              type="button"
-              className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 lg:hidden"
-              onClick={() => setOpen((prev) => !prev)}
-              aria-label="Toggle menu"
-              aria-expanded={open}
-            >
-              Menu
-            </button>
-          </div>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 lg:hidden"
+            onClick={() => setOpen((prev) => !prev)}
+            aria-label="Toggle menu"
+            aria-expanded={open}
+          >
+            Menu
+          </button>
         </div>
 
         {open ? (
@@ -90,16 +79,6 @@ export default function Header() {
                   {item.label}
                 </Link>
               ))}
-
-              <a
-                href={calendlyUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={handleCloseMenu}
-                className="brand-button-primary mt-3 justify-center px-4 py-2 text-sm font-semibold"
-              >
-                Book a 30-Minute Diagnostic Conversation
-              </a>
             </nav>
           </div>
         ) : null}

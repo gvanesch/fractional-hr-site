@@ -2,13 +2,6 @@ import Link from "next/link";
 
 const calendlyUrl = "https://calendly.com/greg-vanesch/30min";
 
-const proofPoints = [
-  "Global People Operations leadership",
-  "ServiceNow HRIS automation and workflow transformation",
-  "Shared services, controls, and governance",
-  "Transformation support across growth, complexity, and change",
-];
-
 const audiencePaths = [
   {
     title: "Growing Companies & Mid-Market",
@@ -45,6 +38,30 @@ const diagnosticSignals = [
   "Processes start to strain as the business grows",
 ];
 
+const journeySteps = [
+  {
+    title: "Identify",
+    label: "HR Operations Health Check",
+    text: "A quick self-assessment to identify where operational strain may be building and whether the issue appears localised or more systemic.",
+    href: "/diagnostic",
+    cta: "Take the Health Check",
+  },
+  {
+    title: "Diagnose",
+    label: "HR Operations Diagnostic Assessment",
+    text: "A structured, multi-perspective analysis of how HR actually operates across the organisation, using input from HR, managers, and leadership.",
+    href: "/diagnostic-assessment",
+    cta: "Explore the Diagnostic Assessment",
+  },
+  {
+    title: "Improve",
+    label: "HR Foundations Sprint",
+    text: "A focused engagement to act on structured insight, improve the highest-impact gaps, and create a practical roadmap for what should happen next.",
+    href: "/services/hr-foundations-sprint",
+    cta: "View the Sprint",
+  },
+];
+
 export default function HomePage() {
   return (
     <>
@@ -63,24 +80,30 @@ export default function HomePage() {
                 </h1>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  I help organisations strengthen HR operations, service delivery,
-                  knowledge frameworks, and HR technology so they can scale with
-                  more clarity, control, and operational confidence.
+                  Van Esch Advisory Ltd helps organisations strengthen HR
+                  operations, service delivery clarity, process discipline, and
+                  operating structure so HR can function more cleanly as the
+                  business grows or becomes more complex.
+                </p>
+                <p className="brand-body-on-dark max-w-3xl text-lg leading-8 text-[#C7D8EA]">
+                  The approach is diagnostic-led. It starts by identifying where
+                  operational friction is building, then uses structured insight
+                  to clarify priorities and improve what matters most.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-4 pt-2">
                 <Link
-                  href="/services"
+                  href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Explore Services
+                  Take the Health Check
                 </Link>
                 <Link
-                  href="/diagnostic"
+                  href="/diagnostic-assessment"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic
+                  Explore the Diagnostic Assessment
                 </Link>
               </div>
             </div>
@@ -112,21 +135,6 @@ export default function HomePage() {
       </section>
 
       <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container py-8">
-          <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-[#F4F6FA] p-6 md:grid-cols-2 lg:grid-cols-4">
-            {proofPoints.map((point) => (
-              <div
-                key={point}
-                className="brand-surface rounded-xl px-4 py-4 text-sm font-medium text-slate-700"
-              >
-                {point}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
         <div className="brand-container brand-section">
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="brand-stack-md">
@@ -136,15 +144,21 @@ export default function HomePage() {
                   Is your HR starting to feel messy?
                 </h2>
                 <p className="brand-subheading text-slate-700">
-                  Many organisations do not start by looking for “HR transformation”.
-                  What they notice first is friction: repeated questions,
-                  inconsistent decisions, manual workarounds, and HR becoming
-                  increasingly reactive.
+                  Many organisations do not start by looking for HR
+                  transformation. What they notice first is friction: repeated
+                  questions, inconsistent decisions, manual workarounds, and HR
+                  becoming increasingly reactive.
                 </p>
                 <p className="brand-body">
-                  The HR Operations Health Check is a short self-assessment designed
-                  to help you understand whether these are isolated frustrations or
-                  signs of wider operational strain.
+                  The HR Operations Health Check is a short self-assessment
+                  designed to help you assess whether these are isolated
+                  frustrations or signs of wider operational strain.
+                </p>
+                <p className="brand-body">
+                  It is the first step in a broader model. For organisations
+                  that need a deeper view, the Health Check can lead into a more
+                  structured Diagnostic Assessment across leadership, managers,
+                  and HR before any focused execution work begins.
                 </p>
               </div>
 
@@ -183,6 +197,62 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="border-b border-slate-200 bg-[#F4F6FA]">
+        <div className="brand-container brand-section">
+          <div className="max-w-3xl brand-stack-sm">
+            <p className="brand-section-kicker">
+              A structured path from signal to action
+            </p>
+            <h2 className="brand-heading-lg text-slate-950">
+              Identify the issue. Diagnose it properly. Improve what matters
+              first.
+            </h2>
+            <p className="brand-subheading text-slate-700">
+              The model is designed to move from early signal to deeper clarity,
+              then into focused execution. Each step has a different purpose,
+              and each one reduces ambiguity before more substantial work
+              begins.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {journeySteps.map((step) => (
+              <div
+                key={step.label}
+                className="brand-surface-card flex h-full flex-col p-8"
+              >
+                <div className="flex-1 brand-stack-sm">
+                  <p className="brand-section-kicker">{step.title}</p>
+                  <h3 className="brand-heading-md text-slate-950">
+                    {step.label}
+                  </h3>
+                  <p className="brand-body">{step.text}</p>
+                </div>
+
+                <div className="pt-6">
+                  <Link
+                    href={step.href}
+                    className="brand-button-dark px-5 py-3 text-base font-medium"
+                  >
+                    {step.cta}
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white px-6 py-5">
+            <p className="text-sm leading-7 text-slate-700">
+              Some organisations start with the Health Check. Others move
+              directly into the Diagnostic Assessment when the signs of
+              operational friction are already clear. The Sprint then turns that
+              clarity into structured action where focused improvement support is
+              needed.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="bg-[#F4F6FA]">
         <div className="brand-container brand-section">
           <div className="max-w-3xl brand-stack-sm">
@@ -195,8 +265,8 @@ export default function HomePage() {
             <p className="brand-subheading text-slate-700">
               A growing business building its HR foundations has very different
               needs from a global organisation redesigning service delivery or
-              navigating complex change. Choose the path that best reflects where
-              your organisation is today.
+              navigating complex change. Choose the path that best reflects
+              where your organisation is today.
             </p>
           </div>
 
@@ -213,7 +283,10 @@ export default function HomePage() {
 
                   <ul className="space-y-3 text-base text-slate-700">
                     {path.bullets.map((bullet) => (
-                      <li key={bullet} className="rounded-lg bg-slate-50 px-4 py-3">
+                      <li
+                        key={bullet}
+                        className="rounded-lg bg-slate-50 px-4 py-3"
+                      >
                         {bullet}
                       </li>
                     ))}
@@ -240,15 +313,20 @@ export default function HomePage() {
             <div className="max-w-4xl brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-section-kicker">
-                  Signature Offer for Growing Companies
+                  Signature offer for growing companies
                 </p>
                 <h2 className="brand-heading-lg text-slate-950">
                   HR Foundations Sprint
                 </h2>
                 <p className="brand-subheading text-slate-700">
-                  A focused 4 week engagement for growing organisations that need
-                  stronger HR foundations, clearer processes, and a practical plan
-                  for what to fix first.
+                  A focused 4 week engagement for growing organisations that
+                  need stronger HR foundations, clearer processes, and a
+                  practical plan for what to improve first.
+                </p>
+                <p className="brand-body">
+                  The Sprint builds on structured diagnostic insight and focuses
+                  on the areas that will make the greatest difference to
+                  operational clarity, consistency, and control.
                 </p>
               </div>
 
@@ -257,15 +335,21 @@ export default function HomePage() {
                   href="/services/hr-foundations-sprint"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Learn About the Sprint
+                  View the Sprint
                 </Link>
                 <Link
-                  href="/diagnostic"
+                  href="/diagnostic-assessment"
                   className="brand-button-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic First
+                  Explore the Diagnostic Assessment
                 </Link>
               </div>
+
+              <p className="text-sm leading-7 text-slate-600">
+                For some organisations, the Health Check is enough to prompt a
+                conversation. For others, the Diagnostic Assessment creates the
+                clarity needed before the Sprint begins.
+              </p>
             </div>
           </div>
         </div>
@@ -302,14 +386,14 @@ export default function HomePage() {
                   href="/diagnostic"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Diagnostic
+                  Take the Health Check
                 </Link>
               </div>
 
               <p className="text-sm text-[#8AAAC8]">
-                17+ years in HR operations and service delivery. Global experience
-                across 30+ countries. Practical support across growth,
-                transformation, and complexity.
+                17+ years in HR operations and service delivery. Global
+                experience across 30+ countries. Practical support across
+                growth, transformation, and complexity.
               </p>
             </div>
           </div>
