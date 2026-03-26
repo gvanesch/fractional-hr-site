@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import type { SavedDiagnosticState } from "../../../lib/diagnostic";
 import { loadDiagnosticState } from "../../../lib/diagnostic-storage";
 
-const calendlyUrl = "https://calendly.com/greg-vanesch/30min";
-
 function getBandNarrative(bandLabel: string) {
   switch (bandLabel) {
     case "Developing":
@@ -73,9 +71,8 @@ export default function DiagnosticInterpretationPage() {
 
   return (
     <>
-      {/* HERO */}
       <section className="brand-hero">
-        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-24 lg:py-32">
+        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-24 lg:py-28">
           <div className="max-w-4xl">
             <p className="brand-kicker">Diagnostic interpretation</p>
 
@@ -86,13 +83,12 @@ export default function DiagnosticInterpretationPage() {
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               This summary provides a structured interpretation of your result,
               highlighting where operational friction may be building and where
-              to focus next.
+              attention is most likely to be useful.
             </p>
           </div>
         </div>
       </section>
 
-      {/* CONTENT */}
       <section className="brand-light-section">
         <div className="brand-container py-14 sm:py-16 lg:py-20">
           <div className="brand-surface-card p-8">
@@ -102,7 +98,6 @@ export default function DiagnosticInterpretationPage() {
               </p>
             ) : result ? (
               <>
-                {/* OVERALL */}
                 <div className="mb-8 rounded-xl bg-slate-50 p-5">
                   <h2 className="mb-3 text-lg font-semibold text-slate-900">
                     Overall profile
@@ -127,7 +122,6 @@ export default function DiagnosticInterpretationPage() {
                   </p>
                 </div>
 
-                {/* CONTEXT */}
                 <div className="mb-8 rounded-xl border border-slate-200 p-5">
                   <h2 className="mb-3 text-lg font-semibold text-slate-900">
                     How this typically shows up
@@ -135,14 +129,13 @@ export default function DiagnosticInterpretationPage() {
 
                   <p className="text-slate-700">
                     Organisations with a similar profile often experience a mix
-                    of structured processes and areas where execution relies more
-                    heavily on individual judgement. As scale increases, this can
-                    begin to create operational friction, particularly across
-                    teams or locations.
+                    of structured processes and areas where execution relies
+                    more heavily on individual judgement. As scale increases,
+                    this can begin to create operational friction, particularly
+                    across teams or locations.
                   </p>
                 </div>
 
-                {/* FRICTION */}
                 {lowestDimensions.length > 0 && (
                   <div className="mb-8 rounded-xl border border-slate-200 p-5">
                     <h2 className="mb-3 text-lg font-semibold text-slate-900">
@@ -164,7 +157,6 @@ export default function DiagnosticInterpretationPage() {
                   </div>
                 )}
 
-                {/* FOCUS */}
                 <div className="mb-8 rounded-xl bg-slate-50 p-5">
                   <h2 className="mb-3 text-lg font-semibold text-slate-900">
                     Potential focus areas
@@ -189,46 +181,36 @@ export default function DiagnosticInterpretationPage() {
                 </h2>
 
                 <p className="text-slate-700">
-                  You can return to the diagnostic and complete it to generate a
-                  personalised summary.
+                  You can return to the Health Check and complete it to generate
+                  a personalised summary.
                 </p>
               </div>
             )}
 
-            {/* CTA */}
             <div className="rounded-xl border border-slate-200 p-5">
               <h2 className="mb-3 text-lg font-semibold text-slate-900">
-                Discuss your result
+                Next step
               </h2>
 
               <p className="mb-4 text-slate-700">
-                A useful next step is a short conversation to walk through your
-                result and explore what it may mean in the context of your
-                organisation.
+                If you would like to share more context or ask a question about
+                your result, you can send an enquiry and continue the
+                conversation from there.
               </p>
 
               <div className="flex flex-wrap gap-4">
-                <a
-                  href={calendlyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="brand-button-primary px-6 py-3 text-base font-medium"
-                >
-                  Book a 30-Minute Diagnostic Conversation
-                </a>
-
                 <Link
                   href="/contact?topic=health-check&source=diagnostic"
-                  className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Send an enquiry instead
+                  Send an enquiry
                 </Link>
 
                 <Link
                   href="/diagnostic"
                   className="rounded-xl border border-slate-300 px-6 py-3 text-base font-medium text-slate-800"
                 >
-                  Back to diagnostic
+                  Back to Health Check
                 </Link>
               </div>
             </div>
