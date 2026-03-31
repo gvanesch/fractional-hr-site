@@ -138,6 +138,17 @@ type PageProps = {
   }>;
 };
 
+type PriorityArea = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  summary: string;
+};
+
+type AlignmentCallout = {
+  title: string;
+  body: string;
+};
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -348,17 +359,299 @@ async function fetchClientDiagnosticReport(
   return json.report;
 }
 
-function ThemePill({
-  theme,
-}: {
-  theme: QualitativeThemeSummary;
-}) {
+function ThemePill({ theme }: { theme: QualitativeThemeSummary }) {
   return (
     <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700">
       {theme.label}
       <span className="ml-2 text-slate-400">({theme.count})</span>
     </span>
   );
+}
+
+function getOverallAverageScore(dimensions: ClientSafeDimensionSummary[]): number | null {
+  const averageScores = dimensions
+    .map((dimension) => {
+      const values = Object.values(dimension.scores).filter(
+        (value): value is number => typeof value === "number",
+      );
+
+      if (values.length === 0) {
+        return null;
+      }
+
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return total / values.length;
+    })
+    .filter((value): value is number => typeof value === "number");
+
+  if (averageScores.length === 0) {
+    return null;
+  }
+
+  const total = averageScores.reduce((sum, value) => sum + value, 0);
+  return Number((total / averageScores.length).toFixed(2));
+}
+
+function getOverallMaturityLabel(score: number | null): string {
+  if (score === null) {
+    return "Insufficient evidence";
+  }
+
+  if (score >= 4.0) {
+    return "Operationally strong";
+  }
+
+  if (score >= 3.2) {
+    return "Broadly stable";
+  }
+
+  if (score >= 2.8) {
+    return "Developing but uneven";
+  }
+
+  return "Operationally fragile";
+}
+
+function getOverallMaturitySummary(score: number | null): string {
+  if (score === null) {
+    return "There is not yet enough scored evidence to form a reliable overall maturity view.";
+  }
+
+  if (score >= 4.0) {
+    return "The operating model appears mature and comparatively well embedded. The main opportunity is likely to be refinement rather than structural correction.";
+  }
+
+  if (score >= 3.2) {
+    return "The operating model appears broadly stable, with enough structure in place to support day-to-day delivery. The main opportunity is to strengthen the weaker parts of the model so they stop creating unnecessary drag.";
+  }
+
+  if (score >= 2.8) {
+    return "The operating model appears usable but uneven. Core structures are present, although there is still enough friction in the system to affect reliability, confidence, and efficiency.";
+  }
+
+  return "The operating model appears structurally fragile. The current pattern suggests broad operational weakness rather than a few isolated issues.";
+}
+
+function getDimensionAverageScore(
+  dimension: ClientSafeDimensionSummary,
+): number | null {
+  const values = Object.values(dimension.scores).filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return Number((total / values.length).toFixed(2));
+}
+
+function getLowestScoringDimensions(
+  dimensions: ClientSafeDimensionSummary[],
+  count: number,
+): ClientSafeDimensionSummary[] {
+  return [...dimensions]
+    .sort((a, b) => {
+      const aScore = getDimensionAverageScore(a) ?? -1;
+      const bScore = getDimensionAverageScore(b) ?? -1;
+      return aScore - bScore;
+    })
+    .slice(0, count);
+}
+
+function getPriorityAreaSummary(params: {
+  dimension: ClientSafeDimensionSummary;
+  narrative?: DimensionNarrative;
+  qualitative?: DimensionQualitativeSummary;
+}): string {
+  const { dimension, narrative, qualitative } = params;
+
+  if (qualitative?.advisoryRead) {
+    return qualitative.advisoryRead;
+  }
+
+  if (narrative?.implication) {
+    return narrative.implication;
+  }
+
+  return `${dimension.dimensionLabel} is showing enough weakness or operating friction to justify closer follow-up.`;
+}
+
+function getStrengthSummary(params: {
+  dimension: ClientSafeDimensionSummary;
+  narrative?: DimensionNarrative;
+}): string {
+  const { dimension, narrative } = params;
+
+  if (narrative?.observation) {
+    return narrative.observation;
+  }
+
+  return `${dimension.dimensionLabel} appears to be one of the more stable areas in the current response set and can be treated as part of the base to build from.`;
+}
+
+function buildImmediatePriorities(params: {
+  priorityDimensions: ClientSafeDimensionSummary[];
+  narrativeMap: Map<string, DimensionNarrative>;
+  qualitativeMap: Map<string, DimensionQualitativeSummary>;
+}): PriorityArea[] {
+  const { priorityDimensions, narrativeMap, qualitativeMap } = params;
+
+  return priorityDimensions.slice(0, 4).map((dimension) => ({
+    dimensionKey: dimension.dimensionKey,
+    dimensionLabel: dimension.dimensionLabel,
+    summary: getPriorityAreaSummary({
+      dimension,
+      narrative: narrativeMap.get(dimension.dimensionKey),
+      qualitative: qualitativeMap.get(dimension.dimensionKey),
+    }),
+  }));
+}
+
+function getScoreValue(
+  dimension: ClientSafeDimensionSummary,
+  questionnaireType: ScoredQuestionnaireType,
+): number | null {
+  const value = dimension.scores[questionnaireType];
+  return typeof value === "number" ? value : null;
+}
+
+function getHighestAndLowestGroups(
+  dimension: ClientSafeDimensionSummary,
+): {
+  highestGroups: ScoredQuestionnaireType[];
+  lowestGroups: ScoredQuestionnaireType[];
+  highestScore: number | null;
+  lowestScore: number | null;
+} {
+  const entries = (["hr", "manager", "leadership"] as const)
+    .map((group) => ({
+      group,
+      score: getScoreValue(dimension, group),
+    }))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        group: ScoredQuestionnaireType;
+        score: number;
+      } => typeof entry.score === "number",
+    );
+
+  if (entries.length === 0) {
+    return {
+      highestGroups: [],
+      lowestGroups: [],
+      highestScore: null,
+      lowestScore: null,
+    };
+  }
+
+  const highestScore = Math.max(...entries.map((entry) => entry.score));
+  const lowestScore = Math.min(...entries.map((entry) => entry.score));
+
+  return {
+    highestGroups: entries
+      .filter((entry) => entry.score === highestScore)
+      .map((entry) => entry.group),
+    lowestGroups: entries
+      .filter((entry) => entry.score === lowestScore)
+      .map((entry) => entry.group),
+    highestScore,
+    lowestScore,
+  };
+}
+
+function formatGroupList(groups: ScoredQuestionnaireType[]): string {
+  const labels = groups.map(formatQuestionnaireTypeLabel);
+
+  if (labels.length === 0) {
+    return "No respondent group";
+  }
+
+  if (labels.length === 1) {
+    return labels[0];
+  }
+
+  if (labels.length === 2) {
+    return `${labels[0]} and ${labels[1]}`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+function buildAlignmentCallout(params: {
+  dimension: ClientSafeDimensionSummary;
+  insight?: DimensionInsight;
+}): AlignmentCallout | null {
+  const { dimension, insight } = params;
+
+  if (!insight || insight.alignment === "aligned") {
+    return null;
+  }
+
+  const { highestGroups, lowestGroups, highestScore, lowestScore } =
+    getHighestAndLowestGroups(dimension);
+
+  const gapText = formatGap(dimension.gap);
+  const highestText = formatGroupList(highestGroups);
+  const lowestText = formatGroupList(lowestGroups);
+
+  if (
+    lowestGroups.length === 1 &&
+    lowestGroups[0] === "hr" &&
+    highestGroups.includes("leadership")
+  ) {
+    return {
+      title: "Perception gap between delivery and leadership",
+      body: `This is one of the clearer cross-group gaps in the response set. HR is scoring this area lower than the rest of the organisation, while leadership is scoring it more positively. A gap of ${gapText} often suggests the friction is being felt most directly at delivery level and is not yet fully visible upward.`,
+    };
+  }
+
+  if (
+    lowestGroups.length === 1 &&
+    lowestGroups[0] === "manager" &&
+    highestGroups.includes("hr") &&
+    highestGroups.includes("leadership")
+  ) {
+    return {
+      title: "Manager experience is lagging the designed model",
+      body: `Managers are rating this dimension lower than both HR and leadership, with a spread of ${gapText}. That pattern often suggests the model looks clearer in design and governance than it does at the point of day-to-day use. In practice, managers are usually the group most exposed to ambiguity in handoffs, ownership, or application.`,
+    };
+  }
+
+  if (
+    lowestGroups.length === 1 &&
+    lowestGroups[0] === "leadership" &&
+    highestGroups.length >= 1
+  ) {
+    return {
+      title: "Leadership concern is sharper than local experience",
+      body: `Leadership is rating this area below the other respondent groups, with a spread of ${gapText}. That can indicate senior concern about resilience or sustainability that is not yet as visible in day-to-day experience. It can also suggest leadership is evaluating the area against a higher future-state standard.`,
+    };
+  }
+
+  if (
+    highestScore !== null &&
+    lowestScore !== null &&
+    highestGroups.length === 1 &&
+    lowestGroups.length === 1
+  ) {
+    return {
+      title: "Meaningful cross-group spread",
+      body: `${highestText} is scoring this area at ${formatScore(
+        highestScore,
+      )}, while ${lowestText} is scoring it at ${formatScore(
+        lowestScore,
+      )}. A spread of ${gapText} suggests the operating experience is not landing consistently across respondent groups, which is often as important as the average score itself.`,
+    };
+  }
+
+  return {
+    title: "Cross-group variation needs interpretation",
+    body: `The spread on this dimension is ${gapText}, which suggests the experience is not landing evenly across the scored respondent groups. That does not automatically mean one group is right and another is wrong, but it does indicate a meaningful difference in how the model is being experienced.`,
+  };
 }
 
 export default async function ClientDiagnosticReportPage({
@@ -397,6 +690,20 @@ export default async function ClientDiagnosticReportPage({
     ]),
   );
 
+  const overallAverageScore = getOverallAverageScore(report.dimensions);
+  const overallMaturityLabel = getOverallMaturityLabel(overallAverageScore);
+  const overallMaturitySummary = getOverallMaturitySummary(overallAverageScore);
+
+  const weakestDimensions = getLowestScoringDimensions(report.dimensions, 3);
+  const immediatePriorities = buildImmediatePriorities({
+    priorityDimensions:
+      report.priorityDimensions.gaps.length > 0
+        ? report.priorityDimensions.gaps
+        : weakestDimensions,
+    narrativeMap,
+    qualitativeMap,
+  });
+
   return (
     <main className="brand-light-section min-h-screen">
       <section className="brand-hero">
@@ -410,8 +717,8 @@ export default async function ClientDiagnosticReportPage({
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               This report provides a structured view of current HR operating
-              maturity, the level of alignment across key respondent groups, and
-              the most important areas for follow-up discussion.
+              maturity, the degree of alignment across scored respondent groups,
+              and the areas most likely to benefit from focused follow-up.
             </p>
 
             <div className="brand-card-dark mt-8 max-w-4xl p-6 sm:p-7">
@@ -426,30 +733,26 @@ export default async function ClientDiagnosticReportPage({
                   </p>
 
                   <p className="text-base leading-7 text-slate-300">
-                    The analysis is based on scored input from HR, managers, and
-                    leadership. It is intended to surface where current people
-                    operations feel strong, where experience varies across
-                    groups, and where deeper discussion is likely to be most
-                    valuable.
+                    {overallMaturitySummary}
                   </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8AAAC8]">
-                      Status
+                      Maturity read
                     </p>
-                    <p className="mt-2 text-base font-medium capitalize text-white">
-                      {report.project.projectStatus.replace(/_/g, " ")}
+                    <p className="mt-2 text-base font-medium text-white">
+                      {overallMaturityLabel}
                     </p>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8AAAC8]">
-                      Primary contact
+                      Overall average
                     </p>
                     <p className="mt-2 text-base font-medium text-white">
-                      {report.project.primaryContactName}
+                      {formatScore(overallAverageScore)}
                     </p>
                   </div>
 
@@ -527,10 +830,10 @@ export default async function ClientDiagnosticReportPage({
 
             <div className="brand-surface rounded-xl px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Priority gaps
+                Overall average
               </p>
               <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                {report.priorityDimensions.gaps.length}
+                {formatScore(overallAverageScore)}
               </p>
             </div>
           </div>
@@ -539,108 +842,86 @@ export default async function ClientDiagnosticReportPage({
 
       <section className="bg-[#F4F6FA]">
         <div className="brand-container brand-section">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="brand-surface-card p-8">
-              <div className="brand-stack-md">
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">Key strengths</p>
-                  <h2 className="brand-heading-md text-slate-950">
-                    Relative strengths in the current response set
-                  </h2>
+          <div className="brand-surface-card p-8">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">Overall snapshot</p>
+                <h2 className="brand-heading-md text-slate-950">
+                  What the response pattern is saying overall
+                </h2>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Operating read
+                  </p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                    {overallMaturityLabel}
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    {overallMaturitySummary}
+                  </p>
                 </div>
 
-                <div className="space-y-4">
-                  {report.priorityDimensions.strengths.length > 0 ? (
-                    report.priorityDimensions.strengths.map((dimension) => (
-                      <div
-                        key={`strength-${dimension.dimensionKey}`}
-                        className="rounded-xl bg-slate-50 p-5"
-                      >
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold text-slate-950">
-                              {dimension.dimensionLabel}
-                            </h3>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">
-                              {dimension.dimensionDescription}
-                            </p>
-                          </div>
-
-                          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700">
-                            Gap: {formatGap(dimension.gap)}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-xl bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-                      No relative strengths are available yet from the current
-                      scored response set.
-                    </div>
-                  )}
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Coverage
+                  </p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                    {report.executiveSummary.completedRespondentGroups} of{" "}
+                    {report.executiveSummary.totalRespondentGroups} groups complete
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    The scored analysis is based on HR, manager, and leadership
+                    input only. Contextual fact pack information is not used in
+                    statistical comparison.
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div className="brand-surface-card p-8">
-              <div className="brand-stack-md">
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">Insight summary</p>
-                  <h2 className="brand-heading-md text-slate-950">
-                    Alignment and completeness
-                  </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Strongest relative areas
+                  </p>
+                  <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-700">
+                    {report.priorityDimensions.strengths.length > 0 ? (
+                      report.priorityDimensions.strengths.map((dimension) => (
+                        <li key={`snapshot-strength-${dimension.dimensionKey}`}>
+                          <span className="font-semibold text-slate-900">
+                            {dimension.dimensionLabel}:
+                          </span>{" "}
+                          {getStrengthSummary({
+                            dimension,
+                            narrative: narrativeMap.get(dimension.dimensionKey),
+                          })}
+                        </li>
+                      ))
+                    ) : (
+                      <li>No relative strengths are available yet.</li>
+                    )}
+                  </ul>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Alignment
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-                        Aligned: {report.insightSummary.alignment.aligned}
-                      </span>
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
-                        Emerging gap:{" "}
-                        {report.insightSummary.alignment.emergingGap}
-                      </span>
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">
-                        Significant gap:{" "}
-                        {report.insightSummary.alignment.significantGap}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Completeness
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-                        Sufficient:{" "}
-                        {report.insightSummary.completeness.sufficient}
-                      </span>
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
-                        Partial: {report.insightSummary.completeness.partial}
-                      </span>
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">
-                        Insufficient:{" "}
-                        {report.insightSummary.completeness.insufficient}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Priority gaps highlighted
-                    </p>
-                    <p className="mt-3 text-sm leading-7 text-slate-700">
-                      {report.priorityDimensions.gaps.length} area
-                      {report.priorityDimensions.gaps.length === 1 ? "" : "s"}{" "}
-                      of notable cross-group variation are currently highlighted
-                      for deeper review.
-                    </p>
-                  </div>
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Priority areas
+                  </p>
+                  <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-700">
+                    {immediatePriorities.length > 0 ? (
+                      immediatePriorities.map((area) => (
+                        <li key={`snapshot-priority-${area.dimensionKey}`}>
+                          <span className="font-semibold text-slate-900">
+                            {area.dimensionLabel}:
+                          </span>{" "}
+                          {area.summary}
+                        </li>
+                      ))
+                    ) : (
+                      <li>No priority areas are available yet.</li>
+                    )}
+                  </ul>
                 </div>
               </div>
             </div>
@@ -649,15 +930,87 @@ export default async function ClientDiagnosticReportPage({
           <div className="brand-surface-card mt-6 p-8">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
-                <p className="brand-section-kicker">What respondents are saying</p>
+                <p className="brand-section-kicker">Insight summary</p>
                 <h2 className="brand-heading-md text-slate-950">
-                  Qualitative themes across the response set
+                  Alignment and evidence quality
+                </h2>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Alignment
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+                      Aligned: {report.insightSummary.alignment.aligned}
+                    </span>
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
+                      Emerging gap:{" "}
+                      {report.insightSummary.alignment.emergingGap}
+                    </span>
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">
+                      Significant gap:{" "}
+                      {report.insightSummary.alignment.significantGap}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-sm leading-7 text-slate-700">
+                    This reflects how consistently the operating experience is
+                    being seen across the scored respondent groups.
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Completeness
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+                      Sufficient:{" "}
+                      {report.insightSummary.completeness.sufficient}
+                    </span>
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
+                      Partial: {report.insightSummary.completeness.partial}
+                    </span>
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">
+                      Insufficient:{" "}
+                      {report.insightSummary.completeness.insufficient}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-sm leading-7 text-slate-700">
+                    Completeness is based on the presence of scored input from
+                    HR, managers, and leadership only.
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Relative spread of results
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                    The current response set shows{" "}
+                    {report.priorityDimensions.gaps.length} highlighted area
+                    {report.priorityDimensions.gaps.length === 1 ? "" : "s"}{" "}
+                    of notable cross-group variation. That means the current
+                    picture is defined more by broad operating strength and
+                    weakness than by major disagreement between respondent groups.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-6 p-8">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">Cross-cutting themes</p>
+                <h2 className="brand-heading-md text-slate-950">
+                  What respondents are saying behind the scores
                 </h2>
                 <p className="brand-body max-w-4xl">
-                  This section highlights the written signals sitting behind the
-                  scores. It helps distinguish issues that are visible in daily
-                  operating practice from those that appear only in quantitative
-                  scoring.
+                  This section highlights the written signals that recur across
+                  the response set. It helps distinguish structural operating
+                  issues from isolated local frustrations.
                 </p>
               </div>
 
@@ -715,7 +1068,45 @@ export default async function ClientDiagnosticReportPage({
                       No cross-cutting written themes are available yet.
                     </p>
                   )}
+
+                  <p className="mt-4 text-sm leading-7 text-slate-700">
+                    These themes do not replace the scores. They help explain how
+                    the operating model is being experienced in practice.
+                  </p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="brand-surface-card mt-6 p-8">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">Immediate priorities</p>
+                <h2 className="brand-heading-md text-slate-950">
+                  Areas most likely to justify focused follow-up
+                </h2>
+                <p className="brand-body max-w-4xl">
+                  These are the areas most likely to be creating visible
+                  operational friction, either because the score pattern is weak,
+                  the themes are recurring, or the practical consequences appear
+                  disproportionate to the score itself.
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {immediatePriorities.map((area) => (
+                  <div
+                    key={`priority-${area.dimensionKey}`}
+                    className="rounded-xl bg-slate-50 p-5"
+                  >
+                    <h3 className="text-lg font-semibold text-slate-950">
+                      {area.dimensionLabel}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">
+                      {area.summary}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -728,17 +1119,17 @@ export default async function ClientDiagnosticReportPage({
             <div className="brand-surface-card p-8">
               <div className="brand-stack-md">
                 <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">Priority gaps</p>
+                  <p className="brand-section-kicker">Relative strengths</p>
                   <h2 className="brand-heading-md text-slate-950">
-                    Areas of greatest cross-group variation
+                    Areas that look more stable in the current response set
                   </h2>
                 </div>
 
                 <div className="space-y-4">
-                  {report.priorityDimensions.gaps.length > 0 ? (
-                    report.priorityDimensions.gaps.map((dimension) => (
+                  {report.priorityDimensions.strengths.length > 0 ? (
+                    report.priorityDimensions.strengths.map((dimension) => (
                       <div
-                        key={`gap-${dimension.dimensionKey}`}
+                        key={`strength-${dimension.dimensionKey}`}
                         className="rounded-xl bg-slate-50 p-5"
                       >
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -747,7 +1138,10 @@ export default async function ClientDiagnosticReportPage({
                               {dimension.dimensionLabel}
                             </h3>
                             <p className="mt-2 text-sm leading-6 text-slate-700">
-                              {dimension.dimensionDescription}
+                              {getStrengthSummary({
+                                dimension,
+                                narrative: narrativeMap.get(dimension.dimensionKey),
+                              })}
                             </p>
                           </div>
 
@@ -759,7 +1153,7 @@ export default async function ClientDiagnosticReportPage({
                     ))
                   ) : (
                     <div className="rounded-xl bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-                      No priority gaps are available yet from the current
+                      No relative strengths are available yet from the current
                       scored response set.
                     </div>
                   )}
@@ -835,6 +1229,10 @@ export default async function ClientDiagnosticReportPage({
               const insight = insightMap.get(dimension.dimensionKey);
               const narrative = narrativeMap.get(dimension.dimensionKey);
               const qualitative = qualitativeMap.get(dimension.dimensionKey);
+              const alignmentCallout = buildAlignmentCallout({
+                dimension,
+                insight,
+              });
 
               return (
                 <article
@@ -908,6 +1306,20 @@ export default async function ClientDiagnosticReportPage({
                       </div>
                     </div>
                   </div>
+
+                  {alignmentCallout ? (
+                    <div className="mt-6 rounded-[1.25rem] border border-amber-200 bg-amber-50 p-6">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                        Alignment call-out
+                      </p>
+                      <h4 className="mt-3 text-lg font-semibold text-slate-950">
+                        {alignmentCallout.title}
+                      </h4>
+                      <p className="mt-3 text-sm leading-7 text-slate-700">
+                        {alignmentCallout.body}
+                      </p>
+                    </div>
+                  ) : null}
 
                   {qualitative ? (
                     <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-[#F8FAFC] p-6">

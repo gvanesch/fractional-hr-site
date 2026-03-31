@@ -7,10 +7,12 @@ export const metadata = {
 
 import { notFound } from "next/navigation";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
+import {
+  questionnaireTypes,
+  type QuestionnaireType,
+} from "@/lib/client-diagnostic/question-bank";
 
 export const runtime = "edge";
-
-type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 
 type PageProps = {
   params: Promise<{
@@ -22,15 +24,8 @@ type PageProps = {
   }>;
 };
 
-const QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
-  "hr",
-  "manager",
-  "leadership",
-  "client_fact_pack",
-];
-
 function isQuestionnaireType(value: string): value is QuestionnaireType {
-  return QUESTIONNAIRE_TYPES.includes(value as QuestionnaireType);
+  return questionnaireTypes.includes(value as QuestionnaireType);
 }
 
 function getSingleValue(
@@ -51,8 +46,6 @@ function getQuestionnaireTitle(questionnaireType: QuestionnaireType): string {
       return "Manager Diagnostic";
     case "leadership":
       return "Leadership Diagnostic";
-    case "client_fact_pack":
-      return "Client Fact Pack";
     default:
       return "Client Diagnostic";
   }
@@ -66,8 +59,6 @@ function getQuestionnaireIntro(questionnaireType: QuestionnaireType): string {
       return "Please answer based on your day-to-day experience of navigating people processes, support, and guidance as a manager.";
     case "leadership":
       return "Please answer from your perspective on how effectively people operations support organisational execution, consistency, and scale.";
-    case "client_fact_pack":
-      return "Please answer from an organisational perspective, using the best available context on structure, operating model, systems, and current ways of working.";
     default:
       return "Please answer based on your direct experience and current understanding of how people operations work today.";
   }

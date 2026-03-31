@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "HR Foundations for Growing Companies | Van Esch Advisory Ltd",
   description:
-    "Practical HR foundations for growing companies and mid-market organisations, including stronger onboarding, clearer ownership, better process discipline, and a structured path from Health Check to Diagnostic Assessment to Sprint.",
+    "Practical HR foundations for growing companies and mid-market organisations, including stronger onboarding, clearer ownership, better process discipline, and a structured path from HR Health Check to HR Operations Diagnostic Assessment to HR Foundations Sprint.",
 };
 
 const commonSigns = [
@@ -18,7 +18,7 @@ const commonSigns = [
 
 const startPath = [
   {
-    title: "HR Operations Health Check",
+    title: "HR Health Check",
     text: "A useful first step where you want a quick signal on whether operational strain may be building.",
     href: "/diagnostic",
     cta: "Take the Health Check",
@@ -141,9 +141,10 @@ export default function GrowingCompaniesPage() {
               </p>
 
               <p>
-                In practice, this usually means improving process clarity,
-                ownership, onboarding, documentation, service access, and the
-                operational discipline around how HR work actually flows.
+                In practical terms, this usually means improving process
+                clarity, ownership, onboarding, documentation, service access,
+                and the operational discipline around how HR work actually
+                flows.
               </p>
             </div>
           </div>
@@ -206,9 +207,9 @@ export default function GrowingCompaniesPage() {
 
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
               The best starting point depends on how clear the pattern already
-              is. You can begin with the HR Operations Health Check, move into
-              the Diagnostic Assessment for deeper clarity, or discuss whether
-              the HR Foundations Sprint is the right next step.
+              is. You can begin with the HR Health Check, move into the
+              Diagnostic Assessment for deeper clarity, or discuss whether the
+              HR Foundations Sprint is the right next step.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">

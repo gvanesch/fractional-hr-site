@@ -14,15 +14,15 @@ const experienceThemes = [
   },
   {
     title: "HR Transformation, Process & Governance",
-    text: "Hands-on work across HR operating models, process design, SOPs, controls, governance structures, ISO27001, SOC2 and statutory reporting. The focus is on creating clarity, consistency, and operational discipline that holds up as organisations scale.",
+    text: "Hands-on work across HR operating models, process design, SOPs, controls, governance structures, ISO27001, SOC2, and statutory reporting. The focus is on creating clarity, consistency, and operational discipline that holds up as organisations scale.",
   },
   {
     title: "HR Technology & Workflow Automation",
-    text: "Practical experience improving HR systems and reducing manual work through better workflow design. This includes ServiceNow and HRIS automation, process redesign, and making systems genuinely useful in day-to-day operations.",
+    text: "Practical experience improving HR systems and reducing manual work through better workflow design. This includes ServiceNow, HR systems integration, process redesign, and making systems genuinely useful in day-to-day operations.",
   },
   {
     title: "M&A, Integration & Organisational Change",
-    text: "Operational delivery through acquisitions, integration planning, TUPE-related change, benefits and employment conditions harmonisation. This includes aligning processes, policies, and structures across multiple entities and regions.",
+    text: "Operational delivery through acquisitions, integration planning, TUPE-related change, and harmonisation of benefits and employment conditions. This includes aligning processes, policies, and structures across multiple entities and regions.",
   },
 ];
 
@@ -30,7 +30,7 @@ const credibility = [
   "17+ years in HR operations and service delivery",
   "Global experience across 30+ countries",
   "Leadership roles in complex and scaled organisations",
-  "Deep experience in ServiceNow HRIS automation and HR technology",
+  "Deep experience in ServiceNow HR technology and workflow design",
   "Delivered across growth, scale, and post-acquisition environments",
 ];
 
@@ -117,6 +117,12 @@ export default function AboutPage() {
                 shows up as inconsistent processes, unclear ownership, service
                 friction, and systems that do not fully support how the business
                 operates.
+              </p>
+
+              <p className="brand-body">
+                Van Esch Advisory was built on a simple idea. HR improves when
+                its operations are designed deliberately, not allowed to evolve
+                by default.
               </p>
 
               <p className="brand-body">
@@ -211,7 +217,8 @@ export default function AboutPage() {
               <p className="brand-body">
                 Much of this work has involved simplifying complexity, whether
                 through process redesign, service delivery improvement, or
-                better use of HR integration technology such as ServiceNow HRSD and key absence management platforms like e-days.
+                better use of HR technology such as ServiceNow HR Service
+                Delivery and connected HR systems.
               </p>
 
               <p className="brand-body">
@@ -312,7 +319,7 @@ export default function AboutPage() {
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can take the HR Operations Health Check for an immediate
+                  You can take the HR Health Check for an immediate
                   self-assessment, or start with a short conversation about your
                   current challenges.
                 </p>

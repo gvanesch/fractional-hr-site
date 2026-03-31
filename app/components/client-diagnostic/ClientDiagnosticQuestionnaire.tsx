@@ -6,11 +6,10 @@ import {
   getQuestionsForDimension,
   type DimensionKey,
   type ProbeQuestion,
+  type QuestionnaireType,
   type ScoreAnswerValue,
   type ScoreQuestion,
 } from "@/lib/client-diagnostic/question-bank";
-
-type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 
 type ClientDiagnosticQuestionnaireProps = {
   questionnaireType: QuestionnaireType;
@@ -97,14 +96,31 @@ export default function ClientDiagnosticQuestionnaire({
     );
   }, [allQuestions]);
 
+  const probeQuestions = useMemo(() => {
+    return allQuestions.filter(
+      (question): question is ProbeQuestion => question.kind === "probe",
+    );
+  }, [allQuestions]);
+
   const completedRequiredCount = useMemo(() => {
     return scoreQuestions.filter((question) => scoreAnswers[question.id]).length;
   }, [scoreAnswers, scoreQuestions]);
+
+  const completedProbeCount = useMemo(() => {
+    return probeQuestions.filter((question) =>
+      Boolean(probeAnswers[question.id]?.trim()),
+    ).length;
+  }, [probeAnswers, probeQuestions]);
 
   const completionPercentage =
     scoreQuestions.length === 0
       ? 0
       : Math.round((completedRequiredCount / scoreQuestions.length) * 100);
+
+  const isReadyToSubmit =
+    hasValidSubmissionContext &&
+    scoreQuestions.length > 0 &&
+    completedRequiredCount === scoreQuestions.length;
 
   useEffect(() => {
     try {
@@ -180,6 +196,11 @@ export default function ClientDiagnosticQuestionnaire({
     const currentIndex = scoreQuestions.findIndex(
       (question) => question.id === questionId,
     );
+
+    if (currentIndex === -1) {
+      return;
+    }
+
     const currentQuestion = scoreQuestions[currentIndex];
     const nextQuestion = scoreQuestions[currentIndex + 1];
 
@@ -191,7 +212,8 @@ export default function ClientDiagnosticQuestionnaire({
     const isNewDimension = currentQuestion.dimension !== nextQuestion.dimension;
 
     if (isNewDimension) {
-      const nextDimensionHeader = dimensionHeaderRefs.current[nextQuestion.dimension];
+      const nextDimensionHeader =
+        dimensionHeaderRefs.current[nextQuestion.dimension];
 
       if (nextDimensionHeader) {
         scrollElementToTargetTop(nextDimensionHeader, stickyCoverageHeight + 96);
@@ -206,17 +228,7 @@ export default function ClientDiagnosticQuestionnaire({
       return;
     }
 
-    if (currentQuestion.order === 1) {
-      scrollElementToTargetTop(nextQuestionElement, stickyCoverageHeight + 180);
-      return;
-    }
-
-    if (currentQuestion.order === 2) {
-      scrollElementToTargetTop(nextQuestionElement, stickyCoverageHeight + 96);
-      return;
-    }
-
-    scrollElementToTargetTop(nextQuestionElement, stickyCoverageHeight + 32);
+    scrollElementToTargetTop(nextQuestionElement, stickyCoverageHeight + 72);
   }
 
   function scrollToReviewSection() {
@@ -302,6 +314,14 @@ export default function ClientDiagnosticQuestionnaire({
       return;
     }
 
+    if (!isReadyToSubmit) {
+      setSubmitState("error");
+      setSubmitMessage(
+        "Please complete all scored questions before submitting the diagnostic.",
+      );
+      return;
+    }
+
     const submission = buildPreparedSubmission();
 
     setPreparedSubmission(submission);
@@ -362,7 +382,12 @@ export default function ClientDiagnosticQuestionnaire({
                 Completion progress
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                {completedRequiredCount} of {scoreQuestions.length} scored questions answered
+                {completedRequiredCount} of {scoreQuestions.length} scored
+                questions answered
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Optional detail responses: {completedProbeCount} of{" "}
+                {probeQuestions.length}
               </p>
             </div>
 
@@ -391,6 +416,13 @@ export default function ClientDiagnosticQuestionnaire({
               return null;
             }
 
+            const scoredInDimension = questions.filter(
+              (question): question is ScoreQuestion => question.kind === "score",
+            );
+            const completedScoredInDimension = scoredInDimension.filter(
+              (question) => scoreAnswers[question.id],
+            ).length;
+
             return (
               <section
                 key={dimension.key}
@@ -401,10 +433,19 @@ export default function ClientDiagnosticQuestionnaire({
                     dimensionHeaderRefs.current[dimension.key] = element;
                   }}
                 >
-                  <p className="brand-section-kicker">{dimension.label}</p>
-                  <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    {dimension.description}
-                  </h2>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="brand-section-kicker">{dimension.label}</p>
+                      <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                        {dimension.description}
+                      </h2>
+                    </div>
+
+                    <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3 text-sm text-slate-700">
+                      {completedScoredInDimension} of {scoredInDimension.length}{" "}
+                      scored answered
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-8 space-y-6">
@@ -418,7 +459,8 @@ export default function ClientDiagnosticQuestionnaire({
                         className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
                       >
                         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                          Question {question.order}
+                          Question {question.order} of{" "}
+                          {scoredInDimension.length}
                         </p>
                         <p className="mt-3 text-base leading-7 text-slate-900">
                           {question.prompt}
@@ -426,7 +468,8 @@ export default function ClientDiagnosticQuestionnaire({
 
                         <div className="mt-5 grid grid-cols-5 gap-3">
                           {[1, 2, 3, 4, 5].map((value) => {
-                            const isSelected = scoreAnswers[question.id] === value;
+                            const isSelected =
+                              scoreAnswers[question.id] === value;
 
                             return (
                               <button
@@ -443,6 +486,7 @@ export default function ClientDiagnosticQuestionnaire({
                                     ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white"
                                     : "border-[var(--brand-border)] bg-[var(--brand-surface-soft)] text-slate-700 hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)]"
                                 }`}
+                                aria-pressed={isSelected}
                               >
                                 {value}
                               </button>
@@ -479,6 +523,35 @@ export default function ClientDiagnosticQuestionnaire({
             used in the diagnostic reporting and advisor views.
           </p>
 
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                Scored questions
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {completedRequiredCount} / {scoreQuestions.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                Optional detail
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {completedProbeCount} / {probeQuestions.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                Submission status
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {isReadyToSubmit ? "Ready" : "Incomplete"}
+              </p>
+            </div>
+          </div>
+
           <div className="mt-6 flex flex-col gap-4 sm:flex-row">
             <button
               type="button"
@@ -491,7 +564,7 @@ export default function ClientDiagnosticQuestionnaire({
             <button
               type="button"
               onClick={handleSubmitDiagnostic}
-              disabled={!hasValidSubmissionContext || submitState === "submitting"}
+              disabled={!isReadyToSubmit || submitState === "submitting"}
               className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitState === "submitting"
@@ -502,7 +575,15 @@ export default function ClientDiagnosticQuestionnaire({
 
           {!hasValidSubmissionContext ? (
             <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              This diagnostic link is missing valid project or participant identifiers.
+              This diagnostic link is missing valid project or participant
+              identifiers.
+            </div>
+          ) : null}
+
+          {hasValidSubmissionContext && !isReadyToSubmit ? (
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              Please complete all scored questions before submitting. Optional
+              detail fields can be left blank.
             </div>
           ) : null}
 
@@ -525,7 +606,12 @@ export default function ClientDiagnosticQuestionnaire({
               </p>
 
               <p className="mt-3 text-sm text-slate-700">
-                {preparedSubmission.responses.length} responses prepared for submission.
+                {preparedSubmission.responses.length} responses prepared for
+                submission.
+              </p>
+              <p className="mt-2 text-sm text-slate-700">
+                This includes {completedRequiredCount} scored responses and{" "}
+                {completedProbeCount} optional detail responses.
               </p>
             </div>
           ) : null}
@@ -560,6 +646,12 @@ function ProbeQuestionCard({
         className="mt-5 w-full rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[var(--brand-accent)]"
         placeholder="Add any relevant context here..."
       />
+
+      {question.helpText ? (
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          {question.helpText}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -13,8 +13,7 @@ import {
   questionnaireTypes,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
-
-export const runtime = "edge";
+import { buildDimensionAnalyses } from "@/lib/client-diagnostic/analysis-engine";
 
 type ParticipantRow = {
   participant_id: string;
@@ -179,26 +178,67 @@ type ErrorResponse = {
   error: string;
 };
 
+const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+];
+
+function isScoredQuestionnaireType(
+  questionnaireType: QuestionnaireType,
+): boolean {
+  return SCORED_QUESTIONNAIRE_TYPES.includes(questionnaireType);
+}
+
 const GENERIC_THEME_LIBRARY: QualitativeThemeDefinition[] = [
   {
     key: "clarity_gap",
     label: "Clarity and interpretation gaps",
-    keywords: ["unclear", "not clear", "confusing", "ambigu", "unsure", "interpret"],
+    keywords: [
+      "unclear",
+      "not clear",
+      "confusing",
+      "ambigu",
+      "unsure",
+      "interpret",
+    ],
   },
   {
     key: "inconsistent_execution",
     label: "Inconsistent execution",
-    keywords: ["inconsistent", "different", "varies", "depends on", "not the same", "uneven"],
+    keywords: [
+      "inconsistent",
+      "different",
+      "varies",
+      "depends on",
+      "not the same",
+      "uneven",
+    ],
   },
   {
     key: "manual_workaround",
     label: "Manual workaround and extra effort",
-    keywords: ["manual", "workaround", "offline", "spreadsheet", "rework", "duplicate"],
+    keywords: [
+      "manual",
+      "workaround",
+      "offline",
+      "spreadsheet",
+      "rework",
+      "duplicate",
+    ],
   },
   {
     key: "ownership_gap",
     label: "Ownership and follow-through gaps",
-    keywords: ["owner", "ownership", "responsib", "accountab", "follow up", "dropped", "handoff"],
+    keywords: [
+      "owner",
+      "ownership",
+      "responsib",
+      "accountab",
+      "follow up",
+      "dropped",
+      "handoff",
+    ],
   },
 ];
 
@@ -207,29 +247,62 @@ const DIMENSION_THEME_LIBRARY: Record<string, QualitativeThemeDefinition[]> = {
     {
       key: "unclear_workflow",
       label: "Workflow steps are not consistently clear",
-      keywords: ["unclear", "not clear", "confusing", "which step", "what happens next", "process"],
+      keywords: [
+        "unclear",
+        "not clear",
+        "confusing",
+        "which step",
+        "what happens next",
+        "process",
+      ],
     },
     {
       key: "local_interpretation",
       label: "Teams are relying on local interpretation",
-      keywords: ["depends on", "manager by manager", "team by team", "interpret", "local", "varies"],
+      keywords: [
+        "depends on",
+        "manager by manager",
+        "team by team",
+        "interpret",
+        "local",
+        "varies",
+      ],
     },
     {
       key: "handoff_ambiguity",
       label: "Handoffs are creating ambiguity",
-      keywords: ["handoff", "handover", "between teams", "passed around", "back and forth"],
+      keywords: [
+        "handoff",
+        "handover",
+        "between teams",
+        "passed around",
+        "back and forth",
+      ],
     },
   ],
   consistency: [
     {
       key: "uneven_decisions",
       label: "Similar issues are being handled differently",
-      keywords: ["different", "inconsistent", "varies", "depends on", "not the same", "uneven"],
+      keywords: [
+        "different",
+        "inconsistent",
+        "varies",
+        "depends on",
+        "not the same",
+        "uneven",
+      ],
     },
     {
       key: "local_variation",
       label: "Local practice is overriding the standard",
-      keywords: ["local", "team by team", "manager by manager", "business area", "region"],
+      keywords: [
+        "local",
+        "team by team",
+        "manager by manager",
+        "business area",
+        "region",
+      ],
     },
     {
       key: "exception_handling",
@@ -241,7 +314,14 @@ const DIMENSION_THEME_LIBRARY: Record<string, QualitativeThemeDefinition[]> = {
     {
       key: "unclear_entry_point",
       label: "Support entry points are not always clear",
-      keywords: ["where to go", "who to contact", "entry point", "mailbox", "reach out", "contact"],
+      keywords: [
+        "where to go",
+        "who to contact",
+        "entry point",
+        "mailbox",
+        "reach out",
+        "contact",
+      ],
     },
     {
       key: "informal_routing",
@@ -258,12 +338,25 @@ const DIMENSION_THEME_LIBRARY: Record<string, QualitativeThemeDefinition[]> = {
     {
       key: "unclear_accountability",
       label: "Accountability is not always clear",
-      keywords: ["owner", "ownership", "responsib", "accountab", "who should", "who owns"],
+      keywords: [
+        "owner",
+        "ownership",
+        "responsib",
+        "accountab",
+        "who should",
+        "who owns",
+      ],
     },
     {
       key: "blurred_boundary",
       label: "Boundaries between roles are blurred",
-      keywords: ["between hr and manager", "between teams", "unclear role", "boundary", "handoff"],
+      keywords: [
+        "between hr and manager",
+        "between teams",
+        "unclear role",
+        "boundary",
+        "handoff",
+      ],
     },
     {
       key: "follow_through_gap",
@@ -456,8 +549,6 @@ function formatQuestionnaireTypeLabel(
       return "Manager";
     case "leadership":
       return "Leadership";
-    case "client_fact_pack":
-      return "Client Fact Pack";
     default:
       return questionnaireType;
   }
@@ -505,14 +596,16 @@ function buildDimensionSummaries(
 ): DimensionSummary[] {
   return dimensionDefinitions.map((dimension) => {
     const matchingRows = scoreRows.filter(
-      (row) => row.dimension_key === dimension.key,
+      (row) =>
+        row.dimension_key === dimension.key &&
+        isScoredQuestionnaireType(row.questionnaire_type),
     );
 
     const scores: QuestionnaireTypeScores = {};
     const completedQuestionnaireTypes: QuestionnaireType[] = [];
     const missingQuestionnaireTypes: QuestionnaireType[] = [];
 
-    for (const questionnaireType of questionnaireTypes) {
+    for (const questionnaireType of SCORED_QUESTIONNAIRE_TYPES) {
       const match = matchingRows.find(
         (row) => row.questionnaire_type === questionnaireType,
       );
@@ -610,7 +703,10 @@ function normaliseText(value: string): string {
 
 function getCleanCommentRows(commentRows: CommentRow[]): CommentRow[] {
   return commentRows.filter(
-    (row) => typeof row.comment_text === "string" && normaliseText(row.comment_text).length > 0,
+    (row) =>
+      isScoredQuestionnaireType(row.questionnaire_type) &&
+      typeof row.comment_text === "string" &&
+      normaliseText(row.comment_text).length > 0,
   );
 }
 
@@ -645,16 +741,23 @@ function countThemeMatches(
     .slice(0, 3);
 }
 
-function getQualitativeConfidence(
-  commentCount: number,
-  respondentGroupCount: number,
-): "high" | "medium" | "low" {
-  if (commentCount >= 6 && respondentGroupCount >= 2) {
+function getQualitativeConfidence(params: {
+  commentCount: number;
+  respondentGroupCount: number;
+  themeCount: number;
+}): "high" | "medium" | "low" {
+  const { commentCount, respondentGroupCount, themeCount } = params;
+
+  if (commentCount >= 6 && respondentGroupCount >= 2 && themeCount >= 2) {
     return "high";
   }
 
-  if (commentCount >= 3) {
+  if (commentCount >= 3 && respondentGroupCount >= 2) {
     return "medium";
+  }
+
+  if (commentCount >= 2) {
+    return "low";
   }
 
   return "low";
@@ -666,11 +769,16 @@ function getIllustrativeSignals(comments: string[]): string[] {
     .filter((comment) => comment.length > 0)
     .slice(0, 3)
     .map((comment) => {
-      if (comment.length <= 160) {
-        return comment;
+      const cleaned = comment
+        .replace(/\s+/g, " ")
+        .replace(/\s([,.;:!?])/g, "$1")
+        .trim();
+
+      if (cleaned.length <= 145) {
+        return cleaned;
       }
 
-      return `${comment.slice(0, 157).trimEnd()}...`;
+      return `${cleaned.slice(0, 142).trimEnd()}...`;
     });
 }
 
@@ -686,34 +794,103 @@ function buildDimensionAdvisoryRead(params: {
     return null;
   }
 
-  const themeLabels = themes.map((theme) => theme.label.toLowerCase());
+  const themeLabels = themes.map((t) => t.label.toLowerCase());
+  const primary = themeLabels[0];
+  const secondary = themeLabels[1];
 
-  const primaryTheme = themeLabels[0];
-  const secondaryTheme = themeLabels[1];
+  const variantSeed =
+    Math.round((insight.averageScore ?? 3) * 10) +
+    Math.round((insight.gap ?? 0) * 10) +
+    dimensionLabel.length;
 
-  const strengthPosition =
-    insight.status === "strong"
-      ? "reinforce the stronger score pattern"
-      : insight.status === "moderate"
-        ? "help explain why the area is only partially embedded"
-        : "reinforce that this is a visible operational weakness";
+  const variant = variantSeed % 4;
 
-  const alignmentPosition =
+  const alignmentLine =
     insight.alignment === "significant_gap"
-      ? "They also suggest that the issue is not being experienced consistently across respondent groups."
+      ? "What stands out most is the difference in how this is being experienced across groups."
       : insight.alignment === "emerging_gap"
-        ? "They suggest there is some unevenness in how the issue is showing up across the organisation."
-        : "The comments are broadly consistent with a shared operating experience rather than a narrow local issue.";
+        ? "There are signs this is not landing evenly across the organisation."
+        : "The pattern appears broadly consistent across respondent groups.";
 
-  if (primaryTheme && secondaryTheme) {
-    return `The written responses for ${dimensionLabel.toLowerCase()} ${strengthPosition}. The clearest signals point to ${primaryTheme}, alongside ${secondaryTheme}. ${alignmentPosition}`;
+  if (insight.status === "strong" && primary) {
+    const options = [
+      `The score for ${dimensionLabel.toLowerCase()} is relatively strong, but the comments add a different layer. ${primary} comes through more clearly than the score alone would suggest. ${alignmentLine}`,
+      `Although ${dimensionLabel.toLowerCase()} scores well overall, the written responses are more mixed. The most consistent signal is ${primary}, which suggests some underlying friction still exists. ${alignmentLine}`,
+      `The quantitative result is positive, but the qualitative signal is more cautious. ${primary} appears repeatedly in the comments, which suggests the experience may not be as strong as the score implies. ${alignmentLine}`,
+      `There is a slight tension between the score and the comments here. ${primary} is coming through consistently, which suggests this area may be stronger in structure than in lived experience. ${alignmentLine}`,
+    ];
+
+    return options[variant];
   }
 
-  if (primaryTheme) {
-    return `The written responses for ${dimensionLabel.toLowerCase()} ${strengthPosition}. The dominant theme is ${primaryTheme}. ${alignmentPosition}`;
+  if (insight.alignment !== "aligned" && primary) {
+    const options = [
+      `The comments on ${dimensionLabel.toLowerCase()} are particularly useful in explaining the variation in scores. ${primary} is the dominant signal, with ${secondary ?? "related issues"} appearing alongside it. ${alignmentLine}`,
+      `The qualitative picture helps explain why this dimension shows variation. ${primary} appears consistently, suggesting the issue is being experienced differently depending on where you sit. ${alignmentLine}`,
+      `This is one of the clearer examples where the written responses explain the score pattern. ${primary} is the strongest theme, and it aligns with the differences seen across respondent groups. ${alignmentLine}`,
+      `The comments add important context to the score variation. ${primary} comes through most clearly, with ${secondary ?? "additional related signals"} reinforcing the same pattern. ${alignmentLine}`,
+    ];
+
+    return options[variant];
   }
 
-  return `The written responses for ${dimensionLabel.toLowerCase()} add useful operational colour to the score pattern. ${alignmentPosition}`;
+  if (primary && secondary) {
+    const options = [
+      `The qualitative signal for ${dimensionLabel.toLowerCase()} is fairly consistent. ${primary} comes through most clearly, with ${secondary} appearing as a secondary thread. ${alignmentLine}`,
+      `Comments on ${dimensionLabel.toLowerCase()} broadly support the score. The strongest signal is ${primary}, alongside ${secondary}. ${alignmentLine}`,
+      `The written responses reinforce the overall picture. ${primary} is the dominant theme, with ${secondary} appearing less frequently but still relevant. ${alignmentLine}`,
+      `The qualitative picture is relatively clear. ${primary} appears most often, with ${secondary} adding further context to the same pattern. ${alignmentLine}`,
+    ];
+
+    return options[variant];
+  }
+
+  if (primary) {
+    return `The written responses for ${dimensionLabel.toLowerCase()} highlight ${primary} as the most consistent signal. ${alignmentLine}`;
+  }
+
+  return `The written responses for ${dimensionLabel.toLowerCase()} provide additional context to the score pattern, although no single theme dominates. ${alignmentLine}`;
+}
+
+function buildSystemicThemeStory(
+  crossCuttingThemes: QualitativeThemeSummary[],
+): string | null {
+  const keys = crossCuttingThemes.map((theme) => theme.key);
+
+  const hasCapacity =
+    keys.includes("bandwidth_constraint") || keys.includes("reactive_load");
+  const hasHandoffs =
+    keys.includes("handoff_delay") || keys.includes("handoff_ambiguity");
+  const hasWorkflow =
+    keys.includes("unclear_workflow") ||
+    keys.includes("local_interpretation") ||
+    keys.includes("uneven_decisions");
+  const hasKnowledge =
+    keys.includes("hard_to_find_guidance") ||
+    keys.includes("dependency_on_hr") ||
+    keys.includes("outdated_guidance");
+  const hasOwnership =
+    keys.includes("unclear_accountability") ||
+    keys.includes("blurred_boundary") ||
+    keys.includes("follow_through_gap");
+
+  if (hasCapacity && hasHandoffs && hasWorkflow) {
+    return "Taken together, the themes suggest an operating model where limited bandwidth, weak handoffs, and workflow ambiguity are reinforcing each other. That usually creates a reactive pattern rather than one clean root cause.";
+  }
+
+  if (hasOwnership && hasWorkflow) {
+    return "Taken together, the themes suggest the operating model is carrying both clarity and accountability issues. In practice, that usually means work moves forward, but not always with one dependable path or one clear owner.";
+  }
+
+  if (hasKnowledge && hasWorkflow) {
+    return "Taken together, the themes suggest the organisation is still relying too much on interpretation in the moment. Guidance exists, but not yet in a way that consistently reduces dependence on local clarification.";
+  }
+
+  if (hasHandoffs && hasOwnership) {
+    return "Taken together, the themes suggest the friction is sitting at the points where work changes hands. That usually indicates a structural operating issue rather than a narrow process defect.";
+  }
+
+  return null;
 }
 
 function buildOverallQualitativeSummary(params: {
@@ -731,24 +908,32 @@ function buildOverallQualitativeSummary(params: {
     return null;
   }
 
-  const groupLabels = respondentGroupsWithComments.map(formatQuestionnaireTypeLabel);
+  const groupLabels = respondentGroupsWithComments.map(
+    formatQuestionnaireTypeLabel,
+  );
   const themeLabels = crossCuttingThemes.map((theme) => theme.label.toLowerCase());
+  const systemicStory = buildSystemicThemeStory(crossCuttingThemes);
 
   if (themeLabels.length >= 3) {
     return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
       ", ",
-    )}. The strongest recurring qualitative signals relate to ${themeLabels[0]}, ${themeLabels[1]}, and ${themeLabels[2]}. Together, these comments suggest the issues are showing up in daily operating practice rather than only in scored perception.`;
+    )}. The most consistent qualitative signals relate to ${themeLabels[0]}, ${themeLabels[1]}, and ${themeLabels[2]}. ${
+      systemicStory ??
+      "Together, that pattern suggests the issues are showing up in day-to-day operation rather than only in scored perception."
+    }`;
   }
 
   if (themeLabels.length >= 1) {
     return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
       ", ",
-    )}. The most consistent qualitative signal relates to ${themeLabels[0]}, which provides useful context behind the scored results.`;
+    )}. The clearest recurring signal relates to ${themeLabels[0]}, which adds useful context behind the score pattern.${
+      systemicStory ? ` ${systemicStory}` : ""
+    }`;
   }
 
   return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
     ", ",
-  )}. They add useful context to the scored results, although the themes are still fairly dispersed.`;
+  )}. The qualitative evidence adds useful context, although the themes are still fairly dispersed and not yet concentrated around one dominant pattern.`;
 }
 
 function buildQualitativeSummary(params: {
@@ -772,7 +957,11 @@ function buildQualitativeSummary(params: {
       new Set(matchingRows.map((row) => row.questionnaire_type)),
     ) as QuestionnaireType[];
 
-    const themes = countThemeMatches(comments, getThemeLibrary(dimension.dimensionKey));
+    const themes = countThemeMatches(
+      comments,
+      getThemeLibrary(dimension.dimensionKey),
+    );
+
     const insight = insights.find(
       (candidate) => candidate.dimensionKey === dimension.dimensionKey,
     );
@@ -793,10 +982,11 @@ function buildQualitativeSummary(params: {
             })
           : null,
       illustrativeSignals: getIllustrativeSignals(comments),
-      confidence: getQualitativeConfidence(
-        comments.length,
-        respondentGroupsWithComments.length,
-      ),
+      confidence: getQualitativeConfidence({
+        commentCount: comments.length,
+        respondentGroupCount: respondentGroupsWithComments.length,
+        themeCount: themes.length,
+      }),
     } satisfies DimensionQualitativeSummary;
   });
 
@@ -944,8 +1134,12 @@ export async function GET(
     }
 
     const participantRows = participants ?? [];
-    const dimensionScoreRows = scoreRows ?? [];
-    const qualitativeRows = commentRows ?? [];
+    const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
+      isScoredQuestionnaireType(row.questionnaire_type),
+    );
+    const qualitativeRows = (commentRows ?? []).filter((row) =>
+      isScoredQuestionnaireType(row.questionnaire_type),
+    );
 
     const completed = participantRows.filter(
       (participant) => participant.participant_status === "completed",
@@ -957,8 +1151,14 @@ export async function GET(
     const respondentGroups = buildRespondentGroups(participantRows);
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
     const dimensionInsights = buildDimensionInsights(dimensions);
-    const dimensionNarratives = buildDimensionNarratives(dimensionInsights);
+
+    const dimensionAnalyses = buildDimensionAnalyses({
+      insights: dimensionInsights,
+    });
+
+    const dimensionNarratives = buildDimensionNarratives(dimensionAnalyses);
     const insightSummary = buildInsightSummary(dimensionInsights);
+
     const qualitativeSummary = buildQualitativeSummary({
       dimensions,
       insights: dimensionInsights,

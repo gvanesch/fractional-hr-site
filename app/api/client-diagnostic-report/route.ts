@@ -7,6 +7,7 @@ import {
   buildDimensionNarratives,
   type DimensionNarrative,
 } from "@/lib/client-diagnostic/narrative-engine";
+import { buildDimensionAnalyses } from "@/lib/client-diagnostic/analysis-engine";
 
 export const runtime = "edge";
 
@@ -533,7 +534,12 @@ export async function GET(
     );
 
     const clientSafeInsights = buildDimensionInsights(clientSafeDimensions);
-    const clientSafeNarratives = buildDimensionNarratives(clientSafeInsights);
+
+    const clientSafeAnalyses = buildDimensionAnalyses({
+      insights: clientSafeInsights,
+    });
+
+    const clientSafeNarratives = buildDimensionNarratives(clientSafeAnalyses);
     const clientSafeInsightSummary = buildInsightSummary(clientSafeInsights);
     const clientSafeQualitative = buildClientSafeQualitativeSummary(
       summary.qualitative,

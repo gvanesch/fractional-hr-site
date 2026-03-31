@@ -3,7 +3,7 @@ import Link from "next/link";
 const participantGroups = [
   {
     title: "HR",
-    text: "Input from HR helps show how processes, ownership, service access, and operating discipline are intended to work and how consistently they are being carried through in practice.",
+    text: "Input from HR helps show how processes, ownership, service access, and operating discipline are intended to work, and how consistently they are being carried through in practice.",
   },
   {
     title: "Managers",
@@ -27,7 +27,7 @@ const revealPoints = [
 const deliverables = [
   "Cross-role scoring across core operational dimensions",
   "Prioritised gaps and areas of lowest maturity",
-  "Narrative insight: observation, implication, and next step",
+  "Narrative insight across observation, implication, and next step",
   "A client-ready diagnostic report",
   "Practical next steps for where to focus first",
   "A structured basis for deciding whether execution support is needed",
@@ -35,7 +35,7 @@ const deliverables = [
 
 const flowSteps = [
   {
-    title: "1. HR Operations Health Check",
+    title: "1. HR Health Check",
     text: "A quick initial signal to identify whether wider operational strain may be building.",
     href: "/diagnostic",
     cta: "View the Health Check",
@@ -80,9 +80,10 @@ export default function DiagnosticAssessmentPage() {
 
                 <p className="brand-body-on-dark max-w-3xl text-lg leading-8 text-[#C7D8EA]">
                   This goes beyond the Health Check and uses structured input
-                  across multiple respondent groups to identify where operations
-                  feel weak, where alignment is strong, where experience differs
-                  by role, and what should be prioritised first.
+                  across leadership, managers, and HR to identify where
+                  operations feel weak, where alignment is strong, where
+                  experience differs by role, and what should be prioritised
+                  first.
                 </p>
               </div>
 
@@ -117,6 +118,16 @@ export default function DiagnosticAssessmentPage() {
                     across the organisation, where operational patterns are
                     holding up well, and where they are starting to create drag,
                     inconsistency, or avoidable complexity.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
+                    This is not a survey
+                  </p>
+                  <p className="mt-3 text-base leading-7 text-slate-200">
+                    It is a structured diagnostic of how HR actually operates
+                    across leadership, managers, and HR.
                   </p>
                 </div>
 
@@ -162,15 +173,6 @@ export default function DiagnosticAssessmentPage() {
               </div>
             ))}
           </div>
-
-          <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-6 py-5">
-            <p className="text-sm leading-7 text-slate-700">
-              A client fact pack is also used to determine baseline data on the
-              organisation, operating model, systems, and current ways of
-              working. This is contextual only and is not part of the scored
-              comparison.
-            </p>
-          </div>
         </div>
       </section>
 
@@ -184,7 +186,7 @@ export default function DiagnosticAssessmentPage() {
                 starts to break down.
               </h2>
               <p className="brand-subheading text-slate-700">
-                The value is not just in a score. It is in understanding where
+                The value is not just in a score. It is in identifying where
                 the experience of HR differs across roles, where operational
                 friction is becoming normalised, and where improvement is likely
                 to have the greatest effect.

@@ -1,4 +1,4 @@
-import { questionnaireTypes, type QuestionnaireType } from "./question-bank";
+import { type QuestionnaireType } from "./question-bank";
 
 export type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
 
@@ -33,6 +33,12 @@ export type DimensionInsight = {
   minScore: number | null;
   scores: QuestionnaireTypeScores;
 };
+
+const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+];
 
 function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
@@ -87,8 +93,12 @@ function getAlignment(gap: number | null): AlignmentStatus | null {
 function getCompleteness(
   completedQuestionnaireTypes: QuestionnaireType[],
 ): CompletenessStatus {
-  const completedCount = completedQuestionnaireTypes.length;
-  const totalCount = questionnaireTypes.length;
+  const completedScoredTypes = SCORED_QUESTIONNAIRE_TYPES.filter(
+    (questionnaireType) => completedQuestionnaireTypes.includes(questionnaireType),
+  );
+
+  const completedCount = completedScoredTypes.length;
+  const totalCount = SCORED_QUESTIONNAIRE_TYPES.length;
 
   if (completedCount === 0) {
     return "insufficient";

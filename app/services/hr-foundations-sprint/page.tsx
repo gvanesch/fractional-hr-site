@@ -88,8 +88,8 @@ export default function HRFoundationsSprintPage() {
                 The HR Foundations Sprint is designed to turn structured
                 diagnostic insight into focused analysis, clearer priorities, and
                 practical design decisions. It is not open-ended discovery. It
-                is a concentrated piece of work aimed at improving the areas that
-                will make the greatest operational difference.
+                is a concentrated piece of work aimed at improving the areas
+                that will make the greatest operational difference.
               </p>
             </div>
 
@@ -148,7 +148,7 @@ export default function HRFoundationsSprintPage() {
             <div className="brand-surface-soft p-8">
               <div className="brand-stack-sm">
                 <h3 className="brand-heading-md text-slate-950">
-                  Week 1 — Priority Confirmation & Context
+                  Week 1. Priority Confirmation & Context
                 </h3>
                 <p className="brand-body">
                   We begin by confirming the priority areas, business context,
@@ -162,7 +162,7 @@ export default function HRFoundationsSprintPage() {
             <div className="brand-surface-soft p-8">
               <div className="brand-stack-sm">
                 <h3 className="brand-heading-md text-slate-950">
-                  Week 2 — Current State Mapping
+                  Week 2. Current-State Mapping
                 </h3>
                 <p className="brand-body">
                   The most relevant processes, responsibilities, systems, and
@@ -175,12 +175,12 @@ export default function HRFoundationsSprintPage() {
             <div className="brand-surface-soft p-8">
               <div className="brand-stack-sm">
                 <h3 className="brand-heading-md text-slate-950">
-                  Week 3 — Prioritisation & Design
+                  Week 3. Prioritisation & Design
                 </h3>
                 <p className="brand-body">
                   Improvement opportunities are assessed and prioritised. The
                   Sprint focuses on practical design decisions that strengthen
-                  clarity, consistency, and execution rather than producing
+                  clarity, consistency, and execution, rather than producing
                   generic observations.
                 </p>
               </div>
@@ -189,7 +189,7 @@ export default function HRFoundationsSprintPage() {
             <div className="brand-surface-soft p-8">
               <div className="brand-stack-sm">
                 <h3 className="brand-heading-md text-slate-950">
-                  Week 4 — Recommendations & Roadmap
+                  Week 4. Recommendations & Roadmap
                 </h3>
                 <p className="brand-body">
                   You receive a clear set of recommendations, practical next
@@ -233,10 +233,7 @@ export default function HRFoundationsSprintPage() {
               </h2>
               <div className="mt-8 space-y-3 text-base text-slate-700">
                 {outcomes.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-lg bg-slate-50 px-4 py-3"
-                  >
+                  <div key={item} className="rounded-lg bg-slate-50 px-4 py-3">
                     {item}
                   </div>
                 ))}
@@ -250,10 +247,7 @@ export default function HRFoundationsSprintPage() {
               </h2>
               <div className="mt-8 space-y-3 text-base text-slate-700">
                 {idealFor.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-lg bg-slate-50 px-4 py-3"
-                  >
+                  <div key={item} className="rounded-lg bg-slate-50 px-4 py-3">
                     {item}
                   </div>
                 ))}

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const entryPoints = [
-  "HR Operations Health Check, where a quick first signal is useful",
+  "HR Health Check, where a quick first signal is useful",
   "HR Operations Diagnostic Assessment, where deeper clarity is needed",
   "Leadership conversations to clarify business priorities and operating realities",
   "Review of current HR processes, documentation, and working practices",
@@ -99,9 +99,9 @@ export default function ApproachPage() {
             <p className="brand-subheading mt-4 text-slate-700">
               Structured diagnostic work helps distinguish symptoms from causes
               before recommendations are made. Depending on the situation, that
-              can begin with the Health Check, move into the Diagnostic
-              Assessment, or start with focused leadership discussion where the
-              issues are already visible.
+              can begin with the HR Health Check, move into the HR Operations
+              Diagnostic Assessment, or start with focused leadership
+              discussion where the issues are already visible.
             </p>
           </div>
 
@@ -118,9 +118,9 @@ export default function ApproachPage() {
 
           <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-6 py-5">
             <p className="text-sm leading-7 text-slate-700">
-              The aim is to understand what the organisation genuinely needs
-              now, what can wait, and where effort is likely to produce the
-              greatest operational effect.
+              The aim is to assess what the organisation genuinely needs now,
+              what can wait, and where effort is likely to produce the greatest
+              operational effect.
             </p>
           </div>
         </div>
@@ -208,8 +208,7 @@ export default function ApproachPage() {
             <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
               If you are looking at how to improve HR operations, strengthen
               service delivery, or build more scalable foundations, the next
-              step can be a short conversation or the HR Operations Health
-              Check.
+              step can be a short conversation or the HR Health Check.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link

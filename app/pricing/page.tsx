@@ -19,23 +19,23 @@ const sprintIncludes = [
 const sprintDeliverables = [
   "Scored diagnostic output across key dimensions",
   "Priority process analysis and mapping",
-  "Operational Friction Analysis",
+  "Operational friction analysis",
   "Prioritised improvement areas",
-  "HR Foundations Roadmap",
-  "Executive Recommendations Presentation",
+  "HR Foundations roadmap",
+  "Executive recommendations presentation",
 ];
 
 const diagnosticAssessmentIncludes = [
   "Multi-perspective input across HR, managers, and leadership",
   "Scored output across core operational dimensions",
   "Identification of alignment gaps and weakest areas",
-  "Narrative insight: observation, implication, and next step",
-  "Structured output to inform whether focused execution support is needed",
+  "Narrative insight across observation, implication, and next step",
+  "A structured report to clarify what should be prioritised first",
 ];
 
 const followOnWork = [
   "HR service delivery design",
-  "Onboarding, offboarding and lifecyle process redesign",
+  "Onboarding, offboarding and lifecycle process redesign",
   "HR knowledge management structures",
   "HR technology optimisation",
 ];
@@ -92,7 +92,7 @@ export default function PricingPage() {
                     HR Operations Diagnostic Assessment
                   </p>
                   <h2 className="brand-heading-lg text-slate-950">
-                    Standalone diagnostic assessment
+                    Structured diagnostic insight before focused action
                   </h2>
                   <p className="brand-subheading text-slate-700">
                     A structured, multi-perspective diagnostic of how HR
@@ -111,7 +111,7 @@ export default function PricingPage() {
 
                     <div className="brand-surface-soft rounded-2xl p-5">
                       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Position in the Journey
+                        Position in the journey
                       </p>
                       <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
                         Step 2
@@ -141,21 +141,19 @@ export default function PricingPage() {
               <div className="mt-10">
                 <div className="brand-body brand-body-lg space-y-4 text-slate-700">
                   <p>
-                    This can be purchased as a standalone engagement or
-                    credited against the HR Foundations Sprint where focused
-                    execution support is the right next step.
+                    This is designed for organisations that need more than a
+                    quick signal, but are not yet ready to move straight into
+                    implementation support.
                   </p>
                   <p>
-                    It is designed to surface alignment gaps, operational
-                    friction, weak dimensions, and the practical issues behind
-                    them, including where ownership is unclear, where handoffs
-                    are slowing work down, and where manual workarounds are
-                    becoming normal.
+                    It provides structured insight into where operational
+                    friction is building, where experience differs by role, and
+                    where the greatest operational value is likely to come from
+                    focused follow-up.
                   </p>
                   <p>
-                    For organisations that are not yet ready for implementation
-                    support, it provides a more structured basis for deciding
-                    what matters most and what should be addressed first.
+                    The assessment is fully credited against the HR Foundations
+                    Sprint if that becomes the right next step.
                   </p>
                 </div>
 
@@ -185,14 +183,15 @@ export default function PricingPage() {
                     operations
                   </h2>
                   <p className="brand-subheading text-slate-700">
-                    A focused four-week engagement to act on diagnostic insight
-                    and improve what matters first.
+                    A focused four-week engagement to turn structured diagnostic
+                    insight into clear priorities, practical design decisions,
+                    and a sequenced roadmap.
                   </p>
 
                   <div className="grid gap-4 pt-2 sm:grid-cols-2">
                     <div className="brand-surface-soft rounded-2xl p-5">
                       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Standard Investment
+                        Standard investment
                       </p>
                       <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
                         £11,500 + VAT
@@ -218,11 +217,11 @@ export default function PricingPage() {
 
                   <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
                     <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Included Value
+                      Included value
                     </p>
                     <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
-                      Includes HR Operations Diagnostic Assessment (typically
-                      £3,000)
+                      Includes HR Operations Diagnostic Assessment, typically
+                      valued at £3,000
                     </p>
                     <p className="mt-3 text-base leading-7 text-slate-700">
                       Total engagement value: £14,500. The Diagnostic
@@ -275,15 +274,14 @@ export default function PricingPage() {
                   <p>
                     It is not open-ended discovery. It is a structured,
                     diagnostic-informed engagement that uses the HR Operations
-                    Diagnostic Assessment to focus analysis, set priorities, and
-                    produce a practical roadmap for improvement.
+                    Diagnostic Assessment to focus effort on the areas creating
+                    the most operational drag.
                   </p>
                   <p>
-                    The work is typically concentrated on the areas creating the
-                    most drag: unclear ownership, inconsistent manager practice,
-                    fragmented service delivery, manual workarounds, or process
-                    gaps that are making day-to-day execution harder than it
-                    should be.
+                    That often includes unclear ownership, inconsistent manager
+                    practice, fragmented service delivery, weak handoffs, manual
+                    workarounds, or process gaps that are making day-to-day
+                    execution harder than it should be.
                   </p>
                 </div>
 
@@ -382,7 +380,7 @@ export default function PricingPage() {
               </div>
 
               <div className="brand-surface-soft h-full rounded-[1.75rem] p-8">
-                <p className="brand-section-kicker">Ongoing Advisory Support</p>
+                <p className="brand-section-kicker">Ongoing advisory support</p>
                 <h3 className="brand-heading-md mt-3 text-slate-950">
                   Ongoing support while HR operations improve
                 </h3>

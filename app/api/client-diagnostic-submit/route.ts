@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getQuestionsForQuestionnaireType,
+  type ClientDiagnosticQuestion,
+  type QuestionnaireType,
+} from "@/lib/client-diagnostic/question-bank";
 
 export const runtime = "edge";
 
-type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 type ResponseKind = "score" | "probe";
 
 type SubmittedResponse = {
@@ -13,28 +17,23 @@ type SubmittedResponse = {
   value: number | string;
 };
 
+type SubmittedPayload = {
+  questionnaireType: QuestionnaireType;
+  preparedAt?: string;
+  responses: SubmittedResponse[];
+};
+
 type ClientDiagnosticSubmitRequestBody = {
   projectId: string;
   participantId: string;
   questionnaireType: QuestionnaireType;
-  responses: SubmittedResponse[];
+  submission: SubmittedPayload;
 };
-
-const VALID_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
-  "hr",
-  "manager",
-  "leadership",
-  "client_fact_pack",
-];
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function isQuestionnaireType(value: string): value is QuestionnaireType {
-  return VALID_QUESTIONNAIRE_TYPES.includes(value as QuestionnaireType);
 }
 
 function getSupabaseAdminClient() {
@@ -57,10 +56,29 @@ function getSupabaseAdminClient() {
   });
 }
 
+function getQuestionMap(
+  questionnaireType: QuestionnaireType,
+): Map<string, ClientDiagnosticQuestion> {
+  return new Map(
+    getQuestionsForQuestionnaireType(questionnaireType).map((question) => [
+      question.id,
+      question,
+    ]),
+  );
+}
+
 function validateRequestBody(
   body: unknown,
 ):
-  | { isValid: true; data: ClientDiagnosticSubmitRequestBody }
+  | {
+      isValid: true;
+      data: {
+        projectId: string;
+        participantId: string;
+        questionnaireType: QuestionnaireType;
+        responses: SubmittedResponse[];
+      };
+    }
   | { isValid: false; message: string } {
   if (!body || typeof body !== "object") {
     return {
@@ -99,10 +117,17 @@ function validateRequestBody(
     };
   }
 
+  if (!candidate.questionnaireType || typeof candidate.questionnaireType !== "string") {
+    return {
+      isValid: false,
+      message: "questionnaireType is required.",
+    };
+  }
+
   if (
-    !candidate.questionnaireType ||
-    typeof candidate.questionnaireType !== "string" ||
-    !isQuestionnaireType(candidate.questionnaireType)
+    candidate.questionnaireType !== "hr" &&
+    candidate.questionnaireType !== "manager" &&
+    candidate.questionnaireType !== "leadership"
   ) {
     return {
       isValid: false,
@@ -110,14 +135,37 @@ function validateRequestBody(
     };
   }
 
-  if (!Array.isArray(candidate.responses) || candidate.responses.length === 0) {
+  if (!candidate.submission || typeof candidate.submission !== "object") {
     return {
       isValid: false,
-      message: "responses must be a non-empty array.",
+      message: "submission is required.",
     };
   }
 
-  for (const response of candidate.responses) {
+  const submission = candidate.submission as Partial<SubmittedPayload>;
+
+  if (
+    !submission.questionnaireType ||
+    submission.questionnaireType !== candidate.questionnaireType
+  ) {
+    return {
+      isValid: false,
+      message:
+        "submission.questionnaireType must be present and match questionnaireType.",
+    };
+  }
+
+  if (!Array.isArray(submission.responses) || submission.responses.length === 0) {
+    return {
+      isValid: false,
+      message: "submission.responses must be a non-empty array.",
+    };
+  }
+
+  const questionMap = getQuestionMap(candidate.questionnaireType);
+  const seenQuestionIds = new Set<string>();
+
+  for (const response of submission.responses) {
     if (!response || typeof response !== "object") {
       return {
         isValid: false,
@@ -134,6 +182,24 @@ function validateRequestBody(
       };
     }
 
+    if (seenQuestionIds.has(typedResponse.questionId)) {
+      return {
+        isValid: false,
+        message: `Duplicate response detected for questionId '${typedResponse.questionId}'.`,
+      };
+    }
+
+    seenQuestionIds.add(typedResponse.questionId);
+
+    const matchedQuestion = questionMap.get(typedResponse.questionId);
+
+    if (!matchedQuestion) {
+      return {
+        isValid: false,
+        message: `Unknown questionId '${typedResponse.questionId}' for this questionnaire.`,
+      };
+    }
+
     if (!typedResponse.dimension || typeof typedResponse.dimension !== "string") {
       return {
         isValid: false,
@@ -141,10 +207,24 @@ function validateRequestBody(
       };
     }
 
+    if (typedResponse.dimension !== matchedQuestion.dimension) {
+      return {
+        isValid: false,
+        message: `Response dimension does not match the question definition for '${typedResponse.questionId}'.`,
+      };
+    }
+
     if (typedResponse.kind !== "score" && typedResponse.kind !== "probe") {
       return {
         isValid: false,
         message: "Each response kind must be 'score' or 'probe'.",
+      };
+    }
+
+    if (typedResponse.kind !== matchedQuestion.kind) {
+      return {
+        isValid: false,
+        message: `Response kind does not match the question definition for '${typedResponse.questionId}'.`,
       };
     }
 
@@ -172,13 +252,37 @@ function validateRequestBody(
     }
   }
 
+  const requiredScoreQuestionIds = [...questionMap.values()]
+    .filter((question) => question.kind === "score" && question.required)
+    .map((question) => question.id);
+
+  const submittedScoreQuestionIds = new Set(
+    submission.responses
+      .filter(
+        (response): response is SubmittedResponse & { kind: "score"; value: number } =>
+          response.kind === "score" && typeof response.value === "number",
+      )
+      .map((response) => response.questionId),
+  );
+
+  const missingRequiredScoreQuestions = requiredScoreQuestionIds.filter(
+    (questionId) => !submittedScoreQuestionIds.has(questionId),
+  );
+
+  if (missingRequiredScoreQuestions.length > 0) {
+    return {
+      isValid: false,
+      message: "All scored questions must be completed before submission.",
+    };
+  }
+
   return {
     isValid: true,
     data: {
       projectId: candidate.projectId,
       participantId: candidate.participantId,
       questionnaireType: candidate.questionnaireType,
-      responses: candidate.responses,
+      responses: submission.responses,
     },
   };
 }
@@ -296,45 +400,55 @@ export async function POST(request: Request) {
       );
     }
 
-    const responseRows = responses.map((response) => {
-      const baseRow = {
-        project_id: projectId,
-        participant_id: participantId,
-        questionnaire_type: questionnaireType,
-        dimension_key: response.dimension,
-        question_key: response.questionId,
-        updated_at: nowIso,
-      };
+    const responseRows = responses
+      .map((response) => {
+        const baseRow = {
+          project_id: projectId,
+          participant_id: participantId,
+          questionnaire_type: questionnaireType,
+          dimension_key: response.dimension,
+          question_key: response.questionId,
+          updated_at: nowIso,
+        };
 
-      if (response.kind === "score") {
+        if (response.kind === "score") {
+          return {
+            ...baseRow,
+            answer_value: response.value,
+            comment_text: null,
+          };
+        }
+
+        const trimmedComment =
+          typeof response.value === "string" ? response.value.trim() : "";
+
+        if (!trimmedComment) {
+          return null;
+        }
+
         return {
           ...baseRow,
-          answer_value: response.value,
-          comment_text: null,
+          answer_value: null,
+          comment_text: trimmedComment,
         };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    if (responseRows.length > 0) {
+      const { error: insertResponsesError } = await supabase
+        .from("client_responses")
+        .insert(responseRows);
+
+      if (insertResponsesError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unable to save client diagnostic responses.",
+            details: insertResponsesError.message,
+          },
+          { status: 500 },
+        );
       }
-
-      return {
-        ...baseRow,
-        answer_value: null,
-        comment_text:
-          typeof response.value === "string" ? response.value.trim() : null,
-      };
-    });
-
-    const { error: insertResponsesError } = await supabase
-      .from("client_responses")
-      .insert(responseRows);
-
-    if (insertResponsesError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to save client diagnostic responses.",
-          details: insertResponsesError.message,
-        },
-        { status: 500 },
-      );
     }
 
     const { error: deleteExistingDimensionScoresError } = await supabase
@@ -347,7 +461,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Responses were saved, but previous dimension scores could not be cleared.",
+          error:
+            "Responses were saved, but previous dimension scores could not be cleared.",
           details: deleteExistingDimensionScoresError.message,
         },
         { status: 500 },

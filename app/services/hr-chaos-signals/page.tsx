@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "HR Chaos Signals | Van Esch Advisory Ltd",
   description:
-    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies, and how the HR Operations Health Check, HR Operations Diagnostic Assessment, or HR Foundations Sprint can help restore clarity.",
+    "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies, and how the HR Health Check, HR Operations Diagnostic Assessment, or HR Foundations Sprint can help restore clarity.",
 };
 
 const signals = [
@@ -84,7 +84,7 @@ const signals = [
 const nextStepOptions = [
   {
     kicker: "Quick signal",
-    title: "HR Operations Health Check",
+    title: "HR Health Check",
     text: "A short self-assessment to identify whether operational strain may be building and whether the issue appears isolated or more systemic.",
     href: "/diagnostic",
     cta: "Take the Health Check",
@@ -138,7 +138,7 @@ export default function HRChaosSignalsPage() {
                 href="/diagnostic"
                 className="brand-button-primary px-6 py-3 text-base font-medium"
               >
-                Take the HR Operations Health Check
+                Take the HR Health Check
               </Link>
               <Link
                 href="/diagnostic-assessment"
@@ -204,7 +204,7 @@ export default function HRChaosSignalsPage() {
             </p>
             <p className="brand-body">
               In practical terms, HR operations have evolved organically rather
-              than being designed deliberately.
+              than been designed deliberately.
             </p>
           </div>
 
@@ -218,6 +218,12 @@ export default function HRChaosSignalsPage() {
               Some organisations need a quick read. Others need a deeper
               diagnostic before deciding what should happen next. Where the
               pattern is already clear, the priority is structured action.
+            </p>
+            <p className="brand-body">
+              For organisations that need more than a quick signal, the HR
+              Operations Diagnostic Assessment provides structured insight across
+              leadership, managers, and HR to show where these issues are
+              rooted.
             </p>
           </div>
 
@@ -271,11 +277,11 @@ export default function HRChaosSignalsPage() {
                   straightforward.
                 </h2>
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can start with the HR Operations Health Check for an
-                  immediate self-assessment, move into the Diagnostic Assessment
-                  for a deeper view, or start with a short conversation if you
-                  already know that structured improvement support is likely to
-                  be needed.
+                  You can start with the HR Health Check for an immediate
+                  self-assessment, move into the Diagnostic Assessment for a
+                  deeper view, or start with a short conversation if you already
+                  know that structured improvement support is likely to be
+                  needed.
                 </p>
               </div>
 
