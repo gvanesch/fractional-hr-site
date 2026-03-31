@@ -27,7 +27,7 @@ const servicePaths = [
   },
   {
     title: "Flexible Support",
-    text: "For organisations that need senior HR operations support, but do not need or want a full-time hire. Support can be provided on a recurring, interim, or fractional basis, as well as for specific priorities or project delivery.",
+    text: "For organisations that need senior HR operations support without a full-time hire. Support can be provided on an ad hoc, recurring, interim, or project basis.",
     bullets: [
       "Ad hoc strategic HR operations support",
       "Recurring senior advisory input",
@@ -46,7 +46,7 @@ const sprintSteps = [
   },
   {
     title: "2. Focused Analysis",
-    text: "Assess the areas creating the most drag, inconsistency, or delivery risk, rather than reopening every part of the operating model.",
+    text: "Assess the areas creating the most drag, inconsistency, or delivery risk rather than reopening every part of the operating model.",
   },
   {
     title: "3. Prioritisation & Design",
@@ -66,21 +66,25 @@ export default function ServicesPage() {
           <div className="grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
             <div className="brand-stack-md">
               <div className="inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-[#8AAAC8]">
-                Van Esch Advisory Ltd • HR Operations • Service Delivery •
-                Transformation Advisory
+                Van Esch Advisory Ltd • HR Operations • Service Delivery • Transformation Advisory
               </div>
 
               <div className="brand-stack-sm">
                 <h1 className="brand-heading-xl max-w-4xl">
-                  Practical HR operations support for growing and complex
-                  organisations.
+                  Practical HR operations support for growing and complex organisations.
                 </h1>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  Van Esch Advisory Ltd helps organisations strengthen HR
-                  operations through clearer service delivery, stronger process
-                  discipline, better ownership, and operating structures that
-                  hold up as the business grows or becomes more complex.
+                  Van Esch Advisory Ltd supports organisations that need
+                  stronger HR operations, better service delivery, clearer
+                  process discipline, and more scalable infrastructure as the
+                  business grows or becomes more complex.
+                </p>
+
+                <p className="brand-body-on-dark max-w-3xl text-lg leading-8 text-[#C7D8EA]">
+                  The work is diagnostic-led. It starts by identifying where
+                  operational friction is building, then uses structured insight
+                  to clarify priorities and improve what matters most.
                 </p>
               </div>
 
@@ -97,13 +101,18 @@ export default function ServicesPage() {
                 >
                   Explore the Diagnostic Assessment
                 </Link>
+                <Link
+                  href="/contact"
+                  className="brand-button-dark px-6 py-3 text-base font-medium"
+                >
+                  Contact
+                </Link>
               </div>
 
               <p className="text-sm text-[#8AAAC8]">
-                Start with the HR Operations Health Check for a quick signal, or
-                move into the HR Operations Diagnostic Assessment if you need a
-                more structured view of how HR actually operates across the
-                organisation.
+                Start with the HR Health Check, then move into the HR
+                Operations Diagnostic Assessment if you need a more structured
+                view of how HR actually operates across the organisation.
               </p>
             </div>
 
@@ -194,24 +203,21 @@ export default function ServicesPage() {
         <div className="brand-container brand-section">
           <div className="brand-surface-soft rounded-[2rem] p-8">
             <div className="max-w-4xl brand-stack-sm">
-              <p className="brand-section-kicker">Start with structured insight</p>
+              <p className="brand-section-kicker">Start with structured diagnostic insight</p>
               <h2 className="brand-heading-lg text-slate-950">
-                Many organisations do not need immediate implementation support.
-                They first need a clearer view of where operational friction is
-                building.
+                A clearer view before you commit to bigger change.
               </h2>
               <p className="brand-subheading text-slate-700">
-                The first question is often not what to change. It is what is
-                actually creating drag, inconsistency, or risk across service
-                delivery, process clarity, ownership, handoffs, and day-to-day
-                execution.
+                Many organisations do not need immediate implementation support.
+                They first need a clearer view of where operational friction is
+                building, how consistently HR is being experienced, and which
+                issues are most likely to matter.
               </p>
               <p className="brand-body">
-                The HR Operations Health Check provides a quick initial signal.
-                The HR Operations Diagnostic Assessment goes further, using
-                structured input across leadership, managers, and HR to
-                identify where operations feel weak, where alignment is strong,
-                and what should be prioritised first.
+                Some start with the HR Health Check as a quick signal. Others
+                move directly into the HR Operations Diagnostic Assessment when
+                the pattern is already clear and a more structured, cross-role
+                view is needed.
               </p>
 
               <div className="flex flex-wrap gap-4 pt-2">
@@ -239,7 +245,7 @@ export default function ServicesPage() {
             <div className="max-w-4xl brand-stack-sm">
               <p className="brand-section-kicker">How the journey works</p>
               <h2 className="brand-heading-lg text-slate-950">
-                A structured path from signal to action
+                A structured path from identifying friction to improving how HR operates.
               </h2>
               <p className="brand-subheading text-slate-700">
                 The model is designed to move from a quick initial read to a
@@ -249,15 +255,15 @@ export default function ServicesPage() {
               <div className="grid gap-4 pt-4 md:grid-cols-3">
                 {[
                   {
-                    title: "Health Check",
-                    text: "A quick self-assessment to surface where operational strain may be building.",
+                    title: "1. HR Health Check",
+                    text: "A quick self-assessment to identify where operational strain may be building.",
                   },
                   {
-                    title: "Diagnostic Assessment",
+                    title: "2. Diagnostic Assessment",
                     text: "A structured, multi-perspective diagnostic of how HR actually operates across your organisation.",
                   },
                   {
-                    title: "HR Foundations Sprint",
+                    title: "3. HR Foundations Sprint",
                     text: "A focused engagement to act on diagnostic insight and improve what matters first.",
                   },
                 ].map((item) => (
@@ -286,7 +292,7 @@ export default function ServicesPage() {
                   href="/diagnostic-assessment"
                   className="brand-button-dark px-6 py-3 text-base font-medium"
                 >
-                  Explore the Diagnostic Assessment
+                  View Diagnostic Assessment
                 </Link>
               </div>
             </div>
@@ -306,17 +312,14 @@ export default function ServicesPage() {
               </h2>
               <p className="brand-subheading text-slate-700">
                 Many organisations do not begin by asking for transformation.
-                What they notice first is operational friction: inconsistent
-                onboarding, unclear ownership, manual workarounds, fragmented
-                manager practice, and HR becoming more reactive than
-                dependable.
+                What they notice first is friction: inconsistent onboarding,
+                unclear ownership, manual workarounds, fragmented manager
+                practice, and HR becoming more reactive than operational.
               </p>
               <p className="brand-body">
-                If that feels familiar, a useful next step is either to identify
-                the common warning signs or take the HR Operations Health Check
-                for a quick read on where strain may be building. Where the
-                signs are already clear, the deeper Diagnostic Assessment can
-                provide a more structured view of what is actually driving them.
+                If that feels familiar, a useful next step is either to
+                identify the common warning signs or take the HR Health Check
+                for a quick read on where operational strain may be building.
               </p>
 
               <div className="flex flex-wrap gap-4 pt-2">
@@ -324,7 +327,7 @@ export default function ServicesPage() {
                   href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Take the HR Operations Health Check
+                  Take the HR Health Check
                 </Link>
                 <Link
                   href="/services/hr-chaos-signals"
@@ -356,15 +359,9 @@ export default function ServicesPage() {
                 </p>
                 <p className="brand-body">
                   The Sprint is designed as diagnostic-informed execution. It
-                  builds on structured assessment and focuses effort on the
-                  issues that will make the greatest difference to process
-                  clarity, service delivery, ownership, and operational
-                  control.
-                </p>
-                <p className="brand-body">
-                  Most organisations either begin with the Health Check or move
-                  into the deeper Diagnostic Assessment before the Sprint
-                  begins.
+                  builds on the HR Operations Diagnostic Assessment to turn
+                  structured insight into focused analysis, prioritised design,
+                  and a clear roadmap for action.
                 </p>
               </div>
 
@@ -398,6 +395,11 @@ export default function ServicesPage() {
                   View Diagnostic Assessment
                 </Link>
               </div>
+
+              <p className="text-sm leading-7 text-slate-600">
+                Most organisations either begin with the Health Check or move
+                into the deeper Diagnostic Assessment before the Sprint begins.
+              </p>
             </div>
           </div>
         </div>
@@ -416,24 +418,24 @@ export default function ServicesPage() {
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
                   Whether the challenge is growth-stage operational clarity,
                   enterprise transformation, or flexible senior support without
-                  full-time overhead, start with the HR Operations Health Check
-                  or move straight to a conversation about the HR Operations
-                  Diagnostic Assessment.
+                  full-time overhead, start with the HR Health Check or move
+                  straight to a conversation about the HR Operations Diagnostic
+                  Assessment.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-4 pt-2">
                 <Link
-                  href="/diagnostic"
+                  href="/contact"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Take the Health Check
+                  Contact
                 </Link>
                 <Link
-                  href="/contact"
+                  href="/diagnostic"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Contact
+                  Take the Health Check
                 </Link>
               </div>
             </div>
