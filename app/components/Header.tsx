@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 const navigation = [
+  { href: "/diagnostic", label: "Health Check" },
   { href: "/services", label: "Services" },
-  { href: "/diagnostic", label: "HR Health Check" },
   { href: "/diagnostic-assessment", label: "Diagnostic Assessment" },
   { href: "/approach", label: "Approach" },
   { href: "/case-studies", label: "Case Studies" },

@@ -2,10 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 const exploreLinks = [
+  { href: "/diagnostic", label: "Health Check" },
   { href: "/services", label: "Services" },
-  { href: "/diagnostic", label: "HR Health Check" },
   { href: "/diagnostic-assessment", label: "Diagnostic Assessment" },
   { href: "/approach", label: "Approach" },
+  { href: "/case-studies", label: "Case Studies" },
   { href: "/about", label: "About" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
@@ -49,7 +50,7 @@ export default function Footer() {
 
             <p className="max-w-xs text-sm leading-7 text-slate-500">
               HR Operations, Service Delivery, and Transformation Advisory for
-              Scaling Organisations.
+              growing and complex organisations.
             </p>
           </div>
 

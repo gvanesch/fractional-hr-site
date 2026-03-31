@@ -238,11 +238,7 @@ export default function AboutPage() {
                 </p>
               </div>
 
-              <p className="brand-body">
-                Delivered across organisations supporting 4,000+ employees
-                across 30+ countries, including through periods of growth,
-                transformation, and acquisition.
-              </p>
+              
             </div>
 
             <div className="brand-surface-card p-8">
