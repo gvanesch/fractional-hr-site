@@ -389,6 +389,14 @@ export default function DiagnosticPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  const resultBandLabel = band?.label ?? "";
+  const diagnosticInterpretationHref =
+    score !== null && resultBandLabel
+      ? `/contact?topic=Diagnostic%20Interpretation&source=health-check&score=${score}&band=${encodeURIComponent(
+          resultBandLabel,
+        )}`
+      : "/contact?topic=Diagnostic%20Interpretation&source=health-check";
+
   return (
     <>
       <section className="brand-hero">
@@ -813,6 +821,48 @@ export default function DiagnosticPage() {
                   >
                     View Diagnostic Assessment
                   </Link>
+                </div>
+              </div>
+
+              <div className="mt-10 rounded-[1.75rem] border border-slate-200 bg-[#F4F6FA] p-6 sm:p-8">
+                <div className="max-w-3xl">
+                  <p className="brand-section-kicker">Next step</p>
+                  <h3 className="brand-heading-md mt-3 text-slate-950">
+                    Turn this into a clear plan
+                  </h3>
+                  <p className="mt-4 text-base leading-7 text-slate-700">
+                    This result highlights where operational friction is likely
+                    building. The next step is understanding what is causing it
+                    and what should be prioritised first.
+                  </p>
+                  <p className="mt-4 text-base leading-7 text-slate-700">
+                    A short diagnostic conversation helps translate this into
+                    practical next steps based on your organisation, operating
+                    model, and current priorities.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap gap-4">
+                    <Link
+                      href={diagnosticInterpretationHref}
+                      className="brand-button-primary px-6 py-3 text-base font-medium"
+                    >
+                      Discuss Your Results
+                    </Link>
+
+                    <a
+                      href="https://calendly.com/greg-vanesch/30min"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+                    >
+                      Book a Diagnostic Conversation
+                    </a>
+                  </div>
+
+                  <p className="mt-4 text-sm text-slate-500">
+                    No preparation needed. Your result can be used as the
+                    starting point for the conversation.
+                  </p>
                 </div>
               </div>
             </div>
