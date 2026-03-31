@@ -119,7 +119,7 @@ export default function HomePage() {
 
             <div className="brand-card-dark p-8 lg:p-9">
               <div className="brand-stack-md">
-                <p className="brand-kicker">Where I typically help</p>
+                <p className="brand-kicker">Where Van Esch Adisory Ltd typically helps</p>
 
                 <div className="space-y-4 text-lg text-white">
                   {[

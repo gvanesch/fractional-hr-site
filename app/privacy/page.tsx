@@ -192,6 +192,9 @@ export default function PrivacyPage() {
                   request, discuss the result, or provide further interpretation
                   of the diagnostic.
                 </p>
+                <p>
+                  Where a user submits an enquiry following completion of the HR Operations Health Check, diagnostic responses, scores, and related contextual information may be linked to that enquiry and associated with the individual’s contact details. This is done to allow the enquiry to be reviewed in context and to support a more informed and relevant response.
+                </p>
               </div>
             </section>
 

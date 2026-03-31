@@ -42,7 +42,7 @@ const MAX_CONTEXT_LENGTH = 120;
 
 function jsonResponse(
   body: Record<string, unknown>,
-  status = 200
+  status = 200,
 ): NextResponse {
   return NextResponse.json(body, {
     status,
@@ -67,7 +67,7 @@ function isNonEmptyString(value: unknown): value is string {
 
 function normaliseOptionalString(
   value: unknown,
-  maxLength: number
+  maxLength: number,
 ): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -85,7 +85,7 @@ function normaliseOptionalString(
 function normaliseRequiredString(
   value: unknown,
   fieldName: string,
-  maxLength: number
+  maxLength: number,
 ): string {
   if (typeof value !== "string") {
     throw new Error(`${fieldName} is required.`);
@@ -140,7 +140,9 @@ function getDimensionInsight(label: string): string {
   }
 }
 
-function normaliseDiagnosticAnswers(value: unknown): DiagnosticAnswers | undefined {
+function normaliseDiagnosticAnswers(
+  value: unknown,
+): DiagnosticAnswers | undefined {
   if (value == null) {
     return undefined;
   }
@@ -188,11 +190,15 @@ function parseRequestBody(input: unknown): ContactRequestBody {
   const raw = input as Record<string, unknown>;
 
   const name = normaliseRequiredString(raw.name, "Name", MAX_NAME_LENGTH);
-  const email = normaliseRequiredString(raw.email, "Email", MAX_EMAIL_LENGTH).toLowerCase();
+  const email = normaliseRequiredString(
+    raw.email,
+    "Email",
+    MAX_EMAIL_LENGTH,
+  ).toLowerCase();
   const message = normaliseRequiredString(
     raw.message,
     "Message",
-    MAX_MESSAGE_LENGTH
+    MAX_MESSAGE_LENGTH,
   );
 
   if (!isValidEmail(email)) {
@@ -215,7 +221,10 @@ function parseRequestBody(input: unknown): ContactRequestBody {
     companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
     industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
     role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
-    countryRegion: normaliseOptionalString(raw.countryRegion, MAX_CONTEXT_LENGTH),
+    countryRegion: normaliseOptionalString(
+      raw.countryRegion,
+      MAX_CONTEXT_LENGTH,
+    ),
     diagnosticAnswers: normaliseDiagnosticAnswers(raw.diagnosticAnswers),
     website,
   };
@@ -289,7 +298,7 @@ function buildListHtml(items: string[]): string {
         <li style="margin: 0 0 10px; color: #334155; line-height: 1.7;">
           ${escapeHtml(item)}
         </li>
-      `
+      `,
     )
     .join("");
 }
@@ -316,6 +325,14 @@ function buildEmailHtml(params: {
   const safeSubmissionId = escapeHtml(submissionId);
   const safeAdvisorUrl = escapeHtml(advisorUrl);
 
+  const isHealthCheckEnquiry =
+    body.source === "diagnostic-interpretation" ||
+    body.topic === "HR Health Check Interpretation";
+
+  const headerTitle = isHealthCheckEnquiry
+    ? "New HR Health Check enquiry"
+    : "New website enquiry";
+
   const hasDiagnostic = Boolean(result && advisorBrief);
 
   let diagnosticSection = "";
@@ -328,7 +345,7 @@ function buildEmailHtml(params: {
             <strong>${escapeHtml(item.label)} — ${item.score} / 5</strong><br />
             ${escapeHtml(getDimensionInsight(item.label))}
           </li>
-        `
+        `,
       )
       .join("");
 
@@ -337,16 +354,16 @@ function buildEmailHtml(params: {
     const promptsHtml = buildListHtml(advisorBrief.discussionPrompts ?? []);
     const focusAreasHtml = buildListHtml(advisorBrief.suggestedFocusAreas ?? []);
     const frictionPointsHtml = buildListHtml(
-      advisorBrief.likelyFrictionPoints ?? []
+      advisorBrief.likelyFrictionPoints ?? [],
     );
     const businessImplicationsHtml = buildListHtml(
-      advisorBrief.businessImplications ?? []
+      advisorBrief.businessImplications ?? [],
     );
     const whatNextHtml = buildListHtml(
-      advisorBrief.whatTypicallyHappensNext ?? []
+      advisorBrief.whatTypicallyHappensNext ?? [],
     );
     const first30DayHtml = buildListHtml(
-      advisorBrief.first30DayPriorities ?? []
+      advisorBrief.first30DayPriorities ?? [],
     );
 
     diagnosticSection = `
@@ -374,7 +391,7 @@ function buildEmailHtml(params: {
           ${escapeHtml(
             advisorBrief.executiveReadout ||
               advisorBrief.overallAssessment ||
-              "The diagnostic suggests there are identifiable HR operational themes worth exploring in more depth."
+              "The diagnostic suggests there are identifiable HR operational themes worth exploring in more depth.",
           )}
         </p>
       </div>
@@ -400,12 +417,12 @@ function buildEmailHtml(params: {
 
       <p style="margin: 0 0 8px; color: #334155;">
         <strong>Headline:</strong> ${escapeHtml(
-          advisorBrief.headline || "Not available"
+          advisorBrief.headline || "Not available",
         )}
       </p>
       <p style="margin: 0 0 20px; color: #334155; line-height: 1.7;">
         ${escapeHtml(
-          advisorBrief.overallAssessment || "No overall assessment available."
+          advisorBrief.overallAssessment || "No overall assessment available.",
         )}
       </p>
 
@@ -547,7 +564,7 @@ function buildEmailHtml(params: {
         </p>
 
         <h1 style="margin: 0 0 8px; font-size: 28px; line-height: 1.2; color: #0A1628;">
-          New website enquiry
+          ${headerTitle}
         </h1>
 
         <p style="margin: 0 0 24px; color: #64748B;">
@@ -614,15 +631,20 @@ async function sendEnquiryEmail(params: {
     throw new Error("Missing CONTACT_TO_EMAIL environment variable.");
   }
 
-  const subjectPrefix =
-    params.body.source === "diagnostic"
-      ? "New HR Operations Diagnostic enquiry"
-      : "New website enquiry";
+  const isHealthCheckEnquiry =
+    params.body.source === "diagnostic-interpretation" ||
+    params.body.topic === "HR Health Check Interpretation";
+
+  const subjectPrefix = isHealthCheckEnquiry
+    ? "New HR Health Check enquiry"
+    : "New website enquiry";
+
+  const companyPart = params.body.company ? ` – ${params.body.company}` : "";
 
   const enrichedSubject =
-    params.result && params.body.source === "diagnostic"
-      ? `${subjectPrefix} – ${params.result.band.label} (${params.result.score}/100)`
-      : subjectPrefix;
+    params.result && isHealthCheckEnquiry
+      ? `${subjectPrefix} – ${params.result.band.label} (${params.result.score}/100)${companyPart}`
+      : `${subjectPrefix}${companyPart}`;
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -648,9 +670,7 @@ async function sendEnquiryEmail(params: {
   const result = (await response.json()) as ResendSendResponse;
 
   if (!response.ok) {
-    throw new Error(
-      result?.error?.message || "Failed to send enquiry email."
-    );
+    throw new Error(result?.error?.message || "Failed to send enquiry email.");
   }
 
   return result;
@@ -692,21 +712,20 @@ export async function POST(request: Request) {
       submissionId,
       advisorUrl,
       resendId: resendResponse.id ?? null,
+      message: "Thanks, your enquiry has been sent. We will come back to you shortly.",
     });
   } catch (error) {
     console.error("Contact API error:", error);
 
     const isValidationError =
       error instanceof Error &&
-      (
-        error.message === "Invalid request body." ||
+      (error.message === "Invalid request body." ||
         error.message === "Name is required." ||
         error.message === "Email is required." ||
         error.message === "Message is required." ||
         error.message === "A valid email address is required." ||
         error.message === "Message must be at least 10 characters." ||
-        error.message === "Diagnostic answers are invalid."
-      );
+        error.message === "Diagnostic answers are invalid.");
 
     if (isValidationError && error instanceof Error) {
       return jsonResponse({ error: error.message }, 400);
@@ -714,7 +733,7 @@ export async function POST(request: Request) {
 
     return jsonResponse(
       { error: "Unable to process enquiry at the moment." },
-      500
+      500,
     );
   }
 }
