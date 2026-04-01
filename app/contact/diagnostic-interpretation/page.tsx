@@ -111,12 +111,17 @@ function buildAdvisoryNarrative(params: {
   lowestDimensions: Array<{ label: string; score: number }>;
 }): AdvisoryNarrative {
   const { bandLabel, score, lowestDimensions } = params;
-  const lowestLabels = lowestDimensions
-    .slice(0, 3)
-    .map((dimension) => dimension.label);
+
+  const lowestLabels = lowestDimensions.slice(0, 3).map((d) => d.label);
   const joinedLabels = formatLabelList(lowestLabels);
-  const weakestTheme = lowestLabels[0] ? getDimensionTheme(lowestLabels[0]) : "";
-  const secondTheme = lowestLabels[1] ? getDimensionTheme(lowestLabels[1]) : "";
+
+  const weakestTheme = lowestLabels[0]
+    ? getDimensionTheme(lowestLabels[0])
+    : "";
+
+  const secondTheme = lowestLabels[1]
+    ? getDimensionTheme(lowestLabels[1])
+    : "";
 
   let interpretation: string[] = [];
   let implications: string[] = [];
@@ -129,131 +134,124 @@ function buildAdvisoryNarrative(params: {
   ) {
     interpretation = [
       `This result suggests that several important HR operational foundations are still forming. The pattern across ${joinedLabels} points to an operating model that may still depend heavily on individual judgement, informal coordination, or manager-led workaround behaviour.`,
-      `In practical terms, this usually means ${weakestTheme}. It can also mean ${secondTheme || "other parts of the model are not yet fully embedded"}, which makes execution harder to keep consistent as the organisation grows.`,
-      `This does not necessarily mean the HR team is underperforming. More often, it means the operating structure around HR has not yet caught up with the pace or complexity of the business.`,
+      `In practice, this often shows up as ${weakestTheme}. It can also mean ${
+        secondTheme || "other parts of the model are not yet fully embedded"
+      }, which makes consistent execution harder as the organisation grows.`,
+      `This does not typically reflect capability gaps within the HR team itself. More often, it reflects that the operating structure around HR has not yet caught up with the pace or complexity of the business.`,
     ];
 
     implications = [
-      "Managers may handle similar issues differently, creating inconsistent employee experience.",
-      "HR may absorb too much coordination work because the model relies more on people than on structure.",
-      "Manual workarounds can become normal before the organisation fully notices the operational cost.",
-      "Periods of hiring, restructuring, or policy change are likely to expose these gaps more clearly.",
+      "Managers may handle similar issues differently, creating inconsistency.",
+      "HR may absorb too much coordination work because structure is not doing enough of the work.",
+      "Manual workarounds can become embedded before the organisation recognises the cost.",
+      "Growth or change is likely to make these issues more visible.",
     ];
 
     whatUsuallyHappensNext = [
-      "More exceptions start appearing because the standard route is not clear enough.",
-      "Managers rely more heavily on HR for judgement calls that should be easier to handle consistently.",
-      "Onboarding, approvals, and day-to-day employee processes begin to feel more uneven.",
-      "The organisation often reaches a point where friction becomes visible faster than improvement work can keep up.",
+      "More exceptions appear because standard routes are not clear enough.",
+      "Managers rely more heavily on HR for judgement calls.",
+      "Operational consistency becomes harder to maintain as complexity increases.",
     ];
 
     diagnosticClarifies = [
-      "Whether these issues are being experienced consistently across HR, managers, and leadership.",
-      "Which weak areas are structural, and which are more local or role-specific.",
-      "Where ownership, service access, and process design are creating the greatest drag.",
-      "What should be prioritised first before the organisation adds more complexity.",
+      "Where structure is missing versus where execution varies.",
+      "Which areas are creating the most friction across roles.",
+      "What should be stabilised first before adding further complexity.",
     ];
   } else if (
     bandLabel === "Friction Building" ||
     bandLabel === "Developing Structure"
   ) {
     interpretation = [
-      `This result suggests that some useful HR foundations are in place, but not yet strongly enough embedded to make delivery feel consistently reliable. The pattern across ${joinedLabels} points to partial structure rather than full operational confidence.`,
-      `The current picture usually reflects an organisation that has added process over time, but still has areas where ${weakestTheme}. In practice, that often means HR can feel broadly functional while still carrying hidden inconsistency or avoidable drag.`,
-      `The next stage is usually not wholesale redesign. It is clarifying where the existing model is falling short and tightening the parts that matter most.`,
+      `This result suggests that useful HR foundations are in place, but not yet consistently embedded. The pattern across ${joinedLabels} points to a model that is functioning, but still carrying avoidable friction.`,
+      `In practice, this often reflects a situation where ${weakestTheme}. The organisation may feel broadly operational, but with uneven execution depending on team, manager, or workflow.`,
+      `The opportunity at this stage is not to redesign everything. It is to strengthen consistency, clarify ownership, and reduce friction in the areas that matter most.`,
     ];
 
     implications = [
-      "Execution quality may vary more by team or manager than leadership realises.",
-      "Some processes may look established on paper but still rely on local interpretation in practice.",
-      "HR may remain more reactive than intended because too much demand is still avoidable.",
-      "Operational drag can build quietly before it becomes a larger business issue.",
+      "Execution quality may vary more than leadership expects.",
+      "Some processes may exist but are not consistently followed.",
+      "HR may still be more reactive than intended.",
+      "Operational friction can build quietly before becoming visible.",
     ];
 
     whatUsuallyHappensNext = [
-      "The organisation sees more visible inconsistency as it scales or changes shape.",
-      "Leadership begins to notice that processes exist, but are not landing evenly.",
-      "HR teams spend time correcting, clarifying, or re-routing work that should move more cleanly.",
-      "Improvement priorities remain unclear because the business can see symptoms, but not root causes.",
+      "Inconsistency becomes more noticeable as the organisation grows.",
+      "HR spends time correcting or clarifying rather than improving.",
+      "The same issues recur without clear prioritisation.",
     ];
 
     diagnosticClarifies = [
-      "Where the current model is genuinely working and where it is only partially embedded.",
-      "How HR, managers, and leadership are experiencing the same processes differently.",
-      "Which areas are creating the most operational drag relative to effort.",
-      "How to prioritise targeted changes rather than spreading effort too widely.",
+      "Where structure exists but is not fully embedded.",
+      "How experience differs across HR, managers, and leadership.",
+      "Which areas will unlock the most value if improved first.",
     ];
   } else if (
     bandLabel === "Partially Structured" ||
     bandLabel === "Structured but Improving"
   ) {
     interpretation = [
-      `This result suggests a reasonably solid HR operating base, with identifiable pressure points rather than broad instability. The pattern across ${joinedLabels} points to areas where a relatively mature model may still be carrying friction, inconsistency, or unnecessary complexity.`,
-      `This usually means the foundations are present, but not yet fully optimised. In practice, ${weakestTheme}, and that can reduce confidence in an otherwise capable operating model.`,
-      `At this stage, the opportunity is usually not foundational repair. It is smarter prioritisation, tighter operating discipline, and reducing hidden drag before it becomes more visible under growth or change.`,
+      `This result suggests a solid HR operating base overall, with targeted areas for refinement rather than fundamental gaps. The pattern across ${joinedLabels} points to specific pressure points rather than systemic weakness.`,
+      `In practice, this typically means the core model is working, but ${weakestTheme}. These are the kinds of issues that do not prevent delivery, but can reduce efficiency, consistency, or confidence over time.`,
+      `At this stage, the opportunity is to sharpen what already exists. Focused improvements in a small number of areas can have a disproportionate impact on overall performance.`,
     ];
 
     implications = [
-      "The organisation may be stronger operationally than it feels in its weakest moments.",
-      "Friction may now sit more in handoffs, exceptions, or role-to-role experience than in total process absence.",
-      "Leadership may see a generally capable HR function, while managers still experience uneven execution in specific areas.",
-      "Targeted improvements could materially improve confidence, resilience, and efficiency.",
+      "The organisation is likely more capable than it sometimes feels.",
+      "Friction may sit in specific workflows rather than across the whole model.",
+      "Small improvements can materially improve consistency and confidence.",
+      "The biggest risk is not weakness, but leaving known friction unaddressed.",
     ];
 
     whatUsuallyHappensNext = [
-      "The same small set of weak points continue to absorb disproportionate effort.",
-      "The organisation remains broadly functional, but certain workflows continue to frustrate managers or HR.",
-      "Growth or change starts to expose where the model is less robust than expected.",
-      "The business benefits most when it moves from general improvement intent to focused operational prioritisation.",
+      "The same few areas continue to absorb disproportionate effort.",
+      "The model works, but certain workflows remain frustrating.",
+      "Growth or change exposes where refinement is still needed.",
     ];
 
     diagnosticClarifies = [
-      "Where the strongest opportunities for optimisation actually sit.",
-      "Whether current friction is shared across roles or concentrated in specific parts of the organisation.",
-      "Which gaps are meaningful enough to prioritise now, versus later.",
-      "What a focused improvement sequence should look like.",
+      "Which areas are worth prioritising now versus later.",
+      "Where friction is structural versus situational.",
+      "How to sequence targeted improvements effectively.",
     ];
   } else {
     interpretation = [
-      `This result suggests a relatively mature HR operating model overall, with the main opportunity sitting in refinement rather than foundational repair. The pattern across ${joinedLabels} points to specific areas where the model may still be carrying inefficiency, inconsistency, or hidden fragility.`,
-      `At this level, the interesting question is rarely whether HR has structure. It is whether that structure is working as cleanly as it could, and whether ${weakestTheme} is constraining scale, confidence, or efficiency more than it should.`,
-      `This usually calls for a more focused read on optimisation, cross-functional friction, and the places where a mature model still has avoidable drag.`,
+      `This result suggests a well-developed HR operating model overall. The pattern across ${joinedLabels} points to areas of refinement rather than structural weakness.`,
+      `At this level, the question is not whether HR operations are working, but how efficiently and consistently they are working. Even in strong models, ${weakestTheme} can create subtle drag that becomes more visible over time.`,
+      `The opportunity is to optimise, not rebuild. Targeted improvements in specific areas can further strengthen scalability, resilience, and overall confidence in the model.`,
     ];
 
     implications = [
-      "The organisation may already have strong fundamentals, but still be carrying hidden inefficiency.",
-      "Weaknesses are more likely to appear in nuanced areas such as handoffs, exception handling, or cross-role alignment.",
-      "The cost of friction may be less visible, but still meaningful over time.",
-      "A more detailed diagnostic can help distinguish normal variation from genuine improvement opportunity.",
+      "The organisation likely has strong operational foundations in place.",
+      "Remaining friction is likely more subtle and localised.",
+      "Improvements at this stage tend to be targeted and high-impact.",
+      "The focus shifts from building structure to refining performance.",
     ];
 
     whatUsuallyHappensNext = [
-      "The business continues to operate capably, but certain friction points remain unresolved.",
-      "Growth, restructuring, or systems change begins to expose less obvious fragility.",
-      "Operational maturity can plateau if optimisation work is never prioritised.",
-      "Leadership often benefits from a clearer view of where refinement would unlock the most value.",
+      "The organisation continues to perform well, but certain inefficiencies persist.",
+      "Growth or change highlights areas where optimisation would help.",
+      "Operational maturity can plateau without focused refinement.",
     ];
 
     diagnosticClarifies = [
-      "Which pressure points are worth solving now versus simply monitoring.",
-      "Where mature performance is masking hidden complexity or avoidable drag.",
-      "How HR, managers, and leadership see the same operating model differently.",
-      "Which targeted changes would improve resilience, efficiency, or confidence most materially.",
+      "Where optimisation will deliver the most value.",
+      "Which areas are already strong versus simply perceived as strong.",
+      "How to refine the model without overcomplicating it.",
     ];
   }
 
   if (score < 35) {
     implications = [
       ...implications,
-      "There is a meaningful risk that operational strain is already affecting manager confidence and service consistency.",
+      "There is a meaningful risk that operational strain is already affecting delivery and manager experience.",
     ];
   }
 
   if (score > 70) {
-    diagnosticClarifies = [
-      ...diagnosticClarifies,
-      "Whether the strongest perceived areas are experienced equally well across the organisation, or only from one viewpoint.",
-    ];
+    interpretation.push(
+      "Overall, this is a strong position. The focus now is on maintaining quality while refining specific areas that will support continued scale and consistency.",
+    );
   }
 
   return {
@@ -488,7 +486,6 @@ export default function DiagnosticInterpretationPage() {
                       Discuss Your Results
                     </Link>
                   </div>
-                  
                 </div>
               </div>
 
