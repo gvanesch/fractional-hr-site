@@ -137,6 +137,34 @@ type ProjectSummaryResponse = {
   };
 };
 
+type ReportIssueType =
+  | "structural"
+  | "behavioural"
+  | "fragile"
+  | "optimisation"
+  | "insufficient-data";
+
+type ReportPriorityArea = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  overallAverage: number | null;
+  gap: number | null;
+  priorityScore: number;
+  issueType: ReportIssueType;
+};
+
+type ReportAnalyticsDimension = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  overallAverage: number | null;
+  hrScore: number | null;
+  managerScore: number | null;
+  leadershipScore: number | null;
+  gap: number | null;
+  priorityScore: number;
+  issueType: ReportIssueType;
+};
+
 type ClientDiagnosticReportResponse = {
   success: true;
   report: {
@@ -167,6 +195,19 @@ type ClientDiagnosticReportResponse = {
         sufficient: number;
         partial: number;
         insufficient: number;
+      };
+    };
+    analytics: {
+      overallScore: number | null;
+      alignmentScore: number | null;
+      confidenceLevel: "low" | "medium" | "high";
+      dimensions: ReportAnalyticsDimension[];
+      priorityAreas: ReportPriorityArea[];
+      priorityClusters: {
+        structural: ReportPriorityArea[];
+        behavioural: ReportPriorityArea[];
+        fragile: ReportPriorityArea[];
+        optimisation: ReportPriorityArea[];
       };
     };
     priorityDimensions: {
@@ -223,6 +264,18 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function roundToTwo(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+function average(values: number[]): number | null {
+  if (!values.length) {
+    return null;
+  }
+
+  return roundToTwo(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
 function getBaseUrl(request: Request): string {
@@ -363,16 +416,193 @@ function buildInsightSummary(dimensionInsights: DimensionInsight[]) {
   };
 }
 
+function classifyIssueType(params: {
+  overallAverage: number | null;
+  gap: number | null;
+}): ReportIssueType {
+  const { overallAverage, gap } = params;
+
+  if (overallAverage === null) {
+    return "insufficient-data";
+  }
+
+  if (overallAverage < 3.2 && (gap ?? 0) < 1.0) {
+    return "structural";
+  }
+
+  if (overallAverage < 3.2 && (gap ?? 0) >= 1.0) {
+    return "behavioural";
+  }
+
+  if (overallAverage >= 3.2 && (gap ?? 0) >= 1.0) {
+    return "fragile";
+  }
+
+  return "optimisation";
+}
+
+function calculatePriorityScore(params: {
+  overallAverage: number | null;
+  gap: number | null;
+}): number {
+  const { overallAverage, gap } = params;
+
+  if (overallAverage === null) {
+    return 0;
+  }
+
+  const severity = 5 - overallAverage;
+  const varianceWeight = gap ?? 0;
+
+  return roundToTwo(severity * 0.7 + varianceWeight * 0.3);
+}
+
+function buildAnalyticsDimensions(
+  dimensions: ClientSafeDimensionSummary[],
+): ReportAnalyticsDimension[] {
+  return dimensions.map((dimension) => {
+    const hrScore = dimension.scores.hr ?? null;
+    const managerScore = dimension.scores.manager ?? null;
+    const leadershipScore = dimension.scores.leadership ?? null;
+
+    const overallAverage = average(
+      [hrScore, managerScore, leadershipScore].filter(
+        (value): value is number => typeof value === "number",
+      ),
+    );
+
+    const issueType = classifyIssueType({
+      overallAverage,
+      gap: dimension.gap,
+    });
+
+    const priorityScore = calculatePriorityScore({
+      overallAverage,
+      gap: dimension.gap,
+    });
+
+    return {
+      dimensionKey: dimension.dimensionKey,
+      dimensionLabel: dimension.dimensionLabel,
+      overallAverage,
+      hrScore,
+      managerScore,
+      leadershipScore,
+      gap: dimension.gap,
+      priorityScore,
+      issueType,
+    };
+  });
+}
+
+function buildPriorityAreas(
+  analyticsDimensions: ReportAnalyticsDimension[],
+): ReportPriorityArea[] {
+  return [...analyticsDimensions]
+    .filter((dimension) => dimension.overallAverage !== null)
+    .sort((a, b) => b.priorityScore - a.priorityScore)
+    .slice(0, 3)
+    .map((dimension) => ({
+      dimensionKey: dimension.dimensionKey,
+      dimensionLabel: dimension.dimensionLabel,
+      overallAverage: dimension.overallAverage,
+      gap: dimension.gap,
+      priorityScore: dimension.priorityScore,
+      issueType: dimension.issueType,
+    }));
+}
+
+function buildPriorityClusters(priorityAreas: ReportPriorityArea[]) {
+  return {
+    structural: priorityAreas.filter((area) => area.issueType === "structural"),
+    behavioural: priorityAreas.filter(
+      (area) => area.issueType === "behavioural",
+    ),
+    fragile: priorityAreas.filter((area) => area.issueType === "fragile"),
+    optimisation: priorityAreas.filter(
+      (area) => area.issueType === "optimisation",
+    ),
+  };
+}
+
+function calculateOverallScore(
+  analyticsDimensions: ReportAnalyticsDimension[],
+): number | null {
+  const values = analyticsDimensions
+    .map((dimension) => dimension.overallAverage)
+    .filter((value): value is number => typeof value === "number");
+
+  if (!values.length) {
+    return null;
+  }
+
+  const avg = average(values);
+
+  if (avg === null) {
+    return null;
+  }
+
+  return roundToTwo(((avg - 1) / 4) * 100);
+}
+
+function calculateAlignmentScore(
+  analyticsDimensions: ReportAnalyticsDimension[],
+): number | null {
+  const gaps = analyticsDimensions
+    .map((dimension) => dimension.gap)
+    .filter((value): value is number => typeof value === "number");
+
+  if (!gaps.length) {
+    return null;
+  }
+
+  const avgGap = average(gaps);
+
+  if (avgGap === null) {
+    return null;
+  }
+
+  return roundToTwo(Math.max(0, 100 - (avgGap / 4) * 100));
+}
+
+function calculateConfidenceLevel(params: {
+  completionPercentage: number;
+  completedRespondentGroups: number;
+  averageGap: number | null;
+}): "low" | "medium" | "high" {
+  const { completionPercentage, completedRespondentGroups, averageGap } = params;
+
+  if (completionPercentage < 50 || completedRespondentGroups < 2) {
+    return "low";
+  }
+
+  if (completionPercentage < 75 || completedRespondentGroups < 3) {
+    return "medium";
+  }
+
+  if (averageGap !== null && averageGap > 1.25) {
+    return "medium";
+  }
+
+  return "high";
+}
+
 function buildExecutiveSummary({
   insights,
   completionPercentage,
   completedRespondentGroups,
   totalRespondentGroups,
+  overallScore,
+  alignmentScore,
+  priorityAreas,
 }: {
   insights: DimensionInsight[];
   completionPercentage: number;
   completedRespondentGroups: number;
   totalRespondentGroups: number;
+  overallScore: number | null;
+  alignmentScore: number | null;
+  priorityAreas: ReportPriorityArea[];
 }): string {
   const strong = insights.filter((insight) => insight.status === "strong").length;
   const weak = insights.filter((insight) => insight.status === "weak").length;
@@ -385,9 +615,14 @@ function buildExecutiveSummary({
     (insight) => insight.alignment === "emerging_gap",
   ).length;
 
+  const topPriorityLabels = priorityAreas.map((area) => area.dimensionLabel);
+
   let maturityStatement = "";
 
-  if (strong >= weak + 2) {
+  if (overallScore !== null && overallScore >= 75) {
+    maturityStatement =
+      "The diagnostic suggests a relatively mature HR operating model overall, with more opportunity in refinement and optimisation than foundational repair.";
+  } else if (strong >= weak + 2) {
     maturityStatement =
       "HR operations appear relatively well established, with several areas of strength across the assessed dimensions.";
   } else if (weak >= strong + 2) {
@@ -400,7 +635,10 @@ function buildExecutiveSummary({
 
   let alignmentStatement = "";
 
-  if (significantGaps > 0) {
+  if (alignmentScore !== null && alignmentScore < 60) {
+    alignmentStatement =
+      "There are meaningful differences in how HR, managers, and leadership experience people operations, suggesting that the current model is not being experienced consistently across the organisation.";
+  } else if (significantGaps > 0) {
     alignmentStatement =
       "There are clear differences in how HR, managers, and leadership experience people operations, suggesting inconsistency in how processes are understood or applied.";
   } else if (emergingGaps > 0) {
@@ -426,7 +664,11 @@ function buildExecutiveSummary({
 
   let directionStatement = "";
 
-  if (significantGaps > 0) {
+  if (topPriorityLabels.length > 0) {
+    directionStatement = `The strongest priorities currently sit in ${topPriorityLabels.join(
+      ", ",
+    )}. These areas are most likely to benefit from deeper investigation, clearer ownership, and more focused improvement sequencing.`;
+  } else if (significantGaps > 0) {
     directionStatement =
       "The most valuable next step is to focus on areas with the greatest variation, aligning expectations, clarifying ownership, and standardising how key processes are delivered.";
   } else if (weak > strong) {
@@ -545,6 +787,12 @@ export async function GET(
       summary.qualitative,
     );
 
+    const analyticsDimensions = buildAnalyticsDimensions(clientSafeDimensions);
+    const priorityAreas = buildPriorityAreas(analyticsDimensions);
+    const priorityClusters = buildPriorityClusters(priorityAreas);
+    const overallScore = calculateOverallScore(analyticsDimensions);
+    const alignmentScore = calculateAlignmentScore(analyticsDimensions);
+
     const strengths = sortDimensionsByGap(
       clientSafeDimensions.filter((dimension) => dimension.gap !== null),
       "asc",
@@ -563,11 +811,26 @@ export async function GET(
     const completionPercentage = summary.completion.completionPercentage;
     const totalRespondentGroups = SCORED_QUESTIONNAIRE_TYPES.length;
 
+    const averageGap = average(
+      analyticsDimensions
+        .map((dimension) => dimension.gap)
+        .filter((value): value is number => typeof value === "number"),
+    );
+
+    const confidenceLevel = calculateConfidenceLevel({
+      completionPercentage,
+      completedRespondentGroups,
+      averageGap,
+    });
+
     const executiveOverview = buildExecutiveSummary({
       insights: clientSafeInsights,
       completionPercentage,
       completedRespondentGroups,
       totalRespondentGroups,
+      overallScore,
+      alignmentScore,
+      priorityAreas,
     });
 
     return NextResponse.json({
@@ -586,6 +849,14 @@ export async function GET(
           totalRespondentGroups,
         },
         insightSummary: clientSafeInsightSummary,
+        analytics: {
+          overallScore,
+          alignmentScore,
+          confidenceLevel,
+          dimensions: analyticsDimensions,
+          priorityAreas,
+          priorityClusters,
+        },
         priorityDimensions: {
           strengths,
           gaps,
