@@ -41,13 +41,18 @@ export type AdvisorBrief = {
   discussionPrompts: string[];
   suggestedFocusAreas: string[];
 
-  // New richer internal advisory layers
+  // Existing richer advisory layers
   executiveReadout: string;
   likelyFrictionPoints: string[];
   businessImplications: string[];
   whatTypicallyHappensNext: string[];
   first30DayPriorities: string[];
   recommendedCallAngle: string;
+
+  // New call-support layers
+  callOpening: string;
+  conversationFlow: string[];
+  conversionPositioning: string[];
 };
 
 export const questions: Question[] = [
@@ -156,7 +161,7 @@ export function scoreToBand(score: number): ResultBand {
 }
 
 export function getDimensionScores(
-  answers: DiagnosticAnswers
+  answers: DiagnosticAnswers,
 ): DiagnosticDimensionScore[] {
   return questions.map((question) => ({
     label: question.dimension,
@@ -175,7 +180,7 @@ export function calculatePercentageScore(rawScore: number): number {
 }
 
 export function calculateDiagnosticResult(
-  answers: DiagnosticAnswers
+  answers: DiagnosticAnswers,
 ): DiagnosticResult {
   const rawScore = calculateRawScore(answers);
   const score = calculatePercentageScore(rawScore);
@@ -274,7 +279,7 @@ function getDiscussionPrompt(label: string): string {
       return "What happens to HR operations when the business scales, restructures, or changes policy quickly?";
     default:
       return `What is currently driving friction in ${label.toLowerCase()}?`;
-  }
+    }
 }
 
 function getSuggestedFocusAreas(labels: string[]): string[] {
@@ -416,7 +421,10 @@ function getFirst30DayPriority(label: string): string {
   }
 }
 
-function buildExecutiveReadout(result: DiagnosticResult, weakestLabels: string[]): string {
+function buildExecutiveReadout(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string {
   const weakestSummary = weakestLabels.join(", ");
 
   if (result.band.label === "Emerging Foundations") {
@@ -450,7 +458,10 @@ function buildOverallAssessment(result: DiagnosticResult): string {
   return "The organisation appears operationally mature overall, with the greatest opportunity likely in optimisation, scalability, and the refinement of more complex cross-functional workflows.";
 }
 
-function buildRecommendedCallAngle(result: DiagnosticResult, weakestLabels: string[]): string {
+function buildRecommendedCallAngle(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string {
   const joined = weakestLabels.join(", ");
 
   if (result.band.label === "Emerging Foundations") {
@@ -466,6 +477,106 @@ function buildRecommendedCallAngle(result: DiagnosticResult, weakestLabels: stri
   }
 
   return `Position the conversation around optimisation and scale-readiness. Use ${joined} to test where a mature HR operation still has hidden inefficiency, fragile handoffs, or opportunities for smarter service design.`;
+}
+
+function buildCallOpening(result: DiagnosticResult, weakestLabels: string[]): string {
+  const weakestSummary = weakestLabels.join(", ");
+
+  if (result.band.label === "Emerging Foundations") {
+    return `Based on your Health Check, the signal is that some core HR foundations may still be forming, particularly around ${weakestSummary}. What would be useful first is understanding where that is creating the most day-to-day friction for you today, rather than jumping straight into solutions.`;
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return `Based on your Health Check, it looks like you already have some useful structure in place, but it may not be landing consistently in practice, particularly around ${weakestSummary}. Before discussing solutions, it would be useful to understand where that is being felt most clearly today.`;
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return `Based on your Health Check, the picture looks reasonably solid overall, but there are a few areas, particularly ${weakestSummary}, where the model may still be creating avoidable friction. It would be useful to start by understanding where that is most visible in practice.`;
+  }
+
+  return `Based on your Health Check, the operating model looks broadly mature, but there are still some areas, particularly ${weakestSummary}, where optimisation or hidden friction may be worth exploring. A useful place to start is understanding where you feel the current model is not working quite as cleanly as it should.`;
+}
+
+function buildConversationFlow(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string[] {
+  const firstWeakest = weakestLabels[0]?.toLowerCase() || "the operating model";
+
+  if (result.band.label === "Emerging Foundations") {
+    return [
+      "Start by confirming whether the result broadly resonates with their current experience.",
+      `Explore where ${firstWeakest} is creating the most visible friction for managers, employees, or HR today.`,
+      "Test whether issues are localised or showing up across multiple teams or workflows.",
+      "Understand what is currently being handled through informal judgement or manual workaround.",
+      "Close by framing the value of moving from reactive handling to more deliberate operating design.",
+    ];
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return [
+      "Start by validating where the current structure is helping and where it is falling short in practice.",
+      "Explore where inconsistency is most visible across teams, managers, or locations.",
+      "Test whether current issues reflect partial process design, weak ownership, or lack of operational discipline.",
+      "Understand whether the organisation sees the problem clearly but lacks prioritised action.",
+      "Close by positioning the diagnostic as a way to validate root causes before broader improvement work.",
+    ];
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return [
+      "Start by confirming which parts of the current HR model already feel dependable.",
+      "Explore where targeted friction continues to absorb disproportionate effort.",
+      "Test whether pain points sit in handoffs, service execution, or manager experience rather than total process absence.",
+      "Understand what is currently preventing more focused optimisation.",
+      "Close by framing the diagnostic as a way to identify the highest-value improvements rather than redesign everything.",
+    ];
+  }
+
+  return [
+    "Start by confirming where the current operating model already feels strong and dependable.",
+    "Explore where hidden inefficiency, cross-functional friction, or fragile handoffs still remain.",
+    "Test whether the organisation is dealing with refinement opportunities rather than foundational gaps.",
+    "Understand which pressure points matter enough to prioritise now.",
+    "Close by positioning the diagnostic as a way to separate normal variation from material optimisation opportunity.",
+  ];
+}
+
+function buildConversionPositioning(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string[] {
+  const weakestSummary = weakestLabels.join(", ");
+
+  if (result.band.label === "Emerging Foundations") {
+    return [
+      "Position the Diagnostic Assessment as a way to validate whether current friction is structural rather than isolated.",
+      `Use ${weakestSummary} to show why greater clarity across HR, managers, and leadership would reduce guesswork.`,
+      "Position the Sprint as focused execution once the highest-friction issues are clear.",
+    ];
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return [
+      "Position the Diagnostic Assessment as the next step to distinguish between partial structure and true operational consistency.",
+      `Use ${weakestSummary} to show where cross-role insight would sharpen prioritisation.`,
+      "Position the Sprint as targeted follow-through once the most material gaps are clear.",
+    ];
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return [
+      "Position the Diagnostic Assessment as a way to identify the most valuable targeted improvements rather than broad redesign.",
+      `Use ${weakestSummary} to explain how deeper evidence across roles would help sequence action.`,
+      "Position the Sprint as a practical route to act on a smaller number of high-value improvements.",
+    ];
+  }
+
+  return [
+    "Position the Diagnostic Assessment as a way to validate optimisation opportunities across multiple stakeholder viewpoints.",
+    `Use ${weakestSummary} to test whether current concerns are meaningful enough to prioritise now.`,
+    "Position the Sprint as a focused route to remove hidden drag once the best improvement opportunities are confirmed.",
+  ];
 }
 
 function dedupe(items: string[]): string[] {
@@ -486,15 +597,22 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
   const executiveReadout = buildExecutiveReadout(result, weakestLabels);
   const likelyFrictionPoints = dedupe(weakestLabels.map(getFrictionPointNarrative));
   const businessImplications = dedupe(
-    weakestLabels.map(getBusinessImplicationNarrative)
+    weakestLabels.map(getBusinessImplicationNarrative),
   );
   const whatTypicallyHappensNext = dedupe(
-    weakestLabels.map(getTypicalNextNarrative)
+    weakestLabels.map(getTypicalNextNarrative),
   );
   const first30DayPriorities = dedupe(
-    weakestLabels.map(getFirst30DayPriority)
+    weakestLabels.map(getFirst30DayPriority),
   );
   const recommendedCallAngle = buildRecommendedCallAngle(result, weakestLabels);
+
+  const callOpening = buildCallOpening(result, weakestLabels);
+  const conversationFlow = buildConversationFlow(result, weakestLabels);
+  const conversionPositioning = buildConversionPositioning(
+    result,
+    weakestLabels,
+  );
 
   return {
     headline,
@@ -509,11 +627,14 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
     whatTypicallyHappensNext,
     first30DayPriorities,
     recommendedCallAngle,
+    callOpening,
+    conversationFlow,
+    conversionPositioning,
   };
 }
 
 export function buildDiagnosticState(
-  answers: DiagnosticAnswers
+  answers: DiagnosticAnswers,
 ): SavedDiagnosticState {
   return {
     answers,

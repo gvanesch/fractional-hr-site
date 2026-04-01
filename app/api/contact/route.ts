@@ -365,6 +365,12 @@ function buildEmailHtml(params: {
     const first30DayHtml = buildListHtml(
       advisorBrief.first30DayPriorities ?? [],
     );
+    const conversationFlowHtml = buildListHtml(
+      advisorBrief.conversationFlow ?? [],
+    );
+    const conversionPositioningHtml = buildListHtml(
+      advisorBrief.conversionPositioning ?? [],
+    );
 
     diagnosticSection = `
       <hr style="margin: 32px 0; border: 0; border-top: 1px solid #E2E8F0;" />
@@ -437,6 +443,45 @@ function buildEmailHtml(params: {
                 ${escapeHtml(advisorBrief.recommendedCallAngle)}
               </p>
             </div>
+          `
+          : ""
+      }
+
+      ${
+        advisorBrief.callOpening
+          ? `
+            <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
+              Suggested call opening
+            </h4>
+            <p style="margin: 0 0 20px; color: #334155; line-height: 1.7;">
+              ${escapeHtml(advisorBrief.callOpening)}
+            </p>
+          `
+          : ""
+      }
+
+      ${
+        advisorBrief.conversationFlow?.length
+          ? `
+            <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
+              Conversation flow
+            </h4>
+            <ul style="margin: 0 0 20px 20px; padding: 0;">
+              ${conversationFlowHtml}
+            </ul>
+          `
+          : ""
+      }
+
+      ${
+        advisorBrief.conversionPositioning?.length
+          ? `
+            <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
+              Positioning into next step
+            </h4>
+            <ul style="margin: 0 0 20px 20px; padding: 0;">
+              ${conversionPositioningHtml}
+            </ul>
           `
           : ""
       }
@@ -712,7 +757,8 @@ export async function POST(request: Request) {
       submissionId,
       advisorUrl,
       resendId: resendResponse.id ?? null,
-      message: "Thanks, your enquiry has been sent. We will come back to you shortly.",
+      message:
+        "Thanks, your enquiry has been sent. We will come back to you shortly.",
     });
   } catch (error) {
     console.error("Contact API error:", error);
