@@ -17,27 +17,7 @@ type PageProps = {
 };
 
 type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
-
-type DimensionInsight = {
-  dimensionKey: string;
-  dimensionLabel: string;
-  dimensionDescription: string;
-  status: "strong" | "moderate" | "weak";
-  alignment: "aligned" | "emerging_gap" | "significant_gap";
-  completeness: "sufficient" | "partial" | "insufficient";
-  averageScore: number | null;
-  gap: number | null;
-  completedQuestionnaireTypes: QuestionnaireType[];
-};
-
-type DimensionNarrative = {
-  dimensionKey: string;
-  dimensionLabel: string;
-  observation: string;
-  implication: string;
-  recommendedNextStep: string;
-  confidence: "high" | "medium" | "low";
-};
+type ScoredQuestionnaireType = "hr" | "manager" | "leadership";
 
 type DimensionSummary = {
   dimensionKey: string;
@@ -96,29 +76,6 @@ type ProjectSummaryResponse = {
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
-  insights: {
-    dimensions: DimensionInsight[];
-    summary: {
-      status: {
-        strong: number;
-        moderate: number;
-        weak: number;
-      };
-      alignment: {
-        aligned: number;
-        emergingGap: number;
-        significantGap: number;
-      };
-      completeness: {
-        sufficient: number;
-        partial: number;
-        insufficient: number;
-      };
-    };
-  };
-  narratives: {
-    dimensions: DimensionNarrative[];
-  };
 };
 
 type ErrorResponse = {
@@ -131,6 +88,12 @@ const QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "manager",
   "leadership",
   "client_fact_pack",
+];
+
+const SCORED_QUESTIONNAIRE_TYPES: ScoredQuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
 ];
 
 function isUuid(value: string): boolean {
@@ -155,8 +118,16 @@ function formatQuestionnaireType(questionnaireType: QuestionnaireType): string {
 }
 
 function formatParticipantStatus(status: string): string {
+  if (status === "completed") {
+    return "Submitted";
+  }
+
+  if (status === "invited") {
+    return "Not yet submitted";
+  }
+
   if (status === "in_progress") {
-    return "In progress";
+    return "Not yet submitted";
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -173,14 +144,28 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
+function formatScore(value: number | null | undefined): string {
+  if (typeof value !== "number") {
+    return "—";
+  }
+
+  return value.toFixed(2);
+}
+
+function formatGap(value: number | null | undefined): string {
+  if (typeof value !== "number") {
+    return "—";
+  }
+
+  return value.toFixed(2);
+}
+
 function getStatusPillClasses(status: string): string {
   switch (status) {
     case "completed":
       return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "invited":
-      return "border-amber-200 bg-amber-50 text-amber-800";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
+      return "border-amber-200 bg-amber-50 text-amber-800";
   }
 }
 
@@ -200,187 +185,167 @@ function getGapToneClasses(gap: number | null): string {
   return "text-emerald-700";
 }
 
-function getInsightStatusTone(status: DimensionInsight["status"]) {
-  switch (status) {
-    case "strong":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "moderate":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "weak":
-      return "border-rose-200 bg-rose-50 text-rose-800";
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
-  }
+function roundToTwo(value: number): number {
+  return Number(value.toFixed(2));
 }
 
-function getInsightAlignmentTone(alignment: DimensionInsight["alignment"]) {
-  switch (alignment) {
-    case "aligned":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "emerging_gap":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "significant_gap":
-      return "border-rose-200 bg-rose-50 text-rose-800";
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
+function average(values: number[]): number | null {
+  if (!values.length) {
+    return null;
   }
+
+  return roundToTwo(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-function getInsightCompletenessTone(
-  completeness: DimensionInsight["completeness"],
-) {
-  switch (completeness) {
-    case "sufficient":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "partial":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "insufficient":
-      return "border-slate-200 bg-slate-50 text-slate-700";
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
-  }
+function getScoredGroupCompletionCount(
+  respondentGroups: RespondentGroupSummary[],
+): number {
+  return respondentGroups.filter(
+    (group) =>
+      SCORED_QUESTIONNAIRE_TYPES.includes(
+        group.questionnaireType as ScoredQuestionnaireType,
+      ) && group.completed > 0,
+  ).length;
 }
 
-function getNarrativeConfidenceTone(
-  confidence: DimensionNarrative["confidence"],
-) {
-  switch (confidence) {
-    case "high":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "medium":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "low":
-      return "border-slate-200 bg-slate-50 text-slate-700";
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700";
+function getReportingReadiness(
+  respondentGroups: RespondentGroupSummary[],
+): {
+  label: string;
+  summary: string;
+  tone: "slate" | "amber" | "emerald";
+} {
+  const completedScoredGroups = getScoredGroupCompletionCount(respondentGroups);
+
+  if (completedScoredGroups < 2) {
+    return {
+      label: "Not ready",
+      summary:
+        "Fewer than two scored respondent groups have submitted. Reporting at this point would be too partial to rely on.",
+      tone: "slate",
+    };
   }
+
+  if (completedScoredGroups < 3) {
+    return {
+      label: "Directional only",
+      summary:
+        "Two scored respondent groups have submitted. Early patterns can be reviewed, but the report should still be treated as directional.",
+      tone: "amber",
+    };
+  }
+
+  return {
+    label: "Ready for reporting",
+    summary:
+      "All three scored respondent groups are represented. The project is ready for fuller reporting and interpretation.",
+    tone: "emerald",
+  };
 }
 
-function formatInsightStatus(status: DimensionInsight["status"]): string {
-  switch (status) {
-    case "strong":
-      return "Strong";
-    case "moderate":
-      return "Moderate";
-    case "weak":
-      return "Weak";
-    default:
-      return "—";
-  }
-}
+function getOverallAverageScore(dimensions: DimensionSummary[]): number | null {
+  const averages = dimensions
+    .map((dimension) => {
+      const values = [
+        dimension.scores.hr,
+        dimension.scores.manager,
+        dimension.scores.leadership,
+      ].filter((value): value is number => typeof value === "number");
 
-function formatAlignment(alignment: DimensionInsight["alignment"]): string {
-  switch (alignment) {
-    case "aligned":
-      return "Aligned";
-    case "emerging_gap":
-      return "Emerging gap";
-    case "significant_gap":
-      return "Significant gap";
-    default:
-      return "—";
-  }
-}
-
-function formatCompleteness(
-  completeness: DimensionInsight["completeness"],
-): string {
-  switch (completeness) {
-    case "sufficient":
-      return "Sufficient";
-    case "partial":
-      return "Partial";
-    case "insufficient":
-      return "Insufficient";
-    default:
-      return "—";
-  }
-}
-
-function formatConfidence(confidence: DimensionNarrative["confidence"]): string {
-  switch (confidence) {
-    case "high":
-      return "High confidence";
-    case "medium":
-      return "Medium confidence";
-    case "low":
-      return "Low confidence";
-    default:
-      return "—";
-  }
-}
-
-function getPriorityDimensions(
-  dimensionInsights: DimensionInsight[],
-): DimensionInsight[] {
-  return [...dimensionInsights]
-    .sort((a, b) => {
-      const statusWeight = (status: DimensionInsight["status"]) => {
-        if (status === "weak") return 0;
-        if (status === "moderate") return 1;
-        if (status === "strong") return 2;
-        return 3;
-      };
-
-      const completenessWeight = (
-        completeness: DimensionInsight["completeness"],
-      ) => {
-        if (completeness === "sufficient") return 0;
-        if (completeness === "partial") return 1;
-        return 2;
-      };
-
-      const alignmentWeight = (alignment: DimensionInsight["alignment"]) => {
-        if (alignment === "significant_gap") return 0;
-        if (alignment === "emerging_gap") return 1;
-        if (alignment === "aligned") return 2;
-        return 3;
-      };
-
-      const statusDiff = statusWeight(a.status) - statusWeight(b.status);
-
-      if (statusDiff !== 0) {
-        return statusDiff;
-      }
-
-      const alignmentDiff =
-        alignmentWeight(a.alignment) - alignmentWeight(b.alignment);
-
-      if (alignmentDiff !== 0) {
-        return alignmentDiff;
-      }
-
-      const completenessDiff =
-        completenessWeight(a.completeness) -
-        completenessWeight(b.completeness);
-
-      if (completenessDiff !== 0) {
-        return completenessDiff;
-      }
-
-      const averageA = a.averageScore ?? 999;
-      const averageB = b.averageScore ?? 999;
-
-      return averageA - averageB;
+      return average(values);
     })
-    .slice(0, 5);
+    .filter((value): value is number => typeof value === "number");
+
+  return average(averages);
 }
 
-function getPriorityNarratives(
-  dimensionInsights: DimensionInsight[],
-  dimensionNarratives: DimensionNarrative[],
-): Array<{
-  insight: DimensionInsight;
-  narrative: DimensionNarrative | undefined;
-}> {
-  const priorityInsights = getPriorityDimensions(dimensionInsights);
+function getAverageGap(dimensions: DimensionSummary[]): number | null {
+  const gaps = dimensions
+    .map((dimension) => dimension.gap)
+    .filter((value): value is number => typeof value === "number");
 
-  return priorityInsights.map((insight) => ({
-    insight,
-    narrative: dimensionNarratives.find(
-      (narrative) => narrative.dimensionKey === insight.dimensionKey,
+  return average(gaps);
+}
+
+function getFullyPopulatedDimensionCount(dimensions: DimensionSummary[]): number {
+  return dimensions.filter((dimension) =>
+    SCORED_QUESTIONNAIRE_TYPES.every(
+      (type) => typeof dimension.scores[type] === "number",
     ),
-  }));
+  ).length;
+}
+
+function getLowestAverageDimensions(
+  dimensions: DimensionSummary[],
+  count: number,
+): Array<{ dimensionLabel: string; average: number | null }> {
+  return dimensions
+    .map((dimension) => {
+      const values = [
+        dimension.scores.hr,
+        dimension.scores.manager,
+        dimension.scores.leadership,
+      ].filter((value): value is number => typeof value === "number");
+
+      return {
+        dimensionLabel: dimension.dimensionLabel,
+        average: average(values),
+      };
+    })
+    .filter((item) => item.average !== null)
+    .sort((a, b) => (a.average ?? 999) - (b.average ?? 999))
+    .slice(0, count);
+}
+
+function getLargestGapDimensions(
+  dimensions: DimensionSummary[],
+  count: number,
+): Array<{ dimensionLabel: string; gap: number | null }> {
+  return dimensions
+    .filter((dimension) => dimension.gap !== null)
+    .sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1))
+    .slice(0, count)
+    .map((dimension) => ({
+      dimensionLabel: dimension.dimensionLabel,
+      gap: dimension.gap,
+    }));
+}
+
+function getLowestGroupSignals(dimensions: DimensionSummary[]): string[] {
+  const signals: string[] = [];
+
+  for (const dimension of dimensions) {
+    const rawEntries = [
+      ["HR", dimension.scores.hr],
+      ["Manager", dimension.scores.manager],
+      ["Leadership", dimension.scores.leadership],
+    ] as const;
+
+    const entries = rawEntries.filter(
+      (
+        entry,
+      ): entry is readonly ["HR" | "Manager" | "Leadership", number] =>
+        typeof entry[1] === "number",
+    );
+
+    if (entries.length < 2) {
+      continue;
+    }
+
+    const sorted = [...entries].sort((a, b) => a[1] - b[1]);
+    const lowest = sorted[0];
+    const highest = sorted[sorted.length - 1];
+
+    if (lowest[0] !== highest[0]) {
+      signals.push(
+        `${dimension.dimensionLabel}: ${lowest[0]} currently lowest at ${lowest[1].toFixed(
+          2,
+        )}, versus ${highest[0]} at ${highest[1].toFixed(2)}.`,
+      );
+    }
+  }
+
+  return signals.slice(0, 4);
 }
 
 async function getBaseUrl(): Promise<string> {
@@ -428,9 +393,7 @@ async function getProjectSummary(
     | ErrorResponse;
 
   if (!response.ok || !data.success) {
-    throw new Error(
-      "Unable to load client diagnostic project summary.",
-    );
+    throw new Error("Unable to load client diagnostic project summary.");
   }
 
   return data;
@@ -448,6 +411,9 @@ export default async function ClientDiagnosticProjectDashboardPage({
   const summary = await getProjectSummary(projectId);
 
   const project = summary.project;
+  const respondentGroups = summary.completion.respondentGroups;
+  const dimensionSummaries = summary.dimensions;
+
   const participantRows = [...summary.completion.participants].sort((a, b) => {
     if (a.questionnaireType !== b.questionnaireType) {
       return a.questionnaireType.localeCompare(b.questionnaireType);
@@ -456,491 +422,404 @@ export default async function ClientDiagnosticProjectDashboardPage({
     return a.roleLabel.localeCompare(b.roleLabel);
   });
 
-  const dimensionSummaries = summary.dimensions;
-  const dimensionInsights = summary.insights.dimensions;
-  const dimensionNarratives = summary.narratives.dimensions;
-  const priorityDimensions = getPriorityDimensions(dimensionInsights);
-  const priorityNarratives = getPriorityNarratives(
-    dimensionInsights,
-    dimensionNarratives,
-  );
-  const insightSummary = summary.insights.summary;
-  const respondentGroups = summary.completion.respondentGroups;
-
   const completedParticipants = summary.completion.completed;
   const totalInvitedParticipants = summary.completion.totalInvited;
   const outstandingParticipants = summary.completion.outstanding;
   const completionPercentage = summary.completion.completionPercentage;
-  const strongestAlignment = summary.strongestAlignment;
-  const biggestGaps = summary.biggestGaps;
+
+  const reportingReadiness = getReportingReadiness(respondentGroups);
+  const overallAverageScore = getOverallAverageScore(dimensionSummaries);
+  const averageGap = getAverageGap(dimensionSummaries);
+  const fullyPopulatedDimensions =
+    getFullyPopulatedDimensionCount(dimensionSummaries);
+
+  const lowestAverageDimensions = getLowestAverageDimensions(
+    dimensionSummaries,
+    3,
+  );
+  const largestGapDimensions = getLargestGapDimensions(dimensionSummaries, 3);
+  const lowestGroupSignals = getLowestGroupSignals(dimensionSummaries);
 
   return (
     <main className="brand-light-section min-h-screen">
-      <section className="brand-hero">
-        <div className="brand-container brand-section brand-hero-content">
-          <div className="max-w-5xl">
-            <p className="brand-kicker">Client diagnostic dashboard</p>
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-4xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Advisor dashboard
+              </p>
 
-            <h1 className="brand-heading-lg mt-5 text-white">
-              {project.companyName}
-            </h1>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                {project.companyName}
+              </h1>
 
-            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Internal project view showing submission progress, participant
-              stage tracking, and cross-role dimension scoring.
-            </p>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
+                Practical internal view for submission tracking, follow-up, data
+                coverage, and reporting readiness. This page is operational only.
+                Interpretation belongs in the report view.
+              </p>
+            </div>
 
-            <div className="brand-card-dark mt-8 grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
-              <DashboardHeroStat
-                label="Project status"
-                value={project.projectStatus}
-              />
-              <DashboardHeroStat
-                label="Participants requested"
-                value={String(totalInvitedParticipants)}
-              />
-              <DashboardHeroStat
-                label="Submissions completed"
-                value={String(completedParticipants)}
-              />
-              <DashboardHeroStat
+            <div className="grid min-w-[320px] gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <SummaryStat label="Project status" value={project.projectStatus} />
+              <SummaryStat
                 label="Completion"
                 value={`${completionPercentage}%`}
+              />
+              <SummaryStat
+                label="Submitted"
+                value={`${completedParticipants} / ${totalInvitedParticipants}`}
+              />
+              <SummaryStat
+                label="Outstanding"
+                value={String(outstandingParticipants)}
               />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="brand-light-section">
-        <div className="brand-container py-10 sm:py-12">
-          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Project overview</p>
-
-              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Submission progress and contact overview
-              </h2>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <InfoCard
-                  label="Primary contact"
-                  value={project.primaryContactName}
-                  secondary={project.primaryContactEmail}
-                />
-                <InfoCard
-                  label="Project status"
-                  value={project.projectStatus}
-                  secondary="Live internal dashboard"
-                />
-                <InfoCard
-                  label="Completed submissions"
-                  value={`${completedParticipants} of ${totalInvitedParticipants}`}
-                  secondary={`${completionPercentage}% complete`}
-                />
-                <InfoCard
-                  label="Outstanding responses"
-                  value={String(outstandingParticipants)}
-                  secondary={`${totalInvitedParticipants} invited · ${completedParticipants} completed`}
-                />
-              </div>
-
-              {project.notes ? (
-                <div className="brand-surface-soft mt-6 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                    Project notes
-                  </p>
-
-                  <p className="brand-body-sm mt-3">{project.notes}</p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Daily oversight</p>
-
-              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Participation summary
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                <StageSummaryRow
-                  label="Completed"
-                  value={completedParticipants}
-                  tone="emerald"
-                />
-                <StageSummaryRow
-                  label="Outstanding"
-                  value={outstandingParticipants}
-                  tone="amber"
-                />
-                <StageSummaryRow
-                  label="Total invited"
-                  value={totalInvitedParticipants}
-                  tone="slate"
-                />
-              </div>
-
-              <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-[var(--brand-accent)]"
-                  style={{ width: `${completionPercentage}%` }}
-                />
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-[var(--brand-text-muted)]">
-                This view is intended to support follow-up and completion
-                tracking. Interpretation should be based on a sufficiently
-                complete response set rather than early partial returns.
-              </p>
-            </div>
-          </div>
-
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Insight summary</p>
-
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Structured diagnostic interpretation
+      <section className="mx-auto max-w-7xl px-6 py-8">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Project overview
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-slate-950">
+              Submission status and contact overview
             </h2>
 
-            <p className="brand-body-sm mt-4 max-w-3xl">
-              This section applies deterministic rules to the current dimension
-              scores to classify status, alignment, and data completeness. It is
-              intended as an internal interpretation layer before narrative
-              reporting is introduced.
-            </p>
-
-            <div className="mt-6 grid gap-6 xl:grid-cols-3">
-              <InsightSummaryPanel
-                title="Dimension status"
-                items={[
-                  {
-                    label: "Strong",
-                    value: insightSummary.status.strong,
-                    tone: "emerald",
-                  },
-                  {
-                    label: "Moderate",
-                    value: insightSummary.status.moderate,
-                    tone: "amber",
-                  },
-                  {
-                    label: "Weak",
-                    value: insightSummary.status.weak,
-                    tone: "rose",
-                  },
-                ]}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <InfoCard
+                label="Primary contact"
+                value={project.primaryContactName}
+                secondary={project.primaryContactEmail}
               />
-
-              <InsightSummaryPanel
-                title="Role alignment"
-                items={[
-                  {
-                    label: "Aligned",
-                    value: insightSummary.alignment.aligned,
-                    tone: "emerald",
-                  },
-                  {
-                    label: "Emerging gap",
-                    value: insightSummary.alignment.emergingGap,
-                    tone: "amber",
-                  },
-                  {
-                    label: "Significant gap",
-                    value: insightSummary.alignment.significantGap,
-                    tone: "rose",
-                  },
-                ]}
+              <InfoCard
+                label="Total invited"
+                value={String(totalInvitedParticipants)}
+                secondary={`${completedParticipants} submitted · ${outstandingParticipants} outstanding`}
               />
-
-              <InsightSummaryPanel
-                title="Data completeness"
-                items={[
-                  {
-                    label: "Sufficient",
-                    value: insightSummary.completeness.sufficient,
-                    tone: "emerald",
-                  },
-                  {
-                    label: "Partial",
-                    value: insightSummary.completeness.partial,
-                    tone: "amber",
-                  },
-                  {
-                    label: "Insufficient",
-                    value: insightSummary.completeness.insufficient,
-                    tone: "slate",
-                  },
-                ]}
+              <InfoCard
+                label="Completed submissions"
+                value={String(completedParticipants)}
+                secondary={`${completionPercentage}% complete`}
+              />
+              <InfoCard
+                label="Reporting readiness"
+                value={reportingReadiness.label}
+                secondary={reportingReadiness.summary}
               />
             </div>
+
+            {project.notes ? (
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Project notes
+                </p>
+                <p className="mt-3 text-sm leading-7 text-slate-700">
+                  {project.notes}
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Priority dimensions</p>
-
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Weakest and least mature areas first
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Data quality and readiness
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-slate-950">
+              Current evidence base
             </h2>
 
-            <p className="brand-body-sm mt-4 max-w-3xl">
-              These dimensions are prioritised using the current rules-based
-              model, weighting weaker scores first, then larger alignment gaps,
-              then lower completeness.
-            </p>
-
-            <div className="mt-6 space-y-4">
-              {priorityDimensions.map((dimension) => (
-                <PriorityDimensionCard
-                  key={dimension.dimensionKey}
-                  dimension={dimension}
-                />
-              ))}
+            <div className="mt-5 space-y-4">
+              <StageSummaryRow
+                label="Scored groups represented"
+                value={`${getScoredGroupCompletionCount(respondentGroups)} / 3`}
+                tone={reportingReadiness.tone}
+              />
+              <StageSummaryRow
+                label="Fully populated dimensions"
+                value={`${fullyPopulatedDimensions} / ${dimensionSummaries.length}`}
+                tone="slate"
+              />
+              <StageSummaryRow
+                label="Overall average score"
+                value={formatScore(overallAverageScore)}
+                tone="slate"
+              />
+              <StageSummaryRow
+                label="Average gap"
+                value={formatGap(averageGap)}
+                tone={
+                  averageGap !== null && averageGap >= 0.75 ? "amber" : "emerald"
+                }
+              />
             </div>
+
+            <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-[var(--brand-accent)]"
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              This dashboard only reflects invited versus submitted responses.
+              It does not track live questionnaire progress before submission.
+            </p>
           </div>
+        </div>
 
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Advisory narrative</p>
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Respondent group coverage
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">
+            Invitation and submission coverage by group
+          </h2>
 
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Structured observations and recommended next steps
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {respondentGroups.map((group) => (
+              <RespondentSummaryCard key={group.questionnaireType} group={group} />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Outstanding follow-up
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">
+            Requested participants still awaiting submission
+          </h2>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {respondentGroups.map((group) => (
+              <OutstandingGroupCard key={group.questionnaireType} group={group} />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Early signal monitor
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-slate-950">
+              Lowest current average scores
             </h2>
 
-            <p className="brand-body-sm mt-4 max-w-3xl">
-              These narrative outputs are generated from the current
-              rules-based insight model. They are designed to support internal
-              advisory preparation before a client-facing reporting layer is
-              introduced.
-            </p>
-
-            <div className="mt-6 space-y-4">
-              {priorityNarratives.map(({ insight, narrative }) =>
-                narrative ? (
-                  <NarrativeCard
-                    key={narrative.dimensionKey}
-                    insight={insight}
-                    narrative={narrative}
+            <div className="mt-5 space-y-3">
+              {lowestAverageDimensions.length > 0 ? (
+                lowestAverageDimensions.map((dimension) => (
+                  <SignalCard
+                    key={`lowest-${dimension.dimensionLabel}`}
+                    title={dimension.dimensionLabel}
+                    value={formatScore(dimension.average)}
+                    secondary="Current average across submitted scored groups"
                   />
-                ) : null,
+                ))
+              ) : (
+                <EmptyStateCard message="Not enough submitted scored data yet to surface low-average dimensions." />
               )}
             </div>
           </div>
 
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Outstanding responses</p>
-
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Follow-up by respondent group
-            </h2>
-
-            <p className="brand-body-sm mt-4 max-w-3xl">
-              Use this section to see which respondent groups still have
-              outstanding responses and who specifically may need follow-up.
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Early signal monitor
             </p>
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              {respondentGroups.map((group) => (
-                <OutstandingGroupCard
-                  key={group.questionnaireType}
-                  group={group}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Participant tracking</p>
-
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Requested participant stages
+            <h2 className="mt-3 text-xl font-semibold text-slate-950">
+              Largest current score gaps
             </h2>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {respondentGroups.map((group) => (
-                <RespondentSummaryCard
-                  key={group.questionnaireType}
-                  group={group}
-                />
-              ))}
-            </div>
-
-            <div className="mt-6 overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
-                <thead>
-                  <tr>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Role
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Questionnaire
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Status
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Started
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Completed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {participantRows.map((participant) => (
-                    <tr key={participant.participantId}>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm font-semibold text-slate-900">
-                        {participant.roleLabel}
-                      </td>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatQuestionnaireType(participant.questionnaireType)}
-                      </td>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusPillClasses(
-                            participant.participantStatus,
-                          )}`}
-                        >
-                          {formatParticipantStatus(
-                            participant.participantStatus,
-                          )}
-                        </span>
-                      </td>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatDateTime(participant.startedAt)}
-                      </td>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 text-sm text-slate-700">
-                        {formatDateTime(participant.completedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-5 space-y-3">
+              {largestGapDimensions.length > 0 ? (
+                largestGapDimensions.map((dimension) => (
+                  <SignalCard
+                    key={`gap-${dimension.dimensionLabel}`}
+                    title={dimension.dimensionLabel}
+                    value={formatGap(dimension.gap)}
+                    secondary="Current max spread across submitted scored groups"
+                  />
+                ))
+              ) : (
+                <EmptyStateCard message="Gap monitoring will appear once more than one scored group has submitted." />
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="mt-8 grid gap-6 xl:grid-cols-2">
-            <div className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Strongest alignment</p>
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Cross-group signals
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">
+            Current role-to-role differences
+          </h2>
 
-              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Lowest role-to-role variation
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                {strongestAlignment.map((dimension) => (
-                  <GapSummaryCard
-                    key={dimension.dimensionKey}
-                    title={dimension.dimensionLabel}
-                    description={dimension.dimensionDescription}
-                    gap={dimension.gap}
-                  />
-                ))}
-
-                {strongestAlignment.length === 0 ? (
-                  <EmptyStateCard message="Alignment insight will appear once more than one respondent group has completed the diagnostic." />
-                ) : null}
-              </div>
-            </div>
-
-            <div className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Biggest gaps</p>
-
-              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Highest role-to-role variation
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                {biggestGaps.map((dimension) => (
-                  <GapSummaryCard
-                    key={dimension.dimensionKey}
-                    title={dimension.dimensionLabel}
-                    description={dimension.dimensionDescription}
-                    gap={dimension.gap}
-                  />
-                ))}
-
-                {biggestGaps.length === 0 ? (
-                  <EmptyStateCard message="Gap insight will appear once more than one respondent group has completed the diagnostic." />
-                ) : null}
-              </div>
-            </div>
+          <div className="mt-5 space-y-3">
+            {lowestGroupSignals.length > 0 ? (
+              lowestGroupSignals.map((signal) => (
+                <div
+                  key={signal}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700"
+                >
+                  {signal}
+                </div>
+              ))
+            ) : (
+              <EmptyStateCard message="Cross-group difference signals will appear once enough scored submissions exist." />
+            )}
           </div>
+        </div>
 
-          <div className="brand-surface-card mt-8 p-6 sm:p-8">
-            <p className="brand-section-kicker">Dimension comparison</p>
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Participant table
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">
+            Invitation and submission register
+          </h2>
 
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Cross-role scoring overview
-            </h2>
-
-            <p className="brand-body-sm mt-4 max-w-3xl">
-              This table shows current average scores by role for each
-              dimension. Missing groups indicate questionnaires that have not
-              yet been completed.
-            </p>
-
-            <div className="mt-6 overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
-                <thead>
-                  <tr>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Dimension
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      HR
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Manager
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Leadership
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Fact Pack
-                    </th>
-                    <th className="border-b border-[var(--brand-border)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      Gap
-                    </th>
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Role
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Questionnaire
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Submission status
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Completed
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Last updated
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {participantRows.map((participant) => (
+                  <tr key={participant.participantId}>
+                    <td className="border-b border-slate-200 px-4 py-4 text-sm font-semibold text-slate-900">
+                      {participant.roleLabel}
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-4 text-sm text-slate-700">
+                      {formatQuestionnaireType(participant.questionnaireType)}
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-4 text-sm">
+                      <span
+                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusPillClasses(
+                          participant.participantStatus,
+                        )}`}
+                      >
+                        {formatParticipantStatus(participant.participantStatus)}
+                      </span>
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-4 text-sm text-slate-700">
+                      {formatDateTime(participant.completedAt)}
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-4 text-sm text-slate-700">
+                      {formatDateTime(participant.updatedAt)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {dimensionSummaries.map((dimension) => (
-                    <tr key={dimension.dimensionKey}>
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 align-top">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {dimension.dimensionLabel}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">
-                          {dimension.dimensionDescription}
-                        </p>
-                      </td>
-                      <ScoreCell value={dimension.scores.hr} />
-                      <ScoreCell value={dimension.scores.manager} />
-                      <ScoreCell value={dimension.scores.leadership} />
-                      <ScoreCell value={dimension.scores.client_fact_pack} />
-                      <td className="border-b border-[var(--brand-border)] px-4 py-4 align-top">
-                        <p
-                          className={`text-sm font-semibold ${getGapToneClasses(
-                            dimension.gap,
-                          )}`}
-                        >
-                          {dimension.gap !== null
-                            ? dimension.gap.toFixed(2)
-                            : "—"}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {dimension.missingQuestionnaireTypes.length > 0
-                            ? `Missing: ${dimension.missingQuestionnaireTypes
-                                .map(formatQuestionnaireType)
-                                .join(", ")}`
-                            : "All requested groups complete"}
-                        </p>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Current scored evidence
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">
+            Dimension coverage and score table
+          </h2>
+
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
+            This table is factual only. It shows current submitted scores,
+            missing scored groups, and score spread. Interpretation should be
+            done in the report page once sufficient evidence exists.
+          </p>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Dimension
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    HR
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Manager
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Leadership
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Fact Pack
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Gap
+                  </th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Coverage
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {dimensionSummaries.map((dimension) => (
+                  <tr key={dimension.dimensionKey}>
+                    <td className="border-b border-slate-200 px-4 py-4 align-top">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {dimension.dimensionLabel}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        {dimension.dimensionDescription}
+                      </p>
+                    </td>
+                    <ScoreCell value={dimension.scores.hr} />
+                    <ScoreCell value={dimension.scores.manager} />
+                    <ScoreCell value={dimension.scores.leadership} />
+                    <ScoreCell value={dimension.scores.client_fact_pack} />
+                    <td className="border-b border-slate-200 px-4 py-4 align-top">
+                      <p
+                        className={`text-sm font-semibold ${getGapToneClasses(
+                          dimension.gap,
+                        )}`}
+                      >
+                        {dimension.gap !== null
+                          ? dimension.gap.toFixed(2)
+                          : "—"}
+                      </p>
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-4 align-top">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {dimension.completedQuestionnaireTypes.length} /{" "}
+                        {QUESTIONNAIRE_TYPES.length}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {dimension.missingQuestionnaireTypes.length > 0
+                          ? `Missing: ${dimension.missingQuestionnaireTypes
+                              .map(formatQuestionnaireType)
+                              .join(", ")}`
+                          : "All requested groups submitted"}
+                      </p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -948,7 +827,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
   );
 }
 
-function DashboardHeroStat({
+function SummaryStat({
   label,
   value,
 }: {
@@ -956,11 +835,11 @@ function DashboardHeroStat({
   value: string;
 }) {
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8AAAC8]">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
     </div>
   );
 }
@@ -975,12 +854,12 @@ function InfoCard({
   secondary: string;
 }) {
   return (
-    <div className="brand-surface-soft p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
       <p className="mt-3 text-base font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-600">{secondary}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{secondary}</p>
     </div>
   );
 }
@@ -991,7 +870,7 @@ function StageSummaryRow({
   tone,
 }: {
   label: string;
-  value: number;
+  value: string;
   tone: "emerald" | "amber" | "slate";
 }) {
   const toneClasses =
@@ -1002,206 +881,9 @@ function StageSummaryRow({
         : "text-slate-700";
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <span className={`text-sm font-semibold ${toneClasses}`}>{value}</span>
-    </div>
-  );
-}
-
-function InsightSummaryPanel({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{
-    label: string;
-    value: number;
-    tone: "emerald" | "amber" | "rose" | "slate";
-  }>;
-}) {
-  return (
-    <div className="brand-surface-soft p-5">
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <div className="mt-4 space-y-3">
-        {items.map((item) => {
-          const toneClasses =
-            item.tone === "emerald"
-              ? "text-emerald-700"
-              : item.tone === "amber"
-                ? "text-amber-700"
-                : item.tone === "rose"
-                  ? "text-rose-700"
-                  : "text-slate-700";
-
-          return (
-            <div
-              key={item.label}
-              className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3"
-            >
-              <span className="text-sm font-medium text-slate-700">
-                {item.label}
-              </span>
-              <span className={`text-sm font-semibold ${toneClasses}`}>
-                {item.value}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PriorityDimensionCard({
-  dimension,
-}: {
-  dimension: DimensionInsight;
-}) {
-  return (
-    <div className="brand-surface-soft p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-base font-semibold text-slate-900">
-            {dimension.dimensionLabel}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {dimension.dimensionDescription}
-          </p>
-        </div>
-
-        <div className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-900">
-          {dimension.averageScore !== null
-            ? dimension.averageScore.toFixed(2)
-            : "—"}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <span
-          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightStatusTone(
-            dimension.status,
-          )}`}
-        >
-          {formatInsightStatus(dimension.status)}
-        </span>
-        <span
-          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightAlignmentTone(
-            dimension.alignment,
-          )}`}
-        >
-          {formatAlignment(dimension.alignment)}
-        </span>
-        <span
-          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightCompletenessTone(
-            dimension.completeness,
-          )}`}
-        >
-          {formatCompleteness(dimension.completeness)}
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <MetricMiniCard
-          label="Average score"
-          value={
-            dimension.averageScore !== null
-              ? dimension.averageScore.toFixed(2)
-              : "—"
-          }
-        />
-        <MetricMiniCard
-          label="Gap"
-          value={dimension.gap !== null ? dimension.gap.toFixed(2) : "—"}
-        />
-        <MetricMiniCard
-          label="Coverage"
-          value={`${dimension.completedQuestionnaireTypes.length}/${QUESTIONNAIRE_TYPES.length}`}
-        />
-      </div>
-    </div>
-  );
-}
-
-function NarrativeCard({
-  insight,
-  narrative,
-}: {
-  insight: DimensionInsight;
-  narrative: DimensionNarrative;
-}) {
-  return (
-    <div className="brand-surface-soft p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-base font-semibold text-slate-900">
-            {narrative.dimensionLabel}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {insight.dimensionDescription}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getNarrativeConfidenceTone(
-              narrative.confidence,
-            )}`}
-          >
-            {formatConfidence(narrative.confidence)}
-          </span>
-          <span
-            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInsightStatusTone(
-              insight.status,
-            )}`}
-          >
-            {formatInsightStatus(insight.status)}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 xl:grid-cols-3">
-        <NarrativeBlock title="Observation" body={narrative.observation} />
-        <NarrativeBlock title="Implication" body={narrative.implication} />
-        <NarrativeBlock
-          title="Recommended next step"
-          body={narrative.recommendedNextStep}
-        />
-      </div>
-    </div>
-  );
-}
-
-function NarrativeBlock({
-  title,
-  body,
-}: {
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-        {title}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-slate-700">{body}</p>
-    </div>
-  );
-}
-
-function MetricMiniCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -1212,17 +894,18 @@ function RespondentSummaryCard({
   group: RespondentGroupSummary;
 }) {
   return (
-    <div className="brand-surface-soft p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         {group.label}
       </p>
+
       <div className="mt-3 flex items-end justify-between gap-4">
         <div>
           <p className="text-2xl font-semibold text-slate-900">
             {group.completed}/{group.totalInvited}
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            completed responses
+            submitted responses
           </p>
         </div>
 
@@ -1245,13 +928,13 @@ function OutstandingGroupCard({
   group: RespondentGroupSummary;
 }) {
   return (
-    <div className="brand-surface-soft p-5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-slate-900">{group.label}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {group.totalInvited} invited · {group.outstanding} outstanding ·{" "}
-            {group.completed} completed
+            {group.completed} submitted
           </p>
         </div>
 
@@ -1266,7 +949,7 @@ function OutstandingGroupCard({
             {group.outstandingParticipants.map((participant) => (
               <div
                 key={participant.participantId}
-                className="rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3"
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -1290,32 +973,31 @@ function OutstandingGroupCard({
             ))}
           </div>
         ) : (
-          <EmptyStateCard message="All requested participants in this group have completed their response." />
+          <EmptyStateCard message="All requested participants in this group have submitted." />
         )}
       </div>
     </div>
   );
 }
 
-function GapSummaryCard({
+function SignalCard({
   title,
-  description,
-  gap,
+  value,
+  secondary,
 }: {
   title: string;
-  description: string;
-  gap: number | null;
+  value: string;
+  secondary: string;
 }) {
   return (
-    <div className="brand-surface-soft p-5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-base font-semibold text-slate-900">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">{secondary}</p>
         </div>
-
-        <div className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-900">
-          {gap !== null ? gap.toFixed(2) : "—"}
+        <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-900">
+          {value}
         </div>
       </div>
     </div>
@@ -1324,7 +1006,7 @@ function GapSummaryCard({
 
 function EmptyStateCard({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-[var(--brand-border)] bg-white p-5">
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5">
       <p className="text-sm leading-6 text-slate-600">{message}</p>
     </div>
   );
@@ -1332,7 +1014,7 @@ function EmptyStateCard({ message }: { message: string }) {
 
 function ScoreCell({ value }: { value?: number }) {
   return (
-    <td className="border-b border-[var(--brand-border)] px-4 py-4 align-top">
+    <td className="border-b border-slate-200 px-4 py-4 align-top">
       <p className="text-sm font-semibold text-slate-900">
         {typeof value === "number" ? value.toFixed(2) : "—"}
       </p>
