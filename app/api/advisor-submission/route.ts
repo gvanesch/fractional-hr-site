@@ -4,6 +4,7 @@ import {
   calculateDiagnosticResult,
   type DiagnosticAnswers,
 } from "../../../lib/diagnostic";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
 
 export const runtime = "edge";
 
@@ -248,10 +249,7 @@ function getInsight(label: string): string {
   }
 }
 
-function buildNarrative(
-  score: number,
-  submission: SubmissionRow,
-): string {
+function buildNarrative(score: number, submission: SubmissionRow): string {
   const size = submission.company_size || "a growing organisation";
 
   if (score < 40) {
@@ -317,6 +315,15 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 
 export async function GET(request: Request) {
   try {
+    const advisorUser = await requireAdvisorUser();
+
+    if (!advisorUser) {
+      return NextResponse.json<ErrorResponse>(
+        { success: false, error: "Unauthorized." },
+        { status: 403 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const submissionId = searchParams.get("submissionId");
 

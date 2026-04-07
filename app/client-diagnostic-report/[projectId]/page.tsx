@@ -36,6 +36,34 @@ type DimensionNarrative = {
   confidence: "high" | "medium" | "low";
 };
 
+type DimensionAnalysisPattern = {
+  code: string;
+  label: string;
+  description: string;
+  severity: string;
+};
+
+type DimensionAnalysis = {
+  dimensionKey: string;
+  dimensionLabel: string;
+  dimensionDescription: string;
+  averageScore: number | null;
+  scores: {
+    hr: number | null;
+    manager: number | null;
+    leadership: number | null;
+  };
+  gap: number | null;
+  alignment: DimensionInsight["alignment"];
+  strength: DimensionInsight["status"];
+  completeness: DimensionInsight["completeness"];
+  confidence: "high" | "medium" | "low";
+  gapPattern: string;
+  primaryPattern: DimensionAnalysisPattern | null;
+  secondaryPattern: DimensionAnalysisPattern | null;
+  flags: string[];
+};
+
 type ClientSafeDimensionSummary = {
   dimensionKey: string;
   dimensionLabel: string;
@@ -152,6 +180,9 @@ type ClientDiagnosticReportResponse = {
     dimensions: ClientSafeDimensionSummary[];
     insights: {
       dimensions: DimensionInsight[];
+    };
+    analyses: {
+      dimensions: DimensionAnalysis[];
     };
     narratives: {
       dimensions: DimensionNarrative[];
@@ -273,6 +304,38 @@ function formatConfidenceLabel(
       return "Low confidence";
     default:
       return confidence;
+  }
+}
+
+function formatCompletenessLabel(
+  completeness: DimensionInsight["completeness"],
+): string {
+  switch (completeness) {
+    case "sufficient":
+      return "Sufficient";
+    case "partial":
+      return "Partial";
+    case "insufficient":
+      return "Insufficient";
+    default:
+      return completeness;
+  }
+}
+
+function formatGapPatternLabel(value: string): string {
+  switch (value) {
+    case "none":
+      return "None";
+    case "hr_lower_than_leadership":
+      return "HR lower than Leadership";
+    case "manager_lower_than_others":
+      return "Manager lower than others";
+    case "leadership_lower_than_others":
+      return "Leadership lower than others";
+    case "general_spread":
+      return "General spread";
+    default:
+      return value.replace(/_/g, " ");
   }
 }
 
@@ -404,12 +467,96 @@ function getAlignmentCallout(params: {
   )} suggests the model is being experienced differently in practice depending on where you sit.`;
 }
 
+function buildDimensionBriefingBlock(params: {
+  dimension: ClientSafeDimensionSummary;
+  analytics?: ReportAnalyticsDimension;
+  insight?: DimensionInsight;
+  analysis?: DimensionAnalysis;
+  narrative?: DimensionNarrative;
+  qualitative?: DimensionQualitativeSummary;
+}): string {
+  const { dimension, analytics, insight, analysis, narrative, qualitative } =
+    params;
+
+  const lines = [
+    `Dimension: ${dimension.dimensionLabel}`,
+    `Description: ${dimension.dimensionDescription}`,
+    `HR score: ${formatScore(dimension.scores.hr)}`,
+    `Manager score: ${formatScore(dimension.scores.manager)}`,
+    `Leadership score: ${formatScore(dimension.scores.leadership)}`,
+    `Overall average: ${formatScore(analytics?.overallAverage)}`,
+    `Gap: ${formatGap(dimension.gap)}`,
+    `Issue type: ${formatIssueType(
+      analytics?.issueType ?? "insufficient-data",
+    )}`,
+    `Priority score: ${
+      typeof analytics?.priorityScore === "number"
+        ? analytics.priorityScore.toFixed(2)
+        : "—"
+    }`,
+    `Status: ${insight ? formatStatusLabel(insight.status) : "—"}`,
+    `Alignment: ${insight ? formatAlignmentLabel(insight.alignment) : "—"}`,
+    `Completeness: ${
+      insight ? formatCompletenessLabel(insight.completeness) : "—"
+    }`,
+    `Analysis confidence: ${
+      analysis ? formatConfidenceLabel(analysis.confidence) : "—"
+    }`,
+    `Gap pattern: ${
+      analysis ? formatGapPatternLabel(analysis.gapPattern) : "—"
+    }`,
+    `Primary pattern: ${analysis?.primaryPattern?.label ?? "—"}`,
+    `Primary pattern description: ${
+      analysis?.primaryPattern?.description ?? "—"
+    }`,
+    `Secondary pattern: ${analysis?.secondaryPattern?.label ?? "—"}`,
+    `Flags: ${
+      analysis && analysis.flags.length > 0 ? analysis.flags.join(", ") : "—"
+    }`,
+    `Observation: ${narrative?.observation ?? "—"}`,
+    `Implication: ${narrative?.implication ?? "—"}`,
+    `Recommended next step: ${narrative?.recommendedNextStep ?? "—"}`,
+    `Qualitative advisory read: ${qualitative?.advisoryRead ?? "—"}`,
+    `Qualitative themes: ${
+      qualitative && qualitative.keyThemes.length > 0
+        ? qualitative.keyThemes
+            .map((theme) => `${theme.label} (${theme.count})`)
+            .join(", ")
+        : "—"
+    }`,
+    `Illustrative signals: ${
+      qualitative && qualitative.illustrativeSignals.length > 0
+        ? qualitative.illustrativeSignals.join(" | ")
+        : "—"
+    }`,
+  ];
+
+  return lines.join("\n");
+}
+
 function ThemePill({ theme }: { theme: QualitativeThemeSummary }) {
   return (
     <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700">
       {theme.label}
       <span className="ml-2 text-slate-400">({theme.count})</span>
     </span>
+  );
+}
+
+function AnalysisBadge({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-medium text-slate-800">{value}</p>
+    </div>
   );
 }
 
@@ -433,6 +580,13 @@ export default async function ClientDiagnosticReportPage({
 
   const insightMap = new Map(
     report.insights.dimensions.map((insight) => [insight.dimensionKey, insight]),
+  );
+
+  const analysisMap = new Map(
+    report.analyses.dimensions.map((analysis) => [
+      analysis.dimensionKey,
+      analysis,
+    ]),
   );
 
   const narrativeMap = new Map(
@@ -770,12 +924,21 @@ export default async function ClientDiagnosticReportPage({
         <div className="mt-6 space-y-6">
           {report.dimensions.map((dimension) => {
             const insight = insightMap.get(dimension.dimensionKey);
+            const analysis = analysisMap.get(dimension.dimensionKey);
             const narrative = narrativeMap.get(dimension.dimensionKey);
             const qualitative = qualitativeMap.get(dimension.dimensionKey);
             const analytics = analyticsMap.get(dimension.dimensionKey);
             const alignmentCallout = getAlignmentCallout({
               dimension,
               insight,
+            });
+            const briefingBlock = buildDimensionBriefingBlock({
+              dimension,
+              analytics,
+              insight,
+              analysis,
+              narrative,
+              qualitative,
             });
 
             return (
@@ -859,6 +1022,72 @@ export default async function ClientDiagnosticReportPage({
                       <p className="mt-3 text-sm leading-7 text-slate-700">
                         {alignmentCallout}
                       </p>
+                    </div>
+                  ) : null}
+
+                  {analysis ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Analysis signals
+                          </p>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            Structured diagnostic patterns surfaced by the
+                            analysis engine. This section is designed to give a
+                            clearer underlying read than prose alone.
+                          </p>
+                        </div>
+
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+                          {formatConfidenceLabel(analysis.confidence)}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <AnalysisBadge
+                          label="Primary pattern"
+                          value={analysis.primaryPattern?.label ?? "None"}
+                        />
+                        <AnalysisBadge
+                          label="Secondary pattern"
+                          value={analysis.secondaryPattern?.label ?? "None"}
+                        />
+                        <AnalysisBadge
+                          label="Gap pattern"
+                          value={formatGapPatternLabel(analysis.gapPattern)}
+                        />
+                        <AnalysisBadge
+                          label="Flags"
+                          value={
+                            analysis.flags.length > 0
+                              ? analysis.flags.join(", ")
+                              : "None"
+                          }
+                        />
+                      </div>
+
+                      {analysis.primaryPattern ? (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Primary pattern description
+                          </p>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            {analysis.primaryPattern.description}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {analysis.secondaryPattern ? (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Secondary pattern description
+                          </p>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            {analysis.secondaryPattern.description}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -952,15 +1181,40 @@ export default async function ClientDiagnosticReportPage({
                     </div>
                   ) : null}
 
+                  <div className="rounded-xl border border-slate-900 bg-slate-950 p-5 text-slate-100">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                          LLM briefing block
+                        </p>
+                        <p className="mt-3 text-sm leading-7 text-slate-300">
+                          This is a compact structured block designed for manual
+                          copy and paste into an LLM when you want a richer
+                          narrative, executive summary, or slide content.
+                        </p>
+                      </div>
+                    </div>
+
+                    <pre className="mt-4 overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-slate-700 bg-slate-900 p-4 text-xs leading-6 text-slate-100">
+                      {briefingBlock}
+                    </pre>
+                  </div>
+
                   {insight ? (
                     <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-slate-500">
                       <span>Status: {formatStatusLabel(insight.status)}</span>
                       <span>·</span>
                       <span>Alignment: {formatAlignmentLabel(insight.alignment)}</span>
                       <span>·</span>
-                      <span>Confidence: {formatConfidenceLabel(
-                        qualitative?.confidence ?? narrative?.confidence ?? "medium",
-                      )}</span>
+                      <span>
+                        Confidence:{" "}
+                        {formatConfidenceLabel(
+                          analysis?.confidence ??
+                            qualitative?.confidence ??
+                            narrative?.confidence ??
+                            "medium",
+                        )}
+                      </span>
                     </div>
                   ) : null}
                 </div>

@@ -1,7 +1,3 @@
-export const runtime = "edge";
-
-import { requireAdvisorUser } from "@/lib/advisor-auth";
-import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildDimensionInsights,
@@ -64,7 +60,7 @@ type ProjectRow = {
 
 type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
 
-type DimensionSummary = {
+export type DimensionSummary = {
   dimensionKey: string;
   dimensionLabel: string;
   dimensionDescription: string;
@@ -98,13 +94,13 @@ type QualitativeThemeDefinition = {
   keywords: string[];
 };
 
-type QualitativeThemeSummary = {
+export type QualitativeThemeSummary = {
   key: string;
   label: string;
   count: number;
 };
 
-type DimensionQualitativeSummary = {
+export type DimensionQualitativeSummary = {
   dimensionKey: string;
   dimensionLabel: string;
   commentCount: number;
@@ -115,14 +111,14 @@ type DimensionQualitativeSummary = {
   confidence: "high" | "medium" | "low";
 };
 
-type OverallQualitativeSummary = {
+export type OverallQualitativeSummary = {
   totalCommentCount: number;
   respondentGroupsWithComments: QuestionnaireType[];
   crossCuttingThemes: QualitativeThemeSummary[];
   summary: string | null;
 };
 
-type ProjectSummaryResponse = {
+export type ProjectSummaryResponse = {
   success: true;
   project: {
     projectId: string;
@@ -183,10 +179,27 @@ type ProjectSummaryResponse = {
   };
 };
 
-type ErrorResponse = {
-  success: false;
-  error: string;
-};
+export type BuildProjectSummaryErrorCode =
+  | "INVALID_PROJECT_ID"
+  | "PROJECT_NOT_FOUND"
+  | "PARTICIPANTS_LOAD_FAILED"
+  | "SCORES_LOAD_FAILED"
+  | "COMMENTS_LOAD_FAILED";
+
+export class BuildProjectSummaryError extends Error {
+  code: BuildProjectSummaryErrorCode;
+  status: number;
+
+  constructor(
+    code: BuildProjectSummaryErrorCode,
+    message: string,
+    status: number,
+  ) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
 
 const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "hr",
@@ -532,7 +545,7 @@ function getSupabaseAdminClient() {
   });
 }
 
-function isUuid(value: string): boolean {
+export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
@@ -960,8 +973,8 @@ function buildOverallQualitativeSummary(params: {
   }
 
   return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
-    ", ",
-  )}. The qualitative evidence adds useful context, although the themes are still fairly dispersed and not yet concentrated around one dominant pattern.`;
+      ", ",
+    )}. The qualitative evidence adds useful context, although the themes are still fairly dispersed and not yet concentrated around one dominant pattern.`;
 }
 
 function buildQualitativeSummary(params: {
@@ -1055,218 +1068,175 @@ function buildQualitativeSummary(params: {
   };
 }
 
-export async function GET(
-  request: Request,
-): Promise<NextResponse<ProjectSummaryResponse | ErrorResponse>> {
-  try {
-    // 🔒 AUTH GUARD
-    const advisorUser = await requireAdvisorUser();
-
-    if (!advisorUser) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized.",
-        },
-        { status: 403 },
-      );
-    }
-
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get("projectId");
-
-    if (!projectId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "projectId is required.",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!isUuid(projectId)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "projectId must be a valid UUID.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const supabase = getSupabaseAdminClient();
-
-    const [
-      { data: project, error: projectError },
-      { data: participants, error: participantsError },
-      { data: scoreRows, error: scoresError },
-      { data: commentRows, error: commentsError },
-    ] = await Promise.all([
-      supabase
-        .from("client_projects")
-        .select(
-          "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
-        )
-        .eq("project_id", projectId)
-        .single<ProjectRow>(),
-      supabase
-        .from("client_participants")
-        .select(
-          "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
-        )
-        .eq("project_id", projectId)
-        .returns<ParticipantRow[]>(),
-      supabase
-        .from("client_dimension_scores")
-        .select(
-          "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-        )
-        .eq("project_id", projectId)
-        .returns<DimensionScoreRow[]>(),
-      supabase
-        .from("client_responses")
-        .select(
-          "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
-        )
-        .eq("project_id", projectId)
-        .not("comment_text", "is", null)
-        .returns<CommentRow[]>(),
-    ]);
-
-    if (projectError || !project) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Project not found.",
-        },
-        { status: 404 },
-      );
-    }
-
-    if (participantsError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to load project participants.",
-        },
-        { status: 500 },
-      );
-    }
-
-    if (scoresError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to load project dimension scores.",
-        },
-        { status: 500 },
-      );
-    }
-
-    if (commentsError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to load project comments.",
-        },
-        { status: 500 },
-      );
-    }
-
-    const participantRows = participants ?? [];
-    const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
-      isScoredQuestionnaireType(row.questionnaire_type),
-    );
-    const qualitativeRows = (commentRows ?? []).filter((row) =>
-      isScoredQuestionnaireType(row.questionnaire_type),
-    );
-
-    const completed = participantRows.filter(
-      (participant) => participant.participant_status === "completed",
-    ).length;
-
-    const totalInvited = participantRows.length;
-    const outstanding = Math.max(totalInvited - completed, 0);
-
-    const respondentGroups = buildRespondentGroups(participantRows);
-    const dimensions = buildDimensionSummaries(dimensionScoreRows);
-    const dimensionInsights = buildDimensionInsights(dimensions);
-    const dimensionAnalyses = buildDimensionAnalyses({
-      insights: dimensionInsights,
-    });
-    const dimensionNarratives = buildDimensionNarratives(dimensionAnalyses);
-    const insightSummary = buildInsightSummary(dimensionInsights);
-
-    const qualitativeSummary = buildQualitativeSummary({
-      dimensions,
-      insights: dimensionInsights,
-      commentRows: qualitativeRows,
-    });
-
-    const strongestAlignment = sortDimensionsByGap(
-      dimensions.filter((dimension) => dimension.gap !== null),
-      "asc",
-    ).slice(0, 3);
-
-    const biggestGaps = sortDimensionsByGap(
-      dimensions.filter((dimension) => dimension.gap !== null),
-      "desc",
-    ).slice(0, 3);
-
-    return NextResponse.json({
-      success: true,
-      project: {
-        projectId: project.project_id,
-        companyName: project.company_name,
-        primaryContactName: project.primary_contact_name,
-        primaryContactEmail: project.primary_contact_email,
-        projectStatus: project.project_status,
-        notes: project.notes,
-      },
-      completion: {
-        totalInvited,
-        outstanding,
-        completed,
-        completionPercentage: getCompletionPercentage(
-          completed,
-          totalInvited,
-        ),
-        participants: participantRows.map((participant) => ({
-          participantId: participant.participant_id,
-          questionnaireType: participant.questionnaire_type,
-          roleLabel: participant.role_label,
-          participantStatus: participant.participant_status,
-          startedAt: participant.started_at,
-          completedAt: participant.completed_at,
-          updatedAt: participant.updated_at,
-        })),
-        respondentGroups,
-      },
-      dimensions,
-      strongestAlignment,
-      biggestGaps,
-      insights: {
-        dimensions: dimensionInsights,
-        summary: insightSummary,
-      },
-      analyses: {
-        dimensions: dimensionAnalyses,
-      },
-      narratives: {
-        dimensions: dimensionNarratives,
-      },
-      qualitative: qualitativeSummary,
-    });
-  } catch (error) {
-    console.error("Unable to build client diagnostic project summary.", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Unexpected server error while building project summary.",
-      },
-      { status: 500 },
+export async function buildProjectSummary(
+  projectId: string,
+): Promise<ProjectSummaryResponse> {
+  if (!projectId) {
+    throw new BuildProjectSummaryError(
+      "INVALID_PROJECT_ID",
+      "projectId is required.",
+      400,
     );
   }
+
+  if (!isUuid(projectId)) {
+    throw new BuildProjectSummaryError(
+      "INVALID_PROJECT_ID",
+      "projectId must be a valid UUID.",
+      400,
+    );
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  const [
+    { data: project, error: projectError },
+    { data: participants, error: participantsError },
+    { data: scoreRows, error: scoresError },
+    { data: commentRows, error: commentsError },
+  ] = await Promise.all([
+    supabase
+      .from("client_projects")
+      .select(
+        "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
+      )
+      .eq("project_id", projectId)
+      .single<ProjectRow>(),
+    supabase
+      .from("client_participants")
+      .select(
+        "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
+      )
+      .eq("project_id", projectId)
+      .returns<ParticipantRow[]>(),
+    supabase
+      .from("client_dimension_scores")
+      .select(
+        "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
+      )
+      .eq("project_id", projectId)
+      .returns<DimensionScoreRow[]>(),
+    supabase
+      .from("client_responses")
+      .select(
+        "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
+      )
+      .eq("project_id", projectId)
+      .not("comment_text", "is", null)
+      .returns<CommentRow[]>(),
+  ]);
+
+  if (projectError || !project) {
+    throw new BuildProjectSummaryError(
+      "PROJECT_NOT_FOUND",
+      "Project not found.",
+      404,
+    );
+  }
+
+  if (participantsError) {
+    throw new BuildProjectSummaryError(
+      "PARTICIPANTS_LOAD_FAILED",
+      "Unable to load project participants.",
+      500,
+    );
+  }
+
+  if (scoresError) {
+    throw new BuildProjectSummaryError(
+      "SCORES_LOAD_FAILED",
+      "Unable to load project dimension scores.",
+      500,
+    );
+  }
+
+  if (commentsError) {
+    throw new BuildProjectSummaryError(
+      "COMMENTS_LOAD_FAILED",
+      "Unable to load project comments.",
+      500,
+    );
+  }
+
+  const participantRows = participants ?? [];
+  const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
+    isScoredQuestionnaireType(row.questionnaire_type),
+  );
+  const qualitativeRows = (commentRows ?? []).filter((row) =>
+    isScoredQuestionnaireType(row.questionnaire_type),
+  );
+
+  const completed = participantRows.filter(
+    (participant) => participant.participant_status === "completed",
+  ).length;
+
+  const totalInvited = participantRows.length;
+  const outstanding = Math.max(totalInvited - completed, 0);
+
+  const respondentGroups = buildRespondentGroups(participantRows);
+  const dimensions = buildDimensionSummaries(dimensionScoreRows);
+  const dimensionInsights = buildDimensionInsights(dimensions);
+  const dimensionAnalyses = buildDimensionAnalyses({
+    insights: dimensionInsights,
+  });
+  const dimensionNarratives = buildDimensionNarratives(dimensionAnalyses);
+  const insightSummary = buildInsightSummary(dimensionInsights);
+
+  const qualitativeSummary = buildQualitativeSummary({
+    dimensions,
+    insights: dimensionInsights,
+    commentRows: qualitativeRows,
+  });
+
+  const strongestAlignment = sortDimensionsByGap(
+    dimensions.filter((dimension) => dimension.gap !== null),
+    "asc",
+  ).slice(0, 3);
+
+  const biggestGaps = sortDimensionsByGap(
+    dimensions.filter((dimension) => dimension.gap !== null),
+    "desc",
+  ).slice(0, 3);
+
+  return {
+    success: true,
+    project: {
+      projectId: project.project_id,
+      companyName: project.company_name,
+      primaryContactName: project.primary_contact_name,
+      primaryContactEmail: project.primary_contact_email,
+      projectStatus: project.project_status,
+      notes: project.notes,
+    },
+    completion: {
+      totalInvited,
+      outstanding,
+      completed,
+      completionPercentage: getCompletionPercentage(completed, totalInvited),
+      participants: participantRows.map((participant) => ({
+        participantId: participant.participant_id,
+        questionnaireType: participant.questionnaire_type,
+        roleLabel: participant.role_label,
+        participantStatus: participant.participant_status,
+        startedAt: participant.started_at,
+        completedAt: participant.completed_at,
+        updatedAt: participant.updated_at,
+      })),
+      respondentGroups,
+    },
+    dimensions,
+    strongestAlignment,
+    biggestGaps,
+    insights: {
+      dimensions: dimensionInsights,
+      summary: insightSummary,
+    },
+    analyses: {
+      dimensions: dimensionAnalyses,
+    },
+    narratives: {
+      dimensions: dimensionNarratives,
+    },
+    qualitative: qualitativeSummary,
+  };
 }

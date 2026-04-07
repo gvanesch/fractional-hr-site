@@ -373,43 +373,20 @@ export default function ClientDiagnosticQuestionnaire({
     <section className="brand-light-section">
       <div className="brand-container py-10 sm:py-12">
         <div className="mb-8 rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] p-5 sm:p-6">
-          <div className="max-w-5xl">
+          <div className="max-w-4xl">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-              How to use the scale
+              Scoring guidance
             </p>
 
             <p className="mt-3 text-sm leading-7 text-slate-700 sm:text-base">
-              Please score each statement based on how work operates today in
-              reality, not how it is intended to work on paper.
+              Use the scale in the usual way. Score based on how work operates
+              today in practice, not how it is intended to work on paper.
             </p>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <ScaleCard
-                value="1"
-                label="Strongly disagree"
-                description="Rarely true in practice, or breaks down regularly."
-              />
-              <ScaleCard
-                value="2"
-                label="Mostly disagree"
-                description="Some evidence exists, but it is inconsistent or unreliable."
-              />
-              <ScaleCard
-                value="3"
-                label="Mixed"
-                description="Partly true, but the experience is uneven or depends on the situation."
-              />
-              <ScaleCard
-                value="4"
-                label="Mostly agree"
-                description="Generally true in practice, with only occasional gaps."
-              />
-              <ScaleCard
-                value="5"
-                label="Strongly agree"
-                description="Consistently true in practice and works as expected."
-              />
-            </div>
+            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+              1 = strongly disagree, 3 = mixed or inconsistent, 5 = strongly
+              agree.
+            </p>
           </div>
         </div>
 
@@ -431,8 +408,7 @@ export default function ClientDiagnosticQuestionnaire({
                 {probeQuestions.length}
               </p>
               <p className="mt-2 text-xs font-medium text-slate-600">
-                Scale reminder: 1 = rarely true in practice, 5 = consistently
-                true in practice.
+                Scale: 1 = disagree, 5 = agree
               </p>
             </div>
 
@@ -510,16 +486,6 @@ export default function ClientDiagnosticQuestionnaire({
                         <p className="mt-3 text-base leading-7 text-slate-900">
                           {question.prompt}
                         </p>
-
-                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs leading-6 text-slate-600 sm:text-sm">
-                            <span className="font-semibold text-slate-800">
-                              Scoring guide:
-                            </span>{" "}
-                            1 = rarely true in practice, 3 = mixed or uneven, 5
-                            = consistently true in practice.
-                          </p>
-                        </div>
 
                         <div className="mt-5 grid grid-cols-5 gap-3">
                           {[1, 2, 3, 4, 5].map((value) => {
@@ -673,29 +639,6 @@ export default function ClientDiagnosticQuestionnaire({
         </section>
       </div>
     </section>
-  );
-}
-
-function ScaleCard({
-  value,
-  label,
-  description,
-}: {
-  value: string;
-  label: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--brand-accent)] text-sm font-bold text-white">
-          {value}
-        </div>
-        <p className="text-sm font-semibold text-slate-900">{label}</p>
-      </div>
-
-      <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
   );
 }
 

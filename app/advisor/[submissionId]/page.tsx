@@ -6,7 +6,8 @@ export const metadata = {
 };
 
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -127,6 +128,30 @@ async function getBaseUrl(): Promise<string> {
   return `${protocol}://${host}`;
 }
 
+async function requireAdvisorSession(submissionId: string) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect(`/advisor/login?next=/advisor/${submissionId}`);
+  }
+
+  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = session.user.email?.toLowerCase() ?? "";
+
+  if (!userEmail || !allowedEmails.includes(userEmail)) {
+    redirect("/advisor/login?error=forbidden");
+  }
+
+  return session;
+}
+
 async function getAdvisorSubmission(
   submissionId: string,
 ): Promise<SuccessResponse> {
@@ -158,6 +183,9 @@ export default async function AdvisorSubmissionPage({
   params,
 }: AdvisorPageProps) {
   const { submissionId } = await params;
+
+  await requireAdvisorSession(submissionId);
+
   const data = await getAdvisorSubmission(submissionId);
 
   const submission = data.submission;

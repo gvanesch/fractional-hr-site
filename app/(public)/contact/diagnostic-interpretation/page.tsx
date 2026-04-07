@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { SavedDiagnosticState } from "../../../lib/diagnostic";
-import { loadDiagnosticState } from "../../../lib/diagnostic-storage";
+import type { SavedDiagnosticState } from "@/lib/diagnostic"
+import { loadDiagnosticState } from "@/lib/diagnostic-storage"
 
 type AdvisoryNarrative = {
   interpretation: string[];

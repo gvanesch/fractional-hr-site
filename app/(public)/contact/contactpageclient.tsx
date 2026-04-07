@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { loadDiagnosticState } from "../../lib/diagnostic-storage";
-import type { DiagnosticAnswers } from "../../lib/diagnostic";
+import { loadDiagnosticState } from "@/lib/diagnostic-storage"
+import type { DiagnosticAnswers } from "@/lib/diagnostic";
 
 type ContactFormState = {
   name: string;

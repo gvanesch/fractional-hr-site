@@ -300,17 +300,7 @@ async function buildProjectResult(
 
 function isAuthorized(request: Request, cronSecret: string) {
   const authorizationHeader = request.headers.get("authorization");
-  const xCronSecretHeader = request.headers.get("x-cron-secret");
-
-  if (authorizationHeader === `Bearer ${cronSecret}`) {
-    return true;
-  }
-
-  if (xCronSecretHeader === cronSecret) {
-    return true;
-  }
-
-  return false;
+  return authorizationHeader === `Bearer ${cronSecret}`;
 }
 
 export async function POST(request: Request) {
@@ -322,9 +312,9 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Unauthorized.",
+          error: "Forbidden.",
         },
-        { status: 401 },
+        { status: 403 },
       );
     }
 
@@ -393,7 +383,6 @@ export async function POST(request: Request) {
       {
         success: false,
         error: "Failed to send daily summary.",
-        details: message,
       },
       { status: 500 },
     );

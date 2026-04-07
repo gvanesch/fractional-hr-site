@@ -117,7 +117,10 @@ function validateRequestBody(
     };
   }
 
-  if (!candidate.questionnaireType || typeof candidate.questionnaireType !== "string") {
+  if (
+    !candidate.questionnaireType ||
+    typeof candidate.questionnaireType !== "string"
+  ) {
     return {
       isValid: false,
       message: "questionnaireType is required.",
@@ -289,11 +292,13 @@ function validateRequestBody(
 
 function buildDimensionScoreRows(params: {
   projectId: string;
+  participantId: string;
   questionnaireType: QuestionnaireType;
   responses: SubmittedResponse[];
   nowIso: string;
 }) {
-  const { projectId, questionnaireType, responses, nowIso } = params;
+  const { projectId, participantId, questionnaireType, responses, nowIso } =
+    params;
 
   const scoreResponses = responses.filter(
     (response): response is SubmittedResponse & { kind: "score"; value: number } =>
@@ -322,6 +327,7 @@ function buildDimensionScoreRows(params: {
 
   return Object.entries(dimensionMap).map(([dimension, aggregate]) => ({
     project_id: projectId,
+    participant_id: participantId,
     questionnaire_type: questionnaireType,
     dimension_key: dimension,
     average_score: Number((aggregate.total / aggregate.count).toFixed(2)),
@@ -366,6 +372,19 @@ export async function POST(request: Request) {
           error: "Participant record not found for this project.",
         },
         { status: 404 },
+      );
+    }
+
+    if (
+      participant.participant_status === "completed" ||
+      participant.completed_at
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This questionnaire has already been submitted.",
+        },
+        { status: 409 },
       );
     }
 
@@ -455,6 +474,7 @@ export async function POST(request: Request) {
       .from("client_dimension_scores")
       .delete()
       .eq("project_id", projectId)
+      .eq("participant_id", participantId)
       .eq("questionnaire_type", questionnaireType);
 
     if (deleteExistingDimensionScoresError) {
@@ -462,7 +482,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            "Responses were saved, but previous dimension scores could not be cleared.",
+            "Responses were saved, but previous participant dimension scores could not be cleared.",
           details: deleteExistingDimensionScoresError.message,
         },
         { status: 500 },
@@ -471,6 +491,7 @@ export async function POST(request: Request) {
 
     const dimensionScoreRows = buildDimensionScoreRows({
       projectId,
+      participantId,
       questionnaireType,
       responses,
       nowIso,
@@ -485,7 +506,8 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: "Responses were saved, but dimension scores could not be created.",
+            error:
+              "Responses were saved, but participant dimension scores could not be created.",
             details: insertDimensionScoresError.message,
           },
           { status: 500 },

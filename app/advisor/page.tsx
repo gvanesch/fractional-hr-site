@@ -4,32 +4,54 @@ export const metadata = {
     follow: false,
   },
 };
-export default function AdvisorIndexPage() {
+
+export default function AdvisorHomePage() {
   return (
-    <main className="min-h-screen bg-[#F4F6FA] px-6 py-16">
-      <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#1E6FD9]">
-          Van Esch
-        </p>
+    <main className="brand-light-section min-h-screen">
+      <section className="brand-hero">
+        <div className="brand-container brand-section brand-hero-content">
+          <div className="max-w-4xl">
+            <p className="brand-kicker">Advisor workspace</p>
 
-        <h1 className="mb-2 text-3xl font-bold text-[#0A1628]">
-          Advisor View
-        </h1>
+            <h1 className="brand-heading-lg mt-5 text-white">
+              Advisor dashboard
+            </h1>
 
-        <p className="mb-6 text-base text-slate-600">
-          HR Operations &amp; Transformation Advisory
-        </p>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-lg font-semibold text-[#0A1628]">
-            Lead-specific advisor links only
-          </h2>
-          <p className="mt-3 leading-7 text-slate-700">
-            This page is no longer used for session-based advisor data.
-            Open an advisor link from a lead notification email or use a URL in
-            the format <span className="font-medium">/advisor/submission-id</span>.
-          </p>
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
+              Manage diagnostic projects, track participant completion, and
+              move from diagnostic insight to structured advisory engagement.
+            </p>
+          </div>
         </div>
+      </section>
+
+      <div className="brand-container py-10">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <a
+            href="/advisor/create-project"
+            className="brand-surface-card p-6 hover:shadow-md transition"
+          >
+            <h2 className="text-lg font-semibold text-slate-900">
+              Create project
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Set up a new diagnostic and invite participants.
+            </p>
+          </a>
+
+          <a
+            href="/advisor/projects"
+            className="brand-surface-card p-6 hover:shadow-md transition"
+          >
+            <h2 className="text-lg font-semibold text-slate-900">
+              View projects
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Monitor completion and access project dashboards.
+            </p>
+          </a>
+
+            </div>
       </div>
     </main>
   );

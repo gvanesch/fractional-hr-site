@@ -10,11 +10,11 @@ import {
   calculateRawScore,
   calculatePercentageScore,
   type AnswerValue,
-} from "../../lib/diagnostic";
+} from "@/lib/diagnostic";
 import {
   saveDiagnosticState,
   clearDiagnosticState,
-} from "../../lib/diagnostic-storage";
+} from "@/lib/diagnostic-storage"
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type CompletionEmailStatus = "idle" | "sending" | "sent" | "error";

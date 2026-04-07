@@ -6,13 +6,14 @@ export const metadata = {
 };
 
 import { notFound } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
 import {
   questionnaireTypes,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 type PageProps = {
   params: Promise<{
@@ -22,6 +23,14 @@ type PageProps = {
     projectId?: string | string[];
     participantId?: string | string[];
   }>;
+};
+
+type ParticipantLookupRow = {
+  participant_id: string;
+  project_id: string;
+  questionnaire_type: string;
+  participant_status: string;
+  completed_at: string | null;
 };
 
 function isQuestionnaireType(value: string): value is QuestionnaireType {
@@ -36,6 +45,39 @@ function getSingleValue(
   }
 
   return value;
+}
+
+function isUuid(value: string | undefined): value is string {
+  if (!value) {
+    return false;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function getEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function getSupabaseAdminClient() {
+  return createClient(
+    getEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    getEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
 }
 
 function getQuestionnaireTitle(questionnaireType: QuestionnaireType): string {
@@ -64,6 +106,49 @@ function getQuestionnaireIntro(questionnaireType: QuestionnaireType): string {
   }
 }
 
+function CompletedQuestionnairePage() {
+  return (
+    <main className="brand-light-section min-h-screen">
+      <section className="brand-hero">
+        <div className="brand-container brand-section brand-hero-content">
+          <div className="max-w-4xl">
+            <p className="brand-kicker">Client diagnostic</p>
+
+            <h1 className="brand-heading-lg mt-5 text-white">
+              Questionnaire already submitted
+            </h1>
+
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
+              This questionnaire has already been completed. Thank you for your
+              response.
+            </p>
+
+            <div className="brand-card-dark mt-8 max-w-3xl p-6 sm:p-7">
+              <div className="space-y-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
+                  What happens next
+                </p>
+
+                <p className="text-base leading-7 text-slate-200">
+                  Your responses have been recorded and will be used in the
+                  wider diagnostic analysis alongside other perspectives across
+                  the organisation.
+                </p>
+
+                <p className="text-base leading-7 text-slate-300">
+                  This helps build a clearer, evidence-based view of how people
+                  operations are working in practice and where the main areas of
+                  friction, inconsistency, or improvement sit.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default async function ClientDiagnosticQuestionnairePage({
   params,
   searchParams,
@@ -77,6 +162,36 @@ export default async function ClientDiagnosticQuestionnairePage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const projectId = getSingleValue(resolvedSearchParams.projectId);
   const participantId = getSingleValue(resolvedSearchParams.participantId);
+
+  if (!isUuid(projectId) || !isUuid(participantId)) {
+    notFound();
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  const { data: participant, error } = await supabase
+    .from("client_participants")
+    .select(
+      "participant_id, project_id, questionnaire_type, participant_status, completed_at",
+    )
+    .eq("participant_id", participantId)
+    .eq("project_id", projectId)
+    .single<ParticipantLookupRow>();
+
+  if (error || !participant) {
+    notFound();
+  }
+
+  if (participant.questionnaire_type !== questionnaireType) {
+    notFound();
+  }
+
+  if (
+    participant.participant_status === "completed" ||
+    participant.completed_at !== null
+  ) {
+    return <CompletedQuestionnairePage />;
+  }
 
   return (
     <main className="brand-light-section min-h-screen">
