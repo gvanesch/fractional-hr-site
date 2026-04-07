@@ -11,6 +11,8 @@ import {
   type ScoreQuestion,
 } from "@/lib/client-diagnostic/question-bank";
 
+export const runtime = "edge";
+
 type ClientDiagnosticQuestionnaireProps = {
   questionnaireType: QuestionnaireType;
   projectId?: string;
