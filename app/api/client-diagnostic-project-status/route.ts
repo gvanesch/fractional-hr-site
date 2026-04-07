@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 type UpdateProjectStatusRequest = {
   projectId: string;

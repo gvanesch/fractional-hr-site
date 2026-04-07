@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
+
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
 type DatabaseQuestionnaireType = "hr" | "manager" | "leadership";
