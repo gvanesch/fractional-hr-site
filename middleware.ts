@@ -10,8 +10,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const response = NextResponse.next();
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -42,7 +40,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(forbiddenUrl);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

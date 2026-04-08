@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
+
 export const metadata = {
   robots: {
     index: false,
@@ -5,7 +8,15 @@ export const metadata = {
   },
 };
 
-export default function AdvisorHomePage() {
+export const runtime = "edge";
+
+export default async function AdvisorHomePage() {
+  const advisorUser = await requireAdvisorUser();
+
+  if (!advisorUser) {
+    redirect("/advisor/login");
+  }
+
   return (
     <main className="brand-light-section min-h-screen">
       <section className="brand-hero">
@@ -29,7 +40,7 @@ export default function AdvisorHomePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <a
             href="/advisor/create-project"
-            className="brand-surface-card p-6 hover:shadow-md transition"
+            className="brand-surface-card p-6 transition hover:shadow-md"
           >
             <h2 className="text-lg font-semibold text-slate-900">
               Create project
@@ -41,7 +52,7 @@ export default function AdvisorHomePage() {
 
           <a
             href="/advisor/projects"
-            className="brand-surface-card p-6 hover:shadow-md transition"
+            className="brand-surface-card p-6 transition hover:shadow-md"
           >
             <h2 className="text-lg font-semibold text-slate-900">
               View projects
@@ -50,8 +61,7 @@ export default function AdvisorHomePage() {
               Monitor completion and access project dashboards.
             </p>
           </a>
-
-            </div>
+        </div>
       </div>
     </main>
   );
