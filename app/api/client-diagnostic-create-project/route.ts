@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import {
+  validateSegmentationSchema,
+  validateSegmentationValues,
+  type SegmentationSchema,
+  type SegmentationValues,
+} from "@/lib/client-diagnostic/segmentation";
 
 export const runtime = "edge";
-
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
 type DatabaseQuestionnaireType = "hr" | "manager" | "leadership";
@@ -13,12 +18,21 @@ type ParticipantInput = {
   name: string;
   email: string;
   questionnaireType: QuestionnaireType;
+  segmentationValues: SegmentationValues;
 };
 
 type CreateProjectRequest = {
   projectName: string;
   companyName?: string;
+  segmentationSchema: SegmentationSchema;
   participants: ParticipantInput[];
+};
+
+type EmailSendResult = {
+  email: string;
+  success: boolean;
+  resendId: string | null;
+  error: string | null;
 };
 
 function getEnv(name: string): string {
@@ -123,7 +137,7 @@ export async function POST(request: Request) {
 
     if (!advisorUser) {
       return NextResponse.json(
-        { error: "Unauthorized." },
+        { success: false, error: "Unauthorized." },
         { status: 403 },
       );
     }
@@ -135,21 +149,30 @@ export async function POST(request: Request) {
 
     const resend = new Resend(getEnv("RESEND_API_KEY"));
 
-    const body = (await request.json()) as CreateProjectRequest;
+    const body = (await request.json()) as Partial<CreateProjectRequest>;
 
     const projectName = body.projectName?.trim();
-    const participants = body.participants || [];
+    const companyName = body.companyName?.trim() || projectName;
+    const participants = Array.isArray(body.participants) ? body.participants : [];
+    const segmentationSchema = validateSegmentationSchema(body.segmentationSchema);
 
     if (!projectName) {
       return NextResponse.json(
-        { error: "Project name is required." },
+        { success: false, error: "Project name is required." },
+        { status: 400 },
+      );
+    }
+
+    if (!segmentationSchema) {
+      return NextResponse.json(
+        { success: false, error: "A valid segmentation schema is required." },
         { status: 400 },
       );
     }
 
     if (participants.length === 0) {
       return NextResponse.json(
-        { error: "At least one participant is required." },
+        { success: false, error: "At least one participant is required." },
         { status: 400 },
       );
     }
@@ -159,14 +182,14 @@ export async function POST(request: Request) {
 
       if (!participant.name?.trim()) {
         return NextResponse.json(
-          { error: `Participant ${i + 1} missing name.` },
+          { success: false, error: `Participant ${i + 1} missing name.` },
           { status: 400 },
         );
       }
 
       if (!participant.email?.trim() || !isValidEmail(participant.email)) {
         return NextResponse.json(
-          { error: `Participant ${i + 1} email invalid.` },
+          { success: false, error: `Participant ${i + 1} email invalid.` },
           { status: 400 },
         );
       }
@@ -177,7 +200,25 @@ export async function POST(request: Request) {
         participant.questionnaireType !== "Leadership"
       ) {
         return NextResponse.json(
-          { error: `Participant ${i + 1} questionnaire type invalid.` },
+          {
+            success: false,
+            error: `Participant ${i + 1} questionnaire type invalid.`,
+          },
+          { status: 400 },
+        );
+      }
+
+      const validatedSegmentationValues = validateSegmentationValues(
+        segmentationSchema,
+        participant.segmentationValues,
+      );
+
+      if (!validatedSegmentationValues) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Participant ${i + 1} segmentation values are invalid.`,
+          },
           { status: 400 },
         );
       }
@@ -189,10 +230,11 @@ export async function POST(request: Request) {
       .from("client_projects")
       .insert({
         project_name: projectName,
-        company_name: body.companyName?.trim() || projectName,
+        company_name: companyName,
         primary_contact_name: primary.name.trim(),
         primary_contact_email: primary.email.trim().toLowerCase(),
         project_status: "active",
+        segmentation_schema: segmentationSchema,
       })
       .select()
       .single();
@@ -201,20 +243,34 @@ export async function POST(request: Request) {
       console.error("Failed to create project", projectError);
 
       return NextResponse.json(
-        { error: "Failed to create project." },
+        { success: false, error: "Failed to create project." },
         { status: 500 },
       );
     }
 
-    const participantRows = participants.map((participant) => ({
-      project_id: project.project_id,
-      questionnaire_type: mapQuestionnaireTypeToDatabaseValue(
-        participant.questionnaireType,
-      ),
-      role_label: participant.questionnaireType,
-      name: participant.name.trim(),
-      email: participant.email.trim().toLowerCase(),
-    }));
+    console.info("Project created successfully", {
+      projectId: project.project_id,
+      projectName,
+      participantCount: participants.length,
+    });
+
+    const participantRows = participants.map((participant) => {
+      const validatedSegmentationValues = validateSegmentationValues(
+        segmentationSchema,
+        participant.segmentationValues,
+      );
+
+      return {
+        project_id: project.project_id,
+        questionnaire_type: mapQuestionnaireTypeToDatabaseValue(
+          participant.questionnaireType,
+        ),
+        role_label: participant.questionnaireType,
+        name: participant.name.trim(),
+        email: participant.email.trim().toLowerCase(),
+        segmentation_values: validatedSegmentationValues,
+      };
+    });
 
     const {
       data: insertedParticipants,
@@ -228,48 +284,127 @@ export async function POST(request: Request) {
       console.error("Failed to create participants", participantError);
 
       return NextResponse.json(
-        { error: "Failed to create participants." },
+        { success: false, error: "Failed to create participants." },
         { status: 500 },
       );
     }
+
+    console.info("Participants created successfully", {
+      projectId: project.project_id,
+      insertedParticipants: insertedParticipants.length,
+    });
 
     const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
     const fromEmail = getEnv("CONTACT_FROM_EMAIL");
     const replyToEmail = getEnv("CONTACT_TO_EMAIL");
 
-    await Promise.all(
+    const emailResults: EmailSendResult[] = await Promise.all(
       insertedParticipants.map(async (participant: any) => {
         const inviteUrl = `${siteUrl}/client-diagnostic/respond/${participant.invite_token}`;
 
-        await resend.emails.send({
-          from: `Van Esch Advisory <${fromEmail}>`,
-          to: participant.email,
-          replyTo: replyToEmail,
-          subject: buildEmailSubject(projectName),
-          html: buildEmailHtml({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          }),
-          text: buildEmailText({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          }),
-        });
+        try {
+          const resendResponse = await resend.emails.send({
+            from: `Van Esch Advisory <${fromEmail}>`,
+            to: participant.email,
+            replyTo: replyToEmail,
+            subject: buildEmailSubject(projectName),
+            html: buildEmailHtml({
+              name: participant.name,
+              projectName,
+              inviteUrl,
+            }),
+            text: buildEmailText({
+              name: participant.name,
+              projectName,
+              inviteUrl,
+            }),
+          });
+
+          const resendError =
+            resendResponse && "error" in resendResponse
+              ? resendResponse.error
+              : null;
+
+          const resendData =
+            resendResponse && "data" in resendResponse
+              ? resendResponse.data
+              : null;
+
+          if (resendError) {
+            console.error("Resend returned an error", {
+              participantEmail: participant.email,
+              resendError,
+            });
+
+            return {
+              email: participant.email,
+              success: false,
+              resendId: null,
+              error:
+                typeof resendError.message === "string"
+                  ? resendError.message
+                  : "Resend returned an error.",
+            };
+          }
+
+          console.info("Resend accepted email send", {
+            participantEmail: participant.email,
+            resendId: resendData?.id ?? null,
+          });
+
+          return {
+            email: participant.email,
+            success: true,
+            resendId: resendData?.id ?? null,
+            error: null,
+          };
+        } catch (emailError) {
+          const message =
+            emailError instanceof Error
+              ? emailError.message
+              : "Unknown email send error.";
+
+          console.error("Email send threw an exception", {
+            participantEmail: participant.email,
+            error: message,
+          });
+
+          return {
+            email: participant.email,
+            success: false,
+            resendId: null,
+            error: message,
+          };
+        }
       }),
     );
+
+    const failedEmails = emailResults.filter((result) => !result.success);
+
+    if (failedEmails.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Project created, but one or more invitation emails failed.",
+          projectId: project.project_id,
+          participants: insertedParticipants.length,
+          emailResults,
+        },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
       projectId: project.project_id,
       participants: insertedParticipants.length,
+      emailResults,
     });
   } catch (error) {
     console.error("Unexpected error in create-project route", error);
 
     return NextResponse.json(
-      { error: "Unexpected server error." },
+      { success: false, error: "Unexpected server error." },
       { status: 500 },
     );
   }

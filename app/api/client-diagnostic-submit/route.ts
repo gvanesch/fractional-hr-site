@@ -26,6 +26,7 @@ type SubmittedPayload = {
 type ClientDiagnosticSubmitRequestBody = {
   projectId: string;
   participantId: string;
+  inviteToken: string;
   questionnaireType: QuestionnaireType;
   submission: SubmittedPayload;
 };
@@ -34,6 +35,10 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function isReasonableInviteToken(value: string): boolean {
+  return typeof value === "string" && value.trim().length >= 16;
 }
 
 function getSupabaseAdminClient() {
@@ -75,6 +80,7 @@ function validateRequestBody(
       data: {
         projectId: string;
         participantId: string;
+        inviteToken: string;
         questionnaireType: QuestionnaireType;
         responses: SubmittedResponse[];
       };
@@ -114,6 +120,20 @@ function validateRequestBody(
     return {
       isValid: false,
       message: "participantId must be a valid UUID.",
+    };
+  }
+
+  if (!candidate.inviteToken || typeof candidate.inviteToken !== "string") {
+    return {
+      isValid: false,
+      message: "inviteToken is required.",
+    };
+  }
+
+  if (!isReasonableInviteToken(candidate.inviteToken)) {
+    return {
+      isValid: false,
+      message: "inviteToken is invalid.",
     };
   }
 
@@ -284,6 +304,7 @@ function validateRequestBody(
     data: {
       projectId: candidate.projectId,
       participantId: candidate.participantId,
+      inviteToken: candidate.inviteToken,
       questionnaireType: candidate.questionnaireType,
       responses: submission.responses,
     },
@@ -351,7 +372,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { projectId, participantId, questionnaireType, responses } =
+    const { projectId, participantId, inviteToken, questionnaireType, responses } =
       validation.data;
 
     const supabase = getSupabaseAdminClient();
@@ -359,11 +380,11 @@ export async function POST(request: Request) {
     const { data: participant, error: participantError } = await supabase
       .from("client_participants")
       .select(
-        "participant_id, project_id, questionnaire_type, participant_status, started_at, completed_at",
+        "participant_id, project_id, questionnaire_type, participant_status, started_at, completed_at, invite_token",
       )
       .eq("participant_id", participantId)
       .eq("project_id", projectId)
-      .single();
+      .maybeSingle();
 
     if (participantError || !participant) {
       return NextResponse.json(
@@ -372,6 +393,16 @@ export async function POST(request: Request) {
           error: "Participant record not found for this project.",
         },
         { status: 404 },
+      );
+    }
+
+    if (!participant.invite_token || participant.invite_token !== inviteToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This diagnostic link is invalid for the selected participant.",
+        },
+        { status: 403 },
       );
     }
 

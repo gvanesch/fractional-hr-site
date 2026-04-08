@@ -22,6 +22,7 @@ type PageProps = {
   searchParams?: Promise<{
     projectId?: string | string[];
     participantId?: string | string[];
+    inviteToken?: string | string[];
   }>;
 };
 
@@ -31,6 +32,7 @@ type ParticipantLookupRow = {
   questionnaire_type: string;
   participant_status: string;
   completed_at: string | null;
+  invite_token: string | null;
 };
 
 function isQuestionnaireType(value: string): value is QuestionnaireType {
@@ -55,6 +57,10 @@ function isUuid(value: string | undefined): value is string {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function isReasonableInviteToken(value: string | undefined): value is string {
+  return typeof value === "string" && value.trim().length >= 16;
 }
 
 function getEnv(name: string): string {
@@ -162,8 +168,13 @@ export default async function ClientDiagnosticQuestionnairePage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const projectId = getSingleValue(resolvedSearchParams.projectId);
   const participantId = getSingleValue(resolvedSearchParams.participantId);
+  const inviteToken = getSingleValue(resolvedSearchParams.inviteToken);
 
-  if (!isUuid(projectId) || !isUuid(participantId)) {
+  if (
+    !isUuid(projectId) ||
+    !isUuid(participantId) ||
+    !isReasonableInviteToken(inviteToken)
+  ) {
     notFound();
   }
 
@@ -172,7 +183,7 @@ export default async function ClientDiagnosticQuestionnairePage({
   const { data: participant, error } = await supabase
     .from("client_participants")
     .select(
-      "participant_id, project_id, questionnaire_type, participant_status, completed_at",
+      "participant_id, project_id, questionnaire_type, participant_status, completed_at, invite_token",
     )
     .eq("participant_id", participantId)
     .eq("project_id", projectId)
@@ -183,6 +194,10 @@ export default async function ClientDiagnosticQuestionnairePage({
   }
 
   if (participant.questionnaire_type !== questionnaireType) {
+    notFound();
+  }
+
+  if (!participant.invite_token || participant.invite_token !== inviteToken) {
     notFound();
   }
 
@@ -233,10 +248,11 @@ export default async function ClientDiagnosticQuestionnairePage({
       </section>
 
       <ClientDiagnosticQuestionnaire
-        questionnaireType={questionnaireType}
-        projectId={projectId}
-        participantId={participantId}
-      />
+          questionnaireType={questionnaireType}
+          projectId={projectId}
+          participantId={participantId}
+          inviteToken={inviteToken}
+        />
     </main>
   );
 }

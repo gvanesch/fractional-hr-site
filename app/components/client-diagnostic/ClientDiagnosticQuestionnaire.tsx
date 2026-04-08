@@ -15,6 +15,7 @@ type ClientDiagnosticQuestionnaireProps = {
   questionnaireType: QuestionnaireType;
   projectId?: string;
   participantId?: string;
+  inviteToken?: string;
 };
 
 type PreparedResponse =
@@ -56,10 +57,15 @@ function isUuid(value: string | undefined): value is string {
   );
 }
 
+function isReasonableInviteToken(value: string | undefined): value is string {
+  return typeof value === "string" && value.trim().length >= 16;
+}
+
 export default function ClientDiagnosticQuestionnaire({
   questionnaireType,
   projectId,
   participantId,
+  inviteToken,
 }: ClientDiagnosticQuestionnaireProps) {
   const [scoreAnswers, setScoreAnswers] = useState<
     Record<string, ScoreAnswerValue | undefined>
@@ -80,7 +86,9 @@ export default function ClientDiagnosticQuestionnaire({
   const reviewSectionRef = useRef<HTMLDivElement | null>(null);
 
   const hasValidSubmissionContext =
-    isUuid(projectId) && isUuid(participantId);
+    isUuid(projectId) &&
+    isUuid(participantId) &&
+    isReasonableInviteToken(inviteToken);
 
   const draftStorageKey = `client-diagnostic-draft:${questionnaireType}:${projectId ?? "unknown"}:${participantId ?? "unknown"}`;
 
@@ -309,7 +317,7 @@ export default function ClientDiagnosticQuestionnaire({
     if (!hasValidSubmissionContext) {
       setSubmitState("error");
       setSubmitMessage(
-        "This diagnostic link is missing the required project or participant context.",
+        "This diagnostic link is missing the required project, participant, or invite token context.",
       );
       return;
     }
@@ -337,6 +345,7 @@ export default function ClientDiagnosticQuestionnaire({
         body: JSON.stringify({
           projectId,
           participantId,
+          inviteToken,
           questionnaireType,
           submission,
         }),
@@ -630,8 +639,8 @@ export default function ClientDiagnosticQuestionnaire({
 
           {!hasValidSubmissionContext ? (
             <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              This diagnostic link is missing valid project or participant
-              identifiers.
+              This diagnostic link is missing valid project, participant, or
+              invite token identifiers.
             </div>
           ) : null}
 

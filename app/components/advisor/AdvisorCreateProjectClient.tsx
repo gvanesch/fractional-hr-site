@@ -1,100 +1,221 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  buildDefaultSegmentationSchema,
+  slugifySegmentationOptionKey,
+  type SegmentationFieldDefinition,
+  type SegmentationFieldKey,
+  type SegmentationSchema,
+  type SegmentationValues,
+} from "@/lib/client-diagnostic/segmentation";
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
 
-type ParticipantDraft = {
+type ParticipantFormRow = {
   id: string;
   name: string;
   email: string;
   questionnaireType: QuestionnaireType;
+  segmentationValues: SegmentationValues;
 };
 
-type CreateProjectResponse = {
-  success?: boolean;
-  projectId?: string;
-  participants?: number;
-  error?: string;
-};
+type CreateProjectResponse =
+  | {
+      success: true;
+      projectId: string;
+      participants: number;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
-function createParticipant(questionnaireType: QuestionnaireType): ParticipantDraft {
+const FIELD_ORDER: SegmentationFieldKey[] = ["function", "location", "level"];
+
+function createParticipantRow(
+  schema: SegmentationSchema,
+  overrides?: Partial<ParticipantFormRow>,
+): ParticipantFormRow {
+  const defaultSegmentationValues: SegmentationValues = {};
+
+  for (const field of schema.fields) {
+    defaultSegmentationValues[field.fieldKey] = field.options[0]?.optionKey ?? "";
+  }
+
   return {
     id: crypto.randomUUID(),
     name: "",
     email: "",
-    questionnaireType,
+    questionnaireType: "Manager",
+    segmentationValues: defaultSegmentationValues,
+    ...overrides,
+  };
+}
+
+function normaliseSchemaForSubmit(
+  schema: SegmentationSchema,
+): SegmentationSchema {
+  return {
+    fields: FIELD_ORDER.map((fieldKey) => {
+      const field = schema.fields.find((item) => item.fieldKey === fieldKey);
+
+      if (!field) {
+        throw new Error(`Missing segmentation field: ${fieldKey}`);
+      }
+
+      const cleanedOptions = field.options
+        .map((option) => ({
+          optionKey:
+            slugifySegmentationOptionKey(option.optionKey || option.optionLabel) ||
+            slugifySegmentationOptionKey(option.optionLabel),
+          optionLabel: option.optionLabel.trim(),
+        }))
+        .filter((option) => option.optionKey && option.optionLabel);
+
+      return {
+        fieldKey,
+        fieldLabel: field.fieldLabel.trim(),
+        options: cleanedOptions,
+      };
+    }),
   };
 }
 
 export default function AdvisorCreateProjectClient() {
+  const defaultSchema = useMemo(() => buildDefaultSegmentationSchema(), []);
   const [projectName, setProjectName] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [participants, setParticipants] = useState<ParticipantDraft[]>([
-    createParticipant("HR"),
-    createParticipant("Manager"),
-    createParticipant("Leadership"),
+  const [segmentationSchema, setSegmentationSchema] =
+    useState<SegmentationSchema>(defaultSchema);
+  const [participants, setParticipants] = useState<ParticipantFormRow[]>([
+    createParticipantRow(defaultSchema, {
+      questionnaireType: "HR",
+    }),
   ]);
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [submitMessage, setSubmitMessage] = useState("");
-  const [projectResult, setProjectResult] = useState<CreateProjectResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const groupedParticipants = useMemo(() => {
-    return {
-      HR: participants.filter((participant) => participant.questionnaireType === "HR"),
-      Manager: participants.filter((participant) => participant.questionnaireType === "Manager"),
-      Leadership: participants.filter((participant) => participant.questionnaireType === "Leadership"),
-    };
-  }, [participants]);
+  function updateFieldLabel(fieldKey: SegmentationFieldKey, fieldLabel: string) {
+    setSegmentationSchema((current) => ({
+      fields: current.fields.map((field) =>
+        field.fieldKey === fieldKey ? { ...field, fieldLabel } : field,
+      ),
+    }));
+  }
+
+  function updateFieldOptions(
+    fieldKey: SegmentationFieldKey,
+    optionLabelsRaw: string,
+  ) {
+    const optionLabels = optionLabelsRaw
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const nextOptions = optionLabels.map((optionLabel) => ({
+      optionKey: slugifySegmentationOptionKey(optionLabel),
+      optionLabel,
+    }));
+
+    setSegmentationSchema((current) => {
+      const nextSchema: SegmentationSchema = {
+        fields: current.fields.map((field) =>
+          field.fieldKey === fieldKey
+            ? {
+                ...field,
+                options: nextOptions.length > 0 ? nextOptions : field.options,
+              }
+            : field,
+        ),
+      };
+
+      setParticipants((currentParticipants) =>
+        currentParticipants.map((participant) => {
+          const matchingField = nextSchema.fields.find(
+            (field) => field.fieldKey === fieldKey,
+          );
+
+          if (!matchingField || matchingField.options.length === 0) {
+            return participant;
+          }
+
+          const currentValue = participant.segmentationValues[fieldKey];
+          const valueStillExists = matchingField.options.some(
+            (option) => option.optionKey === currentValue,
+          );
+
+          return {
+            ...participant,
+            segmentationValues: {
+              ...participant.segmentationValues,
+              [fieldKey]: valueStillExists
+                ? currentValue
+                : matchingField.options[0].optionKey,
+            },
+          };
+        }),
+      );
+
+      return nextSchema;
+    });
+  }
+
+  function addParticipant() {
+    setParticipants((current) => [...current, createParticipantRow(segmentationSchema)]);
+  }
+
+  function removeParticipant(id: string) {
+    setParticipants((current) => {
+      if (current.length === 1) {
+        return current;
+      }
+
+      return current.filter((participant) => participant.id !== id);
+    });
+  }
 
   function updateParticipant(
     id: string,
-    field: "name" | "email",
-    value: string,
+    updates: Partial<ParticipantFormRow>,
   ) {
     setParticipants((current) =>
       current.map((participant) =>
-        participant.id === id ? { ...participant, [field]: value } : participant,
+        participant.id === id ? { ...participant, ...updates } : participant,
       ),
     );
   }
 
-  function addParticipant(questionnaireType: QuestionnaireType) {
-    setParticipants((current) => [...current, createParticipant(questionnaireType)]);
-  }
-
-  function removeParticipant(id: string) {
-    setParticipants((current) => current.filter((participant) => participant.id !== id));
+  function updateParticipantSegmentationValue(
+    id: string,
+    fieldKey: SegmentationFieldKey,
+    value: string,
+  ) {
+    setParticipants((current) =>
+      current.map((participant) =>
+        participant.id === id
+          ? {
+              ...participant,
+              segmentationValues: {
+                ...participant.segmentationValues,
+                [fieldKey]: value,
+              },
+            }
+          : participant,
+      ),
+    );
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const cleanedParticipants = participants
-      .map((participant) => ({
-        name: participant.name.trim(),
-        email: participant.email.trim(),
-        questionnaireType: participant.questionnaireType,
-      }))
-      .filter((participant) => participant.name && participant.email);
-
-    if (!projectName.trim()) {
-      setSubmitState("error");
-      setSubmitMessage("Project name is required.");
-      return;
-    }
-
-    if (cleanedParticipants.length === 0) {
-      setSubmitState("error");
-      setSubmitMessage("Add at least one participant with a name and email.");
-      return;
-    }
-
-    setSubmitState("submitting");
-    setSubmitMessage("");
-    setProjectResult(null);
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
+      const cleanedSchema = normaliseSchemaForSubmit(segmentationSchema);
+
       const response = await fetch("/api/client-diagnostic-create-project", {
         method: "POST",
         headers: {
@@ -103,214 +224,291 @@ export default function AdvisorCreateProjectClient() {
         body: JSON.stringify({
           projectName: projectName.trim(),
           companyName: companyName.trim(),
-          participants: cleanedParticipants,
+          segmentationSchema: cleanedSchema,
+          participants: participants.map((participant) => ({
+            name: participant.name.trim(),
+            email: participant.email.trim(),
+            questionnaireType: participant.questionnaireType,
+            segmentationValues: participant.segmentationValues,
+          })),
         }),
       });
 
       const result = (await response.json()) as CreateProjectResponse;
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Unable to create project.");
+        throw new Error(
+          "error" in result ? result.error : "Unable to create project.",
+        );
       }
 
-      setProjectResult(result);
-      setSubmitState("success");
-      setSubmitMessage("Project created successfully.");
+      setSuccessMessage(
+        `Project created successfully. ${result.participants} participant(s) invited.`,
+      );
+      setProjectName("");
+      setCompanyName("");
+      setSegmentationSchema(buildDefaultSegmentationSchema());
+      setParticipants([
+        createParticipantRow(buildDefaultSegmentationSchema(), {
+          questionnaireType: "HR",
+        }),
+      ]);
     } catch (error) {
-      setSubmitState("error");
-      setSubmitMessage(
+      setErrorMessage(
         error instanceof Error ? error.message : "Unable to create project.",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <section className="brand-light-section">
-      <div className="brand-container py-10 sm:py-12">
-        <form onSubmit={handleSubmit} className="space-y-10">
-          <section className="brand-surface-card p-6 sm:p-8">
-            <p className="brand-section-kicker">Project setup</p>
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Core details
-            </h2>
+    <form onSubmit={handleSubmit} className="space-y-10">
+      <section className="brand-surface-card p-6 sm:p-8">
+        <p className="brand-section-kicker">Project setup</p>
+        <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+          Core project details
+        </h2>
 
-            <div className="mt-8 grid gap-6 md:grid-cols-2">
-              <FieldBlock
-                label="Project name"
-                value={projectName}
-                onChange={setProjectName}
-                placeholder="Example: Acme diagnostic wave 1"
-              />
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-900">
+              Project name
+            </span>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(event) => setProjectName(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              placeholder="Example: Q2 HR Operating Model Diagnostic"
+              required
+            />
+          </label>
 
-              <FieldBlock
-                label="Company name"
-                value={companyName}
-                onChange={setCompanyName}
-                placeholder="Example: Acme Ltd"
-              />
-            </div>
-          </section>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-900">
+              Company name
+            </span>
+            <input
+              type="text"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              placeholder="Example: Acme Group"
+            />
+          </label>
+        </div>
+      </section>
 
-          <ParticipantSection
-            title="HR participants"
-            description="Add HR team members who should complete the HR diagnostic."
-            participants={groupedParticipants.HR}
-            onAdd={() => addParticipant("HR")}
-            onUpdate={updateParticipant}
-            onRemove={removeParticipant}
-          />
+      <section className="brand-surface-card p-6 sm:p-8">
+        <p className="brand-section-kicker">Participant segmentation</p>
+        <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+          Define client-facing field names and dropdown options
+        </h2>
 
-          <ParticipantSection
-            title="Manager participants"
-            description="Add managers who will complete the manager questionnaire."
-            participants={groupedParticipants.Manager}
-            onAdd={() => addParticipant("Manager")}
-            onUpdate={updateParticipant}
-            onRemove={removeParticipant}
-          />
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+          The internal structure remains fixed as function, location, and level.
+          The labels and options shown to participants can be adapted to the
+          client’s internal language.
+        </p>
 
-          <ParticipantSection
-            title="Leadership participants"
-            description="Add leadership respondents who will complete the leadership questionnaire."
-            participants={groupedParticipants.Leadership}
-            onAdd={() => addParticipant("Leadership")}
-            onUpdate={updateParticipant}
-            onRemove={removeParticipant}
-          />
+        <div className="mt-8 space-y-6">
+          {FIELD_ORDER.map((fieldKey) => {
+            const field = segmentationSchema.fields.find(
+              (item) => item.fieldKey === fieldKey,
+            ) as SegmentationFieldDefinition;
 
-          <section className="brand-surface-card p-6 sm:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <button
-                type="submit"
-                disabled={submitState === "submitting"}
-                className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+            return (
+              <div
+                key={field.fieldKey}
+                className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
               >
-                {submitState === "submitting" ? "Creating project..." : "Create project"}
-              </button>
-            </div>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-900">
+                      Display label
+                    </span>
+                    <input
+                      type="text"
+                      value={field.fieldLabel}
+                      onChange={(event) =>
+                        updateFieldLabel(field.fieldKey, event.target.value)
+                      }
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    />
+                  </label>
 
-            {submitState === "success" ? (
-              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {submitMessage}
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-900">
+                      Options, one per line
+                    </span>
+                    <textarea
+                      value={field.options.map((option) => option.optionLabel).join("\n")}
+                      onChange={(event) =>
+                        updateFieldOptions(field.fieldKey, event.target.value)
+                      }
+                      rows={5}
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    />
+                  </label>
+                </div>
               </div>
-            ) : null}
+            );
+          })}
+        </div>
+      </section>
 
-            {submitState === "error" ? (
-              <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {submitMessage}
-              </div>
-            ) : null}
+      <section className="brand-surface-card p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="brand-section-kicker">Participants</p>
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Add invitees and assign segmentation values
+            </h2>
+          </div>
 
-            {projectResult?.success ? (
-              <div className="mt-6 rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4 text-sm text-slate-700">
-                <p className="font-semibold text-slate-900">Project created</p>
-                <p className="mt-2">Project ID: {projectResult.projectId}</p>
-                <p className="mt-1">Participants created: {projectResult.participants}</p>
-              </div>
-            ) : null}
-          </section>
-        </form>
-      </div>
-    </section>
-  );
-}
-
-function FieldBlock({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-semibold text-slate-900">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="mt-3 w-full rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--brand-accent)]"
-      />
-    </label>
-  );
-}
-
-function ParticipantSection({
-  title,
-  description,
-  participants,
-  onAdd,
-  onUpdate,
-  onRemove,
-}: {
-  title: string;
-  description: string;
-  participants: ParticipantDraft[];
-  onAdd: () => void;
-  onUpdate: (id: string, field: "name" | "email", value: string) => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <section className="brand-surface-card p-6 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="brand-section-kicker">{title}</p>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
-            {description}
-          </p>
+          <button
+            type="button"
+            onClick={addParticipant}
+            className="brand-button-dark"
+          >
+            Add participant
+          </button>
         </div>
 
+        <div className="mt-8 space-y-6">
+          {participants.map((participant, index) => (
+            <div
+              key={participant.id}
+              className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-semibold text-slate-900">
+                  Participant {index + 1}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => removeParticipant(participant.id)}
+                  className="text-sm font-medium text-slate-500 hover:text-slate-900"
+                  disabled={participants.length === 1}
+                >
+                  Remove
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-900">
+                    Name
+                  </span>
+                  <input
+                    type="text"
+                    value={participant.name}
+                    onChange={(event) =>
+                      updateParticipant(participant.id, {
+                        name: event.target.value,
+                      })
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    required
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-900">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    value={participant.email}
+                    onChange={(event) =>
+                      updateParticipant(participant.id, {
+                        email: event.target.value,
+                      })
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    required
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-900">
+                    Questionnaire type
+                  </span>
+                  <select
+                    value={participant.questionnaireType}
+                    onChange={(event) =>
+                      updateParticipant(participant.id, {
+                        questionnaireType: event.target
+                          .value as QuestionnaireType,
+                      })
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                  >
+                    <option value="HR">HR</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Leadership">Leadership</option>
+                  </select>
+                </label>
+
+                {FIELD_ORDER.map((fieldKey) => {
+                  const field = segmentationSchema.fields.find(
+                    (item) => item.fieldKey === fieldKey,
+                  ) as SegmentationFieldDefinition;
+
+                  return (
+                    <label key={field.fieldKey} className="block">
+                      <span className="text-sm font-medium text-slate-900">
+                        {field.fieldLabel}
+                      </span>
+                      <select
+                        value={participant.segmentationValues[field.fieldKey] ?? ""}
+                        onChange={(event) =>
+                          updateParticipantSegmentationValue(
+                            participant.id,
+                            field.fieldKey,
+                            event.target.value,
+                          )
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                      >
+                        {field.options.map((option) => (
+                          <option key={option.optionKey} value={option.optionKey}>
+                            {option.optionLabel}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {errorMessage ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {successMessage ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+          {successMessage}
+        </div>
+      ) : null}
+
+      <div className="flex justify-end">
         <button
-          type="button"
-          onClick={onAdd}
-          className="brand-button-dark"
+          type="submit"
+          disabled={isSubmitting}
+          className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Add participant
+          {isSubmitting ? "Creating project..." : "Create project"}
         </button>
       </div>
-
-      <div className="mt-8 space-y-4">
-        {participants.map((participant, index) => (
-          <div
-            key={participant.id}
-            className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-sm font-semibold text-slate-900">
-                Participant {index + 1}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => onRemove(participant.id)}
-                className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-              >
-                Remove
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <FieldBlock
-                label="Name"
-                value={participant.name}
-                onChange={(value) => onUpdate(participant.id, "name", value)}
-                placeholder="Full name"
-              />
-
-              <FieldBlock
-                label="Email"
-                value={participant.email}
-                onChange={(value) => onUpdate(participant.id, "email", value)}
-                placeholder="name@company.com"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
+    </form>
   );
 }
