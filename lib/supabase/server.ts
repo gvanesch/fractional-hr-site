@@ -12,11 +12,13 @@ export async function createSupabaseServerClient() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options) {
-          cookieStore.set({ name, value, ...options });
+        set() {
+          // No-op in server component context.
+          // Cookie writes must happen in Route Handlers or Server Actions.
         },
-        remove(name: string, options) {
-          cookieStore.set({ name, value: "", ...options });
+        remove() {
+          // No-op in server component context.
+          // Cookie writes must happen in Route Handlers or Server Actions.
         },
       },
     },

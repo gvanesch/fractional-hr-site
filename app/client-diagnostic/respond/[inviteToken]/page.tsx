@@ -14,6 +14,8 @@ export const metadata = {
   },
 };
 
+type ProjectQuestionnaireType = QuestionnaireType | "client_fact_pack";
+
 type PageProps = {
   params: Promise<{
     inviteToken: string;
@@ -51,8 +53,14 @@ function getSupabaseAdminClient() {
   );
 }
 
-function isQuestionnaireType(value: string): value is QuestionnaireType {
+function isScoredQuestionnaireType(value: string): value is QuestionnaireType {
   return questionnaireTypes.includes(value as QuestionnaireType);
+}
+
+function isProjectQuestionnaireType(
+  value: string,
+): value is ProjectQuestionnaireType {
+  return isScoredQuestionnaireType(value) || value === "client_fact_pack";
 }
 
 function isReasonableInviteToken(value: string | undefined): value is string {
@@ -96,15 +104,20 @@ export default async function ClientDiagnosticRespondPage({
     notFound();
   }
 
-  if (!isQuestionnaireType(participant.questionnaire_type)) {
+  if (!isProjectQuestionnaireType(participant.questionnaire_type)) {
     notFound();
   }
 
   const targetUrl =
-    `/client-diagnostic/${participant.questionnaire_type}` +
-    `?projectId=${encodeURIComponent(participant.project_id)}` +
-    `&participantId=${encodeURIComponent(participant.participant_id)}` +
-    `&inviteToken=${encodeURIComponent(inviteToken)}`;
+    participant.questionnaire_type === "client_fact_pack"
+      ? `/client-diagnostic/client-fact-pack` +
+        `?projectId=${encodeURIComponent(participant.project_id)}` +
+        `&participantId=${encodeURIComponent(participant.participant_id)}` +
+        `&inviteToken=${encodeURIComponent(inviteToken)}`
+      : `/client-diagnostic/${participant.questionnaire_type}` +
+        `?projectId=${encodeURIComponent(participant.project_id)}` +
+        `&participantId=${encodeURIComponent(participant.participant_id)}` +
+        `&inviteToken=${encodeURIComponent(inviteToken)}`;
 
   redirect(targetUrl);
 }
