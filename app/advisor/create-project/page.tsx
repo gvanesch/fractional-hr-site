@@ -28,7 +28,13 @@ export default function AdvisorCreateProjectPage() {
         </div>
       </section>
 
-      <AdvisorCreateProjectClient />
+      <section className="brand-light-section">
+        <div className="brand-container py-10 sm:py-12">
+          <div className="mx-auto max-w-5xl">
+            <AdvisorCreateProjectClient />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -20,6 +20,11 @@ type ParticipantFormRow = {
   segmentationValues: SegmentationValues;
 };
 
+type FactPackRecipient = {
+  name: string;
+  email: string;
+};
+
 type CreateProjectResponse =
   | {
       success: true;
@@ -40,7 +45,8 @@ function createParticipantRow(
   const defaultSegmentationValues: SegmentationValues = {};
 
   for (const field of schema.fields) {
-    defaultSegmentationValues[field.fieldKey] = field.options[0]?.optionKey ?? "";
+    defaultSegmentationValues[field.fieldKey] =
+      field.options[0]?.optionKey ?? "";
   }
 
   return {
@@ -67,8 +73,9 @@ function normaliseSchemaForSubmit(
       const cleanedOptions = field.options
         .map((option) => ({
           optionKey:
-            slugifySegmentationOptionKey(option.optionKey || option.optionLabel) ||
-            slugifySegmentationOptionKey(option.optionLabel),
+            slugifySegmentationOptionKey(
+              option.optionKey || option.optionLabel,
+            ) || slugifySegmentationOptionKey(option.optionLabel),
           optionLabel: option.optionLabel.trim(),
         }))
         .filter((option) => option.optionKey && option.optionLabel);
@@ -79,6 +86,28 @@ function normaliseSchemaForSubmit(
         options: cleanedOptions,
       };
     }),
+  };
+}
+
+function getCleanFactPackRecipient(
+  factPackRecipient: FactPackRecipient,
+): FactPackRecipient | null {
+  const name = factPackRecipient.name.trim();
+  const email = factPackRecipient.email.trim();
+
+  if (!name && !email) {
+    return null;
+  }
+
+  if (!name || !email) {
+    throw new Error(
+      "If you add a Client Fact Pack recipient, both name and email are required.",
+    );
+  }
+
+  return {
+    name,
+    email,
   };
 }
 
@@ -93,6 +122,10 @@ export default function AdvisorCreateProjectClient() {
       questionnaireType: "HR",
     }),
   ]);
+  const [factPackRecipient, setFactPackRecipient] = useState<FactPackRecipient>({
+    name: "",
+    email: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -163,7 +196,10 @@ export default function AdvisorCreateProjectClient() {
   }
 
   function addParticipant() {
-    setParticipants((current) => [...current, createParticipantRow(segmentationSchema)]);
+    setParticipants((current) => [
+      ...current,
+      createParticipantRow(segmentationSchema),
+    ]);
   }
 
   function removeParticipant(id: string) {
@@ -215,6 +251,8 @@ export default function AdvisorCreateProjectClient() {
 
     try {
       const cleanedSchema = normaliseSchemaForSubmit(segmentationSchema);
+      const cleanedFactPackRecipient =
+        getCleanFactPackRecipient(factPackRecipient);
 
       const response = await fetch("/api/client-diagnostic-create-project", {
         method: "POST",
@@ -231,6 +269,7 @@ export default function AdvisorCreateProjectClient() {
             questionnaireType: participant.questionnaireType,
             segmentationValues: participant.segmentationValues,
           })),
+          factPackRecipient: cleanedFactPackRecipient,
         }),
       });
 
@@ -253,6 +292,10 @@ export default function AdvisorCreateProjectClient() {
           questionnaireType: "HR",
         }),
       ]);
+      setFactPackRecipient({
+        name: "",
+        email: "",
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to create project.",
@@ -343,7 +386,9 @@ export default function AdvisorCreateProjectClient() {
                       Options, one per line
                     </span>
                     <textarea
-                      value={field.options.map((option) => option.optionLabel).join("\n")}
+                      value={field.options
+                        .map((option) => option.optionLabel)
+                        .join("\n")}
                       onChange={(event) =>
                         updateFieldOptions(field.fieldKey, event.target.value)
                       }
@@ -463,7 +508,9 @@ export default function AdvisorCreateProjectClient() {
                         {field.fieldLabel}
                       </span>
                       <select
-                        value={participant.segmentationValues[field.fieldKey] ?? ""}
+                        value={
+                          participant.segmentationValues[field.fieldKey] ?? ""
+                        }
                         onChange={(event) =>
                           updateParticipantSegmentationValue(
                             participant.id,
@@ -474,7 +521,10 @@ export default function AdvisorCreateProjectClient() {
                         className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
                       >
                         {field.options.map((option) => (
-                          <option key={option.optionKey} value={option.optionKey}>
+                          <option
+                            key={option.optionKey}
+                            value={option.optionKey}
+                          >
                             {option.optionLabel}
                           </option>
                         ))}
@@ -485,6 +535,57 @@ export default function AdvisorCreateProjectClient() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="brand-surface-card p-6 sm:p-8">
+        <p className="brand-section-kicker">Client fact pack</p>
+        <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+          Optional recipient
+        </h2>
+
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+          Send one separate Client Fact Pack to capture system, tooling, and
+          infrastructure context. This is tracked in the project but excluded
+          from scored analysis.
+        </p>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-900">
+              Recipient name
+            </span>
+            <input
+              type="text"
+              value={factPackRecipient.name}
+              onChange={(event) =>
+                setFactPackRecipient((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              placeholder="Example: Jane Smith"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-900">
+              Recipient email
+            </span>
+            <input
+              type="email"
+              value={factPackRecipient.email}
+              onChange={(event) =>
+                setFactPackRecipient((current) => ({
+                  ...current,
+                  email: event.target.value,
+                }))
+              }
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              placeholder="Example: jane@acme.com"
+            />
+          </label>
         </div>
       </section>
 

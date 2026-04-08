@@ -20,11 +20,21 @@ import {
   buildDimensionAnalyses,
   type DimensionAnalysis,
 } from "@/lib/client-diagnostic/analysis-engine";
+import type { SegmentationValues } from "@/lib/client-diagnostic/segmentation";
+
+type ProjectQuestionnaireType =
+  | "hr"
+  | "manager"
+  | "leadership"
+  | "client_fact_pack";
 
 type ParticipantRow = {
   participant_id: string;
-  questionnaire_type: QuestionnaireType;
+  questionnaire_type: ProjectQuestionnaireType;
   role_label: string;
+  name: string;
+  email: string;
+  segmentation_values: SegmentationValues | null;
   participant_status: string;
   started_at: string | null;
   completed_at: string | null;
@@ -62,6 +72,19 @@ type ProjectRow = {
   updated_at: string;
 };
 
+type ParticipantSummary = {
+  participantId: string;
+  questionnaireType: ProjectQuestionnaireType;
+  roleLabel: string;
+  name: string;
+  email: string;
+  segmentationValues: SegmentationValues | null;
+  participantStatus: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+};
+
 type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
 
 type DimensionSummary = {
@@ -77,7 +100,7 @@ type DimensionSummary = {
 };
 
 type RespondentGroupSummary = {
-  questionnaireType: QuestionnaireType;
+  questionnaireType: ProjectQuestionnaireType;
   label: string;
   totalInvited: number;
   outstanding: number;
@@ -85,6 +108,9 @@ type RespondentGroupSummary = {
   outstandingParticipants: Array<{
     participantId: string;
     roleLabel: string;
+    name: string;
+    email: string;
+    segmentationValues: SegmentationValues | null;
     participantStatus: string;
     startedAt: string | null;
     completedAt: string | null;
@@ -122,6 +148,14 @@ type OverallQualitativeSummary = {
   summary: string | null;
 };
 
+type CompletionSummary = {
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
+  completionPercentage: number;
+  respondentGroups: RespondentGroupSummary[];
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -132,21 +166,11 @@ type ProjectSummaryResponse = {
     projectStatus: string;
     notes: string | null;
   };
-  completion: {
-    totalInvited: number;
-    outstanding: number;
-    completed: number;
-    completionPercentage: number;
-    participants: Array<{
-      participantId: string;
-      questionnaireType: QuestionnaireType;
-      roleLabel: string;
-      participantStatus: string;
-      startedAt: string | null;
-      completedAt: string | null;
-      updatedAt: string;
-    }>;
-    respondentGroups: RespondentGroupSummary[];
+  completion: CompletionSummary & {
+    participants: ParticipantSummary[];
+  };
+  scoredCompletion: CompletionSummary & {
+    analysisReady: boolean;
   };
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
@@ -187,6 +211,13 @@ type ErrorResponse = {
   success: false;
   error: string;
 };
+
+const ALL_PROJECT_QUESTIONNAIRE_TYPES: ProjectQuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+  "client_fact_pack",
+];
 
 const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "hr",
@@ -562,7 +593,7 @@ function getCompletionPercentage(
 }
 
 function formatQuestionnaireTypeLabel(
-  questionnaireType: QuestionnaireType,
+  questionnaireType: ProjectQuestionnaireType,
 ): string {
   switch (questionnaireType) {
     case "hr":
@@ -571,15 +602,35 @@ function formatQuestionnaireTypeLabel(
       return "Manager";
     case "leadership":
       return "Leadership";
+    case "client_fact_pack":
+      return "Client Fact Pack";
     default:
       return questionnaireType;
   }
 }
 
+function buildParticipantSummary(
+  participant: ParticipantRow,
+): ParticipantSummary {
+  return {
+    participantId: participant.participant_id,
+    questionnaireType: participant.questionnaire_type,
+    roleLabel: participant.role_label,
+    name: participant.name,
+    email: participant.email,
+    segmentationValues: participant.segmentation_values,
+    participantStatus: participant.participant_status,
+    startedAt: participant.started_at,
+    completedAt: participant.completed_at,
+    updatedAt: participant.updated_at,
+  };
+}
+
 function buildRespondentGroups(
   participantRows: ParticipantRow[],
+  includedQuestionnaireTypes: ProjectQuestionnaireType[],
 ): RespondentGroupSummary[] {
-  return questionnaireTypes.map((questionnaireType) => {
+  return includedQuestionnaireTypes.map((questionnaireType) => {
     const matchingParticipants = participantRows.filter(
       (participant) => participant.questionnaire_type === questionnaireType,
     );
@@ -596,6 +647,9 @@ function buildRespondentGroups(
       .map((participant) => ({
         participantId: participant.participant_id,
         roleLabel: participant.role_label,
+        name: participant.name,
+        email: participant.email,
+        segmentationValues: participant.segmentation_values,
         participantStatus: participant.participant_status,
         startedAt: participant.started_at,
         completedAt: participant.completed_at,
@@ -611,6 +665,33 @@ function buildRespondentGroups(
       outstandingParticipants,
     };
   });
+}
+
+function buildCompletionSummary(
+  participantRows: ParticipantRow[],
+  includedQuestionnaireTypes: ProjectQuestionnaireType[],
+): CompletionSummary {
+  const filteredParticipants = participantRows.filter((participant) =>
+    includedQuestionnaireTypes.includes(participant.questionnaire_type),
+  );
+
+  const completed = filteredParticipants.filter(
+    (participant) => participant.participant_status === "completed",
+  ).length;
+
+  const totalInvited = filteredParticipants.length;
+  const outstanding = Math.max(totalInvited - completed, 0);
+
+  return {
+    totalInvited,
+    outstanding,
+    completed,
+    completionPercentage: getCompletionPercentage(completed, totalInvited),
+    respondentGroups: buildRespondentGroups(
+      filteredParticipants,
+      includedQuestionnaireTypes,
+    ),
+  };
 }
 
 function buildDimensionSummaries(
@@ -1059,7 +1140,6 @@ export async function GET(
   request: Request,
 ): Promise<NextResponse<ProjectSummaryResponse | ErrorResponse>> {
   try {
-    // 🔒 AUTH GUARD
     const advisorUser = await requireAdvisorUser();
 
     if (!advisorUser) {
@@ -1113,7 +1193,7 @@ export async function GET(
       supabase
         .from("client_participants")
         .select(
-          "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
+          "participant_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, started_at, completed_at, updated_at",
         )
         .eq("project_id", projectId)
         .returns<ParticipantRow[]>(),
@@ -1175,6 +1255,8 @@ export async function GET(
     }
 
     const participantRows = participants ?? [];
+    const participantSummaries = participantRows.map(buildParticipantSummary);
+
     const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
       isScoredQuestionnaireType(row.questionnaire_type),
     );
@@ -1182,14 +1264,16 @@ export async function GET(
       isScoredQuestionnaireType(row.questionnaire_type),
     );
 
-    const completed = participantRows.filter(
-      (participant) => participant.participant_status === "completed",
-    ).length;
+    const completion = buildCompletionSummary(
+      participantRows,
+      ALL_PROJECT_QUESTIONNAIRE_TYPES,
+    );
 
-    const totalInvited = participantRows.length;
-    const outstanding = Math.max(totalInvited - completed, 0);
+    const scoredCompletion = buildCompletionSummary(
+      participantRows,
+      SCORED_QUESTIONNAIRE_TYPES,
+    );
 
-    const respondentGroups = buildRespondentGroups(participantRows);
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
     const dimensionInsights = buildDimensionInsights(dimensions);
     const dimensionAnalyses = buildDimensionAnalyses({
@@ -1225,23 +1309,13 @@ export async function GET(
         notes: project.notes,
       },
       completion: {
-        totalInvited,
-        outstanding,
-        completed,
-        completionPercentage: getCompletionPercentage(
-          completed,
-          totalInvited,
-        ),
-        participants: participantRows.map((participant) => ({
-          participantId: participant.participant_id,
-          questionnaireType: participant.questionnaire_type,
-          roleLabel: participant.role_label,
-          participantStatus: participant.participant_status,
-          startedAt: participant.started_at,
-          completedAt: participant.completed_at,
-          updatedAt: participant.updated_at,
-        })),
-        respondentGroups,
+        ...completion,
+        participants: participantSummaries,
+      },
+      scoredCompletion: {
+        ...scoredCompletion,
+        analysisReady:
+          scoredCompletion.totalInvited > 0 && scoredCompletion.outstanding === 0,
       },
       dimensions,
       strongestAlignment,

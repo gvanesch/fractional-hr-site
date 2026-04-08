@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
+
+type SegmentationValues = Record<string, string | null | undefined>;
 
 type ParticipantSummary = {
   participantId: string;
   questionnaireType: QuestionnaireType;
   roleLabel: string;
+  name: string;
+  email: string;
+  segmentationValues: SegmentationValues | null;
   participantStatus: string;
   startedAt: string | null;
   completedAt: string | null;
@@ -23,6 +28,9 @@ type RespondentGroupSummary = {
   outstandingParticipants: Array<{
     participantId: string;
     roleLabel: string;
+    name: string;
+    email: string;
+    segmentationValues: SegmentationValues | null;
     participantStatus: string;
     startedAt: string | null;
     completedAt: string | null;
@@ -42,6 +50,14 @@ type DimensionSummary = {
   gap: number | null;
 };
 
+type CompletionSummary = {
+  totalInvited: number;
+  outstanding: number;
+  completed: number;
+  completionPercentage: number;
+  respondentGroups: RespondentGroupSummary[];
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -52,13 +68,11 @@ type ProjectSummaryResponse = {
     projectStatus: string;
     notes: string | null;
   };
-  completion: {
-    totalInvited: number;
-    outstanding: number;
-    completed: number;
-    completionPercentage: number;
+  completion: CompletionSummary & {
     participants: ParticipantSummary[];
-    respondentGroups: RespondentGroupSummary[];
+  };
+  scoredCompletion: CompletionSummary & {
+    analysisReady: boolean;
   };
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
@@ -108,10 +122,58 @@ function formatDateTime(value: string | null): string {
 
 function formatScore(value: number | null | undefined): string {
   if (typeof value !== "number") {
-    return "—";
+    return "Not available";
   }
 
   return value.toFixed(2);
+}
+
+function formatQuestionnaireType(value: QuestionnaireType): string {
+  switch (value) {
+    case "hr":
+      return "HR";
+    case "manager":
+      return "Manager";
+    case "leadership":
+      return "Leadership";
+    case "client_fact_pack":
+      return "Client Fact Pack";
+    default:
+      return value;
+  }
+}
+
+function formatSegmentationValues(
+  segmentationValues: SegmentationValues | null,
+): string {
+  if (!segmentationValues) {
+    return "Not set";
+  }
+
+  const entries = Object.entries(segmentationValues).filter(
+    ([, value]) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  if (entries.length === 0) {
+    return "Not set";
+  }
+
+  return entries
+    .map(([key, value]) => `${humaniseSegmentationKey(key)}: ${value}`)
+    .join(" • ");
+}
+
+function humaniseSegmentationKey(key: string): string {
+  switch (key) {
+    case "function":
+      return "Function";
+    case "location":
+      return "Location";
+    case "level":
+      return "Level";
+    default:
+      return key;
+  }
 }
 
 function getStatusTone(status: string): string {
@@ -124,6 +186,10 @@ function getStatusTone(status: string): string {
       return "border-slate-200 bg-slate-100 text-slate-700";
     case "invited":
       return "border-amber-200 bg-amber-50 text-amber-700";
+    case "in_progress":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "removed":
+      return "border-slate-200 bg-slate-100 text-slate-600";
     default:
       return "border-slate-200 bg-slate-50 text-slate-700";
   }
@@ -232,27 +298,6 @@ export default function AdvisorProjectDashboardClient({
     }
   }
 
-  const scoredGroupsComplete = useMemo(() => {
-    if (!data) {
-      return false;
-    }
-
-    const relevantGroups = data.completion.respondentGroups.filter(
-      (group) =>
-        group.questionnaireType === "hr" ||
-        group.questionnaireType === "manager" ||
-        group.questionnaireType === "leadership",
-    );
-
-    if (relevantGroups.length === 0) {
-      return false;
-    }
-
-    return relevantGroups.every(
-      (group) => group.totalInvited > 0 && group.outstanding === 0,
-    );
-  }, [data]);
-
   if (loading) {
     return (
       <section className="brand-light-section">
@@ -277,15 +322,26 @@ export default function AdvisorProjectDashboardClient({
     );
   }
 
-  const { project, completion, respondentGroups, participants, biggestGaps, strongestAlignment } =
-    {
-      project: data.project,
-      completion: data.completion,
-      respondentGroups: data.completion.respondentGroups,
-      participants: data.completion.participants,
-      biggestGaps: data.biggestGaps,
-      strongestAlignment: data.strongestAlignment,
-    };
+  const project = data.project;
+  const completion = data.completion;
+  const scoredCompletion = data.scoredCompletion;
+  const respondentGroups = data.completion.respondentGroups;
+  const participants = data.completion.participants;
+  const biggestGaps = data.biggestGaps;
+  const strongestAlignment = data.strongestAlignment;
+  console.log("project summary payload", data);
+
+  const scoredRespondentGroups = respondentGroups.filter(
+    (group) =>
+      group.questionnaireType === "hr" ||
+      group.questionnaireType === "manager" ||
+      group.questionnaireType === "leadership",
+  );
+
+  const factPackGroup =
+    respondentGroups.find(
+      (group) => group.questionnaireType === "client_fact_pack",
+    ) ?? null;
 
   return (
     <section className="brand-light-section">
@@ -305,12 +361,14 @@ export default function AdvisorProjectDashboardClient({
                     value={project.projectStatus}
                   />
                   <MetricCard
-                    label="Completion"
+                    label="Project completion"
                     value={`${completion.completionPercentage}%`}
                   />
                   <MetricCard
-                    label="Completed"
-                    value={`${completion.completed} / ${completion.totalInvited}`}
+                    label="Scored readiness"
+                    value={
+                      scoredCompletion?.analysisReady ? "Ready" : "In progress"
+                    }
                   />
                   <MetricCard
                     label="Outstanding"
@@ -338,8 +396,8 @@ export default function AdvisorProjectDashboardClient({
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Close the project once diagnostic collection is complete and you
-                  have moved into the next phase.
+                  Close the project once diagnostic collection is complete and
+                  you have moved into the next phase.
                 </p>
 
                 <div className="mt-5 flex flex-col gap-3">
@@ -365,10 +423,17 @@ export default function AdvisorProjectDashboardClient({
                 </div>
 
                 <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                  {scoredGroupsComplete
-                    ? "All scored respondent groups are complete."
-                    : "There are still outstanding respondent groups or participants."}
+                  {scoredCompletion?.analysisReady
+                    ? "All scored respondent groups are complete and analysis can proceed."
+                    : "Scored diagnostic collection is still in progress."}
                 </div>
+
+                {factPackGroup ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    Client Fact Pack: {factPackGroup.completed} /{" "}
+                    {factPackGroup.totalInvited} completed
+                  </div>
+                ) : null}
 
                 {actionMessage ? (
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -380,13 +445,13 @@ export default function AdvisorProjectDashboardClient({
           </section>
 
           <section className="brand-surface-card p-6 sm:p-8">
-            <p className="brand-section-kicker">Respondent groups</p>
+            <p className="brand-section-kicker">Scored respondent groups</p>
             <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Completion by respondent type
+              Completion by scored respondent type
             </h2>
 
             <div className="mt-8 grid gap-4 xl:grid-cols-3">
-              {respondentGroups.map((group) => (
+              {scoredRespondentGroups.map((group) => (
                 <div
                   key={group.questionnaireType}
                   className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
@@ -444,7 +509,13 @@ export default function AdvisorProjectDashboardClient({
                           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                         >
                           <p className="text-sm font-medium text-slate-900">
-                            {participant.roleLabel}
+                            {participant.name}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {participant.email}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            Role: {participant.roleLabel}
                           </p>
                           <p className="mt-1 text-xs text-slate-600">
                             Status: {participant.participantStatus}
@@ -465,18 +536,60 @@ export default function AdvisorProjectDashboardClient({
             </div>
           </section>
 
+          {factPackGroup ? (
+            <section className="brand-surface-card p-6 sm:p-8">
+              <p className="brand-section-kicker">Client fact pack</p>
+              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                Operational input for final reporting
+              </h2>
+
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                The Client Fact Pack is tracked as a project deliverable and
+                input to final reporting. It is not included in scored
+                comparison, insight generation, narrative engines, or
+                qualitative pattern analysis.
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                <MetricCard
+                  label="Invited"
+                  value={`${factPackGroup.totalInvited}`}
+                />
+                <MetricCard
+                  label="Completed"
+                  value={`${factPackGroup.completed}`}
+                />
+                <MetricCard
+                  label="Outstanding"
+                  value={`${factPackGroup.outstanding}`}
+                />
+              </div>
+            </section>
+          ) : null}
+
           <section className="brand-surface-card p-6 sm:p-8">
-            <p className="brand-section-kicker">Participants</p>
-            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-              Participant register
-            </h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="brand-section-kicker">Participants</p>
+                <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                  Participant register
+                </h2>
+              </div>
+
+              <div className="text-sm text-slate-600">
+                Includes scored diagnostic participants and fact pack delivery.
+              </div>
+            </div>
 
             <div className="mt-8 overflow-x-auto">
               <table className="min-w-full border-separate border-spacing-y-3">
                 <thead>
                   <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+                    <th className="px-4">Name</th>
+                    <th className="px-4">Email</th>
                     <th className="px-4">Role</th>
                     <th className="px-4">Questionnaire</th>
+                    <th className="px-4">Segmentation</th>
                     <th className="px-4">Status</th>
                     <th className="px-4">Started</th>
                     <th className="px-4">Completed</th>
@@ -490,10 +603,15 @@ export default function AdvisorProjectDashboardClient({
                       className="rounded-2xl border border-[var(--brand-border)] bg-white text-sm text-slate-700"
                     >
                       <td className="rounded-l-2xl px-4 py-4 font-medium text-slate-900">
-                        {participant.roleLabel}
+                        {participant.name}
                       </td>
-                      <td className="px-4 py-4 capitalize">
-                        {participant.questionnaireType}
+                      <td className="px-4 py-4">{participant.email}</td>
+                      <td className="px-4 py-4">{participant.roleLabel}</td>
+                      <td className="px-4 py-4">
+                        {formatQuestionnaireType(participant.questionnaireType)}
+                      </td>
+                      <td className="px-4 py-4 text-xs leading-6 text-slate-600">
+                        {formatSegmentationValues(participant.segmentationValues)}
                       </td>
                       <td className="px-4 py-4">
                         <span
@@ -504,8 +622,12 @@ export default function AdvisorProjectDashboardClient({
                           {participant.participantStatus}
                         </span>
                       </td>
-                      <td className="px-4 py-4">{formatDateTime(participant.startedAt)}</td>
-                      <td className="px-4 py-4">{formatDateTime(participant.completedAt)}</td>
+                      <td className="px-4 py-4">
+                        {formatDateTime(participant.startedAt)}
+                      </td>
+                      <td className="px-4 py-4">
+                        {formatDateTime(participant.completedAt)}
+                      </td>
                       <td className="rounded-r-2xl px-4 py-4">
                         {formatDateTime(participant.updatedAt)}
                       </td>
@@ -552,16 +674,16 @@ export default function AdvisorProjectDashboardClient({
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <ActionCard
-                title="Review outstanding participants"
-                description="Use respondent group completion to identify who still needs to respond before analysis is finalised."
+                title="Review outstanding scored participants"
+                description="Use scored respondent-group completion to identify who still needs to respond before analysis is finalised."
+              />
+              <ActionCard
+                title="Confirm fact pack completion"
+                description="Ensure the client fact pack is completed before final reporting so system, tooling, and infrastructure context is available."
               />
               <ActionCard
                 title="Close project when collection ends"
-                description="Once the diagnostic phase is complete, close the project to signal that collection has moved into analysis or delivery."
-              />
-              <ActionCard
-                title="Open report and advisor views"
-                description="Use the existing report and advisor views to interpret scored patterns, gaps, and qualitative themes."
+                description="Once diagnostic collection and fact pack input are complete, close the project to signal that the work has moved into analysis or delivery."
               />
             </div>
           </section>
@@ -584,28 +706,6 @@ function MetricCard({
         {label}
       </p>
       <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function InfoCard({
-  label,
-  value,
-  secondary,
-}: {
-  label: string;
-  value: string;
-  secondary?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-base font-semibold text-slate-900">{value}</p>
-      {secondary ? (
-        <p className="mt-2 text-sm leading-6 text-slate-600">{secondary}</p>
-      ) : null}
     </div>
   );
 }
@@ -656,6 +756,28 @@ function ScoreCard({
       <p className="mt-2 text-lg font-semibold text-slate-900">
         {formatScore(value)}
       </p>
+    </div>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  secondary,
+}: {
+  label: string;
+  value: string;
+  secondary?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-semibold text-slate-900">{value}</p>
+      {secondary ? (
+        <p className="mt-2 text-sm leading-6 text-slate-600">{secondary}</p>
+      ) : null}
     </div>
   );
 }

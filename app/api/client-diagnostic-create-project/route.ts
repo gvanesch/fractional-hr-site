@@ -12,7 +12,11 @@ import {
 export const runtime = "edge";
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
-type DatabaseQuestionnaireType = "hr" | "manager" | "leadership";
+type DatabaseQuestionnaireType =
+  | "hr"
+  | "manager"
+  | "leadership"
+  | "client_fact_pack";
 
 type ParticipantInput = {
   name: string;
@@ -21,11 +25,17 @@ type ParticipantInput = {
   segmentationValues: SegmentationValues;
 };
 
+type FactPackRecipientInput = {
+  name: string;
+  email: string;
+};
+
 type CreateProjectRequest = {
   projectName: string;
   companyName?: string;
   segmentationSchema: SegmentationSchema;
   participants: ParticipantInput[];
+  factPackRecipient?: FactPackRecipientInput | null;
 };
 
 type EmailSendResult = {
@@ -33,6 +43,17 @@ type EmailSendResult = {
   success: boolean;
   resendId: string | null;
   error: string | null;
+};
+
+type InsertedParticipantRow = {
+  participant_id: string;
+  project_id: string;
+  questionnaire_type: DatabaseQuestionnaireType;
+  role_label: string;
+  name: string;
+  email: string;
+  segmentation_values: SegmentationValues | null;
+  invite_token: string | null;
 };
 
 function getEnv(name: string): string {
@@ -64,11 +85,11 @@ function mapQuestionnaireTypeToDatabaseValue(
   }
 }
 
-function buildEmailSubject(projectName: string) {
+function buildDiagnosticEmailSubject(projectName: string) {
   return `Input requested: ${projectName} HR operations diagnostic`;
 }
 
-function buildEmailHtml(params: {
+function buildDiagnosticEmailHtml(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
@@ -104,7 +125,7 @@ function buildEmailHtml(params: {
   `;
 }
 
-function buildEmailText(params: {
+function buildDiagnosticEmailText(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
@@ -131,6 +152,217 @@ function buildEmailText(params: {
   ].join("\n");
 }
 
+function buildFactPackEmailSubject(projectName: string) {
+  return `Input requested: ${projectName} client fact pack`;
+}
+
+function buildFactPackEmailHtml(params: {
+  name: string;
+  projectName: string;
+  inviteUrl: string;
+}) {
+  const { name, projectName, inviteUrl } = params;
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; max-width: 560px;">
+      <p>Hi ${name},</p>
+
+      <p>You’ve been asked to complete the Client Fact Pack for <strong>${projectName}</strong>.</p>
+
+      <p>This captures contextual information on the current people operations environment, including systems, tooling, infrastructure, and delivery context.</p>
+
+      <p>It is used to strengthen final interpretation and advisory output, but it is not included in scored statistical analysis.</p>
+
+      <p><strong>This input should only be completed once for the project.</strong></p>
+
+      <p style="margin: 24px 0;">
+        <a href="${inviteUrl}" 
+           style="display:inline-block;padding:12px 18px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+          Start fact pack
+        </a>
+      </p>
+
+      <p>If you need to pause, you can return to the same link at any time.</p>
+
+      <p style="margin-top: 24px;">
+        Thank you,<br/>
+        Van Esch Advisory
+      </p>
+    </div>
+  `;
+}
+
+function buildFactPackEmailText(params: {
+  name: string;
+  projectName: string;
+  inviteUrl: string;
+}) {
+  const { name, projectName, inviteUrl } = params;
+
+  return [
+    `Hi ${name},`,
+    ``,
+    `You’ve been asked to complete the Client Fact Pack for ${projectName}.`,
+    ``,
+    `This captures contextual information on the current people operations environment, including systems, tooling, infrastructure, and delivery context.`,
+    ``,
+    `It is used to strengthen final interpretation and advisory output, but it is not included in scored statistical analysis.`,
+    ``,
+    `This input should only be completed once for the project.`,
+    ``,
+    `Start fact pack: ${inviteUrl}`,
+    ``,
+    `If you need to pause, you can return to the same link at any time.`,
+    ``,
+    `Thank you,`,
+    `Van Esch Advisory`,
+  ].join("\n");
+}
+
+function getCleanFactPackRecipient(
+  input: FactPackRecipientInput | null | undefined,
+): FactPackRecipientInput | null {
+  if (!input) {
+    return null;
+  }
+
+  const name = input.name?.trim() ?? "";
+  const email = input.email?.trim() ?? "";
+
+  if (!name && !email) {
+    return null;
+  }
+
+  if (!name || !email) {
+    throw new Error(
+      "If a Client Fact Pack recipient is provided, both name and email are required.",
+    );
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error("Client Fact Pack recipient email is invalid.");
+  }
+
+  return {
+    name,
+    email: email.toLowerCase(),
+  };
+}
+
+async function sendParticipantInvite(params: {
+  resend: Resend;
+  fromEmail: string;
+  replyToEmail: string;
+  siteUrl: string;
+  projectName: string;
+  participant: InsertedParticipantRow;
+}): Promise<EmailSendResult> {
+  const { resend, fromEmail, replyToEmail, siteUrl, projectName, participant } =
+    params;
+
+  if (!participant.invite_token) {
+    return {
+      email: participant.email,
+      success: false,
+      resendId: null,
+      error: "Missing invite token on participant row.",
+    };
+  }
+
+  const inviteUrl = `${siteUrl}/client-diagnostic/respond/${participant.invite_token}`;
+
+  const isFactPack = participant.questionnaire_type === "client_fact_pack";
+
+  try {
+    const resendResponse = await resend.emails.send({
+      from: `Van Esch Advisory <${fromEmail}>`,
+      to: participant.email,
+      replyTo: replyToEmail,
+      subject: isFactPack
+        ? buildFactPackEmailSubject(projectName)
+        : buildDiagnosticEmailSubject(projectName),
+      html: isFactPack
+        ? buildFactPackEmailHtml({
+            name: participant.name,
+            projectName,
+            inviteUrl,
+          })
+        : buildDiagnosticEmailHtml({
+            name: participant.name,
+            projectName,
+            inviteUrl,
+          }),
+      text: isFactPack
+        ? buildFactPackEmailText({
+            name: participant.name,
+            projectName,
+            inviteUrl,
+          })
+        : buildDiagnosticEmailText({
+            name: participant.name,
+            projectName,
+            inviteUrl,
+          }),
+    });
+
+    const resendError =
+      resendResponse && "error" in resendResponse
+        ? resendResponse.error
+        : null;
+
+    const resendData =
+      resendResponse && "data" in resendResponse ? resendResponse.data : null;
+
+    if (resendError) {
+      console.error("Resend returned an error", {
+        participantEmail: participant.email,
+        resendError,
+      });
+
+      return {
+        email: participant.email,
+        success: false,
+        resendId: null,
+        error:
+          typeof resendError.message === "string"
+            ? resendError.message
+            : "Resend returned an error.",
+      };
+    }
+
+    console.info("Resend accepted email send", {
+      participantEmail: participant.email,
+      resendId: resendData?.id ?? null,
+      questionnaireType: participant.questionnaire_type,
+    });
+
+    return {
+      email: participant.email,
+      success: true,
+      resendId: resendData?.id ?? null,
+      error: null,
+    };
+  } catch (emailError) {
+    const message =
+      emailError instanceof Error
+        ? emailError.message
+        : "Unknown email send error.";
+
+    console.error("Email send threw an exception", {
+      participantEmail: participant.email,
+      error: message,
+      questionnaireType: participant.questionnaire_type,
+    });
+
+    return {
+      email: participant.email,
+      success: false,
+      resendId: null,
+      error: message,
+    };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const advisorUser = await requireAdvisorUser();
@@ -155,6 +387,9 @@ export async function POST(request: Request) {
     const companyName = body.companyName?.trim() || projectName;
     const participants = Array.isArray(body.participants) ? body.participants : [];
     const segmentationSchema = validateSegmentationSchema(body.segmentationSchema);
+    const factPackRecipient = getCleanFactPackRecipient(
+      body.factPackRecipient ?? null,
+    );
 
     if (!projectName) {
       return NextResponse.json(
@@ -252,9 +487,17 @@ export async function POST(request: Request) {
       projectId: project.project_id,
       projectName,
       participantCount: participants.length,
+      factPackIncluded: Boolean(factPackRecipient),
     });
 
-    const participantRows = participants.map((participant) => {
+    const participantRows: Array<{
+      project_id: string;
+      questionnaire_type: DatabaseQuestionnaireType;
+      role_label: string;
+      name: string;
+      email: string;
+      segmentation_values: SegmentationValues | null;
+    }> = participants.map((participant) => {
       const validatedSegmentationValues = validateSegmentationValues(
         segmentationSchema,
         participant.segmentationValues,
@@ -272,13 +515,27 @@ export async function POST(request: Request) {
       };
     });
 
+    if (factPackRecipient) {
+      participantRows.push({
+        project_id: project.project_id,
+        questionnaire_type: "client_fact_pack",
+        role_label: "Client Fact Pack",
+        name: factPackRecipient.name,
+        email: factPackRecipient.email,
+        segmentation_values: null,
+      });
+    }
+
     const {
       data: insertedParticipants,
       error: participantError,
     } = await supabase
       .from("client_participants")
       .insert(participantRows)
-      .select();
+      .select(
+        "participant_id, project_id, questionnaire_type, role_label, name, email, segmentation_values, invite_token",
+      )
+      .returns<InsertedParticipantRow[]>();
 
     if (participantError || !insertedParticipants) {
       console.error("Failed to create participants", participantError);
@@ -299,84 +556,16 @@ export async function POST(request: Request) {
     const replyToEmail = getEnv("CONTACT_TO_EMAIL");
 
     const emailResults: EmailSendResult[] = await Promise.all(
-      insertedParticipants.map(async (participant: any) => {
-        const inviteUrl = `${siteUrl}/client-diagnostic/respond/${participant.invite_token}`;
-
-        try {
-          const resendResponse = await resend.emails.send({
-            from: `Van Esch Advisory <${fromEmail}>`,
-            to: participant.email,
-            replyTo: replyToEmail,
-            subject: buildEmailSubject(projectName),
-            html: buildEmailHtml({
-              name: participant.name,
-              projectName,
-              inviteUrl,
-            }),
-            text: buildEmailText({
-              name: participant.name,
-              projectName,
-              inviteUrl,
-            }),
-          });
-
-          const resendError =
-            resendResponse && "error" in resendResponse
-              ? resendResponse.error
-              : null;
-
-          const resendData =
-            resendResponse && "data" in resendResponse
-              ? resendResponse.data
-              : null;
-
-          if (resendError) {
-            console.error("Resend returned an error", {
-              participantEmail: participant.email,
-              resendError,
-            });
-
-            return {
-              email: participant.email,
-              success: false,
-              resendId: null,
-              error:
-                typeof resendError.message === "string"
-                  ? resendError.message
-                  : "Resend returned an error.",
-            };
-          }
-
-          console.info("Resend accepted email send", {
-            participantEmail: participant.email,
-            resendId: resendData?.id ?? null,
-          });
-
-          return {
-            email: participant.email,
-            success: true,
-            resendId: resendData?.id ?? null,
-            error: null,
-          };
-        } catch (emailError) {
-          const message =
-            emailError instanceof Error
-              ? emailError.message
-              : "Unknown email send error.";
-
-          console.error("Email send threw an exception", {
-            participantEmail: participant.email,
-            error: message,
-          });
-
-          return {
-            email: participant.email,
-            success: false,
-            resendId: null,
-            error: message,
-          };
-        }
-      }),
+      insertedParticipants.map((participant) =>
+        sendParticipantInvite({
+          resend,
+          fromEmail,
+          replyToEmail,
+          siteUrl,
+          projectName,
+          participant,
+        }),
+      ),
     );
 
     const failedEmails = emailResults.filter((result) => !result.success);
@@ -404,7 +593,13 @@ export async function POST(request: Request) {
     console.error("Unexpected error in create-project route", error);
 
     return NextResponse.json(
-      { success: false, error: "Unexpected server error." },
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unexpected server error.",
+      },
       { status: 500 },
     );
   }
