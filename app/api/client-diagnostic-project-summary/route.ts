@@ -13,7 +13,6 @@ import {
 } from "@/lib/client-diagnostic/narrative-engine";
 import {
   dimensionDefinitions,
-  questionnaireTypes,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
 import {
@@ -70,6 +69,14 @@ type ProjectRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type FactPackRow = {
+  participant_id: string;
+  status: string;
+  submitted_at: string | null;
+  updated_at: string;
+  response_json: Record<string, unknown> | null;
 };
 
 type ParticipantSummary = {
@@ -156,6 +163,20 @@ type CompletionSummary = {
   respondentGroups: RespondentGroupSummary[];
 };
 
+type FactPackSummary = {
+  invited: boolean;
+  participantId: string | null;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  participantStatus: string | null;
+  factPackStatus: "not_invited" | "not_started" | "in_progress" | "completed";
+  hasSavedResponse: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  submittedAt: string | null;
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -172,6 +193,7 @@ type ProjectSummaryResponse = {
   scoredCompletion: CompletionSummary & {
     analysisReady: boolean;
   };
+  factPack: FactPackSummary;
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
@@ -217,6 +239,12 @@ const ALL_PROJECT_QUESTIONNAIRE_TYPES: ProjectQuestionnaireType[] = [
   "manager",
   "leadership",
   "client_fact_pack",
+];
+
+const SCORED_PROJECT_QUESTIONNAIRE_TYPES: ProjectQuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
 ];
 
 const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
@@ -694,6 +722,74 @@ function buildCompletionSummary(
   };
 }
 
+function buildFactPackSummary(
+  participantRows: ParticipantRow[],
+  factPackRows: FactPackRow[],
+): FactPackSummary {
+  const participant =
+    participantRows.find(
+      (row) => row.questionnaire_type === "client_fact_pack",
+    ) ?? null;
+
+  if (!participant) {
+    return {
+      invited: false,
+      participantId: null,
+      recipientName: null,
+      recipientEmail: null,
+      participantStatus: null,
+      factPackStatus: "not_invited",
+      hasSavedResponse: false,
+      startedAt: null,
+      completedAt: null,
+      updatedAt: null,
+      submittedAt: null,
+    };
+  }
+
+  const factPack =
+    factPackRows.find((row) => row.participant_id === participant.participant_id) ??
+    null;
+
+  const hasSavedResponse = Boolean(
+    factPack?.response_json &&
+      typeof factPack.response_json === "object" &&
+      Object.keys(factPack.response_json).length > 0,
+  );
+
+  let factPackStatus: FactPackSummary["factPackStatus"] = "not_started";
+
+  if (
+    participant.participant_status === "completed" ||
+    participant.completed_at !== null ||
+    factPack?.status === "completed" ||
+    factPack?.submitted_at !== null
+  ) {
+    factPackStatus = "completed";
+  } else if (
+    participant.started_at !== null ||
+    participant.participant_status === "in_progress" ||
+    factPack?.status === "in_progress" ||
+    hasSavedResponse
+  ) {
+    factPackStatus = "in_progress";
+  }
+
+  return {
+    invited: true,
+    participantId: participant.participant_id,
+    recipientName: participant.name,
+    recipientEmail: participant.email,
+    participantStatus: participant.participant_status,
+    factPackStatus,
+    hasSavedResponse,
+    startedAt: participant.started_at,
+    completedAt: participant.completed_at,
+    updatedAt: factPack?.updated_at ?? participant.updated_at,
+    submittedAt: factPack?.submitted_at ?? null,
+  };
+}
+
 function buildDimensionSummaries(
   scoreRows: DimensionScoreRow[],
 ): DimensionSummary[] {
@@ -1017,8 +1113,8 @@ function buildOverallQualitativeSummary(params: {
     return null;
   }
 
-  const groupLabels = respondentGroupsWithComments.map(
-    formatQuestionnaireTypeLabel,
+  const groupLabels = respondentGroupsWithComments.map((value) =>
+    formatQuestionnaireTypeLabel(value),
   );
   const themeLabels = crossCuttingThemes.map((theme) => theme.label.toLowerCase());
   const systemicStory = buildSystemicThemeStory(crossCuttingThemes);
@@ -1180,6 +1276,7 @@ export async function GET(
     const [
       { data: project, error: projectError },
       { data: participants, error: participantsError },
+      { data: factPackRows, error: factPackError },
       { data: scoreRows, error: scoresError },
       { data: commentRows, error: commentsError },
     ] = await Promise.all([
@@ -1197,6 +1294,13 @@ export async function GET(
         )
         .eq("project_id", projectId)
         .returns<ParticipantRow[]>(),
+      supabase
+        .from("client_fact_packs")
+        .select(
+          "participant_id, status, submitted_at, updated_at, response_json",
+        )
+        .eq("project_id", projectId)
+        .returns<FactPackRow[]>(),
       supabase
         .from("client_dimension_scores")
         .select(
@@ -1234,6 +1338,16 @@ export async function GET(
       );
     }
 
+    if (factPackError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to load client fact pack summary.",
+        },
+        { status: 500 },
+      );
+    }
+
     if (scoresError) {
       return NextResponse.json(
         {
@@ -1256,6 +1370,10 @@ export async function GET(
 
     const participantRows = participants ?? [];
     const participantSummaries = participantRows.map(buildParticipantSummary);
+    const factPackSummary = buildFactPackSummary(
+      participantRows,
+      factPackRows ?? [],
+    );
 
     const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
       isScoredQuestionnaireType(row.questionnaire_type),
@@ -1271,7 +1389,7 @@ export async function GET(
 
     const scoredCompletion = buildCompletionSummary(
       participantRows,
-      SCORED_QUESTIONNAIRE_TYPES,
+      SCORED_PROJECT_QUESTIONNAIRE_TYPES,
     );
 
     const dimensions = buildDimensionSummaries(dimensionScoreRows);
@@ -1315,8 +1433,10 @@ export async function GET(
       scoredCompletion: {
         ...scoredCompletion,
         analysisReady:
-          scoredCompletion.totalInvited > 0 && scoredCompletion.outstanding === 0,
+          scoredCompletion.totalInvited > 0 &&
+          scoredCompletion.outstanding === 0,
       },
+      factPack: factPackSummary,
       dimensions,
       strongestAlignment,
       biggestGaps,

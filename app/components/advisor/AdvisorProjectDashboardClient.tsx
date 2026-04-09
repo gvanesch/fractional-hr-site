@@ -58,6 +58,20 @@ type CompletionSummary = {
   respondentGroups: RespondentGroupSummary[];
 };
 
+type FactPackSummary = {
+  invited: boolean;
+  participantId: string | null;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  participantStatus: string | null;
+  factPackStatus: "not_invited" | "not_started" | "in_progress" | "completed";
+  hasSavedResponse: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  submittedAt: string | null;
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -74,6 +88,7 @@ type ProjectSummaryResponse = {
   scoredCompletion: CompletionSummary & {
     analysisReady: boolean;
   };
+  factPack: FactPackSummary;
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
@@ -192,6 +207,36 @@ function getStatusTone(status: string): string {
       return "border-slate-200 bg-slate-100 text-slate-600";
     default:
       return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function getFactPackTone(status: FactPackSummary["factPackStatus"]): string {
+  switch (status) {
+    case "completed":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "in_progress":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "not_started":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "not_invited":
+      return "border-slate-200 bg-slate-100 text-slate-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function getFactPackStatusLabel(status: FactPackSummary["factPackStatus"]): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "in_progress":
+      return "Draft saved";
+    case "not_started":
+      return "Not started";
+    case "not_invited":
+      return "Not invited";
+    default:
+      return status;
   }
 }
 
@@ -325,11 +370,11 @@ export default function AdvisorProjectDashboardClient({
   const project = data.project;
   const completion = data.completion;
   const scoredCompletion = data.scoredCompletion;
+  const factPack = data.factPack;
   const respondentGroups = data.completion.respondentGroups;
   const participants = data.completion.participants;
   const biggestGaps = data.biggestGaps;
   const strongestAlignment = data.strongestAlignment;
-  console.log("project summary payload", data);
 
   const scoredRespondentGroups = respondentGroups.filter(
     (group) =>
@@ -337,11 +382,6 @@ export default function AdvisorProjectDashboardClient({
       group.questionnaireType === "manager" ||
       group.questionnaireType === "leadership",
   );
-
-  const factPackGroup =
-    respondentGroups.find(
-      (group) => group.questionnaireType === "client_fact_pack",
-    ) ?? null;
 
   return (
     <section className="brand-light-section">
@@ -366,9 +406,7 @@ export default function AdvisorProjectDashboardClient({
                   />
                   <MetricCard
                     label="Scored readiness"
-                    value={
-                      scoredCompletion?.analysisReady ? "Ready" : "In progress"
-                    }
+                    value={scoredCompletion.analysisReady ? "Ready" : "In progress"}
                   />
                   <MetricCard
                     label="Outstanding"
@@ -423,17 +461,41 @@ export default function AdvisorProjectDashboardClient({
                 </div>
 
                 <div className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                  {scoredCompletion?.analysisReady
+                  {scoredCompletion.analysisReady
                     ? "All scored respondent groups are complete and analysis can proceed."
                     : "Scored diagnostic collection is still in progress."}
                 </div>
 
-                {factPackGroup ? (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Client Fact Pack: {factPackGroup.completed} /{" "}
-                    {factPackGroup.totalInvited} completed
+                {factPack.invited ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Client Fact Pack
+                      </p>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getFactPackTone(
+                          factPack.factPackStatus,
+                        )}`}
+                      >
+                        {getFactPackStatusLabel(factPack.factPackStatus)}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm text-slate-700">
+                      {factPack.recipientName || "Recipient not set"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {factPack.recipientEmail || "No email recorded"}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-600">
+                      Last updated: {formatDateTime(factPack.updatedAt)}
+                    </p>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    No Client Fact Pack recipient has been added to this project.
+                  </div>
+                )}
 
                 {actionMessage ? (
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -536,36 +598,51 @@ export default function AdvisorProjectDashboardClient({
             </div>
           </section>
 
-          {factPackGroup ? (
-            <section className="brand-surface-card p-6 sm:p-8">
-              <p className="brand-section-kicker">Client fact pack</p>
-              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                Operational input for final reporting
-              </h2>
+          <section className="brand-surface-card p-6 sm:p-8">
+            <p className="brand-section-kicker">Client fact pack</p>
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Operational input for final reporting
+            </h2>
 
-              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                The Client Fact Pack is tracked as a project deliverable and
-                input to final reporting. It is not included in scored
-                comparison, insight generation, narrative engines, or
-                qualitative pattern analysis.
-              </div>
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              The Client Fact Pack is tracked as a project deliverable and input
+              to final reporting. It is not included in scored comparison,
+              insight generation, narrative engines, or qualitative pattern
+              analysis.
+            </div>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                <MetricCard
-                  label="Invited"
-                  value={`${factPackGroup.totalInvited}`}
-                />
-                <MetricCard
-                  label="Completed"
-                  value={`${factPackGroup.completed}`}
-                />
-                <MetricCard
-                  label="Outstanding"
-                  value={`${factPackGroup.outstanding}`}
-                />
-              </div>
-            </section>
-          ) : null}
+            <div className="mt-8 grid gap-4 md:grid-cols-4">
+              <MetricCard
+                label="Invited"
+                value={factPack.invited ? "Yes" : "No"}
+              />
+              <MetricCard
+                label="Status"
+                value={getFactPackStatusLabel(factPack.factPackStatus)}
+              />
+              <MetricCard
+                label="Saved response"
+                value={factPack.hasSavedResponse ? "Yes" : "No"}
+              />
+              <MetricCard
+                label="Submitted"
+                value={factPack.submittedAt ? "Yes" : "No"}
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <InfoCard
+                label="Recipient"
+                value={factPack.recipientName || "Not assigned"}
+                secondary={factPack.recipientEmail || "No email recorded"}
+              />
+              <InfoCard
+                label="Fact pack timing"
+                value={`Updated: ${formatDateTime(factPack.updatedAt)}`}
+                secondary={`Submitted: ${formatDateTime(factPack.submittedAt)}`}
+              />
+            </div>
+          </section>
 
           <section className="brand-surface-card p-6 sm:p-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
