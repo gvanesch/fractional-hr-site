@@ -39,19 +39,20 @@ export default async function AdvisorReportPage({ params }: PageProps) {
 
   let report: ClientDiagnosticReport;
 
-  try {
-    report = await getReport(projectId);
-  } catch (error) {
-    if (error instanceof BuildProjectSummaryError) {
-      if (error.status === 404) {
-        notFound();
-      }
+try {
+  report = await getReport(projectId);
+} catch (error) {
+  console.error("REPORT BUILD ERROR:", error);
 
-      throw new Error(error.message);
-    }
-
-    throw error;
-  }
+  return (
+    <main style={{ padding: "40px" }}>
+      <h1>Report failed</h1>
+      <pre style={{ whiteSpace: "pre-wrap" }}>
+        {JSON.stringify(error, null, 2)}
+      </pre>
+    </main>
+  );
+}
 
   return (
     <main className="brand-light-section min-h-screen">
