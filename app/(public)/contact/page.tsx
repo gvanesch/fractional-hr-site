@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import ContactPageClient from "./contactpageclient";
 
-export const runtime = "edge";
 
 export const metadata: Metadata = {
   title: "Contact | Van Esch Advisory Ltd",

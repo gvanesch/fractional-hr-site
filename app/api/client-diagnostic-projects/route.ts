@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export const runtime = "edge";
 
 export async function GET() {
   try {

@@ -9,7 +9,6 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import ClientFactPackForm from "@/app/components/client-diagnostic/ClientFactPackForm";
 
-export const runtime = "edge";
 
 type PageProps = {
   searchParams?: Promise<{

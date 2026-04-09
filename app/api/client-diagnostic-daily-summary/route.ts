@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { questionnaireTypes } from "@/lib/client-diagnostic/question-bank";
 
-export const runtime = "edge";
 
 type ClientProjectRow = {
   project_id: string;

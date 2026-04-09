@@ -7,7 +7,6 @@ import {
   type AdvisorBrief,
 } from "../../../lib/diagnostic";
 
-export const runtime = "edge";
 
 type ContactRequestBody = {
   name: string;

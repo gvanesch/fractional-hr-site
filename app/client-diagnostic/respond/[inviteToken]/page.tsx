@@ -5,7 +5,6 @@ import {
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
 
-export const runtime = "edge";
 
 export const metadata = {
   robots: {

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "edge";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f-]{36}$/i.test(value);

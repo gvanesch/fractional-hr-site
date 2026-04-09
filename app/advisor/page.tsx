@@ -8,7 +8,6 @@ export const metadata = {
   },
 };
 
-export const runtime = "edge";
 
 export default async function AdvisorHomePage() {
   const advisorUser = await requireAdvisorUser();

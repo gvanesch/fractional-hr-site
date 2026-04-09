@@ -7,7 +7,6 @@ import {
   type AnswerValue,
 } from "../../../lib/diagnostic";
 
-export const runtime = "edge";
 
 type DiagnosticCompleteRequestBody = {
   answers: Record<number, AnswerValue | undefined>;

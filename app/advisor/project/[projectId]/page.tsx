@@ -1,5 +1,4 @@
 import AdvisorProjectDashboardClient from "@/app/components/advisor/AdvisorProjectDashboardClient";
-export const runtime = "edge";
 
 export const metadata = {
   title: "Diagnostic Project Dashboard | Van Esch Advisory",

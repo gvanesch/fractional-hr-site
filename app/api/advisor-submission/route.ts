@@ -6,7 +6,6 @@ import {
 } from "../../../lib/diagnostic";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export const runtime = "edge";
 
 type JsonPrimitive = string | number | boolean | null;
 type JsonValue = JsonPrimitive | JsonObject | JsonValue[];

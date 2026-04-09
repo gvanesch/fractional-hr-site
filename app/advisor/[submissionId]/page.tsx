@@ -9,7 +9,6 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 type AdvisorBrief = {

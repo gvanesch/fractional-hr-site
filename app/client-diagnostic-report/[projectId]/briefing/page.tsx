@@ -7,7 +7,6 @@ import {
   type ReportIssueType,
 } from "@/lib/client-diagnostic/build-client-diagnostic-report";
 
-export const runtime = "edge";
 
 export const metadata = {
   robots: {

@@ -9,7 +9,6 @@ import {
   type SegmentationValues,
 } from "@/lib/client-diagnostic/segmentation";
 
-export const runtime = "edge";
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
 type DatabaseQuestionnaireType =

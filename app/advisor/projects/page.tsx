@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export const runtime = "edge";
 
 type Project = {
   project_id: string;

@@ -1,4 +1,3 @@
-export const runtime = "edge";
 
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { NextResponse } from "next/server";

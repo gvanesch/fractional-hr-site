@@ -1,5 +1,4 @@
 import AdvisorLoginForm from "./AdvisorLoginForm";
-export const runtime = "edge";
 
 export const metadata = {
   robots: {

@@ -8,7 +8,6 @@ export const metadata = {
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-export const runtime = "edge";
 
 type PageProps = {
   params: Promise<{
