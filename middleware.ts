@@ -3,8 +3,6 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 
-export const runtime = "experimental-edge";
-
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
