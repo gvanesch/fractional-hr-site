@@ -183,6 +183,19 @@ type FactPackFormState = {
   };
 };
 
+type SubmitApiResponse =
+  | {
+      success: true;
+      mode: "draft" | "submit";
+      status: "in_progress" | "completed";
+      message: string;
+    }
+  | {
+      success: false;
+      error: string;
+      details?: string;
+    };
+
 function createSystemRecord(): SystemRecord {
   return {
     id: crypto.randomUUID(),
@@ -266,11 +279,16 @@ const CONTROL_CLASS =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900";
 
 export default function ClientFactPackForm({
+  projectId,
+  participantId,
+  inviteToken,
   recipientName,
 }: ClientFactPackFormProps) {
   const [formState, setFormState] = useState<FactPackFormState>(INITIAL_STATE);
   const [submitMessage, setSubmitMessage] = useState("");
-  const [submitState, setSubmitState] = useState<"idle" | "not_ready">("idle");
+  const [submitState, setSubmitState] = useState<
+    "idle" | "saving_draft" | "submitting" | "success" | "error"
+  >("idle");
 
   const hasMnaActivity = formState.operatingContext.mnaActivity !== "none_planned";
 
@@ -416,12 +434,46 @@ export default function ClientFactPackForm({
     }));
   }
 
+  async function saveFactPack(mode: "draft" | "submit") {
+    setSubmitState(mode === "draft" ? "saving_draft" : "submitting");
+    setSubmitMessage("");
+
+    try {
+      const response = await fetch("/api/client-fact-pack-submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId,
+          participantId,
+          inviteToken,
+          responseJson: formState,
+          mode,
+        }),
+      });
+
+      const result = (await response.json()) as SubmitApiResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          "error" in result ? result.error : "Unable to save fact pack.",
+        );
+      }
+
+      setSubmitState("success");
+      setSubmitMessage(result.message);
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitMessage(
+        error instanceof Error ? error.message : "Unable to save fact pack.",
+      );
+    }
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitState("not_ready");
-    setSubmitMessage(
-      "The fact pack structure is now more robust. Submission wiring and Supabase persistence are the next batch.",
-    );
+    void saveFactPack("submit");
   }
 
   return (
@@ -1445,14 +1497,39 @@ export default function ClientFactPackForm({
             </section>
 
             {submitMessage ? (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-700">
+              <div
+                className={`rounded-2xl px-5 py-4 text-sm ${
+                  submitState === "error"
+                    ? "border border-rose-200 bg-rose-50 text-rose-700"
+                    : "border border-blue-200 bg-blue-50 text-blue-700"
+                }`}
+              >
                 {submitMessage}
               </div>
             ) : null}
 
-            <div className="flex justify-end">
-              <button type="submit" className="brand-button-primary">
-                Save fact pack
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => void saveFactPack("draft")}
+                disabled={
+                  submitState === "saving_draft" || submitState === "submitting"
+                }
+                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitState === "saving_draft" ? "Saving draft..." : "Save draft"}
+              </button>
+
+              <button
+                type="submit"
+                disabled={
+                  submitState === "saving_draft" || submitState === "submitting"
+                }
+                className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitState === "submitting"
+                  ? "Submitting..."
+                  : "Submit fact pack"}
               </button>
             </div>
           </form>
