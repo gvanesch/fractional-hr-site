@@ -31,14 +31,20 @@ type ClientDiagnosticSubmitRequestBody = {
   submission: SubmittedPayload;
 };
 
+type SubmitClientDiagnosticRpcResult = {
+  success: boolean;
+  projectId: string;
+  participantId: string;
+  questionnaireType: QuestionnaireType;
+  savedResponseCount: number;
+  dimensionScoresCreated: number;
+  message: string;
+};
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function isReasonableInviteToken(value: string): boolean {
-  return typeof value === "string" && value.trim().length >= 16;
 }
 
 function getSupabaseAdminClient() {
@@ -130,10 +136,10 @@ function validateRequestBody(
     };
   }
 
-  if (!isReasonableInviteToken(candidate.inviteToken)) {
+  if (!isUuid(candidate.inviteToken)) {
     return {
       isValid: false,
-      message: "inviteToken is invalid.",
+      message: "inviteToken must be a valid UUID.",
     };
   }
 
@@ -311,16 +317,36 @@ function validateRequestBody(
   };
 }
 
-function buildDimensionScoreRows(params: {
-  projectId: string;
-  participantId: string;
-  questionnaireType: QuestionnaireType;
-  responses: SubmittedResponse[];
-  nowIso: string;
-}) {
-  const { projectId, participantId, questionnaireType, responses, nowIso } =
-    params;
+function buildResponseRows(responses: SubmittedResponse[]) {
+  return responses
+    .map((response) => {
+      if (response.kind === "score") {
+        return {
+          dimension_key: response.dimension,
+          question_key: response.questionId,
+          answer_value: response.value,
+          comment_text: null,
+        };
+      }
 
+      const trimmedComment =
+        typeof response.value === "string" ? response.value.trim() : "";
+
+      if (!trimmedComment) {
+        return null;
+      }
+
+      return {
+        dimension_key: response.dimension,
+        question_key: response.questionId,
+        answer_value: null,
+        comment_text: trimmedComment,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+}
+
+function buildDimensionScoreRows(responses: SubmittedResponse[]) {
   const scoreResponses = responses.filter(
     (response): response is SubmittedResponse & { kind: "score"; value: number } =>
       response.kind === "score" && typeof response.value === "number",
@@ -347,14 +373,30 @@ function buildDimensionScoreRows(params: {
   }
 
   return Object.entries(dimensionMap).map(([dimension, aggregate]) => ({
-    project_id: projectId,
-    participant_id: participantId,
-    questionnaire_type: questionnaireType,
     dimension_key: dimension,
     average_score: Number((aggregate.total / aggregate.count).toFixed(2)),
     response_count: aggregate.count,
-    updated_at: nowIso,
   }));
+}
+
+function mapRpcErrorToResponse(errorMessage: string) {
+  switch (errorMessage) {
+    case "Participant record not found for this project.":
+      return { status: 404, error: errorMessage };
+    case "This diagnostic link is invalid for the selected participant.":
+      return { status: 403, error: errorMessage };
+    case "This questionnaire has already been submitted.":
+      return { status: 409, error: errorMessage };
+    case "Submitted questionnaire type does not match the participant record.":
+      return { status: 400, error: errorMessage };
+    case "Participant is not in a valid state for submission.":
+      return { status: 409, error: errorMessage };
+    default:
+      return {
+        status: 500,
+        error: "Unexpected server error while saving client diagnostic submission.",
+      };
+  }
 }
 
 export async function POST(request: Request) {
@@ -375,218 +417,44 @@ export async function POST(request: Request) {
     const { projectId, participantId, inviteToken, questionnaireType, responses } =
       validation.data;
 
+    const responseRows = buildResponseRows(responses);
+    const dimensionScoreRows = buildDimensionScoreRows(responses);
+
     const supabase = getSupabaseAdminClient();
 
-    const { data: participant, error: participantError } = await supabase
-      .from("client_participants")
-      .select(
-        "participant_id, project_id, questionnaire_type, participant_status, started_at, completed_at, invite_token",
-      )
-      .eq("participant_id", participantId)
-      .eq("project_id", projectId)
-      .maybeSingle();
-
-    if (participantError || !participant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Participant record not found for this project.",
-        },
-        { status: 404 },
-      );
-    }
-
-    if (!participant.invite_token || participant.invite_token !== inviteToken) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "This diagnostic link is invalid for the selected participant.",
-        },
-        { status: 403 },
-      );
-    }
-
-    if (
-      participant.participant_status === "completed" ||
-      participant.completed_at
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "This questionnaire has already been submitted.",
-        },
-        { status: 409 },
-      );
-    }
-
-    if (participant.questionnaire_type !== questionnaireType) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Submitted questionnaire type does not match the participant record.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const nowIso = new Date().toISOString();
-
-    const { error: deleteExistingResponsesError } = await supabase
-      .from("client_responses")
-      .delete()
-      .eq("project_id", projectId)
-      .eq("participant_id", participantId)
-      .eq("questionnaire_type", questionnaireType);
-
-    if (deleteExistingResponsesError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to replace existing participant responses.",
-          details: deleteExistingResponsesError.message,
-        },
-        { status: 500 },
-      );
-    }
-
-    const responseRows = responses
-      .map((response) => {
-        const baseRow = {
-          project_id: projectId,
-          participant_id: participantId,
-          questionnaire_type: questionnaireType,
-          dimension_key: response.dimension,
-          question_key: response.questionId,
-          updated_at: nowIso,
-        };
-
-        if (response.kind === "score") {
-          return {
-            ...baseRow,
-            answer_value: response.value,
-            comment_text: null,
-          };
-        }
-
-        const trimmedComment =
-          typeof response.value === "string" ? response.value.trim() : "";
-
-        if (!trimmedComment) {
-          return null;
-        }
-
-        return {
-          ...baseRow,
-          answer_value: null,
-          comment_text: trimmedComment,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => row !== null);
-
-    if (responseRows.length > 0) {
-      const { error: insertResponsesError } = await supabase
-        .from("client_responses")
-        .insert(responseRows);
-
-      if (insertResponsesError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Unable to save client diagnostic responses.",
-            details: insertResponsesError.message,
-          },
-          { status: 500 },
-        );
-      }
-    }
-
-    const { error: deleteExistingDimensionScoresError } = await supabase
-      .from("client_dimension_scores")
-      .delete()
-      .eq("project_id", projectId)
-      .eq("participant_id", participantId)
-      .eq("questionnaire_type", questionnaireType);
-
-    if (deleteExistingDimensionScoresError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Responses were saved, but previous participant dimension scores could not be cleared.",
-          details: deleteExistingDimensionScoresError.message,
-        },
-        { status: 500 },
-      );
-    }
-
-    const dimensionScoreRows = buildDimensionScoreRows({
-      projectId,
-      participantId,
-      questionnaireType,
-      responses,
-      nowIso,
+    const { data, error } = await supabase.rpc("submit_client_diagnostic", {
+      p_project_id: projectId,
+      p_participant_id: participantId,
+      p_invite_token: inviteToken,
+      p_questionnaire_type: questionnaireType,
+      p_response_rows: responseRows,
+      p_dimension_score_rows: dimensionScoreRows,
     });
 
-    if (dimensionScoreRows.length > 0) {
-      const { error: insertDimensionScoresError } = await supabase
-        .from("client_dimension_scores")
-        .insert(dimensionScoreRows);
+    if (error) {
+      console.error("Client diagnostic submission RPC failed.", error);
 
-      if (insertDimensionScoresError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Responses were saved, but participant dimension scores could not be created.",
-            details: insertDimensionScoresError.message,
-          },
-          { status: 500 },
-        );
-      }
-    }
+      const mapped = mapRpcErrorToResponse(error.message);
 
-    const participantUpdate: {
-      participant_status: string;
-      updated_at: string;
-      started_at?: string;
-      completed_at?: string;
-    } = {
-      participant_status: "completed",
-      updated_at: nowIso,
-      completed_at: nowIso,
-    };
-
-    if (!participant.started_at) {
-      participantUpdate.started_at = nowIso;
-    }
-
-    const { error: updateParticipantError } = await supabase
-      .from("client_participants")
-      .update(participantUpdate)
-      .eq("participant_id", participantId)
-      .eq("project_id", projectId);
-
-    if (updateParticipantError) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Responses were saved, but participant status could not be updated.",
-          details: updateParticipantError.message,
+          error: mapped.error,
         },
-        { status: 500 },
+        { status: mapped.status },
       );
     }
+
+    const result = data as SubmitClientDiagnosticRpcResult;
 
     return NextResponse.json({
       success: true,
-      projectId,
-      participantId,
-      questionnaireType,
-      savedResponseCount: responseRows.length,
-      dimensionScoresCreated: dimensionScoreRows.length,
-      message: "Client diagnostic submission saved successfully.",
+      projectId: result.projectId,
+      participantId: result.participantId,
+      questionnaireType: result.questionnaireType,
+      savedResponseCount: result.savedResponseCount,
+      dimensionScoresCreated: result.dimensionScoresCreated,
+      message: result.message,
     });
   } catch (error) {
     console.error("Client diagnostic submission failed.", error);

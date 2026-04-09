@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ClientFactPackFormProps = {
   projectId: string;
@@ -196,6 +196,17 @@ type SubmitApiResponse =
       details?: string;
     };
 
+type LoadFactPackApiResponse =
+  | {
+      success: true;
+      data: Partial<FactPackFormState> | null;
+      status: "not_started" | "in_progress" | "completed";
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 function createSystemRecord(): SystemRecord {
   return {
     id: crypto.randomUUID(),
@@ -275,6 +286,47 @@ const INITIAL_STATE: FactPackFormState = {
   },
 };
 
+function deepMerge<T>(base: T, incoming: Partial<T>): T {
+  if (typeof base !== "object" || base === null) {
+    return base;
+  }
+
+  if (Array.isArray(base)) {
+    return (Array.isArray(incoming) ? incoming : base) as T;
+  }
+
+  const output: Record<string, unknown> = {
+    ...(base as Record<string, unknown>),
+  };
+
+  for (const key in incoming) {
+    const baseValue = (base as Record<string, unknown>)[key];
+    const incomingValue = (incoming as Record<string, unknown>)[key];
+
+    if (incomingValue === undefined) {
+      continue;
+    }
+
+    if (
+      typeof baseValue === "object" &&
+      baseValue !== null &&
+      !Array.isArray(baseValue) &&
+      typeof incomingValue === "object" &&
+      incomingValue !== null &&
+      !Array.isArray(incomingValue)
+    ) {
+      output[key] = deepMerge(
+        baseValue as Record<string, unknown>,
+        incomingValue as Record<string, unknown>,
+      );
+    } else {
+      output[key] = incomingValue;
+    }
+  }
+
+  return output as T;
+}
+
 const CONTROL_CLASS =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900";
 
@@ -289,8 +341,99 @@ export default function ClientFactPackForm({
   const [submitState, setSubmitState] = useState<
     "idle" | "saving_draft" | "submitting" | "success" | "error"
   >("idle");
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
 
-  const hasMnaActivity = formState.operatingContext.mnaActivity !== "none_planned";
+  const hasMnaActivity =
+    formState.operatingContext.mnaActivity !== "none_planned";
+
+  useEffect(() => {
+    void loadDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function hydrateSystemRecords(
+    records: unknown,
+  ): FactPackFormState["systems"]["records"] {
+    if (!Array.isArray(records) || records.length === 0) {
+      return INITIAL_STATE.systems.records;
+    }
+
+    return records.map((record) => {
+      const merged = deepMerge(createSystemRecord(), record as Partial<SystemRecord>);
+
+      return {
+        ...merged,
+        id:
+          typeof merged.id === "string" && merged.id.trim().length > 0
+            ? merged.id
+            : crypto.randomUUID(),
+      };
+    });
+  }
+
+  function hydrateInitiatives(
+    initiatives: unknown,
+  ): FactPackFormState["changeAndFutureState"]["initiatives"] {
+    if (!Array.isArray(initiatives) || initiatives.length === 0) {
+      return INITIAL_STATE.changeAndFutureState.initiatives;
+    }
+
+    return initiatives.map((initiative) => {
+      const merged = deepMerge(
+        createChangeInitiative(),
+        initiative as Partial<ChangeInitiative>,
+      );
+
+      return {
+        ...merged,
+        id:
+          typeof merged.id === "string" && merged.id.trim().length > 0
+            ? merged.id
+            : crypto.randomUUID(),
+      };
+    });
+  }
+
+  function hydrateFactPackState(
+    savedData: Partial<FactPackFormState>,
+  ): FactPackFormState {
+    const merged = deepMerge(INITIAL_STATE, savedData);
+
+    return {
+      ...merged,
+      systems: {
+        ...merged.systems,
+        records: hydrateSystemRecords(merged.systems.records),
+      },
+      changeAndFutureState: {
+        ...merged.changeAndFutureState,
+        initiatives: hydrateInitiatives(merged.changeAndFutureState.initiatives),
+      },
+    };
+  }
+
+  async function loadDraft() {
+    try {
+      const response = await fetch(
+        `/api/client-fact-pack?projectId=${encodeURIComponent(projectId)}&participantId=${encodeURIComponent(participantId)}&inviteToken=${encodeURIComponent(inviteToken)}`,
+        {
+          cache: "no-store",
+        },
+      );
+
+      const result = (await response.json()) as LoadFactPackApiResponse;
+
+      if (!response.ok || !result.success || !result.data) {
+        return;
+      }
+
+      setFormState(hydrateFactPackState(result.data));
+    } catch (error) {
+      console.error("Failed to load fact pack draft.", error);
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  }
 
   function updateSectionField<
     TSection extends keyof FactPackFormState,
@@ -474,6 +617,16 @@ export default function ClientFactPackForm({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void saveFactPack("submit");
+  }
+
+  if (isLoadingDraft) {
+    return (
+      <section className="brand-light-section">
+        <div className="brand-container py-20 text-center text-slate-600">
+          Loading saved responses...
+        </div>
+      </section>
+    );
   }
 
   return (

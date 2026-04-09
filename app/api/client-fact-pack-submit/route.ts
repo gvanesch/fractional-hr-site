@@ -11,14 +11,11 @@ type FactPackSubmitRequest = {
   mode: "draft" | "submit";
 };
 
-type ParticipantLookupRow = {
-  participant_id: string;
-  project_id: string;
-  questionnaire_type: string;
-  participant_status: string;
-  completed_at: string | null;
-  invite_token: string | null;
-  started_at: string | null;
+type SaveClientFactPackRpcResult = {
+  success: boolean;
+  mode: "draft" | "submit";
+  status: "in_progress" | "completed";
+  message: string;
 };
 
 function getEnv(name: string): string {
@@ -54,13 +51,7 @@ function isUuid(value: string | undefined): value is string {
   );
 }
 
-function isReasonableInviteToken(value: string | undefined): value is string {
-  return typeof value === "string" && value.trim().length >= 16;
-}
-
-function isPlainObject(
-  value: unknown,
-): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -92,10 +83,10 @@ function validateRequestBody(
     };
   }
 
-  if (!isReasonableInviteToken(candidate.inviteToken)) {
+  if (!isUuid(candidate.inviteToken)) {
     return {
       isValid: false,
-      message: "inviteToken is invalid.",
+      message: "inviteToken must be a valid UUID.",
     };
   }
 
@@ -125,6 +116,26 @@ function validateRequestBody(
   };
 }
 
+function mapRpcErrorToResponse(errorMessage: string) {
+  switch (errorMessage) {
+    case "Participant record not found for this project.":
+      return { status: 404, error: errorMessage };
+    case "Participant is not a client fact pack recipient.":
+      return { status: 400, error: errorMessage };
+    case "Invite token does not match this participant.":
+      return { status: 403, error: errorMessage };
+    case "This fact pack has already been submitted.":
+      return { status: 409, error: errorMessage };
+    case "Participant is not in a valid state for fact pack access.":
+      return { status: 409, error: errorMessage };
+    default:
+      return {
+        status: 500,
+        error: "Unexpected server error while saving client fact pack.",
+      };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -142,116 +153,35 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdminClient();
 
-    const { data: participant, error: participantError } = await supabase
-      .from("client_participants")
-      .select(
-        "participant_id, project_id, questionnaire_type, participant_status, completed_at, invite_token, started_at",
-      )
-      .eq("participant_id", participantId)
-      .eq("project_id", projectId)
-      .single<ParticipantLookupRow>();
+    const { data, error } = await supabase.rpc("save_client_fact_pack", {
+      p_project_id: projectId,
+      p_participant_id: participantId,
+      p_invite_token: inviteToken,
+      p_response_json: responseJson,
+      p_mode: mode,
+    });
 
-    if (participantError || !participant) {
-      return NextResponse.json(
-        { success: false, error: "Participant record not found for this project." },
-        { status: 404 },
-      );
-    }
+    if (error) {
+      console.error("Client fact pack RPC failed.", error);
 
-    if (participant.questionnaire_type !== "client_fact_pack") {
-      return NextResponse.json(
-        { success: false, error: "Participant is not a client fact pack recipient." },
-        { status: 400 },
-      );
-    }
+      const mapped = mapRpcErrorToResponse(error.message);
 
-    if (!participant.invite_token || participant.invite_token !== inviteToken) {
-      return NextResponse.json(
-        { success: false, error: "Invite token does not match this participant." },
-        { status: 403 },
-      );
-    }
-
-    if (
-      mode === "submit" &&
-      (participant.participant_status === "completed" ||
-        participant.completed_at !== null)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "This fact pack has already been submitted." },
-        { status: 409 },
-      );
-    }
-
-    const nowIso = new Date().toISOString();
-    const nextStatus = mode === "submit" ? "completed" : "in_progress";
-
-    const { error: upsertFactPackError } = await supabase
-      .from("client_fact_packs")
-      .upsert(
-        {
-          project_id: projectId,
-          participant_id: participantId,
-          invite_token: inviteToken,
-          response_json: responseJson,
-          status: nextStatus,
-          submitted_at: mode === "submit" ? nowIso : null,
-          updated_at: nowIso,
-        },
-        {
-          onConflict: "participant_id",
-        },
-      );
-
-    if (upsertFactPackError) {
       return NextResponse.json(
         {
           success: false,
-          error: "Unable to save fact pack.",
-          details: upsertFactPackError.message,
+          error: mapped.error,
         },
-        { status: 500 },
+        { status: mapped.status },
       );
     }
 
-    const participantUpdate: Record<string, string | null> = {
-      updated_at: nowIso,
-    };
-
-    if (!participant.started_at) {
-      participantUpdate.started_at = nowIso;
-    }
-
-    if (mode === "submit") {
-      participantUpdate.participant_status = "completed";
-      participantUpdate.completed_at = nowIso;
-    }
-
-    const { error: participantUpdateError } = await supabase
-      .from("client_participants")
-      .update(participantUpdate)
-      .eq("participant_id", participantId)
-      .eq("project_id", projectId);
-
-    if (participantUpdateError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Fact pack was saved, but participant status could not be updated.",
-          details: participantUpdateError.message,
-        },
-        { status: 500 },
-      );
-    }
+    const result = data as SaveClientFactPackRpcResult;
 
     return NextResponse.json({
       success: true,
-      mode,
-      status: nextStatus,
-      message:
-        mode === "submit"
-          ? "Client fact pack submitted successfully."
-          : "Client fact pack draft saved successfully.",
+      mode: result.mode,
+      status: result.status,
+      message: result.message,
     });
   } catch (error) {
     console.error("Client fact pack save failed.", error);
