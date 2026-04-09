@@ -6,7 +6,11 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/advisor/", "/api/"],
+        disallow: [
+          "/advisor/",
+          "/api/",
+          "/client-diagnostic/",
+        ],
       },
     ],
     sitemap: "https://vanesch.uk/sitemap.xml",

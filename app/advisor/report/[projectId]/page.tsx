@@ -1,41 +1,57 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
+import {
+  buildClientDiagnosticReport,
+  type ClientDiagnosticReport,
+} from "@/lib/client-diagnostic/build-client-diagnostic-report";
+import { BuildProjectSummaryError } from "@/lib/client-diagnostic/build-project-summary";
 
 type PageProps = {
   params: Promise<{
     projectId: string;
   }>;
 };
+
 export const runtime = "edge";
 
 function isUuid(value: string): boolean {
-  return /^[0-9a-f-]{36}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
-async function getReport(projectId: string) {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/client-diagnostic-report?projectId=${projectId}`,
-    {
-      cache: "no-store",
-    },
-  );
-
-  const data = await res.json();
-
-  if (!res.ok || !data.success) {
-    throw new Error("Failed to load report");
-  }
-
-  return data.report;
+async function getReport(projectId: string): Promise<ClientDiagnosticReport> {
+  return buildClientDiagnosticReport(projectId);
 }
 
 export default async function AdvisorReportPage({ params }: PageProps) {
+  const advisorUser = await requireAdvisorUser();
+
+  if (!advisorUser) {
+    redirect("/advisor/login");
+  }
+
   const { projectId } = await params;
 
   if (!isUuid(projectId)) {
     notFound();
   }
 
-  const report = await getReport(projectId);
+  let report: ClientDiagnosticReport;
+
+  try {
+    report = await getReport(projectId);
+  } catch (error) {
+    if (error instanceof BuildProjectSummaryError) {
+      if (error.status === 404) {
+        notFound();
+      }
+
+      throw new Error(error.message);
+    }
+
+    throw error;
+  }
 
   return (
     <main className="brand-light-section min-h-screen">
@@ -55,46 +71,57 @@ export default async function AdvisorReportPage({ params }: PageProps) {
         </div>
       </section>
 
-      <div className="brand-container py-10 space-y-10">
-        {/* Executive Summary */}
+      <div className="brand-container space-y-10 py-10">
         <section className="brand-surface-card p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             Executive summary
           </h2>
 
-          <p className="mt-4 text-slate-700 leading-7">
+          <p className="mt-4 leading-7 text-slate-700">
             {report.executiveSummary.overview}
           </p>
         </section>
 
-        {/* Analytics */}
         <section className="brand-surface-card p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             Key metrics
           </h2>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Metric label="Overall score" value={report.analytics.overallScore} />
-            <Metric label="Alignment score" value={report.analytics.alignmentScore} />
-            <Metric label="Confidence" value={report.analytics.confidenceLevel} />
+            <Metric
+              label="Overall score"
+              value={formatMetricValue(report.analytics.overallScore)}
+            />
+            <Metric
+              label="Alignment score"
+              value={formatMetricValue(report.analytics.alignmentScore)}
+            />
+            <Metric
+              label="Confidence"
+              value={report.analytics.confidenceLevel}
+            />
           </div>
         </section>
 
-        {/* Priority Areas */}
         <section className="brand-surface-card p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             Priority areas
           </h2>
 
           <div className="mt-4 space-y-4">
-            {report.analytics.priorityAreas.map((area: any) => (
-              <div
-                key={area.dimensionKey}
-                className="rounded-lg border p-4"
-              >
-                <p className="font-semibold">{area.dimensionLabel}</p>
-                <p className="text-sm text-slate-600">
-                  Score: {area.overallAverage ?? "-"} | Gap: {area.gap ?? "-"}
+            {report.analytics.priorityAreas.map((area) => (
+              <div key={area.dimensionKey} className="rounded-lg border p-4">
+                <p className="font-semibold text-slate-900">
+                  {area.dimensionLabel}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  Score: {formatMetricValue(area.overallAverage)} | Gap:{" "}
+                  {formatMetricValue(area.gap)}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Issue type: {area.issueType}
                 </p>
               </div>
             ))}
@@ -105,13 +132,29 @@ export default async function AdvisorReportPage({ params }: PageProps) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: any }) {
+function formatMetricValue(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+
+  return String(value);
+}
+
+function Metric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
-    <div className="rounded-xl border p-4 bg-white">
-      <p className="text-xs text-slate-500 uppercase">{label}</p>
-      <p className="text-lg font-semibold mt-1">
-        {value ?? "-"}
-      </p>
+    <div className="rounded-xl border bg-white p-4">
+      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

@@ -12,10 +12,6 @@ export const metadata: Metadata = {
   description:
     "HR Operations, Service Delivery, and Transformation Advisory for scaling and complex organisations.",
 
-  alternates: {
-    canonical: "/",
-  },
-
   openGraph: {
     title: "Van Esch Advisory Ltd",
     description:
