@@ -1,10 +1,9 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   questionnaireTypes,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
-
 
 export const metadata = {
   robots: {
@@ -27,30 +26,28 @@ type ParticipantInviteLookupRow = {
   questionnaire_type: string;
   participant_status: string;
   completed_at: string | null;
+  invite_expires_at: string | null;
+  invite_revoked_at: string | null;
+  client_projects:
+    | {
+        project_status: string;
+      }
+    | {
+        project_status: string;
+      }[]
+    | null;
 };
 
-function getEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function getSupabaseAdminClient() {
-  return createClient(
-    getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    getEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    },
-  );
-}
+type ResolvedParticipantInvite = {
+  participant_id: string;
+  project_id: string;
+  questionnaire_type: ProjectQuestionnaireType;
+  participant_status: string;
+  completed_at: string | null;
+  invite_expires_at: string | null;
+  invite_revoked_at: string | null;
+  project_status: string;
+};
 
 function isScoredQuestionnaireType(value: string): value is QuestionnaireType {
   return questionnaireTypes.includes(value as QuestionnaireType);
@@ -76,6 +73,51 @@ function isUuid(value: string | undefined): value is string {
   );
 }
 
+function isInviteExpired(inviteExpiresAt: string | null): boolean {
+  if (!inviteExpiresAt) {
+    return false;
+  }
+
+  const expiresAt = new Date(inviteExpiresAt);
+  return Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now();
+}
+
+function isParticipantStateAllowed(params: {
+  participantStatus: string;
+  completedAt: string | null;
+  questionnaireType: ProjectQuestionnaireType;
+}): boolean {
+  const { participantStatus, completedAt, questionnaireType } = params;
+
+  if (participantStatus === "archived") {
+    return false;
+  }
+
+  if (questionnaireType === "client_fact_pack") {
+    return participantStatus === "invited" || participantStatus === "started";
+  }
+
+  if (completedAt) {
+    return false;
+  }
+
+  return participantStatus === "invited" || participantStatus === "started";
+}
+
+function getProjectStatus(
+  clientProjects: ParticipantInviteLookupRow["client_projects"],
+): string | null {
+  if (!clientProjects) {
+    return null;
+  }
+
+  if (Array.isArray(clientProjects)) {
+    return clientProjects[0]?.project_status ?? null;
+  }
+
+  return clientProjects.project_status ?? null;
+}
+
 export default async function ClientDiagnosticRespondPage({
   params,
 }: PageProps) {
@@ -85,19 +127,31 @@ export default async function ClientDiagnosticRespondPage({
     notFound();
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
-  const { data: participant, error } = await supabase
+  const { data, error } = await supabase
     .from("client_participants")
     .select(
-      "participant_id, project_id, questionnaire_type, participant_status, completed_at",
+      `
+        participant_id,
+        project_id,
+        questionnaire_type,
+        participant_status,
+        completed_at,
+        invite_expires_at,
+        invite_revoked_at,
+        client_projects!inner(project_status)
+      `,
     )
     .eq("invite_token", inviteToken)
-    .maybeSingle<ParticipantInviteLookupRow>();
+    .maybeSingle();
 
-  if (error || !participant) {
+  if (error || !data) {
     notFound();
   }
+
+  const participant = data as ParticipantInviteLookupRow;
+  const projectStatus = getProjectStatus(participant.client_projects);
 
   if (!isUuid(participant.participant_id) || !isUuid(participant.project_id)) {
     notFound();
@@ -107,15 +161,52 @@ export default async function ClientDiagnosticRespondPage({
     notFound();
   }
 
+  if (!projectStatus) {
+    notFound();
+  }
+
+  const resolvedParticipant: ResolvedParticipantInvite = {
+    participant_id: participant.participant_id,
+    project_id: participant.project_id,
+    questionnaire_type: participant.questionnaire_type,
+    participant_status: participant.participant_status,
+    completed_at: participant.completed_at,
+    invite_expires_at: participant.invite_expires_at,
+    invite_revoked_at: participant.invite_revoked_at,
+    project_status: projectStatus,
+  };
+
+  if (resolvedParticipant.project_status !== "active") {
+    notFound();
+  }
+
+  if (resolvedParticipant.invite_revoked_at) {
+    notFound();
+  }
+
+  if (isInviteExpired(resolvedParticipant.invite_expires_at)) {
+    notFound();
+  }
+
+  if (
+    !isParticipantStateAllowed({
+      participantStatus: resolvedParticipant.participant_status,
+      completedAt: resolvedParticipant.completed_at,
+      questionnaireType: resolvedParticipant.questionnaire_type,
+    })
+  ) {
+    notFound();
+  }
+
   const targetUrl =
-    participant.questionnaire_type === "client_fact_pack"
+    resolvedParticipant.questionnaire_type === "client_fact_pack"
       ? `/client-diagnostic/client-fact-pack` +
-        `?projectId=${encodeURIComponent(participant.project_id)}` +
-        `&participantId=${encodeURIComponent(participant.participant_id)}` +
+        `?projectId=${encodeURIComponent(resolvedParticipant.project_id)}` +
+        `&participantId=${encodeURIComponent(resolvedParticipant.participant_id)}` +
         `&inviteToken=${encodeURIComponent(inviteToken)}`
-      : `/client-diagnostic/${participant.questionnaire_type}` +
-        `?projectId=${encodeURIComponent(participant.project_id)}` +
-        `&participantId=${encodeURIComponent(participant.participant_id)}` +
+      : `/client-diagnostic/${resolvedParticipant.questionnaire_type}` +
+        `?projectId=${encodeURIComponent(resolvedParticipant.project_id)}` +
+        `&participantId=${encodeURIComponent(resolvedParticipant.participant_id)}` +
         `&inviteToken=${encodeURIComponent(inviteToken)}`;
 
   redirect(targetUrl);

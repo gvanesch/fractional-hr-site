@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   getQuestionsForQuestionnaireType,
   type ClientDiagnosticQuestion,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
-
 
 type ResponseKind = "score" | "probe";
 
@@ -44,26 +43,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.");
-  }
-
-  if (!supabaseServiceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
 }
 
 function getQuestionMap(
@@ -384,11 +363,17 @@ function mapRpcErrorToResponse(errorMessage: string) {
       return { status: 404, error: errorMessage };
     case "This diagnostic link is invalid for the selected participant.":
       return { status: 403, error: errorMessage };
+    case "This diagnostic link is no longer active.":
+      return { status: 403, error: errorMessage };
+    case "This diagnostic link has expired.":
+      return { status: 403, error: errorMessage };
     case "This questionnaire has already been submitted.":
       return { status: 409, error: errorMessage };
     case "Submitted questionnaire type does not match the participant record.":
       return { status: 400, error: errorMessage };
     case "Participant is not in a valid state for submission.":
+      return { status: 409, error: errorMessage };
+    case "Project is not in a valid state for submission.":
       return { status: 409, error: errorMessage };
     default:
       return {
@@ -398,7 +383,7 @@ function mapRpcErrorToResponse(errorMessage: string) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
     const body = await request.json();
     const validation = validateRequestBody(body);
@@ -419,7 +404,7 @@ export async function POST(request: Request) {
     const responseRows = buildResponseRows(responses);
     const dimensionScoreRows = buildDimensionScoreRows(responses);
 
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase.rpc("submit_client_diagnostic", {
       p_project_id: projectId,

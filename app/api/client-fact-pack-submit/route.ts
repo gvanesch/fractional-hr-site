@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type FactPackSubmitRequest = {
   projectId: string;
@@ -16,29 +15,6 @@ type SaveClientFactPackRpcResult = {
   status: "in_progress" | "completed";
   message: string;
 };
-
-function getEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function getSupabaseAdminClient() {
-  return createClient(
-    getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    getEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    },
-  );
-}
 
 function isUuid(value: string | undefined): value is string {
   if (!value) {
@@ -123,9 +99,15 @@ function mapRpcErrorToResponse(errorMessage: string) {
       return { status: 400, error: errorMessage };
     case "Invite token does not match this participant.":
       return { status: 403, error: errorMessage };
+    case "This fact pack link is no longer active.":
+      return { status: 403, error: errorMessage };
+    case "This fact pack link has expired.":
+      return { status: 403, error: errorMessage };
     case "This fact pack has already been submitted.":
       return { status: 409, error: errorMessage };
     case "Participant is not in a valid state for fact pack access.":
+      return { status: 409, error: errorMessage };
+    case "Project is not in a valid state for fact pack access.":
       return { status: 409, error: errorMessage };
     default:
       return {
@@ -135,7 +117,7 @@ function mapRpcErrorToResponse(errorMessage: string) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
     const body = await request.json();
     const validation = validateRequestBody(body);
@@ -150,7 +132,7 @@ export async function POST(request: Request) {
     const { projectId, participantId, inviteToken, responseJson, mode } =
       validation.data;
 
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase.rpc("save_client_fact_pack", {
       p_project_id: projectId,

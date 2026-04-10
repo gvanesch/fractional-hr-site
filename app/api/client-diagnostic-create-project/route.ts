@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   validateSegmentationSchema,
   validateSegmentationValues,
@@ -9,8 +9,7 @@ import {
   type SegmentationValues,
 } from "@/lib/client-diagnostic/segmentation";
 
-
-type QuestionnaireType = "HR" | "Manager" | "Leadership";
+type UiQuestionnaireType = "HR" | "Manager" | "Leadership";
 type DatabaseQuestionnaireType =
   | "hr"
   | "manager"
@@ -20,7 +19,7 @@ type DatabaseQuestionnaireType =
 type ParticipantInput = {
   name: string;
   email: string;
-  questionnaireType: QuestionnaireType;
+  questionnaireType: UiQuestionnaireType;
   segmentationValues: SegmentationValues;
 };
 
@@ -53,7 +52,10 @@ type InsertedParticipantRow = {
   email: string;
   segmentation_values: SegmentationValues | null;
   invite_token: string | null;
+  invite_expires_at: string | null;
 };
+
+const DEFAULT_INVITE_EXPIRY_DAYS = 21;
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -70,7 +72,7 @@ function isValidEmail(email: string): boolean {
 }
 
 function mapQuestionnaireTypeToDatabaseValue(
-  questionnaireType: QuestionnaireType,
+  questionnaireType: UiQuestionnaireType,
 ): DatabaseQuestionnaireType {
   switch (questionnaireType) {
     case "HR":
@@ -84,7 +86,7 @@ function mapQuestionnaireTypeToDatabaseValue(
   }
 }
 
-function buildDiagnosticEmailSubject(projectName: string) {
+function buildDiagnosticEmailSubject(projectName: string): string {
   return `Input requested: ${projectName} HR operations diagnostic`;
 }
 
@@ -92,7 +94,7 @@ function buildDiagnosticEmailHtml(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
-}) {
+}): string {
   const { name, projectName, inviteUrl } = params;
 
   return `
@@ -128,7 +130,7 @@ function buildDiagnosticEmailText(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
-}) {
+}): string {
   const { name, projectName, inviteUrl } = params;
 
   return [
@@ -151,7 +153,7 @@ function buildDiagnosticEmailText(params: {
   ].join("\n");
 }
 
-function buildFactPackEmailSubject(projectName: string) {
+function buildFactPackEmailSubject(projectName: string): string {
   return `Input requested: ${projectName} client fact pack`;
 }
 
@@ -159,7 +161,7 @@ function buildFactPackEmailHtml(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
-}) {
+}): string {
   const { name, projectName, inviteUrl } = params;
 
   return `
@@ -195,7 +197,7 @@ function buildFactPackEmailText(params: {
   name: string;
   projectName: string;
   inviteUrl: string;
-}) {
+}): string {
   const { name, projectName, inviteUrl } = params;
 
   return [
@@ -248,6 +250,39 @@ function getCleanFactPackRecipient(
   };
 }
 
+function getDefaultInviteExpiresAt(): string {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + DEFAULT_INVITE_EXPIRY_DAYS);
+  return expiresAt.toISOString();
+}
+
+function getNormalisedParticipantEmails(
+  participants: ParticipantInput[],
+  factPackRecipient: FactPackRecipientInput | null,
+): string[] {
+  const emails = participants.map((participant) =>
+    participant.email.trim().toLowerCase(),
+  );
+
+  if (factPackRecipient) {
+    emails.push(factPackRecipient.email.trim().toLowerCase());
+  }
+
+  return emails;
+}
+
+function getDuplicateEmails(emails: string[]): string[] {
+  const seen = new Map<string, number>();
+
+  for (const email of emails) {
+    seen.set(email, (seen.get(email) ?? 0) + 1);
+  }
+
+  return [...seen.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([email]) => email);
+}
+
 async function sendParticipantInvite(params: {
   resend: Resend;
   fromEmail: string;
@@ -269,7 +304,6 @@ async function sendParticipantInvite(params: {
   }
 
   const inviteUrl = `${siteUrl}/client-diagnostic/respond/${participant.invite_token}`;
-
   const isFactPack = participant.questionnaire_type === "client_fact_pack";
 
   try {
@@ -333,6 +367,7 @@ async function sendParticipantInvite(params: {
       participantEmail: participant.email,
       resendId: resendData?.id ?? null,
       questionnaireType: participant.questionnaire_type,
+      inviteExpiresAt: participant.invite_expires_at,
     });
 
     return {
@@ -362,7 +397,7 @@ async function sendParticipantInvite(params: {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
     const advisorUser = await requireAdvisorUser();
 
@@ -373,11 +408,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      getEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    );
-
+    const supabase = createSupabaseAdminClient();
     const resend = new Resend(getEnv("RESEND_API_KEY"));
 
     const body = (await request.json()) as Partial<CreateProjectRequest>;
@@ -458,6 +489,22 @@ export async function POST(request: Request) {
       }
     }
 
+    const normalisedEmails = getNormalisedParticipantEmails(
+      participants,
+      factPackRecipient,
+    );
+    const duplicateEmails = getDuplicateEmails(normalisedEmails);
+
+    if (duplicateEmails.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Duplicate participant email(s) detected: ${duplicateEmails.join(", ")}.`,
+        },
+        { status: 400 },
+      );
+    }
+
     const primary = participants[0];
 
     const { data: project, error: projectError } = await supabase
@@ -470,7 +517,7 @@ export async function POST(request: Request) {
         project_status: "active",
         segmentation_schema: segmentationSchema,
       })
-      .select()
+      .select("project_id, project_name, company_name")
       .single();
 
     if (projectError || !project) {
@@ -489,6 +536,8 @@ export async function POST(request: Request) {
       factPackIncluded: Boolean(factPackRecipient),
     });
 
+    const inviteExpiresAt = getDefaultInviteExpiresAt();
+
     const participantRows: Array<{
       project_id: string;
       questionnaire_type: DatabaseQuestionnaireType;
@@ -496,6 +545,7 @@ export async function POST(request: Request) {
       name: string;
       email: string;
       segmentation_values: SegmentationValues | null;
+      invite_expires_at: string;
     }> = participants.map((participant) => {
       const validatedSegmentationValues = validateSegmentationValues(
         segmentationSchema,
@@ -511,6 +561,7 @@ export async function POST(request: Request) {
         name: participant.name.trim(),
         email: participant.email.trim().toLowerCase(),
         segmentation_values: validatedSegmentationValues,
+        invite_expires_at: inviteExpiresAt,
       };
     });
 
@@ -522,17 +573,15 @@ export async function POST(request: Request) {
         name: factPackRecipient.name,
         email: factPackRecipient.email,
         segmentation_values: null,
+        invite_expires_at: inviteExpiresAt,
       });
     }
 
-    const {
-      data: insertedParticipants,
-      error: participantError,
-    } = await supabase
+    const { data: insertedParticipants, error: participantError } = await supabase
       .from("client_participants")
       .insert(participantRows)
       .select(
-        "participant_id, project_id, questionnaire_type, role_label, name, email, segmentation_values, invite_token",
+        "participant_id, project_id, questionnaire_type, role_label, name, email, segmentation_values, invite_token, invite_expires_at",
       )
       .returns<InsertedParticipantRow[]>();
 
@@ -548,6 +597,7 @@ export async function POST(request: Request) {
     console.info("Participants created successfully", {
       projectId: project.project_id,
       insertedParticipants: insertedParticipants.length,
+      inviteExpiresAt,
     });
 
     const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
@@ -586,6 +636,7 @@ export async function POST(request: Request) {
       success: true,
       projectId: project.project_id,
       participants: insertedParticipants.length,
+      inviteExpiresAt,
       emailResults,
     });
   } catch (error) {
@@ -594,10 +645,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unexpected server error.",
+        error: "Unexpected server error.",
       },
       { status: 500 },
     );

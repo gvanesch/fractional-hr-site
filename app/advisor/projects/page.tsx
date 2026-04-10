@@ -17,7 +17,7 @@ type Project = {
   project_id: string;
   project_name: string | null;
   company_name: string | null;
-  project_status: string | null;
+  project_status: "active" | "closed" | "archived" | null;
   created_at: string;
 };
 
@@ -46,25 +46,29 @@ function formatProjectTitle(project: Project): string {
   return "Untitled project";
 }
 
-function formatProjectStatus(status: string | null): string {
-  if (!status) {
-    return "Unknown";
+/**
+ * 🔴 CRITICAL CHANGE
+ * UI language is now Open / Closed only
+ */
+function getProjectStatusLabel(status: Project["project_status"]): string {
+  switch (status) {
+    case "active":
+      return "Open";
+    case "closed":
+      return "Closed";
+    case "archived":
+      return "Archived";
+    default:
+      return "Unknown";
   }
-
-  return status
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getStatusClasses(status: string | null): string {
+function getStatusClasses(status: Project["project_status"]): string {
   switch (status) {
     case "active":
       return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "draft":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "complete":
-    case "completed":
-      return "border-blue-200 bg-blue-50 text-blue-800";
+    case "closed":
+      return "border-slate-300 bg-slate-100 text-slate-700";
     case "archived":
       return "border-amber-200 bg-amber-50 text-amber-800";
     default:
@@ -88,6 +92,9 @@ export default async function AdvisorProjectsPage() {
 
   const projects: Project[] = !error && data ? data : [];
 
+  const openProjects = projects.filter((p) => p.project_status === "active");
+  const closedProjects = projects.filter((p) => p.project_status === "closed");
+
   return (
     <main className="brand-light-section min-h-screen">
       <section className="brand-hero">
@@ -98,31 +105,15 @@ export default async function AdvisorProjectsPage() {
             <h1 className="brand-heading-lg mt-5 text-white">Projects</h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              View and manage all diagnostic projects. This should become the
-              main control point for entering a project workspace, moving into
-              reporting, and later managing participants, status changes, and
-              outputs without relying on direct links.
+              View and manage all diagnostic projects. This is the control layer
+              for accessing project workspaces, monitoring progress, and moving
+              into reporting.
             </p>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <WorkspaceStat
-                label="Total projects"
-                value={String(projects.length)}
-              />
-              <WorkspaceStat
-                label="Active projects"
-                value={String(
-                  projects.filter((project) => project.project_status === "active")
-                    .length,
-                )}
-              />
-              <WorkspaceStat
-                label="Draft / setup"
-                value={String(
-                  projects.filter((project) => project.project_status === "draft")
-                    .length,
-                )}
-              />
+              <WorkspaceStat label="Total" value={String(projects.length)} />
+              <WorkspaceStat label="Open" value={String(openProjects.length)} />
+              <WorkspaceStat label="Closed" value={String(closedProjects.length)} />
             </div>
           </div>
         </div>
@@ -134,8 +125,8 @@ export default async function AdvisorProjectsPage() {
             <h2 className="text-lg font-semibold text-slate-900">
               Unable to load projects
             </h2>
-            <p className="mt-4 text-sm leading-7 text-rose-600">
-              There was a problem retrieving diagnostic projects from Supabase.
+            <p className="mt-4 text-sm text-rose-600">
+              There was a problem retrieving projects from Supabase.
             </p>
           </section>
         ) : projects.length === 0 ? (
@@ -143,9 +134,8 @@ export default async function AdvisorProjectsPage() {
             <h2 className="text-lg font-semibold text-slate-900">
               No projects found
             </h2>
-            <p className="mt-4 text-sm leading-7 text-slate-700">
-              No diagnostic projects are currently available in the advisor
-              workspace.
+            <p className="mt-4 text-sm text-slate-700">
+              No diagnostic projects are currently available.
             </p>
           </section>
         ) : (
@@ -167,7 +157,7 @@ export default async function AdvisorProjectsPage() {
                           project.project_status,
                         )}`}
                       >
-                        {formatProjectStatus(project.project_status)}
+                        {getProjectStatusLabel(project.project_status)}
                       </span>
                     </div>
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +12,7 @@ type CreateParticipantBody = {
   email?: string;
 };
 
-function createSupabaseAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+const DEFAULT_INVITE_EXPIRY_DAYS = 21;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -35,16 +30,19 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export async function POST(request: Request) {
+function getDefaultInviteExpiresAt(): string {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + DEFAULT_INVITE_EXPIRY_DAYS);
+  return expiresAt.toISOString();
+}
+
+export async function POST(request: Request): Promise<Response> {
   try {
     const advisorUser = await requireAdvisorUser();
 
     if (!advisorUser) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized.",
-        },
+        { success: false, error: "Unauthorized." },
         { status: 403 },
       );
     }
@@ -59,71 +57,64 @@ export async function POST(request: Request) {
 
     if (!projectId || !isUuid(projectId)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "A valid projectId is required.",
-        },
+        { success: false, error: "A valid projectId is required." },
         { status: 400 },
       );
     }
 
     if (!isValidQuestionnaireType(questionnaireType)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "A valid questionnaireType is required.",
-        },
+        { success: false, error: "A valid questionnaireType is required." },
         { status: 400 },
       );
     }
 
     if (!roleLabel) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "roleLabel is required.",
-        },
+        { success: false, error: "roleLabel is required." },
         { status: 400 },
       );
     }
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "A valid email address is required.",
-        },
+        { success: false, error: "A valid email address is required." },
         { status: 400 },
       );
     }
 
     const supabase = createSupabaseAdminClient();
 
+    // 🔒 Check project exists AND is active
     const { data: project, error: projectError } = await supabase
       .from("client_projects")
-      .select("project_id")
+      .select("project_id, project_status")
       .eq("project_id", projectId)
       .single();
 
     if (projectError || !project) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Project not found.",
-        },
+        { success: false, error: "Project not found." },
         { status: 404 },
       );
     }
 
-    const { data: existingParticipant, error: existingParticipantError } =
-      await supabase
-        .from("client_participants")
-        .select("participant_id")
-        .eq("project_id", projectId)
-        .eq("email", email)
-        .maybeSingle();
+    if (project.project_status !== "active") {
+      return NextResponse.json(
+        { success: false, error: "Project is not active." },
+        { status: 409 },
+      );
+    }
 
-    if (existingParticipantError) {
+    // 🔒 Prevent duplicate emails in project
+    const { data: existing, error: existingError } = await supabase
+      .from("client_participants")
+      .select("participant_id")
+      .eq("project_id", projectId)
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingError) {
       return NextResponse.json(
         {
           success: false,
@@ -133,15 +124,17 @@ export async function POST(request: Request) {
       );
     }
 
-    if (existingParticipant) {
+    if (existing) {
       return NextResponse.json(
         {
           success: false,
-          error: "A participant with this email already exists for the project.",
+          error: "A participant with this email already exists.",
         },
         { status: 409 },
       );
     }
+
+    const inviteExpiresAt = getDefaultInviteExpiresAt();
 
     const { data: participant, error: insertError } = await supabase
       .from("client_participants")
@@ -153,22 +146,18 @@ export async function POST(request: Request) {
         email,
         participant_status: "invited",
         invited_at: new Date().toISOString(),
+        invite_expires_at: inviteExpiresAt,
       })
       .select(
-        "participant_id, project_id, questionnaire_type, role_label, name, email, participant_status, invited_at",
+        "participant_id, email, participant_status, invite_expires_at",
       )
       .single();
 
     if (insertError || !participant) {
-      console.error("[advisor-project-participants] insert failed", {
-        insertError,
-      });
+      console.error("Participant insert failed", insertError);
 
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to create participant.",
-        },
+        { success: false, error: "Unable to create participant." },
         { status: 500 },
       );
     }
@@ -181,16 +170,12 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("[advisor-project-participants] POST failed", {
-      error,
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error("Unexpected error creating participant", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Unexpected server error while creating participant.",
+        error: "Unexpected server error.",
       },
       { status: 500 },
     );
