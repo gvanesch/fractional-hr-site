@@ -1,8 +1,13 @@
+import {
+  isValidCanonicalSegmentationKey,
+} from "@/lib/client-diagnostic/canonical-segmentation";
+
 export type SegmentationFieldKey = "function" | "location" | "level";
 
 export type SegmentationOption = {
   optionKey: string;
   optionLabel: string;
+  canonicalKey: string;
 };
 
 export type SegmentationFieldDefinition = {
@@ -106,14 +111,29 @@ export function validateSegmentationSchema(
 
       const rawOptionKey = rawOption.optionKey;
       const rawOptionLabel = rawOption.optionLabel;
+      const rawCanonicalKey = rawOption.canonicalKey;
 
-      if (!isNonEmptyString(rawOptionKey) || !isNonEmptyString(rawOptionLabel)) {
+      if (
+        !isNonEmptyString(rawOptionKey) ||
+        !isNonEmptyString(rawOptionLabel) ||
+        !isNonEmptyString(rawCanonicalKey)
+      ) {
         return null;
       }
 
       const normalisedOptionKey = normaliseKey(rawOptionKey);
+      const normalisedCanonicalKey = normaliseKey(rawCanonicalKey);
 
       if (seenOptionKeys.has(normalisedOptionKey)) {
+        return null;
+      }
+
+      if (
+        !isValidCanonicalSegmentationKey(
+          rawFieldKey,
+          normalisedCanonicalKey,
+        )
+      ) {
         return null;
       }
 
@@ -122,6 +142,7 @@ export function validateSegmentationSchema(
       options.push({
         optionKey: normalisedOptionKey,
         optionLabel: rawOptionLabel.trim(),
+        canonicalKey: normalisedCanonicalKey,
       });
     }
 
@@ -191,27 +212,63 @@ export function buildDefaultSegmentationSchema(): SegmentationSchema {
         fieldKey: "function",
         fieldLabel: "Function",
         options: [
-          { optionKey: "hr_people", optionLabel: "HR / People" },
-          { optionKey: "operations", optionLabel: "Operations" },
-          { optionKey: "sales", optionLabel: "Sales" },
+          {
+            optionKey: "hr_people",
+            optionLabel: "HR / People",
+            canonicalKey: "hr",
+          },
+          {
+            optionKey: "operations",
+            optionLabel: "Operations",
+            canonicalKey: "operations",
+          },
+          {
+            optionKey: "sales",
+            optionLabel: "Sales",
+            canonicalKey: "sales",
+          },
         ],
       },
       {
         fieldKey: "location",
         fieldLabel: "Location",
         options: [
-          { optionKey: "uk", optionLabel: "UK" },
-          { optionKey: "emea", optionLabel: "EMEA" },
-          { optionKey: "global", optionLabel: "Global" },
+          {
+            optionKey: "uk",
+            optionLabel: "UK",
+            canonicalKey: "uk",
+          },
+          {
+            optionKey: "emea",
+            optionLabel: "EMEA",
+            canonicalKey: "emea",
+          },
+          {
+            optionKey: "global",
+            optionLabel: "Global",
+            canonicalKey: "global",
+          },
         ],
       },
       {
         fieldKey: "level",
         fieldLabel: "Level",
         options: [
-          { optionKey: "individual_contributor", optionLabel: "Individual Contributor" },
-          { optionKey: "manager", optionLabel: "Manager" },
-          { optionKey: "leadership", optionLabel: "Leadership" },
+          {
+            optionKey: "individual_contributor",
+            optionLabel: "Individual Contributor",
+            canonicalKey: "individual_contributor",
+          },
+          {
+            optionKey: "manager",
+            optionLabel: "Manager",
+            canonicalKey: "manager",
+          },
+          {
+            optionKey: "leadership",
+            optionLabel: "Leadership",
+            canonicalKey: "executive",
+          },
         ],
       },
     ],

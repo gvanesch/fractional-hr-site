@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import AdvisorNav from "@/app/components/advisor/AdvisorNav";
 
 export default function AdvisorLayout({

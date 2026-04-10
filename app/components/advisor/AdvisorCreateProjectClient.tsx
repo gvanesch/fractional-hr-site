@@ -9,6 +9,7 @@ import {
   type SegmentationSchema,
   type SegmentationValues,
 } from "@/lib/client-diagnostic/segmentation";
+import { getCanonicalSegmentationOptions } from "@/lib/client-diagnostic/canonical-segmentation";
 
 type QuestionnaireType = "HR" | "Manager" | "Leadership";
 
@@ -72,13 +73,20 @@ function normaliseSchemaForSubmit(
 
       const cleanedOptions = field.options
         .map((option) => ({
-          optionKey:
-            slugifySegmentationOptionKey(
-              option.optionKey || option.optionLabel,
-            ) || slugifySegmentationOptionKey(option.optionLabel),
+          optionKey: slugifySegmentationOptionKey(option.optionLabel),
           optionLabel: option.optionLabel.trim(),
+          canonicalKey: option.canonicalKey.trim(),
         }))
-        .filter((option) => option.optionKey && option.optionLabel);
+        .filter(
+          (option) =>
+            option.optionKey && option.optionLabel && option.canonicalKey,
+        );
+
+      if (cleanedOptions.length === 0) {
+        throw new Error(
+          `At least one valid option is required for ${field.fieldLabel}.`,
+        );
+      }
 
       return {
         fieldKey,
@@ -138,54 +146,116 @@ export default function AdvisorCreateProjectClient() {
     }));
   }
 
-  function updateFieldOptions(
+function updateOptionLabel(
+  fieldKey: SegmentationFieldKey,
+  optionKey: string,
+  optionLabel: string,
+) {
+  setSegmentationSchema((current) => ({
+    fields: current.fields.map((field) =>
+      field.fieldKey === fieldKey
+        ? {
+            ...field,
+            options: field.options.map((option) =>
+              option.optionKey === optionKey
+                ? {
+                    ...option,
+                    optionLabel,
+                  }
+                : option,
+            ),
+          }
+        : field,
+    ),
+  }));
+}
+
+  function updateOptionCanonicalKey(
     fieldKey: SegmentationFieldKey,
-    optionLabelsRaw: string,
+    optionKey: string,
+    canonicalKey: string,
   ) {
-    const optionLabels = optionLabelsRaw
-      .split("\n")
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    const nextOptions = optionLabels.map((optionLabel) => ({
-      optionKey: slugifySegmentationOptionKey(optionLabel),
-      optionLabel,
+    setSegmentationSchema((current) => ({
+      fields: current.fields.map((field) =>
+        field.fieldKey === fieldKey
+          ? {
+              ...field,
+              options: field.options.map((option) =>
+                option.optionKey === optionKey
+                  ? {
+                      ...option,
+                      canonicalKey,
+                    }
+                  : option,
+              ),
+            }
+          : field,
+      ),
     }));
+  }
 
+  function addOptionRow(fieldKey: SegmentationFieldKey) {
+    const canonicalOptions = getCanonicalSegmentationOptions(fieldKey);
+    const defaultCanonicalKey = canonicalOptions[0]?.key ?? "other";
+    const newOptionKey = `option_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+
+    setSegmentationSchema((current) => ({
+      fields: current.fields.map((field) =>
+        field.fieldKey === fieldKey
+          ? {
+              ...field,
+              options: [
+                ...field.options,
+                {
+                  optionKey: newOptionKey,
+                  optionLabel: "",
+                  canonicalKey: defaultCanonicalKey,
+                },
+              ],
+            }
+          : field,
+      ),
+    }));
+  }
+
+  function removeOptionRow(fieldKey: SegmentationFieldKey, optionKey: string) {
     setSegmentationSchema((current) => {
+      const nextFields = current.fields.map((field) => {
+        if (field.fieldKey !== fieldKey) {
+          return field;
+        }
+
+        if (field.options.length === 1) {
+          return field;
+        }
+
+        return {
+          ...field,
+          options: field.options.filter((option) => option.optionKey !== optionKey),
+        };
+      });
+
       const nextSchema: SegmentationSchema = {
-        fields: current.fields.map((field) =>
-          field.fieldKey === fieldKey
-            ? {
-                ...field,
-                options: nextOptions.length > 0 ? nextOptions : field.options,
-              }
-            : field,
-        ),
+        fields: nextFields,
       };
+
+      const updatedField = nextSchema.fields.find(
+        (field) => field.fieldKey === fieldKey,
+      );
+
+      const fallbackOptionKey = updatedField?.options[0]?.optionKey ?? "";
 
       setParticipants((currentParticipants) =>
         currentParticipants.map((participant) => {
-          const matchingField = nextSchema.fields.find(
-            (field) => field.fieldKey === fieldKey,
-          );
-
-          if (!matchingField || matchingField.options.length === 0) {
+          if (participant.segmentationValues[fieldKey] !== optionKey) {
             return participant;
           }
-
-          const currentValue = participant.segmentationValues[fieldKey];
-          const valueStillExists = matchingField.options.some(
-            (option) => option.optionKey === currentValue,
-          );
 
           return {
             ...participant,
             segmentationValues: {
               ...participant.segmentationValues,
-              [fieldKey]: valueStillExists
-                ? currentValue
-                : matchingField.options[0].optionKey,
+              [fieldKey]: fallbackOptionKey,
             },
           };
         }),
@@ -281,14 +351,16 @@ export default function AdvisorCreateProjectClient() {
         );
       }
 
+      const resetSchema = buildDefaultSegmentationSchema();
+
       setSuccessMessage(
         `Project created successfully. ${result.participants} participant(s) invited.`,
       );
       setProjectName("");
       setCompanyName("");
-      setSegmentationSchema(buildDefaultSegmentationSchema());
+      setSegmentationSchema(resetSchema);
       setParticipants([
-        createParticipantRow(buildDefaultSegmentationSchema(), {
+        createParticipantRow(resetSchema, {
           questionnaireType: "HR",
         }),
       ]);
@@ -322,7 +394,7 @@ export default function AdvisorCreateProjectClient() {
               type="text"
               value={projectName}
               onChange={(event) => setProjectName(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
               placeholder="Example: Q2 HR Operating Model Diagnostic"
               required
             />
@@ -336,7 +408,7 @@ export default function AdvisorCreateProjectClient() {
               type="text"
               value={companyName}
               onChange={(event) => setCompanyName(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
               placeholder="Example: Acme Group"
             />
           </label>
@@ -346,13 +418,14 @@ export default function AdvisorCreateProjectClient() {
       <section className="brand-surface-card p-6 sm:p-8">
         <p className="brand-section-kicker">Participant segmentation</p>
         <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-          Define client-facing field names and dropdown options
+          Define client-facing field names and canonical mappings
         </h2>
 
         <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
           The internal structure remains fixed as function, location, and level.
-          The labels and options shown to participants can be adapted to the
-          client’s internal language.
+          The labels and option names shown to participants can be adapted to the
+          client&apos;s language. Canonical mappings stay controlled so
+          cross-project reporting remains clean over time.
         </p>
 
         <div className="mt-8 space-y-6">
@@ -361,41 +434,110 @@ export default function AdvisorCreateProjectClient() {
               (item) => item.fieldKey === fieldKey,
             ) as SegmentationFieldDefinition;
 
+            const canonicalOptions = getCanonicalSegmentationOptions(field.fieldKey);
+
             return (
               <div
                 key={field.fieldKey}
                 className="rounded-2xl border border-[var(--brand-border)] bg-white p-5"
               >
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm font-medium text-slate-900">
-                      Display label
-                    </span>
-                    <input
-                      type="text"
-                      value={field.fieldLabel}
-                      onChange={(event) =>
-                        updateFieldLabel(field.fieldKey, event.target.value)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
-                    />
-                  </label>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="block">
+                      <span className="text-sm font-medium text-slate-900">
+                        Display label
+                      </span>
+                      <input
+                        type="text"
+                        value={field.fieldLabel}
+                        onChange={(event) =>
+                          updateFieldLabel(field.fieldKey, event.target.value)
+                        }
+                        className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                      />
+                    </label>
+                  </div>
 
-                  <label className="block">
-                    <span className="text-sm font-medium text-slate-900">
-                      Options, one per line
-                    </span>
-                    <textarea
-                      value={field.options
-                        .map((option) => option.optionLabel)
-                        .join("\n")}
-                      onChange={(event) =>
-                        updateFieldOptions(field.fieldKey, event.target.value)
-                      }
-                      rows={5}
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
-                    />
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addOptionRow(field.fieldKey)}
+                    className="brand-button-dark mt-7"
+                  >
+                    Add option
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {field.options.map((option, optionIndex) => (
+                    <div
+                      key={option.optionKey}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Option {optionIndex + 1}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeOptionRow(field.fieldKey, option.optionKey)
+                          }
+                          className="text-sm font-medium text-slate-500 hover:text-slate-900"
+                          disabled={field.options.length === 1}
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="text-sm font-medium text-slate-900">
+                            Display option
+                          </span>
+                          <input
+                            type="text"
+                            value={option.optionLabel}
+                            onChange={(event) =>
+                              updateOptionLabel(
+                                field.fieldKey,
+                                option.optionKey,
+                                event.target.value,
+                              )
+                            }
+                            className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                            placeholder="Example: People Team"
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="text-sm font-medium text-slate-900">
+                            Canonical mapping
+                          </span>
+                          <select
+                            value={option.canonicalKey}
+                            onChange={(event) =>
+                              updateOptionCanonicalKey(
+                                field.fieldKey,
+                                option.optionKey,
+                                event.target.value,
+                              )
+                            }
+                            className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                          >
+                            {canonicalOptions.map((canonicalOption) => (
+                              <option
+                                key={canonicalOption.key}
+                                value={canonicalOption.key}
+                              >
+                                {canonicalOption.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -455,7 +597,7 @@ export default function AdvisorCreateProjectClient() {
                         name: event.target.value,
                       })
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
                     required
                   />
                 </label>
@@ -472,7 +614,7 @@ export default function AdvisorCreateProjectClient() {
                         email: event.target.value,
                       })
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
                     required
                   />
                 </label>
@@ -489,7 +631,7 @@ export default function AdvisorCreateProjectClient() {
                           .value as QuestionnaireType,
                       })
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                    className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
                   >
                     <option value="HR">HR</option>
                     <option value="Manager">Manager</option>
@@ -518,7 +660,7 @@ export default function AdvisorCreateProjectClient() {
                             event.target.value,
                           )
                         }
-                        className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+                        className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
                       >
                         {field.options.map((option) => (
                           <option
@@ -564,7 +706,7 @@ export default function AdvisorCreateProjectClient() {
                   name: event.target.value,
                 }))
               }
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
               placeholder="Example: Jane Smith"
             />
           </label>
@@ -582,7 +724,7 @@ export default function AdvisorCreateProjectClient() {
                   email: event.target.value,
                 }))
               }
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
+              className="mt-2 w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-900"
               placeholder="Example: jane@acme.com"
             />
           </label>

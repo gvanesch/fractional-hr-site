@@ -5,9 +5,14 @@ export const metadata = {
   },
 };
 
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-
+import {
+  getProjectSummaryData,
+  isUuid,
+  type DimensionSummary,
+  type ProjectSummaryResponse,
+  type RespondentGroupSummary,
+} from "@/lib/client-diagnostic/get-project-summary";
 
 type PageProps = {
   params: Promise<{
@@ -17,70 +22,6 @@ type PageProps = {
 
 type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 type ScoredQuestionnaireType = "hr" | "manager" | "leadership";
-
-type DimensionSummary = {
-  dimensionKey: string;
-  dimensionLabel: string;
-  dimensionDescription: string;
-  scores: Partial<Record<QuestionnaireType, number>>;
-  completedQuestionnaireTypes: QuestionnaireType[];
-  missingQuestionnaireTypes: QuestionnaireType[];
-  maxScore: number | null;
-  minScore: number | null;
-  gap: number | null;
-};
-
-type RespondentGroupSummary = {
-  questionnaireType: QuestionnaireType;
-  label: string;
-  totalInvited: number;
-  outstanding: number;
-  completed: number;
-  outstandingParticipants: Array<{
-    participantId: string;
-    roleLabel: string;
-    participantStatus: string;
-    startedAt: string | null;
-    completedAt: string | null;
-    updatedAt: string;
-  }>;
-};
-
-type ProjectSummaryResponse = {
-  success: true;
-  project: {
-    projectId: string;
-    companyName: string;
-    primaryContactName: string;
-    primaryContactEmail: string;
-    projectStatus: string;
-    notes: string | null;
-  };
-  completion: {
-    totalInvited: number;
-    outstanding: number;
-    completed: number;
-    completionPercentage: number;
-    participants: Array<{
-      participantId: string;
-      questionnaireType: QuestionnaireType;
-      roleLabel: string;
-      participantStatus: string;
-      startedAt: string | null;
-      completedAt: string | null;
-      updatedAt: string;
-    }>;
-    respondentGroups: RespondentGroupSummary[];
-  };
-  dimensions: DimensionSummary[];
-  strongestAlignment: DimensionSummary[];
-  biggestGaps: DimensionSummary[];
-};
-
-type ErrorResponse = {
-  success: false;
-  error: string;
-};
 
 const QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "hr",
@@ -94,12 +35,6 @@ const SCORED_QUESTIONNAIRE_TYPES: ScoredQuestionnaireType[] = [
   "manager",
   "leadership",
 ];
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
 
 function formatQuestionnaireType(questionnaireType: QuestionnaireType): string {
   switch (questionnaireType) {
@@ -347,55 +282,23 @@ function getLowestGroupSignals(dimensions: DimensionSummary[]): string[] {
   return signals.slice(0, 4);
 }
 
-async function getBaseUrl(): Promise<string> {
-  const envSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-
-  if (envSiteUrl) {
-    return envSiteUrl.replace(/\/$/, "");
-  }
-
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("host");
-
-  if (!host) {
-    throw new Error("Unable to determine site host.");
-  }
-
-  const protocol =
-    host.includes("localhost") || host.startsWith("127.0.0.1")
-      ? "http"
-      : "https";
-
-  return `${protocol}://${host}`;
-}
-
 async function getProjectSummary(
   projectId: string,
 ): Promise<ProjectSummaryResponse> {
-  const baseUrl = await getBaseUrl();
+  try {
+    return await getProjectSummaryData(projectId);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Project not found.") {
+      notFound();
+    }
 
-  const response = await fetch(
-    `${baseUrl}/api/client-diagnostic-project-summary?projectId=${encodeURIComponent(
+    console.error("[advisor-client-diagnostic] getProjectSummary:direct-error", {
       projectId,
-    )}`,
-    {
-      cache: "no-store",
-    },
-  );
+      error,
+    });
 
-  if (response.status === 404) {
-    notFound();
+    throw error;
   }
-
-  const data = (await response.json()) as
-    | ProjectSummaryResponse
-    | ErrorResponse;
-
-  if (!response.ok || !data.success) {
-    throw new Error("Unable to load client diagnostic project summary.");
-  }
-
-  return data;
 }
 
 export default async function ClientDiagnosticProjectDashboardPage({
@@ -790,7 +693,7 @@ export default async function ClientDiagnosticProjectDashboardPage({
                     <ScoreCell value={dimension.scores.hr} />
                     <ScoreCell value={dimension.scores.manager} />
                     <ScoreCell value={dimension.scores.leadership} />
-                    <ScoreCell value={dimension.scores.client_fact_pack} />
+                    <ScoreCell />
                     <td className="border-b border-slate-200 px-4 py-4 align-top">
                       <p
                         className={`text-sm font-semibold ${getGapToneClasses(

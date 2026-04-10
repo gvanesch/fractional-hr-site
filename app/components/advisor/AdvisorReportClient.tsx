@@ -1,167 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type {
+  ClientDiagnosticReport,
+  ReportPriorityArea,
+} from "@/lib/client-diagnostic/build-client-diagnostic-report";
 
 type AdvisorReportClientProps = {
-  projectId: string;
+  report: ClientDiagnosticReport;
 };
-
-type ReportIssueType =
-  | "structural"
-  | "behavioural"
-  | "fragile"
-  | "optimisation"
-  | "insufficient-data";
-
-type ReportPriorityArea = {
-  dimensionKey: string;
-  dimensionLabel: string;
-  overallAverage: number | null;
-  gap: number | null;
-  priorityScore: number;
-  issueType: ReportIssueType;
-};
-
-type ClientDiagnosticReport = {
-  project: {
-    projectId: string;
-    companyName: string;
-    primaryContactName: string;
-    projectStatus: string;
-  };
-  executiveSummary: {
-    overview: string;
-    completionPercentage: number;
-    completedRespondentGroups: number;
-    totalRespondentGroups: number;
-  };
-  analytics: {
-    overallScore: number | null;
-    alignmentScore: number | null;
-    confidenceLevel: "low" | "medium" | "high";
-    priorityAreas: ReportPriorityArea[];
-  };
-};
-
-type ReportApiResponse =
-  | {
-      success: true;
-      report: ClientDiagnosticReport;
-    }
-  | {
-      success: false;
-      error: string;
-    };
 
 export default function AdvisorReportClient({
-  projectId,
+  report,
 }: AdvisorReportClientProps) {
-  const [report, setReport] = useState<ClientDiagnosticReport | null>(null);
-  const [error, setError] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadReport() {
-      try {
-        setIsLoading(true);
-        setError("");
-
-        const response = await fetch(
-          `/api/client-diagnostic-report?projectId=${encodeURIComponent(projectId)}`,
-          {
-            cache: "no-store",
-            credentials: "same-origin",
-          },
-        );
-
-        const result = (await response.json()) as ReportApiResponse;
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            "error" in result ? result.error : "Failed to load report.",
-          );
-        }
-
-        if (!isCancelled) {
-          setReport(result.report);
-        }
-      } catch (loadError) {
-        if (!isCancelled) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Failed to load report.",
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadReport();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [projectId]);
-
-  if (isLoading) {
-    return (
-      <main className="brand-light-section min-h-screen">
-        <section className="brand-hero">
-          <div className="brand-container brand-section brand-hero-content">
-            <div className="max-w-4xl">
-              <p className="brand-kicker">Advisor workspace</p>
-
-              <h1 className="brand-heading-lg mt-5 text-white">
-                Diagnostic report
-              </h1>
-
-              <p className="brand-subheading brand-body-on-dark mt-6">
-                Loading report...
-              </p>
-            </div>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (error || !report) {
-    return (
-      <main className="brand-light-section min-h-screen">
-        <section className="brand-hero">
-          <div className="brand-container brand-section brand-hero-content">
-            <div className="max-w-4xl">
-              <p className="brand-kicker">Advisor workspace</p>
-
-              <h1 className="brand-heading-lg mt-5 text-white">
-                Diagnostic report
-              </h1>
-
-              <p className="brand-subheading brand-body-on-dark mt-6">
-                Unable to load report.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <div className="brand-container py-10">
-          <section className="brand-surface-card p-6">
-            <h2 className="text-lg font-semibold text-slate-900">Error</h2>
-            <p className="mt-4 leading-7 text-slate-700">
-              {error || "Unknown error."}
-            </p>
-          </section>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="brand-light-section min-h-screen">
       <section className="brand-hero">
@@ -218,22 +68,18 @@ export default function AdvisorReportClient({
           </h2>
 
           <div className="mt-4 space-y-4">
-            {report.analytics.priorityAreas.map((area) => (
-              <div key={area.dimensionKey} className="rounded-lg border p-4">
-                <p className="font-semibold text-slate-900">
-                  {area.dimensionLabel}
-                </p>
-
-                <p className="mt-1 text-sm text-slate-600">
-                  Score: {formatMetricValue(area.overallAverage)} | Gap:{" "}
-                  {formatMetricValue(area.gap)}
-                </p>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Issue type: {area.issueType}
+            {report.analytics.priorityAreas.length > 0 ? (
+              report.analytics.priorityAreas.map((area) => (
+                <PriorityAreaCard key={area.dimensionKey} area={area} />
+              ))
+            ) : (
+              <div className="rounded-lg border p-4">
+                <p className="text-sm text-slate-600">
+                  No priority areas could be identified from the current scored
+                  data set.
                 </p>
               </div>
-            ))}
+            )}
           </div>
         </section>
       </div>
@@ -264,6 +110,27 @@ function Metric({
     <div className="rounded-xl border bg-white p-4">
       <p className="text-xs uppercase text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function PriorityAreaCard({
+  area,
+}: {
+  area: ReportPriorityArea;
+}) {
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="font-semibold text-slate-900">{area.dimensionLabel}</p>
+
+      <p className="mt-1 text-sm text-slate-600">
+        Score: {formatMetricValue(area.overallAverage)} | Gap:{" "}
+        {formatMetricValue(area.gap)}
+      </p>
+
+      <p className="mt-1 text-sm text-slate-500">
+        Issue type: {area.issueType}
+      </p>
     </div>
   );
 }
