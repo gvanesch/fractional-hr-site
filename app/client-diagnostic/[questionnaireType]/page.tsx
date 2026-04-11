@@ -6,13 +6,12 @@ export const metadata = {
 };
 
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
 import {
   questionnaireTypes,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
-
 
 type PageProps = {
   params: Promise<{
@@ -32,6 +31,16 @@ type ParticipantLookupRow = {
   participant_status: string;
   completed_at: string | null;
   invite_token: string | null;
+  invite_expires_at: string | null;
+  invite_revoked_at: string | null;
+  client_projects:
+    | {
+        project_status: string;
+      }
+    | {
+        project_status: string;
+      }[]
+    | null;
 };
 
 function isQuestionnaireType(value: string): value is QuestionnaireType {
@@ -62,27 +71,31 @@ function isReasonableInviteToken(value: string | undefined): value is string {
   return typeof value === "string" && value.trim().length >= 16;
 }
 
-function getEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+function isInviteExpired(inviteExpiresAt: string | null): boolean {
+  if (!inviteExpiresAt) {
+    return false;
   }
 
-  return value;
+  const expiresAt = new Date(inviteExpiresAt);
+  return Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now();
 }
 
-function getSupabaseAdminClient() {
-  return createClient(
-    getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    getEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    },
-  );
+function getProjectStatus(
+  clientProjects: ParticipantLookupRow["client_projects"],
+): string | null {
+  if (!clientProjects) {
+    return null;
+  }
+
+  if (Array.isArray(clientProjects)) {
+    return clientProjects[0]?.project_status ?? null;
+  }
+
+  return clientProjects.project_status ?? null;
+}
+
+function isOpenParticipantState(participantStatus: string): boolean {
+  return participantStatus === "invited" || participantStatus === "started";
 }
 
 function getQuestionnaireTitle(questionnaireType: QuestionnaireType): string {
@@ -177,12 +190,22 @@ export default async function ClientDiagnosticQuestionnairePage({
     notFound();
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data: participant, error } = await supabase
     .from("client_participants")
     .select(
-      "participant_id, project_id, questionnaire_type, participant_status, completed_at, invite_token",
+      `
+        participant_id,
+        project_id,
+        questionnaire_type,
+        participant_status,
+        completed_at,
+        invite_token,
+        invite_expires_at,
+        invite_revoked_at,
+        client_projects!client_participants_project_fk!inner(project_status)
+      `,
     )
     .eq("participant_id", participantId)
     .eq("project_id", projectId)
@@ -192,6 +215,8 @@ export default async function ClientDiagnosticQuestionnairePage({
     notFound();
   }
 
+  const projectStatus = getProjectStatus(participant.client_projects);
+
   if (participant.questionnaire_type !== questionnaireType) {
     notFound();
   }
@@ -200,11 +225,31 @@ export default async function ClientDiagnosticQuestionnairePage({
     notFound();
   }
 
+  if (!projectStatus || projectStatus !== "active") {
+    notFound();
+  }
+
+  if (participant.invite_revoked_at) {
+    notFound();
+  }
+
+  if (isInviteExpired(participant.invite_expires_at)) {
+    notFound();
+  }
+
+  if (participant.participant_status === "archived") {
+    notFound();
+  }
+
   if (
     participant.participant_status === "completed" ||
     participant.completed_at !== null
   ) {
     return <CompletedQuestionnairePage />;
+  }
+
+  if (!isOpenParticipantState(participant.participant_status)) {
+    notFound();
   }
 
   return (
@@ -247,11 +292,11 @@ export default async function ClientDiagnosticQuestionnairePage({
       </section>
 
       <ClientDiagnosticQuestionnaire
-          questionnaireType={questionnaireType}
-          projectId={projectId}
-          participantId={participantId}
-          inviteToken={inviteToken}
-        />
+        questionnaireType={questionnaireType}
+        projectId={projectId}
+        participantId={participantId}
+        inviteToken={inviteToken}
+      />
     </main>
   );
 }

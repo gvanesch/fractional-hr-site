@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = {
   title: "Advisor Projects | Van Esch Advisory",
@@ -21,13 +21,6 @@ type Project = {
   created_at: string;
 };
 
-function createSupabaseAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
-
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
@@ -46,10 +39,6 @@ function formatProjectTitle(project: Project): string {
   return "Untitled project";
 }
 
-/**
- * 🔴 CRITICAL CHANGE
- * UI language is now Open / Closed only
- */
 function getProjectStatusLabel(status: Project["project_status"]): string {
   switch (status) {
     case "active":
@@ -87,7 +76,9 @@ export default async function AdvisorProjectsPage() {
 
   const { data, error } = await supabase
     .from("client_projects")
-    .select("project_id, project_name, company_name, project_status, created_at")
+    .select(
+      "project_id, project_name, company_name, project_status, created_at",
+    )
     .order("created_at", { ascending: false });
 
   const projects: Project[] = !error && data ? data : [];
@@ -113,7 +104,10 @@ export default async function AdvisorProjectsPage() {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <WorkspaceStat label="Total" value={String(projects.length)} />
               <WorkspaceStat label="Open" value={String(openProjects.length)} />
-              <WorkspaceStat label="Closed" value={String(closedProjects.length)} />
+              <WorkspaceStat
+                label="Closed"
+                value={String(closedProjects.length)}
+              />
             </div>
           </div>
         </div>

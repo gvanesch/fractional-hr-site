@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
-
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type UpdateProjectStatusRequest = {
   projectId: string;
   projectStatus: "active" | "closed";
 };
-
-function getEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-
-  return value;
-}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -58,10 +47,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      getEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    );
+    const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
       .from("client_projects")

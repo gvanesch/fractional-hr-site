@@ -49,6 +49,17 @@ type ResolvedParticipantInvite = {
   project_status: string;
 };
 
+function logAndNotFound(reason: string, details?: Record<string, unknown>): never {
+  console.info(
+    JSON.stringify({
+      event: "client_diagnostic_respond_not_found",
+      reason,
+      ...(details ?? {}),
+    }),
+  );
+  notFound();
+}
+
 function isScoredQuestionnaireType(value: string): value is QuestionnaireType {
   return questionnaireTypes.includes(value as QuestionnaireType);
 }
@@ -124,7 +135,7 @@ export default async function ClientDiagnosticRespondPage({
   const { inviteToken } = await params;
 
   if (!isReasonableInviteToken(inviteToken)) {
-    notFound();
+    logAndNotFound("invalid_invite_token_format", { inviteToken });
   }
 
   const supabase = createSupabaseAdminClient();
@@ -140,29 +151,43 @@ export default async function ClientDiagnosticRespondPage({
         completed_at,
         invite_expires_at,
         invite_revoked_at,
-        client_projects!inner(project_status)
+        client_projects!client_participants_project_fk!inner(project_status)
       `,
     )
     .eq("invite_token", inviteToken)
     .maybeSingle();
 
   if (error || !data) {
-    notFound();
+    logAndNotFound("participant_lookup_failed", {
+      inviteToken,
+      error: error?.message ?? null,
+      hasData: Boolean(data),
+    });
   }
 
   const participant = data as ParticipantInviteLookupRow;
   const projectStatus = getProjectStatus(participant.client_projects);
 
   if (!isUuid(participant.participant_id) || !isUuid(participant.project_id)) {
-    notFound();
+    logAndNotFound("invalid_participant_or_project_uuid", {
+      inviteToken,
+      participantId: participant.participant_id,
+      projectId: participant.project_id,
+    });
   }
 
   if (!isProjectQuestionnaireType(participant.questionnaire_type)) {
-    notFound();
+    logAndNotFound("invalid_questionnaire_type", {
+      inviteToken,
+      questionnaireType: participant.questionnaire_type,
+    });
   }
 
   if (!projectStatus) {
-    notFound();
+    logAndNotFound("missing_project_status", {
+      inviteToken,
+      clientProjects: participant.client_projects,
+    });
   }
 
   const resolvedParticipant: ResolvedParticipantInvite = {
@@ -177,15 +202,25 @@ export default async function ClientDiagnosticRespondPage({
   };
 
   if (resolvedParticipant.project_status !== "active") {
-    notFound();
+    logAndNotFound("project_not_active", {
+      inviteToken,
+      projectStatus: resolvedParticipant.project_status,
+    });
   }
 
   if (resolvedParticipant.invite_revoked_at) {
-    notFound();
+    logAndNotFound("invite_revoked", {
+      inviteToken,
+      inviteRevokedAt: resolvedParticipant.invite_revoked_at,
+    });
   }
 
   if (isInviteExpired(resolvedParticipant.invite_expires_at)) {
-    notFound();
+    logAndNotFound("invite_expired", {
+      inviteToken,
+      inviteExpiresAt: resolvedParticipant.invite_expires_at,
+      now: new Date().toISOString(),
+    });
   }
 
   if (
@@ -195,7 +230,12 @@ export default async function ClientDiagnosticRespondPage({
       questionnaireType: resolvedParticipant.questionnaire_type,
     })
   ) {
-    notFound();
+    logAndNotFound("participant_state_not_allowed", {
+      inviteToken,
+      participantStatus: resolvedParticipant.participant_status,
+      completedAt: resolvedParticipant.completed_at,
+      questionnaireType: resolvedParticipant.questionnaire_type,
+    });
   }
 
   const targetUrl =
@@ -208,6 +248,15 @@ export default async function ClientDiagnosticRespondPage({
         `?projectId=${encodeURIComponent(resolvedParticipant.project_id)}` +
         `&participantId=${encodeURIComponent(resolvedParticipant.participant_id)}` +
         `&inviteToken=${encodeURIComponent(inviteToken)}`;
+
+  console.info(
+    JSON.stringify({
+      event: "client_diagnostic_respond_redirect",
+      inviteToken,
+      questionnaireType: resolvedParticipant.questionnaire_type,
+      targetUrl,
+    }),
+  );
 
   redirect(targetUrl);
 }

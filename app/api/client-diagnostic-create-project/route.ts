@@ -256,25 +256,17 @@ function getDefaultInviteExpiresAt(): string {
   return expiresAt.toISOString();
 }
 
-function getNormalisedParticipantEmails(
-  participants: ParticipantInput[],
-  factPackRecipient: FactPackRecipientInput | null,
-): string[] {
-  const emails = participants.map((participant) =>
-    participant.email.trim().toLowerCase(),
-  );
-
-  if (factPackRecipient) {
-    emails.push(factPackRecipient.email.trim().toLowerCase());
-  }
-
-  return emails;
+function getNormalisedParticipantEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
-function getDuplicateEmails(emails: string[]): string[] {
+function getDuplicateQuestionnaireParticipantEmails(
+  participants: ParticipantInput[],
+): string[] {
   const seen = new Map<string, number>();
 
-  for (const email of emails) {
+  for (const participant of participants) {
+    const email = getNormalisedParticipantEmail(participant.email);
     seen.set(email, (seen.get(email) ?? 0) + 1);
   }
 
@@ -489,17 +481,14 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    const normalisedEmails = getNormalisedParticipantEmails(
-      participants,
-      factPackRecipient,
-    );
-    const duplicateEmails = getDuplicateEmails(normalisedEmails);
+    const duplicateQuestionnaireEmails =
+      getDuplicateQuestionnaireParticipantEmails(participants);
 
-    if (duplicateEmails.length > 0) {
+    if (duplicateQuestionnaireEmails.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: `Duplicate participant email(s) detected: ${duplicateEmails.join(", ")}.`,
+          error: `Duplicate participant email(s) detected across scored questionnaires: ${duplicateQuestionnaireEmails.join(", ")}.`,
         },
         { status: 400 },
       );
@@ -537,6 +526,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     const inviteExpiresAt = getDefaultInviteExpiresAt();
+    const invitedAt = new Date().toISOString();
 
     const participantRows: Array<{
       project_id: string;
@@ -545,6 +535,8 @@ export async function POST(request: Request): Promise<Response> {
       name: string;
       email: string;
       segmentation_values: SegmentationValues | null;
+      participant_status: "invited";
+      invited_at: string;
       invite_expires_at: string;
     }> = participants.map((participant) => {
       const validatedSegmentationValues = validateSegmentationValues(
@@ -561,6 +553,8 @@ export async function POST(request: Request): Promise<Response> {
         name: participant.name.trim(),
         email: participant.email.trim().toLowerCase(),
         segmentation_values: validatedSegmentationValues,
+        participant_status: "invited",
+        invited_at: invitedAt,
         invite_expires_at: inviteExpiresAt,
       };
     });
@@ -573,6 +567,8 @@ export async function POST(request: Request): Promise<Response> {
         name: factPackRecipient.name,
         email: factPackRecipient.email,
         segmentation_values: null,
+        participant_status: "invited",
+        invited_at: invitedAt,
         invite_expires_at: inviteExpiresAt,
       });
     }
@@ -598,6 +594,7 @@ export async function POST(request: Request): Promise<Response> {
       projectId: project.project_id,
       insertedParticipants: insertedParticipants.length,
       inviteExpiresAt,
+      invitedAt,
     });
 
     const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
