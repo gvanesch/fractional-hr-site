@@ -126,6 +126,26 @@ type ProjectUpdateResponse =
       error: string;
     };
 
+type ParticipantUpdateResponse =
+  | {
+      success: true;
+      participant: {
+        participantId: string;
+        projectId: string;
+        questionnaireType: QuestionnaireType;
+        roleLabel: string;
+        name: string;
+        email: string;
+        segmentationValues: SegmentationValues | null;
+        participantStatus: string;
+        completedAt: string | null;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 type ExtendInviteResponse =
   | {
       success: true;
@@ -158,9 +178,32 @@ type ProjectDetailsFormState = {
   notes: string;
 };
 
+type ParticipantEditFormState = {
+  name: string;
+  email: string;
+  roleLabel: string;
+  questionnaireType: QuestionnaireType;
+  segmentationValues: {
+    function: string;
+    location: string;
+    level: string;
+  };
+};
+
 const EXTEND_OPTIONS = [7, 14, 21, 30] as const;
 const MSA_OPTIONS = ["", "not_started", "in_review", "signed"] as const;
 const DPA_OPTIONS = ["", "not_required", "required", "signed"] as const;
+const SCORED_QUESTIONNAIRE_OPTIONS: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+];
+const ALL_QUESTIONNAIRE_OPTIONS: QuestionnaireType[] = [
+  "hr",
+  "manager",
+  "leadership",
+  "client_fact_pack",
+];
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -343,6 +386,13 @@ function canExtendInvite(participant: ParticipantSummary): boolean {
   return true;
 }
 
+function isCompletedParticipant(participant: ParticipantSummary): boolean {
+  return (
+    participant.participantStatus === "completed" ||
+    participant.completedAt !== null
+  );
+}
+
 function createProjectDetailsFormState(
   project: ProjectSummaryResponse["project"],
 ): ProjectDetailsFormState {
@@ -354,6 +404,31 @@ function createProjectDetailsFormState(
     msaStatus: project.msaStatus ?? "",
     dpaStatus: project.dpaStatus ?? "",
     notes: project.notes ?? "",
+  };
+}
+
+function createParticipantEditFormState(
+  participant: ParticipantSummary,
+): ParticipantEditFormState {
+  return {
+    name: participant.name,
+    email: participant.email,
+    roleLabel: participant.roleLabel,
+    questionnaireType: participant.questionnaireType,
+    segmentationValues: {
+      function:
+        typeof participant.segmentationValues?.function === "string"
+          ? participant.segmentationValues.function
+          : "",
+      location:
+        typeof participant.segmentationValues?.location === "string"
+          ? participant.segmentationValues.location
+          : "",
+      level:
+        typeof participant.segmentationValues?.level === "string"
+          ? participant.segmentationValues.level
+          : "",
+    },
   };
 }
 
@@ -381,6 +456,14 @@ export default function AdvisorProjectDashboardClient({
     dpaStatus: "",
     notes: "",
   });
+  const [editingParticipantId, setEditingParticipantId] = useState("");
+  const [participantEditForm, setParticipantEditForm] =
+    useState<ParticipantEditFormState | null>(null);
+  const [participantActionState, setParticipantActionState] = useState<
+    "idle" | "saving"
+  >("idle");
+  const [participantActionMessage, setParticipantActionMessage] = useState("");
+  const [participantActionError, setParticipantActionError] = useState("");
 
   async function loadProject() {
     if (!isUuid(projectId)) {
@@ -567,6 +650,86 @@ export default function AdvisorProjectDashboardClient({
       );
     } finally {
       setInviteActionParticipantId("");
+    }
+  }
+
+  function beginParticipantEdit(participant: ParticipantSummary) {
+    setEditingParticipantId(participant.participantId);
+    setParticipantEditForm(createParticipantEditFormState(participant));
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
+  function cancelParticipantEdit() {
+    setEditingParticipantId("");
+    setParticipantEditForm(null);
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
+  async function saveParticipantEdit() {
+    if (!editingParticipantId || !participantEditForm) {
+      setParticipantActionError("No participant is selected for editing.");
+      return;
+    }
+
+    setParticipantActionState("saving");
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+
+    try {
+      const payload: {
+        participantId: string;
+        name: string;
+        email: string;
+        roleLabel: string;
+        questionnaireType: QuestionnaireType;
+        segmentationValues: SegmentationValues | null;
+      } = {
+        participantId: editingParticipantId,
+        name: participantEditForm.name.trim(),
+        email: participantEditForm.email.trim(),
+        roleLabel: participantEditForm.roleLabel.trim(),
+        questionnaireType: participantEditForm.questionnaireType,
+        segmentationValues:
+          participantEditForm.questionnaireType === "client_fact_pack"
+            ? null
+            : {
+                function:
+                  participantEditForm.segmentationValues.function.trim() || null,
+                location:
+                  participantEditForm.segmentationValues.location.trim() || null,
+                level:
+                  participantEditForm.segmentationValues.level.trim() || null,
+              },
+      };
+
+      const response = await fetch("/api/advisor-update-participant", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json()) as ParticipantUpdateResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          "error" in result ? result.error : "Unable to update participant.",
+        );
+      }
+
+      setParticipantActionMessage("Participant updated successfully.");
+      setEditingParticipantId("");
+      setParticipantEditForm(null);
+      await loadProject();
+    } catch (error) {
+      setParticipantActionError(
+        error instanceof Error ? error.message : "Unable to update participant.",
+      );
+    } finally {
+      setParticipantActionState("idle");
     }
   }
 
@@ -903,6 +1066,18 @@ export default function AdvisorProjectDashboardClient({
                 </div>
               ) : null}
 
+              {participantActionMessage ? (
+                <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {participantActionMessage}
+                </div>
+              ) : null}
+
+              {participantActionError ? (
+                <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {participantActionError}
+                </div>
+              ) : null}
+
               <div className="mt-6 overflow-x-auto">
                 <table className="min-w-full border-separate border-spacing-y-3">
                   <thead>
@@ -928,6 +1103,232 @@ export default function AdvisorProjectDashboardClient({
                       const extendDisabled =
                         !canExtendInvite(participant) ||
                         project.projectStatus !== "active";
+                      const isEditing =
+                        editingParticipantId === participant.participantId &&
+                        participantEditForm !== null;
+                      const participantCompleted = isCompletedParticipant(participant);
+
+                      if (isEditing && participantEditForm) {
+                        return (
+                          <tr
+                            key={participant.participantId}
+                            className="rounded-2xl border border-[var(--brand-border)] bg-white text-sm text-slate-700"
+                          >
+                            <td
+                              className="rounded-2xl px-4 py-4"
+                              colSpan={10}
+                            >
+                              <div className="space-y-4">
+                                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                                  <EditableField label="Name">
+                                    <input
+                                      type="text"
+                                      value={participantEditForm.name}
+                                      onChange={(event) =>
+                                        setParticipantEditForm((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                name: event.target.value,
+                                              }
+                                            : current,
+                                        )
+                                      }
+                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                    />
+                                  </EditableField>
+
+                                  <EditableField label="Email">
+                                    <input
+                                      type="email"
+                                      value={participantEditForm.email}
+                                      onChange={(event) =>
+                                        setParticipantEditForm((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                email: event.target.value,
+                                              }
+                                            : current,
+                                        )
+                                      }
+                                      disabled={participantCompleted}
+                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    />
+                                  </EditableField>
+
+                                  <EditableField label="Role">
+                                    <input
+                                      type="text"
+                                      value={participantEditForm.roleLabel}
+                                      onChange={(event) =>
+                                        setParticipantEditForm((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                roleLabel: event.target.value,
+                                              }
+                                            : current,
+                                        )
+                                      }
+                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                    />
+                                  </EditableField>
+
+                                  <EditableField label="Questionnaire">
+                                    <select
+                                      value={participantEditForm.questionnaireType}
+                                      onChange={(event) =>
+                                        setParticipantEditForm((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                questionnaireType:
+                                                  event.target
+                                                    .value as QuestionnaireType,
+                                                segmentationValues:
+                                                  event.target.value ===
+                                                  "client_fact_pack"
+                                                    ? {
+                                                        function: "",
+                                                        location: "",
+                                                        level: "",
+                                                      }
+                                                    : current.segmentationValues,
+                                              }
+                                            : current,
+                                        )
+                                      }
+                                      disabled={participantCompleted}
+                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    >
+                                      {(participantCompleted
+                                        ? ALL_QUESTIONNAIRE_OPTIONS
+                                        : ALL_QUESTIONNAIRE_OPTIONS
+                                      ).map((option) => (
+                                        <option key={option} value={option}>
+                                          {formatQuestionnaireType(option)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </EditableField>
+
+                                  {participantEditForm.questionnaireType !==
+                                  "client_fact_pack" ? (
+                                    <>
+                                      <EditableField label="Function">
+                                        <input
+                                          type="text"
+                                          value={
+                                            participantEditForm.segmentationValues
+                                              .function
+                                          }
+                                          onChange={(event) =>
+                                            setParticipantEditForm((current) =>
+                                              current
+                                                ? {
+                                                    ...current,
+                                                    segmentationValues: {
+                                                      ...current.segmentationValues,
+                                                      function: event.target.value,
+                                                    },
+                                                  }
+                                                : current,
+                                            )
+                                          }
+                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                        />
+                                      </EditableField>
+
+                                      <EditableField label="Location">
+                                        <input
+                                          type="text"
+                                          value={
+                                            participantEditForm.segmentationValues
+                                              .location
+                                          }
+                                          onChange={(event) =>
+                                            setParticipantEditForm((current) =>
+                                              current
+                                                ? {
+                                                    ...current,
+                                                    segmentationValues: {
+                                                      ...current.segmentationValues,
+                                                      location: event.target.value,
+                                                    },
+                                                  }
+                                                : current,
+                                            )
+                                          }
+                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                        />
+                                      </EditableField>
+
+                                      <EditableField label="Level">
+                                        <input
+                                          type="text"
+                                          value={
+                                            participantEditForm.segmentationValues
+                                              .level
+                                          }
+                                          onChange={(event) =>
+                                            setParticipantEditForm((current) =>
+                                              current
+                                                ? {
+                                                    ...current,
+                                                    segmentationValues: {
+                                                      ...current.segmentationValues,
+                                                      level: event.target.value,
+                                                    },
+                                                  }
+                                                : current,
+                                            )
+                                          }
+                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                        />
+                                      </EditableField>
+                                    </>
+                                  ) : (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:col-span-2 xl:col-span-3">
+                                      Client Fact Pack participants do not use scored
+                                      segmentation fields.
+                                    </div>
+                                  )}
+                                </div>
+
+                                {participantCompleted ? (
+                                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                    Completed participants cannot have email or
+                                    questionnaire type changed.
+                                  </div>
+                                ) : null}
+
+                                <div className="flex flex-wrap gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => void saveParticipantEdit()}
+                                    disabled={participantActionState === "saving"}
+                                    className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {participantActionState === "saving"
+                                      ? "Saving..."
+                                      : "Save participant"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={cancelParticipantEdit}
+                                    disabled={participantActionState === "saving"}
+                                    className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
 
                       return (
                         <tr
@@ -971,7 +1372,16 @@ export default function AdvisorProjectDashboardClient({
                             {formatDateTime(participant.completedAt)}
                           </td>
                           <td className="rounded-r-2xl px-4 py-4">
-                            <div className="flex min-w-[180px] flex-col gap-2">
+                            <div className="flex min-w-[200px] flex-col gap-2">
+                              <button
+                                type="button"
+                                onClick={() => beginParticipantEdit(participant)}
+                                disabled={participantActionState === "saving"}
+                                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Edit participant
+                              </button>
+
                               <select
                                 value={selectedDays}
                                 onChange={(event) =>
@@ -1107,11 +1517,11 @@ function InfoCard({
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-900 break-words">
+      <p className="mt-2 break-words text-base font-semibold text-slate-900">
         {value}
       </p>
       {secondary ? (
-        <p className="mt-2 text-sm leading-6 text-slate-600 break-words">
+        <p className="mt-2 break-words text-sm leading-6 text-slate-600">
           {secondary}
         </p>
       ) : null}
@@ -1337,6 +1747,23 @@ function ProjectDetailsEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+function EditableField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
