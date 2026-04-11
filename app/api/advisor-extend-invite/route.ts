@@ -25,8 +25,26 @@ function isAllowedExtensionDays(
   );
 }
 
-function getExtendedInviteExpiry(days: number): string {
-  const expiresAt = new Date();
+function getExtensionBaseDate(currentInviteExpiresAt: string | null): Date {
+  if (!currentInviteExpiresAt) {
+    return new Date();
+  }
+
+  const currentExpiry = new Date(currentInviteExpiresAt);
+
+  if (Number.isNaN(currentExpiry.getTime())) {
+    return new Date();
+  }
+
+  return currentExpiry;
+}
+
+function getExtendedInviteExpiry(
+  currentInviteExpiresAt: string | null,
+  days: number,
+): string {
+  const baseDate = getExtensionBaseDate(currentInviteExpiresAt);
+  const expiresAt = new Date(baseDate);
   expiresAt.setDate(expiresAt.getDate() + days);
   return expiresAt.toISOString();
 }
@@ -136,7 +154,10 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const inviteExpiresAt = getExtendedInviteExpiry(days);
+    const inviteExpiresAt = getExtendedInviteExpiry(
+      participant.invite_expires_at,
+      days,
+    );
 
     const { data: updatedParticipant, error: updateError } = await supabase
       .from("client_participants")
