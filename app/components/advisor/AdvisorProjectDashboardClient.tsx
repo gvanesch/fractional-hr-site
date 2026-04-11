@@ -1,8 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import AddParticipantForm from "@/app/components/advisor/AddParticipantForm";
+import type {
+  SegmentationFieldKey,
+  SegmentationSchema,
+} from "@/lib/client-diagnostic/segmentation";
 
 type QuestionnaireType = "hr" | "manager" | "leadership" | "client_fact_pack";
 
@@ -93,6 +104,7 @@ type ProjectSummaryResponse = {
     dpaStatus: string | null;
     projectStatus: string;
     notes: string | null;
+    segmentationSchema: SegmentationSchema | null;
   };
   completion: CompletionSummary & {
     participants: ParticipantSummary[];
@@ -146,6 +158,21 @@ type ParticipantUpdateResponse =
       error: string;
     };
 
+type ArchiveParticipantResponse =
+  | {
+      success: true;
+      participant: {
+        participantId: string;
+        projectId: string;
+        participantStatus: string;
+        completedAt: string | null;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 type ExtendInviteResponse =
   | {
       success: true;
@@ -190,14 +217,18 @@ type ParticipantEditFormState = {
   };
 };
 
+type ParticipantEditPermissions = {
+  canEditAnyField: boolean;
+  canEditName: boolean;
+  canEditEmail: boolean;
+  canEditRole: boolean;
+  canEditQuestionnaire: boolean;
+  canEditSegmentation: boolean;
+};
+
 const EXTEND_OPTIONS = [7, 14, 21, 30] as const;
 const MSA_OPTIONS = ["", "not_started", "in_review", "signed"] as const;
 const DPA_OPTIONS = ["", "not_required", "required", "signed"] as const;
-const SCORED_QUESTIONNAIRE_OPTIONS: QuestionnaireType[] = [
-  "hr",
-  "manager",
-  "leadership",
-];
 const ALL_QUESTIONNAIRE_OPTIONS: QuestionnaireType[] = [
   "hr",
   "manager",
@@ -254,39 +285,6 @@ function formatQuestionnaireType(value: QuestionnaireType): string {
   }
 }
 
-function humaniseSegmentationKey(key: string): string {
-  switch (key) {
-    case "function":
-      return "Function";
-    case "location":
-      return "Location";
-    case "level":
-      return "Level";
-    default:
-      return key;
-  }
-}
-
-function formatSegmentationValues(
-  segmentationValues: SegmentationValues | null,
-): string {
-  if (!segmentationValues) {
-    return "Not set";
-  }
-
-  const entries = Object.entries(segmentationValues).filter(
-    ([, value]) => typeof value === "string" && value.trim().length > 0,
-  );
-
-  if (entries.length === 0) {
-    return "Not set";
-  }
-
-  return entries
-    .map(([key, value]) => `${humaniseSegmentationKey(key)}: ${value}`)
-    .join(" • ");
-}
-
 function formatProjectStatus(value: string): string {
   switch (value) {
     case "active":
@@ -308,6 +306,14 @@ function formatStatusValue(value: string | null | undefined): string {
   }
 
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getDisplayParticipantStatus(status: string): string {
+  if (status === "archived") {
+    return "Withdrawn";
+  }
+
+  return formatStatusValue(status);
 }
 
 function getProjectStatusTone(status: string): string {
@@ -386,11 +392,66 @@ function canExtendInvite(participant: ParticipantSummary): boolean {
   return true;
 }
 
+function canArchiveParticipant(participant: ParticipantSummary): boolean {
+  if (participant.participantStatus === "archived") {
+    return false;
+  }
+
+  if (participant.participantStatus === "completed" || participant.completedAt) {
+    return false;
+  }
+
+  return true;
+}
+
 function isCompletedParticipant(participant: ParticipantSummary): boolean {
   return (
     participant.participantStatus === "completed" ||
     participant.completedAt !== null
   );
+}
+
+function isStartedParticipant(participant: ParticipantSummary): boolean {
+  return participant.participantStatus === "started";
+}
+
+function isArchivedParticipant(participant: ParticipantSummary): boolean {
+  return participant.participantStatus === "archived";
+}
+
+function getParticipantEditPermissions(
+  participant: ParticipantSummary,
+): ParticipantEditPermissions {
+  if (isArchivedParticipant(participant)) {
+    return {
+      canEditAnyField: false,
+      canEditName: false,
+      canEditEmail: false,
+      canEditRole: false,
+      canEditQuestionnaire: false,
+      canEditSegmentation: false,
+    };
+  }
+
+  if (isStartedParticipant(participant) || isCompletedParticipant(participant)) {
+    return {
+      canEditAnyField: true,
+      canEditName: true,
+      canEditEmail: false,
+      canEditRole: false,
+      canEditQuestionnaire: false,
+      canEditSegmentation: false,
+    };
+  }
+
+  return {
+    canEditAnyField: true,
+    canEditName: true,
+    canEditEmail: true,
+    canEditRole: true,
+    canEditQuestionnaire: true,
+    canEditSegmentation: true,
+  };
 }
 
 function createProjectDetailsFormState(
@@ -432,6 +493,102 @@ function createParticipantEditFormState(
   };
 }
 
+function getSegmentationField(
+  segmentationSchema: SegmentationSchema | null | undefined,
+  fieldKey: SegmentationFieldKey,
+) {
+  return segmentationSchema?.fields.find((field) => field.fieldKey === fieldKey) ?? null;
+}
+
+function getSegmentationOptionLabel(
+  segmentationSchema: SegmentationSchema | null | undefined,
+  fieldKey: SegmentationFieldKey,
+  optionKey: string | null | undefined,
+): string {
+  if (!optionKey) {
+    return "Not set";
+  }
+
+  const field = getSegmentationField(segmentationSchema, fieldKey);
+
+  if (!field) {
+    return optionKey;
+  }
+
+  const option = field.options.find((candidate) => candidate.optionKey === optionKey);
+
+  return option?.optionLabel ?? optionKey;
+}
+
+function getSegmentationDisplayItems(
+  participant: ParticipantSummary,
+  segmentationSchema: SegmentationSchema | null | undefined,
+): Array<{ label: string; value: string }> {
+  return [
+    {
+      label: "Role",
+      value: participant.roleLabel || "Not set",
+    },
+    {
+      label: "Function",
+      value: getSegmentationOptionLabel(
+        segmentationSchema,
+        "function",
+        typeof participant.segmentationValues?.function === "string"
+          ? participant.segmentationValues.function
+          : null,
+      ),
+    },
+    {
+      label: "Location",
+      value: getSegmentationOptionLabel(
+        segmentationSchema,
+        "location",
+        typeof participant.segmentationValues?.location === "string"
+          ? participant.segmentationValues.location
+          : null,
+      ),
+    },
+    {
+      label: "Level",
+      value: getSegmentationOptionLabel(
+        segmentationSchema,
+        "level",
+        typeof participant.segmentationValues?.level === "string"
+          ? participant.segmentationValues.level
+          : null,
+      ),
+    },
+  ];
+}
+
+function getParticipantEditGuidance(
+  participant: ParticipantSummary,
+): string | null {
+  if (isArchivedParticipant(participant)) {
+    return "Withdrawn participants are locked. Reinstate the participant first if this was done in error.";
+  }
+
+  if (isStartedParticipant(participant)) {
+    return "This participant has started. Only the name can be changed now. Email, role, questionnaire, and segmentation are locked to protect analysis integrity.";
+  }
+
+  if (isCompletedParticipant(participant)) {
+    return "This participant has completed. Only the name can be changed now. Email, role, questionnaire, and segmentation are locked to protect analysis integrity.";
+  }
+
+  return null;
+}
+
+function getLockedFieldClassName(isLocked: boolean): string {
+  return [
+    "h-10 w-full rounded-xl border px-3 text-sm outline-none transition",
+    isLocked
+      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+      : "border-slate-300 bg-white text-slate-900 focus:border-slate-500",
+  ].join(" ");
+}
+
 export default function AdvisorProjectDashboardClient({
   projectId,
 }: AdvisorProjectDashboardClientProps) {
@@ -464,6 +621,7 @@ export default function AdvisorProjectDashboardClient({
   >("idle");
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
+  const [archivingParticipantId, setArchivingParticipantId] = useState("");
 
   async function loadProject() {
     if (!isUuid(projectId)) {
@@ -654,6 +812,10 @@ export default function AdvisorProjectDashboardClient({
   }
 
   function beginParticipantEdit(participant: ParticipantSummary) {
+    if (isArchivedParticipant(participant)) {
+      return;
+    }
+
     setEditingParticipantId(participant.participantId);
     setParticipantEditForm(createParticipantEditFormState(participant));
     setParticipantActionMessage("");
@@ -733,6 +895,54 @@ export default function AdvisorProjectDashboardClient({
     }
   }
 
+  async function archiveParticipant(participantId: string) {
+    const confirmed = window.confirm(
+      "This will withdraw the participant from active collection and exclude them from analysis. This can be reversed later. Continue?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setArchivingParticipantId(participantId);
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+
+    try {
+      const response = await fetch("/api/advisor-archive-participant", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participantId,
+        }),
+      });
+
+      const result = (await response.json()) as ArchiveParticipantResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          "error" in result ? result.error : "Unable to archive participant.",
+        );
+      }
+
+      if (editingParticipantId === participantId) {
+        setEditingParticipantId("");
+        setParticipantEditForm(null);
+      }
+
+      setParticipantActionMessage("Participant withdrawn successfully.");
+      await loadProject();
+    } catch (error) {
+      setParticipantActionError(
+        error instanceof Error ? error.message : "Unable to archive participant.",
+      );
+    } finally {
+      setArchivingParticipantId("");
+    }
+  }
+
   if (loading) {
     return (
       <section className="brand-light-section min-h-screen">
@@ -765,6 +975,7 @@ export default function AdvisorProjectDashboardClient({
   const participants = data.completion.participants;
   const biggestGaps = data.biggestGaps;
   const strongestAlignment = data.strongestAlignment;
+  const segmentationSchema = project.segmentationSchema;
 
   const scoredRespondentGroups = respondentGroups.filter(
     (group) =>
@@ -1017,7 +1228,7 @@ export default function AdvisorProjectDashboardClient({
                                 Role: {participant.roleLabel}
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
-                                Status: {participant.participantStatus}
+                                Status: {getDisplayParticipantStatus(participant.participantStatus)}
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
                                 Started: {formatDateTime(participant.startedAt)}
@@ -1078,352 +1289,356 @@ export default function AdvisorProjectDashboardClient({
                 </div>
               ) : null}
 
-              <div className="mt-6 overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-y-3">
-                  <thead>
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
-                      <th className="px-4">Participant</th>
-                      <th className="px-4">Role</th>
-                      <th className="px-4">Questionnaire</th>
-                      <th className="px-4">Segmentation</th>
-                      <th className="px-4">Status</th>
-                      <th className="px-4">Invited</th>
-                      <th className="px-4">Expires</th>
-                      <th className="px-4">Started</th>
-                      <th className="px-4">Completed</th>
-                      <th className="px-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participants.map((participant) => {
-                      const selectedDays =
-                        extendDaysByParticipantId[participant.participantId] ?? 21;
-                      const isExtending =
-                        inviteActionParticipantId === participant.participantId;
-                      const extendDisabled =
-                        !canExtendInvite(participant) ||
-                        project.projectStatus !== "active";
-                      const isEditing =
-                        editingParticipantId === participant.participantId &&
-                        participantEditForm !== null;
-                      const participantCompleted = isCompletedParticipant(participant);
+              <div className="mt-6 space-y-4">
+                {participants.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                    No participants recorded for this project yet.
+                  </div>
+                ) : (
+                  participants.map((participant) => {
+                    const selectedDays =
+                      extendDaysByParticipantId[participant.participantId] ?? 21;
+                    const isExtending =
+                      inviteActionParticipantId === participant.participantId;
+                    const extendDisabled =
+                      !canExtendInvite(participant) ||
+                      project.projectStatus !== "active";
+                    const isEditing =
+                      editingParticipantId === participant.participantId &&
+                      participantEditForm !== null;
+                    const isArchiving =
+                      archivingParticipantId === participant.participantId;
+                    const archiveDisabled =
+                      !canArchiveParticipant(participant) ||
+                      project.projectStatus !== "active" ||
+                      participantActionState === "saving" ||
+                      isArchiving;
 
-                      if (isEditing && participantEditForm) {
-                        return (
-                          <tr
-                            key={participant.participantId}
-                            className="rounded-2xl border border-[var(--brand-border)] bg-white text-sm text-slate-700"
-                          >
-                            <td
-                              className="rounded-2xl px-4 py-4"
-                              colSpan={10}
-                            >
-                              <div className="space-y-4">
-                                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                                  <EditableField label="Name">
-                                    <input
-                                      type="text"
-                                      value={participantEditForm.name}
-                                      onChange={(event) =>
-                                        setParticipantEditForm((current) =>
-                                          current
-                                            ? {
-                                                ...current,
-                                                name: event.target.value,
-                                              }
-                                            : current,
-                                        )
-                                      }
-                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                    />
-                                  </EditableField>
-
-                                  <EditableField label="Email">
-                                    <input
-                                      type="email"
-                                      value={participantEditForm.email}
-                                      onChange={(event) =>
-                                        setParticipantEditForm((current) =>
-                                          current
-                                            ? {
-                                                ...current,
-                                                email: event.target.value,
-                                              }
-                                            : current,
-                                        )
-                                      }
-                                      disabled={participantCompleted}
-                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                    />
-                                  </EditableField>
-
-                                  <EditableField label="Role">
-                                    <input
-                                      type="text"
-                                      value={participantEditForm.roleLabel}
-                                      onChange={(event) =>
-                                        setParticipantEditForm((current) =>
-                                          current
-                                            ? {
-                                                ...current,
-                                                roleLabel: event.target.value,
-                                              }
-                                            : current,
-                                        )
-                                      }
-                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                    />
-                                  </EditableField>
-
-                                  <EditableField label="Questionnaire">
-                                    <select
-                                      value={participantEditForm.questionnaireType}
-                                      onChange={(event) =>
-                                        setParticipantEditForm((current) =>
-                                          current
-                                            ? {
-                                                ...current,
-                                                questionnaireType:
-                                                  event.target
-                                                    .value as QuestionnaireType,
-                                                segmentationValues:
-                                                  event.target.value ===
-                                                  "client_fact_pack"
-                                                    ? {
-                                                        function: "",
-                                                        location: "",
-                                                        level: "",
-                                                      }
-                                                    : current.segmentationValues,
-                                              }
-                                            : current,
-                                        )
-                                      }
-                                      disabled={participantCompleted}
-                                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                    >
-                                      {(participantCompleted
-                                        ? ALL_QUESTIONNAIRE_OPTIONS
-                                        : ALL_QUESTIONNAIRE_OPTIONS
-                                      ).map((option) => (
-                                        <option key={option} value={option}>
-                                          {formatQuestionnaireType(option)}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </EditableField>
-
-                                  {participantEditForm.questionnaireType !==
-                                  "client_fact_pack" ? (
-                                    <>
-                                      <EditableField label="Function">
-                                        <input
-                                          type="text"
-                                          value={
-                                            participantEditForm.segmentationValues
-                                              .function
-                                          }
-                                          onChange={(event) =>
-                                            setParticipantEditForm((current) =>
-                                              current
-                                                ? {
-                                                    ...current,
-                                                    segmentationValues: {
-                                                      ...current.segmentationValues,
-                                                      function: event.target.value,
-                                                    },
-                                                  }
-                                                : current,
-                                            )
-                                          }
-                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                        />
-                                      </EditableField>
-
-                                      <EditableField label="Location">
-                                        <input
-                                          type="text"
-                                          value={
-                                            participantEditForm.segmentationValues
-                                              .location
-                                          }
-                                          onChange={(event) =>
-                                            setParticipantEditForm((current) =>
-                                              current
-                                                ? {
-                                                    ...current,
-                                                    segmentationValues: {
-                                                      ...current.segmentationValues,
-                                                      location: event.target.value,
-                                                    },
-                                                  }
-                                                : current,
-                                            )
-                                          }
-                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                        />
-                                      </EditableField>
-
-                                      <EditableField label="Level">
-                                        <input
-                                          type="text"
-                                          value={
-                                            participantEditForm.segmentationValues
-                                              .level
-                                          }
-                                          onChange={(event) =>
-                                            setParticipantEditForm((current) =>
-                                              current
-                                                ? {
-                                                    ...current,
-                                                    segmentationValues: {
-                                                      ...current.segmentationValues,
-                                                      level: event.target.value,
-                                                    },
-                                                  }
-                                                : current,
-                                            )
-                                          }
-                                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                        />
-                                      </EditableField>
-                                    </>
-                                  ) : (
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:col-span-2 xl:col-span-3">
-                                      Client Fact Pack participants do not use scored
-                                      segmentation fields.
-                                    </div>
-                                  )}
-                                </div>
-
-                                {participantCompleted ? (
-                                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                                    Completed participants cannot have email or
-                                    questionnaire type changed.
-                                  </div>
-                                ) : null}
-
-                                <div className="flex flex-wrap gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => void saveParticipantEdit()}
-                                    disabled={participantActionState === "saving"}
-                                    className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {participantActionState === "saving"
-                                      ? "Saving..."
-                                      : "Save participant"}
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={cancelParticipantEdit}
-                                    disabled={participantActionState === "saving"}
-                                    className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      }
+                    if (isEditing && participantEditForm) {
+                      const permissions = getParticipantEditPermissions(participant);
+                      const editGuidance = getParticipantEditGuidance(participant);
+                      const functionField = getSegmentationField(
+                        segmentationSchema,
+                        "function",
+                      );
+                      const locationField = getSegmentationField(
+                        segmentationSchema,
+                        "location",
+                      );
+                      const levelField = getSegmentationField(
+                        segmentationSchema,
+                        "level",
+                      );
 
                       return (
-                        <tr
+                        <div
                           key={participant.participantId}
-                          className="rounded-2xl border border-[var(--brand-border)] bg-white text-sm text-slate-700"
+                          className="rounded-2xl border border-[var(--brand-border)] bg-white p-5 shadow-sm"
                         >
-                          <td className="rounded-l-2xl px-4 py-4">
-                            <p className="font-medium text-slate-900">
-                              {participant.name}
+                          <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <p className="text-base font-semibold text-slate-900">
+                              Editing participant
                             </p>
-                            <p className="mt-1 text-xs text-slate-600">
-                              {participant.email}
-                            </p>
-                          </td>
-                          <td className="px-4 py-4">{participant.roleLabel}</td>
-                          <td className="px-4 py-4">
-                            {formatQuestionnaireType(participant.questionnaireType)}
-                          </td>
-                          <td className="px-4 py-4 text-xs leading-6 text-slate-600">
-                            {formatSegmentationValues(participant.segmentationValues)}
-                          </td>
-                          <td className="px-4 py-4">
                             <span
                               className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusTone(
                                 participant.participantStatus,
                               )}`}
                             >
-                              {participant.participantStatus.replace(/_/g, " ")}
+                              {getDisplayParticipantStatus(participant.participantStatus)}
                             </span>
-                          </td>
-                          <td className="px-4 py-4">
-                            {formatDateTime(participant.invitedAt)}
-                          </td>
-                          <td className="px-4 py-4">
-                            {formatDateTime(participant.inviteExpiresAt)}
-                          </td>
-                          <td className="px-4 py-4">
-                            {formatDateTime(participant.startedAt)}
-                          </td>
-                          <td className="px-4 py-4">
-                            {formatDateTime(participant.completedAt)}
-                          </td>
-                          <td className="rounded-r-2xl px-4 py-4">
-                            <div className="flex min-w-[200px] flex-col gap-2">
-                              <button
-                                type="button"
-                                onClick={() => beginParticipantEdit(participant)}
-                                disabled={participantActionState === "saving"}
-                                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                Edit participant
-                              </button>
+                          </div>
 
-                              <select
-                                value={selectedDays}
+                          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                            <EditableField label="Name">
+                              <input
+                                type="text"
+                                value={participantEditForm.name}
                                 onChange={(event) =>
-                                  setExtendDaysByParticipantId((current) => ({
-                                    ...current,
-                                    [participant.participantId]: Number(
-                                      event.target.value,
-                                    ),
-                                  }))
+                                  setParticipantEditForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          name: event.target.value,
+                                        }
+                                      : current,
+                                  )
                                 }
-                                disabled={extendDisabled || isExtending}
-                                className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={!permissions.canEditName}
+                                className={getLockedFieldClassName(
+                                  !permissions.canEditName,
+                                )}
+                              />
+                            </EditableField>
+
+                            <EditableField label="Email">
+                              <input
+                                type="email"
+                                value={participantEditForm.email}
+                                onChange={(event) =>
+                                  setParticipantEditForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          email: event.target.value,
+                                        }
+                                      : current,
+                                  )
+                                }
+                                disabled={!permissions.canEditEmail}
+                                className={getLockedFieldClassName(
+                                  !permissions.canEditEmail,
+                                )}
+                              />
+                            </EditableField>
+
+                            <EditableField label="Role">
+                              <input
+                                type="text"
+                                value={participantEditForm.roleLabel}
+                                onChange={(event) =>
+                                  setParticipantEditForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          roleLabel: event.target.value,
+                                        }
+                                      : current,
+                                  )
+                                }
+                                disabled={!permissions.canEditRole}
+                                className={getLockedFieldClassName(
+                                  !permissions.canEditRole,
+                                )}
+                              />
+                            </EditableField>
+
+                            <EditableField label="Questionnaire">
+                              <select
+                                value={participantEditForm.questionnaireType}
+                                onChange={(event) =>
+                                  setParticipantEditForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          questionnaireType:
+                                            event.target.value as QuestionnaireType,
+                                        }
+                                      : current,
+                                  )
+                                }
+                                disabled={!permissions.canEditQuestionnaire}
+                                className={getLockedFieldClassName(
+                                  !permissions.canEditQuestionnaire,
+                                )}
                               >
-                                {EXTEND_OPTIONS.map((days) => (
-                                  <option key={days} value={days}>
-                                    Extend by {days} days
+                                {ALL_QUESTIONNAIRE_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {formatQuestionnaireType(option)}
                                   </option>
                                 ))}
                               </select>
+                            </EditableField>
 
-                              <button
-                                type="button"
-                                onClick={() => void extendInvite(participant.participantId)}
-                                disabled={extendDisabled || isExtending}
-                                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isExtending ? "Extending..." : "Extend invite"}
-                              </button>
+                            {participantEditForm.questionnaireType !==
+                            "client_fact_pack" ? (
+                              <>
+                                <EditableField label="Function">
+                                  <select
+                                    value={
+                                      participantEditForm.segmentationValues.function
+                                    }
+                                    onChange={(event) =>
+                                      setParticipantEditForm((current) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              segmentationValues: {
+                                                ...current.segmentationValues,
+                                                function: event.target.value,
+                                              },
+                                            }
+                                          : current,
+                                      )
+                                    }
+                                    disabled={
+                                      !permissions.canEditSegmentation ||
+                                      !functionField
+                                    }
+                                    className={getLockedFieldClassName(
+                                      !permissions.canEditSegmentation ||
+                                        !functionField,
+                                    )}
+                                  >
+                                    <option value="">Select function</option>
+                                    {(functionField?.options ?? []).map((option) => (
+                                      <option
+                                        key={option.optionKey}
+                                        value={option.optionKey}
+                                      >
+                                        {option.optionLabel}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </EditableField>
 
-                              {extendDisabled ? (
-                                <p className="text-xs text-slate-500">
-                                  Invite extension is only available for open,
-                                  incomplete participants in an open project.
-                                </p>
-                              ) : null}
+                                <EditableField label="Location">
+                                  <select
+                                    value={
+                                      participantEditForm.segmentationValues.location
+                                    }
+                                    onChange={(event) =>
+                                      setParticipantEditForm((current) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              segmentationValues: {
+                                                ...current.segmentationValues,
+                                                location: event.target.value,
+                                              },
+                                            }
+                                          : current,
+                                      )
+                                    }
+                                    disabled={
+                                      !permissions.canEditSegmentation ||
+                                      !locationField
+                                    }
+                                    className={getLockedFieldClassName(
+                                      !permissions.canEditSegmentation ||
+                                        !locationField,
+                                    )}
+                                  >
+                                    <option value="">Select location</option>
+                                    {(locationField?.options ?? []).map((option) => (
+                                      <option
+                                        key={option.optionKey}
+                                        value={option.optionKey}
+                                      >
+                                        {option.optionLabel}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </EditableField>
+
+                                <EditableField label="Level">
+                                  <select
+                                    value={
+                                      participantEditForm.segmentationValues.level
+                                    }
+                                    onChange={(event) =>
+                                      setParticipantEditForm((current) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              segmentationValues: {
+                                                ...current.segmentationValues,
+                                                level: event.target.value,
+                                              },
+                                            }
+                                          : current,
+                                      )
+                                    }
+                                    disabled={
+                                      !permissions.canEditSegmentation || !levelField
+                                    }
+                                    className={getLockedFieldClassName(
+                                      !permissions.canEditSegmentation ||
+                                        !levelField,
+                                    )}
+                                  >
+                                    <option value="">Select level</option>
+                                    {(levelField?.options ?? []).map((option) => (
+                                      <option
+                                        key={option.optionKey}
+                                        value={option.optionKey}
+                                      >
+                                        {option.optionLabel}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </EditableField>
+                              </>
+                            ) : (
+                              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:col-span-2 xl:col-span-3">
+                                Client Fact Pack participants do not use scored
+                                segmentation fields.
+                              </div>
+                            )}
+                          </div>
+
+                          {editGuidance ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                              {editGuidance}
                             </div>
-                          </td>
-                        </tr>
+                          ) : null}
+
+                          {!segmentationSchema ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                              Project segmentation options are unavailable, so
+                              controlled dropdown values cannot be shown.
+                            </div>
+                          ) : null}
+
+                          <div className="mt-5 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => void saveParticipantEdit()}
+                              disabled={
+                                participantActionState === "saving" ||
+                                !permissions.canEditAnyField
+                              }
+                              className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {participantActionState === "saving"
+                                ? "Saving..."
+                                : "Save participant"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cancelParticipantEdit}
+                              disabled={participantActionState === "saving"}
+                              className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       );
-                    })}
-                  </tbody>
-                </table>
+                    }
+
+                    const editDisabled =
+                      isArchivedParticipant(participant) ||
+                      project.projectStatus !== "active" ||
+                      isArchiving;
+
+                    return (
+                      <ParticipantCard
+                        key={participant.participantId}
+                        participant={participant}
+                        projectStatus={project.projectStatus}
+                        segmentationSchema={segmentationSchema}
+                        selectedDays={selectedDays}
+                        isExtending={isExtending}
+                        extendDisabled={extendDisabled}
+                        isArchiving={isArchiving}
+                        archiveDisabled={archiveDisabled}
+                        editDisabled={editDisabled}
+                        onEdit={() => beginParticipantEdit(participant)}
+                        onArchive={() => void archiveParticipant(participant.participantId)}
+                        onExtendDaysChange={(days) =>
+                          setExtendDaysByParticipantId((current) => ({
+                            ...current,
+                            [participant.participantId]: days,
+                          }))
+                        }
+                        onExtendInvite={() =>
+                          void extendInvite(participant.participantId)
+                        }
+                      />
+                    );
+                  })
+                )}
               </div>
             </section>
 
@@ -1617,7 +1832,7 @@ function ProjectDetailsEditor({
 }: {
   formState: ProjectDetailsFormState;
   actionState: "idle" | "saving";
-  onChange: React.Dispatch<React.SetStateAction<ProjectDetailsFormState>>;
+  onChange: Dispatch<SetStateAction<ProjectDetailsFormState>>;
   onSave: () => void;
 }) {
   return (
@@ -1750,12 +1965,202 @@ function ProjectDetailsEditor({
   );
 }
 
+function ParticipantCard({
+  participant,
+  projectStatus,
+  segmentationSchema,
+  selectedDays,
+  isExtending,
+  extendDisabled,
+  isArchiving,
+  archiveDisabled,
+  editDisabled,
+  onEdit,
+  onArchive,
+  onExtendDaysChange,
+  onExtendInvite,
+}: {
+  participant: ParticipantSummary;
+  projectStatus: string;
+  segmentationSchema: SegmentationSchema | null;
+  selectedDays: number;
+  isExtending: boolean;
+  extendDisabled: boolean;
+  isArchiving: boolean;
+  archiveDisabled: boolean;
+  editDisabled: boolean;
+  onEdit: () => void;
+  onArchive: () => void;
+  onExtendDaysChange: (days: number) => void;
+  onExtendInvite: () => void;
+}) {
+  const segmentationDisplayItems = useMemo(
+    () => getSegmentationDisplayItems(participant, segmentationSchema),
+    [participant, segmentationSchema],
+  );
+
+  return (
+    <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold text-slate-900">
+              {participant.name}
+            </h3>
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusTone(
+                participant.participantStatus,
+              )}`}
+            >
+              {getDisplayParticipantStatus(participant.participantStatus)}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+              {formatQuestionnaireType(participant.questionnaireType)}
+            </span>
+          </div>
+
+          <p className="mt-2 break-words text-sm text-slate-600">
+            {participant.email}
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {segmentationDisplayItems.map((item) => (
+              <AttributeCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetaChip label="Invited" value={formatDateTime(participant.invitedAt)} />
+            <MetaChip
+              label="Expires"
+              value={formatDateTime(participant.inviteExpiresAt)}
+            />
+            <MetaChip label="Started" value={formatDateTime(participant.startedAt)} />
+            <MetaChip
+              label="Completed"
+              value={formatDateTime(participant.completedAt)}
+            />
+          </div>
+
+          {projectStatus !== "active" ? (
+            <p className="mt-4 text-xs text-slate-500">
+              This project is closed. Participant actions are restricted.
+            </p>
+          ) : null}
+
+          {isArchivedParticipant(participant) ? (
+            <p className="mt-4 text-xs text-slate-500">
+              This participant has been withdrawn. Editing is disabled until a
+              reinstate flow is added.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="w-full xl:w-[260px]">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Actions
+            </p>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={editDisabled}
+                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Edit participant
+              </button>
+
+              <button
+                type="button"
+                onClick={onArchive}
+                disabled={archiveDisabled}
+                className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isArchiving ? "Withdrawing..." : "Withdraw participant"}
+              </button>
+
+              <select
+                value={selectedDays}
+                onChange={(event) => onExtendDaysChange(Number(event.target.value))}
+                disabled={extendDisabled || isExtending}
+                className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {EXTEND_OPTIONS.map((days) => (
+                  <option key={days} value={days}>
+                    Extend by {days} days
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={onExtendInvite}
+                disabled={extendDisabled || isExtending}
+                className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isExtending ? "Extending..." : "Extend invite"}
+              </button>
+            </div>
+
+            {extendDisabled ? (
+              <p className="mt-3 text-xs text-slate-500">
+                Invite extension is only available for open, incomplete participants
+                in an open project.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttributeCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-medium text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function MetaChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm text-slate-700">{value}</p>
+    </div>
+  );
+}
+
 function EditableField({
   label,
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className="block">
@@ -1772,7 +2177,7 @@ function FieldGroup({
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className="block">

@@ -15,7 +15,10 @@ import {
   buildDimensionAnalyses,
   type DimensionAnalysis,
 } from "@/lib/client-diagnostic/analysis-engine";
-import type { SegmentationValues } from "@/lib/client-diagnostic/segmentation";
+import type {
+  SegmentationSchema,
+  SegmentationValues,
+} from "@/lib/client-diagnostic/segmentation";
 
 type ProjectQuestionnaireType =
   | "hr"
@@ -31,6 +34,8 @@ type ParticipantRow = {
   email: string;
   segmentation_values: SegmentationValues | null;
   participant_status: string;
+  invited_at: string | null;
+  invite_expires_at: string | null;
   started_at: string | null;
   completed_at: string | null;
   updated_at: string;
@@ -69,6 +74,7 @@ type ProjectRow = {
   dpa_status: string | null;
   project_status: string;
   notes: string | null;
+  segmentation_schema: SegmentationSchema | null;
   created_at: string;
   updated_at: string;
 };
@@ -89,6 +95,8 @@ type ParticipantSummary = {
   email: string;
   segmentationValues: SegmentationValues | null;
   participantStatus: string;
+  invitedAt: string | null;
+  inviteExpiresAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
   updatedAt: string;
@@ -121,6 +129,8 @@ export type RespondentGroupSummary = {
     email: string;
     segmentationValues: SegmentationValues | null;
     participantStatus: string;
+    invitedAt: string | null;
+    inviteExpiresAt: string | null;
     startedAt: string | null;
     completedAt: string | null;
     updatedAt: string;
@@ -194,6 +204,7 @@ export type ProjectSummaryResponse = {
     dpaStatus: string | null;
     projectStatus: string;
     notes: string | null;
+    segmentationSchema: SegmentationSchema | null;
   };
   completion: CompletionSummary & {
     participants: ParticipantSummary[];
@@ -260,6 +271,16 @@ function isScoredQuestionnaireType(
   questionnaireType: QuestionnaireType,
 ): boolean {
   return SCORED_QUESTIONNAIRE_TYPES.includes(questionnaireType);
+}
+
+function isWithdrawnParticipant(
+  participant: Pick<ParticipantRow, "participant_status">,
+): boolean {
+  return participant.participant_status === "archived";
+}
+
+function getActiveParticipants(participantRows: ParticipantRow[]): ParticipantRow[] {
+  return participantRows.filter((participant) => !isWithdrawnParticipant(participant));
 }
 
 const GENERIC_THEME_LIBRARY: QualitativeThemeDefinition[] = [
@@ -651,6 +672,8 @@ function buildParticipantSummary(
     email: participant.email,
     segmentationValues: participant.segmentation_values,
     participantStatus: participant.participant_status,
+    invitedAt: participant.invited_at,
+    inviteExpiresAt: participant.invite_expires_at,
     startedAt: participant.started_at,
     completedAt: participant.completed_at,
     updatedAt: participant.updated_at,
@@ -661,8 +684,10 @@ function buildRespondentGroups(
   participantRows: ParticipantRow[],
   includedQuestionnaireTypes: ProjectQuestionnaireType[],
 ): RespondentGroupSummary[] {
+  const activeParticipants = getActiveParticipants(participantRows);
+
   return includedQuestionnaireTypes.map((questionnaireType) => {
-    const matchingParticipants = participantRows.filter(
+    const matchingParticipants = activeParticipants.filter(
       (participant) => participant.questionnaire_type === questionnaireType,
     );
 
@@ -682,6 +707,8 @@ function buildRespondentGroups(
         email: participant.email,
         segmentationValues: participant.segmentation_values,
         participantStatus: participant.participant_status,
+        invitedAt: participant.invited_at,
+        inviteExpiresAt: participant.invite_expires_at,
         startedAt: participant.started_at,
         completedAt: participant.completed_at,
         updatedAt: participant.updated_at,
@@ -702,7 +729,9 @@ function buildCompletionSummary(
   participantRows: ParticipantRow[],
   includedQuestionnaireTypes: ProjectQuestionnaireType[],
 ): CompletionSummary {
-  const filteredParticipants = participantRows.filter((participant) =>
+  const activeParticipants = getActiveParticipants(participantRows);
+
+  const filteredParticipants = activeParticipants.filter((participant) =>
     includedQuestionnaireTypes.includes(participant.questionnaire_type),
   );
 
@@ -730,7 +759,7 @@ function buildFactPackSummary(
   factPackRows: FactPackRow[],
 ): FactPackSummary {
   const participant =
-    participantRows.find(
+    getActiveParticipants(participantRows).find(
       (row) => row.questionnaire_type === "client_fact_pack",
     ) ?? null;
 
@@ -1254,14 +1283,14 @@ export async function getProjectSummaryData(
     supabase
       .from("client_projects")
       .select(
-        "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, created_at, updated_at",
-      )
+        "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, segmentation_schema, created_at, updated_at",
+    )
       .eq("project_id", projectId)
       .single<ProjectRow>(),
     supabase
       .from("client_participants")
       .select(
-        "participant_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, started_at, completed_at, updated_at",
+        "participant_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, invited_at, invite_expires_at, started_at, completed_at, updated_at",
       )
       .eq("project_id", projectId)
       .returns<ParticipantRow[]>(),
@@ -1310,17 +1339,37 @@ export async function getProjectSummaryData(
   }
 
   const participantRows = participants ?? [];
+  const activeParticipants = getActiveParticipants(participantRows);
+  const activeParticipantIds = new Set(
+    activeParticipants.map((participant) => participant.participant_id),
+  );
+  const activeScoredParticipantIds = new Set(
+    activeParticipants
+      .filter((participant) =>
+        participant.questionnaire_type === "hr" ||
+        participant.questionnaire_type === "manager" ||
+        participant.questionnaire_type === "leadership",
+      )
+      .map((participant) => participant.participant_id),
+  );
+
   const participantSummaries = participantRows.map(buildParticipantSummary);
   const factPackSummary = buildFactPackSummary(
     participantRows,
     factPackRows ?? [],
   );
 
-  const dimensionScoreRows = (scoreRows ?? []).filter((row) =>
-    isScoredQuestionnaireType(row.questionnaire_type),
+  const dimensionScoreRows = (scoreRows ?? []).filter(
+    (row) =>
+      isScoredQuestionnaireType(row.questionnaire_type) &&
+      row.participant_id !== null &&
+      activeScoredParticipantIds.has(row.participant_id),
   );
-  const qualitativeRows = (commentRows ?? []).filter((row) =>
-    isScoredQuestionnaireType(row.questionnaire_type),
+
+  const qualitativeRows = (commentRows ?? []).filter(
+    (row) =>
+      isScoredQuestionnaireType(row.questionnaire_type) &&
+      activeParticipantIds.has(row.participant_id),
   );
 
   const completion = buildCompletionSummary(
@@ -1360,19 +1409,20 @@ export async function getProjectSummaryData(
   return {
     success: true,
     project: {
-      projectId: project.project_id,
-      companyName: project.company_name,
-      primaryContactName: project.primary_contact_name,
-      primaryContactEmail: project.primary_contact_email,
-      billingContactName: project.billing_contact_name,
-      billingContactEmail: project.billing_contact_email,
-      companyWebsite: project.company_website,
-      purchaseOrderNumber: project.purchase_order_number,
-      msaStatus: project.msa_status,
-      dpaStatus: project.dpa_status,
-      projectStatus: project.project_status,
-      notes: project.notes,
-    },
+        projectId: project.project_id,
+        companyName: project.company_name,
+        primaryContactName: project.primary_contact_name,
+        primaryContactEmail: project.primary_contact_email,
+        billingContactName: project.billing_contact_name,
+        billingContactEmail: project.billing_contact_email,
+        companyWebsite: project.company_website,
+        purchaseOrderNumber: project.purchase_order_number,
+        msaStatus: project.msa_status,
+        dpaStatus: project.dpa_status,
+        projectStatus: project.project_status,
+        notes: project.notes,
+        segmentationSchema: project.segmentation_schema,
+     },
     completion: {
       ...completion,
       participants: participantSummaries,

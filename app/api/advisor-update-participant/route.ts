@@ -62,6 +62,46 @@ function isCompletedParticipant(participant: ParticipantRow): boolean {
   );
 }
 
+function isStartedParticipant(participant: ParticipantRow): boolean {
+  return participant.participant_status === "started";
+}
+
+function isArchivedParticipant(participant: ParticipantRow): boolean {
+  return participant.participant_status === "archived";
+}
+
+function normaliseSegmentationValues(
+  questionnaireType: QuestionnaireType,
+  segmentationValues: SegmentationValues | null,
+): SegmentationValues | null {
+  if (questionnaireType === "client_fact_pack") {
+    return null;
+  }
+
+  if (!segmentationValues || typeof segmentationValues !== "object") {
+    return {
+      function: null,
+      location: null,
+      level: null,
+    };
+  }
+
+  return {
+    function:
+      typeof segmentationValues.function === "string"
+        ? segmentationValues.function.trim() || null
+        : null,
+    location:
+      typeof segmentationValues.location === "string"
+        ? segmentationValues.location.trim() || null
+        : null,
+    level:
+      typeof segmentationValues.level === "string"
+        ? segmentationValues.level.trim() || null
+        : null,
+  };
+}
+
 export async function PATCH(request: Request): Promise<Response> {
   try {
     const advisorUser = await requireAdvisorUser();
@@ -80,7 +120,7 @@ export async function PATCH(request: Request): Promise<Response> {
     const email = normaliseEmail(cleanString(body.email));
     const roleLabel = cleanString(body.roleLabel);
     const questionnaireType = cleanString(body.questionnaireType);
-    const segmentationValues =
+    const rawSegmentationValues =
       body.segmentationValues && typeof body.segmentationValues === "object"
         ? body.segmentationValues
         : null;
@@ -138,29 +178,79 @@ export async function PATCH(request: Request): Promise<Response> {
       );
     }
 
+    if (isArchivedParticipant(existingParticipant)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Withdrawn participants cannot be edited. Reinstate the participant first if this was done in error.",
+        },
+        { status: 409 },
+      );
+    }
+
     const participantIsCompleted = isCompletedParticipant(existingParticipant);
+    const participantIsStarted = isStartedParticipant(existingParticipant);
 
-    if (participantIsCompleted) {
-      if (email !== existingParticipant.email) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Completed participants cannot have their email changed.",
+    const normalisedSegmentationValues = normaliseSegmentationValues(
+      questionnaireType,
+      rawSegmentationValues,
+    );
+
+    if (participantIsStarted || participantIsCompleted) {
+      if (name === existingParticipant.name) {
+        return NextResponse.json({
+          success: true,
+          participant: {
+            participantId: existingParticipant.participant_id,
+            projectId: existingParticipant.project_id,
+            questionnaireType: existingParticipant.questionnaire_type,
+            roleLabel: existingParticipant.role_label,
+            name: existingParticipant.name,
+            email: existingParticipant.email,
+            segmentationValues: existingParticipant.segmentation_values,
+            participantStatus: existingParticipant.participant_status,
+            completedAt: existingParticipant.completed_at,
           },
-          { status: 409 },
+        });
+      }
+
+      const { data: updatedNameOnlyParticipant, error: updateNameOnlyError } =
+        await supabase
+          .from("client_participants")
+          .update({
+            name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("participant_id", participantId)
+          .select(
+            "participant_id, project_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, completed_at",
+          )
+          .single<ParticipantRow>();
+
+      if (updateNameOnlyError || !updatedNameOnlyParticipant) {
+        console.error("Participant name-only update failed", updateNameOnlyError);
+
+        return NextResponse.json(
+          { success: false, error: "Unable to update participant." },
+          { status: 500 },
         );
       }
 
-      if (questionnaireType !== existingParticipant.questionnaire_type) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Completed participants cannot have their questionnaire type changed.",
-          },
-          { status: 409 },
-        );
-      }
+      return NextResponse.json({
+        success: true,
+        participant: {
+          participantId: updatedNameOnlyParticipant.participant_id,
+          projectId: updatedNameOnlyParticipant.project_id,
+          questionnaireType: updatedNameOnlyParticipant.questionnaire_type,
+          roleLabel: updatedNameOnlyParticipant.role_label,
+          name: updatedNameOnlyParticipant.name,
+          email: updatedNameOnlyParticipant.email,
+          segmentationValues: updatedNameOnlyParticipant.segmentation_values,
+          participantStatus: updatedNameOnlyParticipant.participant_status,
+          completedAt: updatedNameOnlyParticipant.completed_at,
+        },
+      });
     }
 
     const { data: conflictingParticipants, error: conflictingParticipantsError } =
@@ -213,13 +303,15 @@ export async function PATCH(request: Request): Promise<Response> {
     }
 
     if (questionnaireType !== "client_fact_pack") {
-      const { data: duplicateQuestionnaireTypeRows, error: duplicateQuestionnaireTypeError } =
-        await supabase
-          .from("client_participants")
-          .select("participant_id")
-          .eq("project_id", existingParticipant.project_id)
-          .eq("email", email)
-          .neq("participant_id", participantId);
+      const {
+        data: duplicateQuestionnaireTypeRows,
+        error: duplicateQuestionnaireTypeError,
+      } = await supabase
+        .from("client_participants")
+        .select("participant_id")
+        .eq("project_id", existingParticipant.project_id)
+        .eq("email", email)
+        .neq("participant_id", participantId);
 
       if (duplicateQuestionnaireTypeError) {
         return NextResponse.json(
@@ -250,9 +342,7 @@ export async function PATCH(request: Request): Promise<Response> {
         email,
         role_label: roleLabel,
         questionnaire_type: questionnaireType,
-        segmentation_values: questionnaireType === "client_fact_pack"
-          ? null
-          : segmentationValues,
+        segmentation_values: normalisedSegmentationValues,
         updated_at: new Date().toISOString(),
       })
       .eq("participant_id", participantId)
