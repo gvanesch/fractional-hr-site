@@ -61,6 +61,12 @@ type ProjectRow = {
   company_name: string;
   primary_contact_name: string;
   primary_contact_email: string;
+  billing_contact_name: string | null;
+  billing_contact_email: string | null;
+  company_website: string | null;
+  purchase_order_number: string | null;
+  msa_status: string | null;
+  dpa_status: string | null;
   project_status: string;
   notes: string | null;
   created_at: string;
@@ -180,6 +186,12 @@ export type ProjectSummaryResponse = {
     companyName: string;
     primaryContactName: string;
     primaryContactEmail: string;
+    billingContactName: string | null;
+    billingContactEmail: string | null;
+    companyWebsite: string | null;
+    purchaseOrderNumber: string | null;
+    msaStatus: string | null;
+    dpaStatus: string | null;
     projectStatus: string;
     notes: string | null;
   };
@@ -1242,7 +1254,7 @@ export async function getProjectSummaryData(
     supabase
       .from("client_projects")
       .select(
-        "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
+        "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, created_at, updated_at",
       )
       .eq("project_id", projectId)
       .single<ProjectRow>(),
@@ -1352,6 +1364,12 @@ export async function getProjectSummaryData(
       companyName: project.company_name,
       primaryContactName: project.primary_contact_name,
       primaryContactEmail: project.primary_contact_email,
+      billingContactName: project.billing_contact_name,
+      billingContactEmail: project.billing_contact_email,
+      companyWebsite: project.company_website,
+      purchaseOrderNumber: project.purchase_order_number,
+      msaStatus: project.msa_status,
+      dpaStatus: project.dpa_status,
       projectStatus: project.project_status,
       notes: project.notes,
     },

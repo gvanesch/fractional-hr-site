@@ -1,4 +1,5 @@
-import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   questionnaireTypes,
@@ -48,17 +49,6 @@ type ResolvedParticipantInvite = {
   invite_revoked_at: string | null;
   project_status: string;
 };
-
-function logAndNotFound(reason: string, details?: Record<string, unknown>): never {
-  console.info(
-    JSON.stringify({
-      event: "client_diagnostic_respond_not_found",
-      reason,
-      ...(details ?? {}),
-    }),
-  );
-  notFound();
-}
 
 function isScoredQuestionnaireType(value: string): value is QuestionnaireType {
   return questionnaireTypes.includes(value as QuestionnaireType);
@@ -129,13 +119,65 @@ function getProjectStatus(
   return clientProjects.project_status ?? null;
 }
 
+function LinkNoLongerActivePage() {
+  return (
+    <main className="brand-light-section min-h-screen">
+      <section className="brand-hero">
+        <div className="brand-container brand-section brand-hero-content">
+          <div className="max-w-4xl">
+            <p className="brand-kicker">Client diagnostic</p>
+
+            <h1 className="brand-heading-lg mt-5 text-white">
+              This diagnostic link is no longer active
+            </h1>
+
+            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
+              This can happen if the project has been closed, the invitation has
+              expired, or the link is no longer valid.
+            </p>
+
+            <div className="brand-card-dark mt-8 max-w-3xl p-6 sm:p-7">
+              <div className="space-y-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
+                  Need help?
+                </p>
+
+                <p className="text-base leading-7 text-slate-200">
+                  If you believe this is an error, please contact{" "}
+                  <a
+                    href="mailto:info@vanesch.uk"
+                    className="font-semibold text-white underline underline-offset-4"
+                  >
+                    info@vanesch.uk
+                  </a>{" "}
+                  for further assistance.
+                </p>
+
+                <p className="text-base leading-7 text-slate-300">
+                  You can also return to the Van Esch Advisory website below.
+                </p>
+
+                <div className="pt-2">
+                  <Link href="/" className="brand-button-primary text-center">
+                    Visit vanesch.uk
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default async function ClientDiagnosticRespondPage({
   params,
 }: PageProps) {
   const { inviteToken } = await params;
 
   if (!isReasonableInviteToken(inviteToken)) {
-    logAndNotFound("invalid_invite_token_format", { inviteToken });
+    return <LinkNoLongerActivePage />;
   }
 
   const supabase = createSupabaseAdminClient();
@@ -158,36 +200,31 @@ export default async function ClientDiagnosticRespondPage({
     .maybeSingle();
 
   if (error || !data) {
-    logAndNotFound("participant_lookup_failed", {
-      inviteToken,
-      error: error?.message ?? null,
-      hasData: Boolean(data),
-    });
+    console.info(
+      JSON.stringify({
+        event: "client_diagnostic_respond_inactive_link",
+        reason: "participant_lookup_failed",
+        inviteToken,
+        error: error?.message ?? null,
+      }),
+    );
+
+    return <LinkNoLongerActivePage />;
   }
 
   const participant = data as ParticipantInviteLookupRow;
   const projectStatus = getProjectStatus(participant.client_projects);
 
   if (!isUuid(participant.participant_id) || !isUuid(participant.project_id)) {
-    logAndNotFound("invalid_participant_or_project_uuid", {
-      inviteToken,
-      participantId: participant.participant_id,
-      projectId: participant.project_id,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   if (!isProjectQuestionnaireType(participant.questionnaire_type)) {
-    logAndNotFound("invalid_questionnaire_type", {
-      inviteToken,
-      questionnaireType: participant.questionnaire_type,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   if (!projectStatus) {
-    logAndNotFound("missing_project_status", {
-      inviteToken,
-      clientProjects: participant.client_projects,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   const resolvedParticipant: ResolvedParticipantInvite = {
@@ -202,25 +239,15 @@ export default async function ClientDiagnosticRespondPage({
   };
 
   if (resolvedParticipant.project_status !== "active") {
-    logAndNotFound("project_not_active", {
-      inviteToken,
-      projectStatus: resolvedParticipant.project_status,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   if (resolvedParticipant.invite_revoked_at) {
-    logAndNotFound("invite_revoked", {
-      inviteToken,
-      inviteRevokedAt: resolvedParticipant.invite_revoked_at,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   if (isInviteExpired(resolvedParticipant.invite_expires_at)) {
-    logAndNotFound("invite_expired", {
-      inviteToken,
-      inviteExpiresAt: resolvedParticipant.invite_expires_at,
-      now: new Date().toISOString(),
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   if (
@@ -230,12 +257,7 @@ export default async function ClientDiagnosticRespondPage({
       questionnaireType: resolvedParticipant.questionnaire_type,
     })
   ) {
-    logAndNotFound("participant_state_not_allowed", {
-      inviteToken,
-      participantStatus: resolvedParticipant.participant_status,
-      completedAt: resolvedParticipant.completed_at,
-      questionnaireType: resolvedParticipant.questionnaire_type,
-    });
+    return <LinkNoLongerActivePage />;
   }
 
   const targetUrl =
@@ -248,15 +270,6 @@ export default async function ClientDiagnosticRespondPage({
         `?projectId=${encodeURIComponent(resolvedParticipant.project_id)}` +
         `&participantId=${encodeURIComponent(resolvedParticipant.participant_id)}` +
         `&inviteToken=${encodeURIComponent(inviteToken)}`;
-
-  console.info(
-    JSON.stringify({
-      event: "client_diagnostic_respond_redirect",
-      inviteToken,
-      questionnaireType: resolvedParticipant.questionnaire_type,
-      targetUrl,
-    }),
-  );
 
   redirect(targetUrl);
 }

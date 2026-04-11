@@ -85,6 +85,12 @@ type ProjectSummaryResponse = {
     companyName: string;
     primaryContactName: string;
     primaryContactEmail: string;
+    billingContactName: string | null;
+    billingContactEmail: string | null;
+    companyWebsite: string | null;
+    purchaseOrderNumber: string | null;
+    msaStatus: string | null;
+    dpaStatus: string | null;
     projectStatus: string;
     notes: string | null;
   };
@@ -111,6 +117,15 @@ type ProjectStatusResponse = {
   projectStatus: string;
 };
 
+type ProjectUpdateResponse =
+  | {
+      success: true;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 type ExtendInviteResponse =
   | {
       success: true;
@@ -133,7 +148,19 @@ type AdvisorProjectDashboardClientProps = {
   projectId: string;
 };
 
+type ProjectDetailsFormState = {
+  billingContactName: string;
+  billingContactEmail: string;
+  companyWebsite: string;
+  purchaseOrderNumber: string;
+  msaStatus: string;
+  dpaStatus: string;
+  notes: string;
+};
+
 const EXTEND_OPTIONS = [7, 14, 21, 30] as const;
+const MSA_OPTIONS = ["", "not_started", "in_review", "signed"] as const;
+const DPA_OPTIONS = ["", "not_required", "required", "signed"] as const;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -226,8 +253,18 @@ function formatProjectStatus(value: string): string {
     case "archived":
       return "Archived";
     default:
-      return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+      return value
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
   }
+}
+
+function formatStatusValue(value: string | null | undefined): string {
+  if (!value) {
+    return "Not set";
+  }
+
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function getProjectStatusTone(status: string): string {
@@ -306,6 +343,20 @@ function canExtendInvite(participant: ParticipantSummary): boolean {
   return true;
 }
 
+function createProjectDetailsFormState(
+  project: ProjectSummaryResponse["project"],
+): ProjectDetailsFormState {
+  return {
+    billingContactName: project.billingContactName ?? "",
+    billingContactEmail: project.billingContactEmail ?? "",
+    companyWebsite: project.companyWebsite ?? "",
+    purchaseOrderNumber: project.purchaseOrderNumber ?? "",
+    msaStatus: project.msaStatus ?? "",
+    dpaStatus: project.dpaStatus ?? "",
+    notes: project.notes ?? "",
+  };
+}
+
 export default function AdvisorProjectDashboardClient({
   projectId,
 }: AdvisorProjectDashboardClientProps) {
@@ -320,6 +371,16 @@ export default function AdvisorProjectDashboardClient({
   const [extendDaysByParticipantId, setExtendDaysByParticipantId] = useState<
     Record<string, number>
   >({});
+  const [isEditingProjectDetails, setIsEditingProjectDetails] = useState(false);
+  const [projectDetailsForm, setProjectDetailsForm] = useState<ProjectDetailsFormState>({
+    billingContactName: "",
+    billingContactEmail: "",
+    companyWebsite: "",
+    purchaseOrderNumber: "",
+    msaStatus: "",
+    dpaStatus: "",
+    notes: "",
+  });
 
   async function loadProject() {
     if (!isUuid(projectId)) {
@@ -351,6 +412,7 @@ export default function AdvisorProjectDashboardClient({
       }
 
       setData(result);
+      setProjectDetailsForm(createProjectDetailsFormState(result.project));
     } catch (error) {
       setLoadError(
         error instanceof Error
@@ -409,6 +471,58 @@ export default function AdvisorProjectDashboardClient({
         error instanceof Error
           ? error.message
           : "Unable to update project status.",
+      );
+    } finally {
+      setActionState("idle");
+    }
+  }
+
+  async function saveProjectDetails() {
+    if (!isUuid(projectId)) {
+      setActionMessage("projectId must be a valid UUID.");
+      return;
+    }
+
+    setActionState("saving");
+    setActionMessage("");
+
+    try {
+      const response = await fetch("/api/client-diagnostic-project-update", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId,
+          billingContactName:
+            projectDetailsForm.billingContactName.trim() || null,
+          billingContactEmail:
+            projectDetailsForm.billingContactEmail.trim() || null,
+          companyWebsite: projectDetailsForm.companyWebsite.trim() || null,
+          purchaseOrderNumber:
+            projectDetailsForm.purchaseOrderNumber.trim() || null,
+          msaStatus: projectDetailsForm.msaStatus || null,
+          dpaStatus: projectDetailsForm.dpaStatus || null,
+          notes: projectDetailsForm.notes.trim() || null,
+        }),
+      });
+
+      const result = (await response.json()) as ProjectUpdateResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          "error" in result ? result.error : "Unable to update project details.",
+        );
+      }
+
+      setActionMessage("Project details updated successfully.");
+      setIsEditingProjectDetails(false);
+      await loadProject();
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update project details.",
       );
     } finally {
       setActionState("idle");
@@ -569,25 +683,97 @@ export default function AdvisorProjectDashboardClient({
                   />
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <InfoCard
                     label="Primary contact"
                     value={project.primaryContactName}
                     secondary={project.primaryContactEmail}
                   />
-                  <InfoCard
-                    label="Project ID"
-                    value={project.projectId}
-                    secondary={project.notes || "No project notes recorded."}
-                  />
-                  <ControlCard
-                    projectStatus={project.projectStatus}
-                    actionState={actionState}
-                    actionMessage={actionMessage}
-                    analysisReady={scoredCompletion.analysisReady}
-                    onUpdateProjectStatus={updateProjectStatus}
-                  />
+                  <InfoCard label="Project ID" value={project.projectId} />
                 </div>
+
+                <ControlCard
+                  projectStatus={project.projectStatus}
+                  actionState={actionState}
+                  actionMessage={actionMessage}
+                  analysisReady={scoredCompletion.analysisReady}
+                  onUpdateProjectStatus={updateProjectStatus}
+                />
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="brand-section-kicker mt-2">Company & engagement</p>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">
+                      Delivery and commercial context
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEditingProjectDetails) {
+                        setProjectDetailsForm(createProjectDetailsFormState(project));
+                        setIsEditingProjectDetails(false);
+                        return;
+                      }
+
+                      setProjectDetailsForm(createProjectDetailsFormState(project));
+                      setIsEditingProjectDetails(true);
+                    }}
+                    className="brand-button-dark"
+                  >
+                    {isEditingProjectDetails ? "Cancel edit" : "Edit project details"}
+                  </button>
+                </div>
+
+                {isEditingProjectDetails ? (
+                  <ProjectDetailsEditor
+                    formState={projectDetailsForm}
+                    actionState={actionState}
+                    onChange={setProjectDetailsForm}
+                    onSave={() => void saveProjectDetails()}
+                  />
+                ) : (
+                  <>
+                    <div className="grid gap-4 lg:grid-cols-3">
+                      <InfoCard
+                        label="Billing contact"
+                        value={project.billingContactName || "Not set"}
+                        secondary={
+                          project.billingContactEmail || "No billing email recorded"
+                        }
+                      />
+                      <InfoCard
+                        label="Company website"
+                        value={project.companyWebsite || "Not set"}
+                        secondary={
+                          project.companyWebsite
+                            ? "Reference website for project context."
+                            : undefined
+                        }
+                      />
+                      <InfoCard
+                        label="Purchase order"
+                        value={project.purchaseOrderNumber || "Not set"}
+                      />
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <InfoCard
+                        label="MSA status"
+                        value={formatStatusValue(project.msaStatus)}
+                        secondary="Master services agreement status for this engagement."
+                      />
+                      <InfoCard
+                        label="DPA status"
+                        value={formatStatusValue(project.dpaStatus)}
+                        secondary="Data processing agreement status where applicable."
+                      />
+                    </div>
+
+                    <NotesCard notes={project.notes} />
+                  </>
+                )}
               </div>
             </section>
 
@@ -921,10 +1107,33 @@ function InfoCard({
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 text-base font-semibold text-slate-900 break-words">
+        {value}
+      </p>
       {secondary ? (
-        <p className="mt-2 text-sm leading-6 text-slate-600">{secondary}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600 break-words">
+          {secondary}
+        </p>
       ) : null}
+    </div>
+  );
+}
+
+function NotesCard({
+  notes,
+}: {
+  notes: string | null;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        Advisor notes
+      </p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+        {notes && notes.trim().length > 0
+          ? notes
+          : "No advisor notes recorded yet."}
+      </p>
     </div>
   );
 }
@@ -953,7 +1162,7 @@ function ControlCard({
         analysis or delivery.
       </p>
 
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {projectStatus === "closed" ? (
           <button
             type="button"
@@ -987,6 +1196,164 @@ function ControlCard({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ProjectDetailsEditor({
+  formState,
+  actionState,
+  onChange,
+  onSave,
+}: {
+  formState: ProjectDetailsFormState;
+  actionState: "idle" | "saving";
+  onChange: React.Dispatch<React.SetStateAction<ProjectDetailsFormState>>;
+  onSave: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--brand-border)] bg-white p-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FieldGroup label="Billing contact name">
+          <input
+            type="text"
+            value={formState.billingContactName}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                billingContactName: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          />
+        </FieldGroup>
+
+        <FieldGroup label="Billing contact email">
+          <input
+            type="email"
+            value={formState.billingContactEmail}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                billingContactEmail: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          />
+        </FieldGroup>
+
+        <FieldGroup label="Company website">
+          <input
+            type="url"
+            value={formState.companyWebsite}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                companyWebsite: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          />
+        </FieldGroup>
+
+        <FieldGroup label="Purchase order number">
+          <input
+            type="text"
+            value={formState.purchaseOrderNumber}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                purchaseOrderNumber: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          />
+        </FieldGroup>
+
+        <FieldGroup label="MSA status">
+          <select
+            value={formState.msaStatus}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                msaStatus: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          >
+            <option value="">Not set</option>
+            {MSA_OPTIONS.filter((option) => option !== "").map((option) => (
+              <option key={option} value={option}>
+                {formatStatusValue(option)}
+              </option>
+            ))}
+          </select>
+        </FieldGroup>
+
+        <FieldGroup label="DPA status">
+          <select
+            value={formState.dpaStatus}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                dpaStatus: event.target.value,
+              }))
+            }
+            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          >
+            <option value="">Not set</option>
+            {DPA_OPTIONS.filter((option) => option !== "").map((option) => (
+              <option key={option} value={option}>
+                {formatStatusValue(option)}
+              </option>
+            ))}
+          </select>
+        </FieldGroup>
+      </div>
+
+      <div className="mt-4">
+        <FieldGroup label="Advisor notes">
+          <textarea
+            value={formState.notes}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                notes: event.target.value,
+              }))
+            }
+            rows={6}
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+          />
+        </FieldGroup>
+      </div>
+
+      <div className="mt-5">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={actionState === "saving"}
+          className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {actionState === "saving" ? "Saving..." : "Save project details"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FieldGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
