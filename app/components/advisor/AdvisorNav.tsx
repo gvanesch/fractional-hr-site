@@ -25,6 +25,13 @@ export default function AdvisorNav() {
           >
             Projects
           </a>
+
+          <a
+            href="/advisor/health-checks"
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
+            Health Checks
+          </a>
         </div>
       </div>
     </div>
