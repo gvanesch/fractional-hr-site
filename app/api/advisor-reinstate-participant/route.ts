@@ -2,18 +2,15 @@ import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const ALLOWED_WITHDRAW_REASONS = [
-  "wrong_details",
-  "duplicate_participant",
-  "added_in_error",
-  "contact_left_organisation",
-  "company_withdrew_participant",
-  "declined_to_participate",
-  "no_longer_in_scope",
+const ALLOWED_REINSTATE_REASONS = [
+  "withdrawn_in_error",
+  "duplicate_resolved",
+  "client_requested_reinstatement",
+  "participant_now_in_scope",
   "other",
 ] as const;
 
-type WithdrawReason = (typeof ALLOWED_WITHDRAW_REASONS)[number];
+type ReinstateReason = (typeof ALLOWED_REINSTATE_REASONS)[number];
 
 type ParticipantRow = {
   participant_id: string;
@@ -23,10 +20,10 @@ type ParticipantRow = {
   invite_revoked_at: string | null;
 };
 
-type ArchiveParticipantRequestBody = {
+type ReinstateParticipantRequestBody = {
   participantId?: string;
-  withdrawReason?: string;
-  withdrawNote?: string;
+  reinstateReason?: string;
+  reinstateNote?: string;
 };
 
 function isUuid(value: string): boolean {
@@ -35,12 +32,12 @@ function isUuid(value: string): boolean {
   );
 }
 
-function isValidWithdrawReason(value: string): value is WithdrawReason {
-  return ALLOWED_WITHDRAW_REASONS.includes(value as WithdrawReason);
-}
-
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isValidReinstateReason(value: string): value is ReinstateReason {
+  return ALLOWED_REINSTATE_REASONS.includes(value as ReinstateReason);
 }
 
 export async function PATCH(request: Request): Promise<Response> {
@@ -54,11 +51,10 @@ export async function PATCH(request: Request): Promise<Response> {
       );
     }
 
-    const body = (await request.json()) as ArchiveParticipantRequestBody;
-
+    const body = (await request.json()) as ReinstateParticipantRequestBody;
     const participantId = cleanString(body.participantId);
-    const withdrawReason = cleanString(body.withdrawReason);
-    const withdrawNote = cleanString(body.withdrawNote);
+    const reinstateReason = cleanString(body.reinstateReason);
+    const reinstateNote = cleanString(body.reinstateNote);
 
     if (!participantId || !isUuid(participantId)) {
       return NextResponse.json(
@@ -67,11 +63,11 @@ export async function PATCH(request: Request): Promise<Response> {
       );
     }
 
-    if (!withdrawReason || !isValidWithdrawReason(withdrawReason)) {
+    if (!reinstateReason || !isValidReinstateReason(reinstateReason)) {
       return NextResponse.json(
         {
           success: false,
-          error: `A valid withdrawReason is required. Allowed values: ${ALLOWED_WITHDRAW_REASONS.join(", ")}.`,
+          error: `A valid reinstateReason is required. Allowed values: ${ALLOWED_REINSTATE_REASONS.join(", ")}.`,
         },
         { status: 400 },
       );
@@ -94,22 +90,22 @@ export async function PATCH(request: Request): Promise<Response> {
       );
     }
 
-    if (participant.participant_status === "archived") {
+    if (participant.participant_status !== "archived") {
       return NextResponse.json(
-        { success: false, error: "Participant is already archived." },
+        {
+          success: false,
+          error: "Only withdrawn participants can be reinstated.",
+        },
         { status: 409 },
       );
     }
 
-    if (
-      participant.participant_status === "completed" ||
-      participant.completed_at !== null
-    ) {
+    if (participant.completed_at !== null) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Completed participants cannot be archived. Completed participation must remain intact for reporting and future comparison.",
+            "Completed participants cannot be reinstated through this route.",
         },
         { status: 409 },
       );
@@ -120,11 +116,11 @@ export async function PATCH(request: Request): Promise<Response> {
     const { data: updatedParticipant, error: updateError } = await supabase
       .from("client_participants")
       .update({
-        participant_status: "archived",
-        invite_revoked_at: participant.invite_revoked_at ?? now,
-        withdraw_reason: withdrawReason,
-        withdraw_note: withdrawNote || null,
-        withdrawn_at: now,
+        participant_status: "invited",
+        invite_revoked_at: null,
+        reinstate_reason: reinstateReason,
+        reinstate_note: reinstateNote || null,
+        reinstated_at: now,
         updated_at: now,
       })
       .eq("participant_id", participantId)
@@ -134,28 +130,29 @@ export async function PATCH(request: Request): Promise<Response> {
       .single<ParticipantRow>();
 
     if (updateError || !updatedParticipant) {
-      console.error("Participant archive failed", {
+      console.error("Participant reinstate failed", {
         participantId,
         error: updateError,
       });
 
       return NextResponse.json(
-        { success: false, error: "Unable to withdraw participant." },
+        { success: false, error: "Unable to reinstate participant." },
         { status: 500 },
       );
     }
 
     console.info(
       JSON.stringify({
-        event: "participant_withdrawn",
+        event: "participant_reinstated",
         participantId: updatedParticipant.participant_id,
         projectId: updatedParticipant.project_id,
         participantStatusBefore: participant.participant_status,
         participantStatusAfter: updatedParticipant.participant_status,
         completedAt: updatedParticipant.completed_at,
-        inviteRevokedAt: updatedParticipant.invite_revoked_at,
-        withdrawReason,
-        withdrawnAt: now,
+        inviteRevokedAtBefore: participant.invite_revoked_at,
+        inviteRevokedAtAfter: updatedParticipant.invite_revoked_at,
+        reinstateReason,
+        reinstatedAt: now,
       }),
     );
 
@@ -169,7 +166,7 @@ export async function PATCH(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    console.error("Unexpected error archiving participant", error);
+    console.error("Unexpected error reinstating participant", error);
 
     return NextResponse.json(
       {

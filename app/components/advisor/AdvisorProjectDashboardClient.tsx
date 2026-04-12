@@ -158,7 +158,22 @@ type ParticipantUpdateResponse =
       error: string;
     };
 
-type ArchiveParticipantResponse =
+type WithdrawParticipantResponse =
+  | {
+      success: true;
+      participant: {
+        participantId: string;
+        projectId: string;
+        participantStatus: string;
+        completedAt: string | null;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type ReinstateParticipantResponse =
   | {
       success: true;
       participant: {
@@ -226,6 +241,33 @@ type ParticipantEditPermissions = {
   canEditSegmentation: boolean;
 };
 
+type WithdrawReason =
+  | "wrong_details"
+  | "duplicate_participant"
+  | "added_in_error"
+  | "contact_left_organisation"
+  | "company_withdrew_participant"
+  | "declined_to_participate"
+  | "no_longer_in_scope"
+  | "other";
+
+type WithdrawFormState = {
+  reason: WithdrawReason | "";
+  note: string;
+};
+
+type ReinstateReason =
+  | "withdrawn_in_error"
+  | "duplicate_resolved"
+  | "client_requested_reinstatement"
+  | "participant_now_in_scope"
+  | "other";
+
+type ReinstateFormState = {
+  reason: ReinstateReason | "";
+  note: string;
+};
+
 const EXTEND_OPTIONS = [7, 14, 21, 30] as const;
 const MSA_OPTIONS = ["", "not_started", "in_review", "signed"] as const;
 const DPA_OPTIONS = ["", "not_required", "required", "signed"] as const;
@@ -234,6 +276,37 @@ const ALL_QUESTIONNAIRE_OPTIONS: QuestionnaireType[] = [
   "manager",
   "leadership",
   "client_fact_pack",
+];
+
+const WITHDRAW_REASON_OPTIONS: Array<{
+  value: WithdrawReason;
+  label: string;
+}> = [
+  { value: "wrong_details", label: "Wrong details entered" },
+  { value: "duplicate_participant", label: "Duplicate participant" },
+  { value: "added_in_error", label: "Added in error" },
+  { value: "contact_left_organisation", label: "Contact left organisation" },
+  {
+    value: "company_withdrew_participant",
+    label: "Company withdrew participant",
+  },
+  { value: "declined_to_participate", label: "Declined to participate" },
+  { value: "no_longer_in_scope", label: "No longer in scope" },
+  { value: "other", label: "Other" },
+];
+
+const REINSTATE_REASON_OPTIONS: Array<{
+  value: ReinstateReason;
+  label: string;
+}> = [
+  { value: "withdrawn_in_error", label: "Withdrawn in error" },
+  { value: "duplicate_resolved", label: "Duplicate resolved" },
+  {
+    value: "client_requested_reinstatement",
+    label: "Client requested reinstatement",
+  },
+  { value: "participant_now_in_scope", label: "Participant now in scope" },
+  { value: "other", label: "Other" },
 ];
 
 function isUuid(value: string): boolean {
@@ -493,11 +566,27 @@ function createParticipantEditFormState(
   };
 }
 
+function getInitialWithdrawFormState(): WithdrawFormState {
+  return {
+    reason: "",
+    note: "",
+  };
+}
+
+function getInitialReinstateFormState(): ReinstateFormState {
+  return {
+    reason: "",
+    note: "",
+  };
+}
+
 function getSegmentationField(
   segmentationSchema: SegmentationSchema | null | undefined,
   fieldKey: SegmentationFieldKey,
 ) {
-  return segmentationSchema?.fields.find((field) => field.fieldKey === fieldKey) ?? null;
+  return (
+    segmentationSchema?.fields.find((field) => field.fieldKey === fieldKey) ?? null
+  );
 }
 
 function getSegmentationOptionLabel(
@@ -604,15 +693,16 @@ export default function AdvisorProjectDashboardClient({
     Record<string, number>
   >({});
   const [isEditingProjectDetails, setIsEditingProjectDetails] = useState(false);
-  const [projectDetailsForm, setProjectDetailsForm] = useState<ProjectDetailsFormState>({
-    billingContactName: "",
-    billingContactEmail: "",
-    companyWebsite: "",
-    purchaseOrderNumber: "",
-    msaStatus: "",
-    dpaStatus: "",
-    notes: "",
-  });
+  const [projectDetailsForm, setProjectDetailsForm] =
+    useState<ProjectDetailsFormState>({
+      billingContactName: "",
+      billingContactEmail: "",
+      companyWebsite: "",
+      purchaseOrderNumber: "",
+      msaStatus: "",
+      dpaStatus: "",
+      notes: "",
+    });
   const [editingParticipantId, setEditingParticipantId] = useState("");
   const [participantEditForm, setParticipantEditForm] =
     useState<ParticipantEditFormState | null>(null);
@@ -622,6 +712,15 @@ export default function AdvisorProjectDashboardClient({
   const [participantActionMessage, setParticipantActionMessage] = useState("");
   const [participantActionError, setParticipantActionError] = useState("");
   const [archivingParticipantId, setArchivingParticipantId] = useState("");
+  const [withdrawingParticipantId, setWithdrawingParticipantId] = useState("");
+  const [withdrawFormByParticipantId, setWithdrawFormByParticipantId] = useState<
+    Record<string, WithdrawFormState>
+  >({});
+  const [reinstatingParticipantId, setReinstatingParticipantId] = useState("");
+  const [reinstateFlowParticipantId, setReinstateFlowParticipantId] = useState("");
+  const [reinstateFormByParticipantId, setReinstateFormByParticipantId] = useState<
+    Record<string, ReinstateFormState>
+  >({});
 
   async function loadProject() {
     if (!isUuid(projectId)) {
@@ -829,6 +928,52 @@ export default function AdvisorProjectDashboardClient({
     setParticipantActionError("");
   }
 
+  function beginParticipantWithdraw(participantId: string) {
+    setWithdrawingParticipantId(participantId);
+    setWithdrawFormByParticipantId((current) => ({
+      ...current,
+      [participantId]: current[participantId] ?? getInitialWithdrawFormState(),
+    }));
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
+  function cancelParticipantWithdraw(participantId: string) {
+    setWithdrawingParticipantId((current) =>
+      current === participantId ? "" : current,
+    );
+    setWithdrawFormByParticipantId((current) => {
+      const next = { ...current };
+      delete next[participantId];
+      return next;
+    });
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
+  function beginParticipantReinstate(participantId: string) {
+    setReinstateFlowParticipantId(participantId);
+    setReinstateFormByParticipantId((current) => ({
+      ...current,
+      [participantId]: current[participantId] ?? getInitialReinstateFormState(),
+    }));
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
+  function cancelParticipantReinstate(participantId: string) {
+    setReinstateFlowParticipantId((current) =>
+      current === participantId ? "" : current,
+    );
+    setReinstateFormByParticipantId((current) => {
+      const next = { ...current };
+      delete next[participantId];
+      return next;
+    });
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+  }
+
   async function saveParticipantEdit() {
     if (!editingParticipantId || !participantEditForm) {
       setParticipantActionError("No participant is selected for editing.");
@@ -896,11 +1041,10 @@ export default function AdvisorProjectDashboardClient({
   }
 
   async function archiveParticipant(participantId: string) {
-    const confirmed = window.confirm(
-      "This will withdraw the participant from active collection and exclude them from analysis. This can be reversed later. Continue?",
-    );
+    const withdrawForm = withdrawFormByParticipantId[participantId];
 
-    if (!confirmed) {
+    if (!withdrawForm?.reason) {
+      setParticipantActionError("Please select a withdraw reason.");
       return;
     }
 
@@ -909,21 +1053,23 @@ export default function AdvisorProjectDashboardClient({
     setParticipantActionError("");
 
     try {
-      const response = await fetch("/api/advisor-archive-participant", {
+      const response = await fetch("/api/advisor-withdraw-participant", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           participantId,
+          withdrawReason: withdrawForm.reason,
+          withdrawNote: withdrawForm.note.trim() || null,
         }),
       });
 
-      const result = (await response.json()) as ArchiveParticipantResponse;
+      const result = (await response.json()) as WithdrawParticipantResponse;
 
       if (!response.ok || !result.success) {
         throw new Error(
-          "error" in result ? result.error : "Unable to archive participant.",
+          "error" in result ? result.error : "Unable to withdraw participant.",
         );
       }
 
@@ -932,14 +1078,60 @@ export default function AdvisorProjectDashboardClient({
         setParticipantEditForm(null);
       }
 
+      cancelParticipantWithdraw(participantId);
       setParticipantActionMessage("Participant withdrawn successfully.");
       await loadProject();
     } catch (error) {
       setParticipantActionError(
-        error instanceof Error ? error.message : "Unable to archive participant.",
+        error instanceof Error ? error.message : "Unable to withdraw participant.",
       );
     } finally {
       setArchivingParticipantId("");
+    }
+  }
+
+  async function reinstateParticipant(participantId: string) {
+    const reinstateForm = reinstateFormByParticipantId[participantId];
+
+    if (!reinstateForm?.reason) {
+      setParticipantActionError("Please select a reinstate reason.");
+      return;
+    }
+
+    setReinstatingParticipantId(participantId);
+    setParticipantActionMessage("");
+    setParticipantActionError("");
+
+    try {
+      const response = await fetch("/api/advisor-reinstate-participant", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participantId,
+          reinstateReason: reinstateForm.reason,
+          reinstateNote: reinstateForm.note.trim() || null,
+        }),
+      });
+
+      const result = (await response.json()) as ReinstateParticipantResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          "error" in result ? result.error : "Unable to reinstate participant.",
+        );
+      }
+
+      cancelParticipantReinstate(participantId);
+      setParticipantActionMessage("Participant reinstated successfully.");
+      await loadProject();
+    } catch (error) {
+      setParticipantActionError(
+        error instanceof Error ? error.message : "Unable to reinstate participant.",
+      );
+    } finally {
+      setReinstatingParticipantId("");
     }
   }
 
@@ -1008,10 +1200,7 @@ export default function AdvisorProjectDashboardClient({
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                href="/advisor/projects"
-                className="brand-button-dark text-center"
-              >
+              <Link href="/advisor/projects" className="brand-button-dark text-center">
                 All projects
               </Link>
 
@@ -1308,11 +1497,20 @@ export default function AdvisorProjectDashboardClient({
                       participantEditForm !== null;
                     const isArchiving =
                       archivingParticipantId === participant.participantId;
+                    const isWithdrawing =
+                      withdrawingParticipantId === participant.participantId;
+                    const isReinstating =
+                      reinstatingParticipantId === participant.participantId;
+                    const isReinstateFlowOpen =
+                      reinstateFlowParticipantId === participant.participantId;
                     const archiveDisabled =
                       !canArchiveParticipant(participant) ||
                       project.projectStatus !== "active" ||
                       participantActionState === "saving" ||
-                      isArchiving;
+                      isArchiving ||
+                      isWithdrawing ||
+                      isReinstating ||
+                      isReinstateFlowOpen;
 
                     if (isEditing && participantEditForm) {
                       const permissions = getParticipantEditPermissions(participant);
@@ -1610,7 +1808,18 @@ export default function AdvisorProjectDashboardClient({
                     const editDisabled =
                       isArchivedParticipant(participant) ||
                       project.projectStatus !== "active" ||
-                      isArchiving;
+                      isArchiving ||
+                      isWithdrawing ||
+                      isReinstating ||
+                      isReinstateFlowOpen;
+
+                    const withdrawForm =
+                      withdrawFormByParticipantId[participant.participantId] ??
+                      getInitialWithdrawFormState();
+
+                    const reinstateForm =
+                      reinstateFormByParticipantId[participant.participantId] ??
+                      getInitialReinstateFormState();
 
                     return (
                       <ParticipantCard
@@ -1622,10 +1831,42 @@ export default function AdvisorProjectDashboardClient({
                         isExtending={isExtending}
                         extendDisabled={extendDisabled}
                         isArchiving={isArchiving}
+                        isWithdrawing={isWithdrawing}
+                        isReinstating={isReinstating}
+                        isReinstateFlowOpen={isReinstateFlowOpen}
                         archiveDisabled={archiveDisabled}
                         editDisabled={editDisabled}
+                        withdrawForm={withdrawForm}
+                        reinstateForm={reinstateForm}
                         onEdit={() => beginParticipantEdit(participant)}
-                        onArchive={() => void archiveParticipant(participant.participantId)}
+                        onArchive={() => beginParticipantWithdraw(participant.participantId)}
+                        onCancelArchive={() =>
+                          cancelParticipantWithdraw(participant.participantId)
+                        }
+                        onWithdrawFormChange={(nextForm) =>
+                          setWithdrawFormByParticipantId((current) => ({
+                            ...current,
+                            [participant.participantId]: nextForm,
+                          }))
+                        }
+                        onConfirmArchive={() =>
+                          void archiveParticipant(participant.participantId)
+                        }
+                        onBeginReinstate={() =>
+                          beginParticipantReinstate(participant.participantId)
+                        }
+                        onCancelReinstate={() =>
+                          cancelParticipantReinstate(participant.participantId)
+                        }
+                        onReinstateFormChange={(nextForm) =>
+                          setReinstateFormByParticipantId((current) => ({
+                            ...current,
+                            [participant.participantId]: nextForm,
+                          }))
+                        }
+                        onConfirmReinstate={() =>
+                          void reinstateParticipant(participant.participantId)
+                        }
                         onExtendDaysChange={(days) =>
                           setExtendDaysByParticipantId((current) => ({
                             ...current,
@@ -1973,10 +2214,22 @@ function ParticipantCard({
   isExtending,
   extendDisabled,
   isArchiving,
+  isWithdrawing,
+  isReinstating,
+  isReinstateFlowOpen,
   archiveDisabled,
   editDisabled,
+  withdrawForm,
+  reinstateForm,
   onEdit,
   onArchive,
+  onCancelArchive,
+  onWithdrawFormChange,
+  onConfirmArchive,
+  onBeginReinstate,
+  onCancelReinstate,
+  onReinstateFormChange,
+  onConfirmReinstate,
   onExtendDaysChange,
   onExtendInvite,
 }: {
@@ -1987,10 +2240,22 @@ function ParticipantCard({
   isExtending: boolean;
   extendDisabled: boolean;
   isArchiving: boolean;
+  isWithdrawing: boolean;
+  isReinstating: boolean;
+  isReinstateFlowOpen: boolean;
   archiveDisabled: boolean;
   editDisabled: boolean;
+  withdrawForm: WithdrawFormState;
+  reinstateForm: ReinstateFormState;
   onEdit: () => void;
   onArchive: () => void;
+  onCancelArchive: () => void;
+  onWithdrawFormChange: (nextForm: WithdrawFormState) => void;
+  onConfirmArchive: () => void;
+  onBeginReinstate: () => void;
+  onCancelReinstate: () => void;
+  onReinstateFormChange: (nextForm: ReinstateFormState) => void;
+  onConfirmReinstate: () => void;
   onExtendDaysChange: (days: number) => void;
   onExtendInvite: () => void;
 }) {
@@ -2054,13 +2319,13 @@ function ParticipantCard({
 
           {isArchivedParticipant(participant) ? (
             <p className="mt-4 text-xs text-slate-500">
-              This participant has been withdrawn. Editing is disabled until a
-              reinstate flow is added.
+              This participant has been withdrawn. Editing is disabled until the
+              participant is reinstated.
             </p>
           ) : null}
         </div>
 
-        <div className="w-full xl:w-[260px]">
+        <div className="w-full xl:w-[300px]">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Actions
@@ -2076,19 +2341,190 @@ function ParticipantCard({
                 Edit participant
               </button>
 
-              <button
-                type="button"
-                onClick={onArchive}
-                disabled={archiveDisabled}
-                className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isArchiving ? "Withdrawing..." : "Withdraw participant"}
-              </button>
+              {isArchivedParticipant(participant) ? (
+                isReinstateFlowOpen ? (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                    <p className="text-sm font-semibold text-sky-900">
+                      Reinstate participant
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-sky-800">
+                      This will return the participant to active collection and
+                      include them in analysis again.
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-sky-900">
+                          Reason
+                        </span>
+                        <select
+                          value={reinstateForm.reason}
+                          onChange={(event) =>
+                            onReinstateFormChange({
+                              ...reinstateForm,
+                              reason: event.target.value as ReinstateReason | "",
+                            })
+                          }
+                          disabled={isReinstating}
+                          className="h-10 w-full rounded-xl border border-sky-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">Select reason</option>
+                          {REINSTATE_REASON_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-sky-900">
+                          Note (optional)
+                        </span>
+                        <textarea
+                          value={reinstateForm.note}
+                          onChange={(event) =>
+                            onReinstateFormChange({
+                              ...reinstateForm,
+                              note: event.target.value,
+                            })
+                          }
+                          disabled={isReinstating}
+                          rows={3}
+                          className="w-full rounded-xl border border-sky-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          placeholder="Add any useful context for future review"
+                        />
+                      </label>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={onConfirmReinstate}
+                          disabled={isReinstating || !reinstateForm.reason}
+                          className="rounded-xl border border-sky-300 bg-sky-100 px-4 py-2.5 text-sm font-medium text-sky-900 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isReinstating ? "Reinstating..." : "Confirm reinstate"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={onCancelReinstate}
+                          disabled={isReinstating}
+                          className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onBeginReinstate}
+                    disabled={
+                      projectStatus !== "active" || isReinstating || isWithdrawing
+                    }
+                    className="rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-medium text-sky-800 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Reinstate participant
+                  </button>
+                )
+              ) : isWithdrawing ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Withdraw participant
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-amber-800">
+                    This will remove the participant from active collection and
+                    exclude them from analysis while preserving the audit trail.
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
+                        Reason
+                      </span>
+                      <select
+                        value={withdrawForm.reason}
+                        onChange={(event) =>
+                          onWithdrawFormChange({
+                            ...withdrawForm,
+                            reason: event.target.value as WithdrawReason | "",
+                          })
+                        }
+                        disabled={isArchiving}
+                        className="h-10 w-full rounded-xl border border-amber-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">Select reason</option>
+                        {WITHDRAW_REASON_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
+                        Note (optional)
+                      </span>
+                      <textarea
+                        value={withdrawForm.note}
+                        onChange={(event) =>
+                          onWithdrawFormChange({
+                            ...withdrawForm,
+                            note: event.target.value,
+                          })
+                        }
+                        disabled={isArchiving}
+                        rows={3}
+                        className="w-full rounded-xl border border-amber-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        placeholder="Add any useful context for future review"
+                      />
+                    </label>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={onConfirmArchive}
+                        disabled={isArchiving || !withdrawForm.reason}
+                        className="rounded-xl border border-amber-300 bg-amber-100 px-4 py-2.5 text-sm font-medium text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isArchiving ? "Withdrawing..." : "Confirm withdrawal"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={onCancelArchive}
+                        disabled={isArchiving}
+                        className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onArchive}
+                  disabled={archiveDisabled}
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Withdraw participant
+                </button>
+              )}
 
               <select
                 value={selectedDays}
                 onChange={(event) => onExtendDaysChange(Number(event.target.value))}
-                disabled={extendDisabled || isExtending}
+                disabled={
+                  extendDisabled ||
+                  isExtending ||
+                  isWithdrawing ||
+                  isReinstating ||
+                  isReinstateFlowOpen
+                }
                 className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {EXTEND_OPTIONS.map((days) => (
@@ -2101,7 +2537,13 @@ function ParticipantCard({
               <button
                 type="button"
                 onClick={onExtendInvite}
-                disabled={extendDisabled || isExtending}
+                disabled={
+                  extendDisabled ||
+                  isExtending ||
+                  isWithdrawing ||
+                  isReinstating ||
+                  isReinstateFlowOpen
+                }
                 className="brand-button-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isExtending ? "Extending..." : "Extend invite"}
