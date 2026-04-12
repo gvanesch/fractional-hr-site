@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { loadDiagnosticState } from "@/lib/diagnostic-storage"
+import { loadDiagnosticState } from "@/lib/diagnostic-storage";
 import type { DiagnosticAnswers } from "@/lib/diagnostic";
 
 type ContactFormState = {
@@ -42,6 +42,7 @@ type HealthCheckDraftState = {
 };
 
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
+const HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY = "health-check-submission-id";
 
 const enquiryTopics = [
   "General Enquiry",
@@ -107,6 +108,7 @@ export default function ContactPageClient() {
   const sourceParam = searchParams.get("source");
   const scoreParam = searchParams.get("score");
   const bandParam = searchParams.get("band");
+  const submissionIdParam = searchParams.get("submissionId");
 
   const forcedTopic = useMemo(
     () => normaliseTopic(topicParam, sourceParam),
@@ -131,6 +133,7 @@ export default function ContactPageClient() {
   const [draftState, setDraftState] = useState<HealthCheckDraftState | null>(
     null,
   );
+  const [storedSubmissionId, setStoredSubmissionId] = useState("");
 
   useEffect(() => {
     try {
@@ -156,6 +159,15 @@ export default function ContactPageClient() {
       console.error("Failed to load health check draft for contact form:", error);
       setDraftState(null);
     }
+
+    try {
+      const storedId =
+        window.localStorage.getItem(HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY) ?? "";
+      setStoredSubmissionId(storedId);
+    } catch (error) {
+      console.error("Failed to load stored health check submission id:", error);
+      setStoredSubmissionId("");
+    }
   }, []);
 
   useEffect(() => {
@@ -164,6 +176,18 @@ export default function ContactPageClient() {
       topic: forcedTopic,
     }));
   }, [forcedTopic]);
+
+  const effectiveSubmissionId = useMemo(() => {
+    if (submissionIdParam && submissionIdParam.trim()) {
+      return submissionIdParam.trim();
+    }
+
+    if (storedSubmissionId && storedSubmissionId.trim()) {
+      return storedSubmissionId.trim();
+    }
+
+    return "";
+  }, [submissionIdParam, storedSubmissionId]);
 
   const displayScore =
     diagnosticState?.result?.score ?? (scoreParam ? Number(scoreParam) : null);
@@ -210,6 +234,7 @@ export default function ContactPageClient() {
           ...formState,
           topic: effectiveTopic,
           source: sourceParam ?? "contact-page",
+          submissionId: effectiveSubmissionId || undefined,
           diagnosticAnswers: effectiveDiagnosticAnswers,
           companySize: effectiveCompanySize,
           industry: effectiveIndustry,
@@ -405,7 +430,6 @@ export default function ContactPageClient() {
 • what would be most useful to get from the conversation`}
                     required
                   />
-                  
                 </div>
 
                 {submitState === "error" && (

@@ -12,6 +12,8 @@ type AdvisoryNarrative = {
   diagnosticClarifies: string[];
 };
 
+const HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY = "health-check-submission-id";
+
 function formatLabelList(labels: string[]): string {
   if (labels.length === 0) {
     return "";
@@ -265,15 +267,21 @@ function buildAdvisoryNarrative(params: {
 export default function DiagnosticInterpretationPage() {
   const [diagnosticState, setDiagnosticState] =
     useState<SavedDiagnosticState | null>(null);
+  const [healthCheckSubmissionId, setHealthCheckSubmissionId] = useState("");
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     try {
       const savedState = loadDiagnosticState();
       setDiagnosticState(savedState);
+
+      const storedSubmissionId =
+        window.localStorage.getItem(HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY) ?? "";
+      setHealthCheckSubmissionId(storedSubmissionId);
     } catch (error) {
       console.error("Failed to load diagnostic interpretation state:", error);
       setDiagnosticState(null);
+      setHealthCheckSubmissionId("");
     } finally {
       setHasLoaded(true);
     }
@@ -294,11 +302,23 @@ export default function DiagnosticInterpretationPage() {
     });
   }, [result, lowestDimensions]);
 
-  const contactHref = result
-    ? `/contact?topic=HR%20Health%20Check%20Interpretation&source=diagnostic-interpretation&score=${result.score}&band=${encodeURIComponent(
-        result.band.label,
-      )}`
-    : "/contact?topic=HR%20Health%20Check%20Interpretation&source=diagnostic-interpretation";
+  const contactHref = useMemo(() => {
+    const params = new URLSearchParams();
+
+    params.set("topic", "HR Health Check Interpretation");
+    params.set("source", "diagnostic-interpretation");
+
+    if (result) {
+      params.set("score", String(result.score));
+      params.set("band", result.band.label);
+    }
+
+    if (healthCheckSubmissionId) {
+      params.set("submissionId", healthCheckSubmissionId);
+    }
+
+    return `/contact?${params.toString()}`;
+  }, [result, healthCheckSubmissionId]);
 
   return (
     <>

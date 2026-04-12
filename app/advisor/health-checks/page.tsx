@@ -14,13 +14,16 @@ export const metadata = {
 
 type SearchParams = Promise<{
   q?: string;
-  from?: string;
-  to?: string;
+  completedFrom?: string;
+  completedTo?: string;
+  enquiryFrom?: string;
+  enquiryTo?: string;
   industry?: string;
   role?: string;
   companySize?: string;
   band?: string;
   source?: string;
+  status?: string;
   sort?: string;
 }>;
 
@@ -30,8 +33,13 @@ type AdvisorHealthChecksPageProps = {
 
 type HealthCheckRow = {
   submission_id: string;
-  contact_name: string;
-  contact_email: string;
+  completed_at: string | null;
+  contact_submitted_at: string | null;
+  submission_source: string | null;
+  completion_version: string | null;
+  email: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
   contact_company: string | null;
   contact_topic: string | null;
   contact_source: string | null;
@@ -41,20 +49,22 @@ type HealthCheckRow = {
   country_region: string | null;
   score: number | null;
   band: string | null;
-  contact_submitted_at: string | null;
   advisor_brief: unknown | null;
   contact_message: string | null;
 };
 
 type HealthCheckFilters = {
   q: string;
-  from: string;
-  to: string;
+  completedFrom: string;
+  completedTo: string;
+  enquiryFrom: string;
+  enquiryTo: string;
   industry: string;
   role: string;
   companySize: string;
   band: string;
   source: string;
+  status: string;
   sort: string;
 };
 
@@ -66,7 +76,7 @@ type FilterOptions = {
   sources: string[];
 };
 
-const DEFAULT_SORT = "submitted_desc";
+const DEFAULT_SORT = "completed_desc";
 
 function normaliseFilter(value: string | undefined): string {
   return value?.trim() ?? "";
@@ -75,18 +85,21 @@ function normaliseFilter(value: string | undefined): string {
 function getFilters(searchParams: Awaited<SearchParams>): HealthCheckFilters {
   return {
     q: normaliseFilter(searchParams.q),
-    from: normaliseFilter(searchParams.from),
-    to: normaliseFilter(searchParams.to),
+    completedFrom: normaliseFilter(searchParams.completedFrom),
+    completedTo: normaliseFilter(searchParams.completedTo),
+    enquiryFrom: normaliseFilter(searchParams.enquiryFrom),
+    enquiryTo: normaliseFilter(searchParams.enquiryTo),
     industry: normaliseFilter(searchParams.industry),
     role: normaliseFilter(searchParams.role),
     companySize: normaliseFilter(searchParams.companySize),
     band: normaliseFilter(searchParams.band),
     source: normaliseFilter(searchParams.source),
+    status: normaliseFilter(searchParams.status),
     sort: normaliseFilter(searchParams.sort) || DEFAULT_SORT,
   };
 }
 
-function formatSubmittedAt(value: string | null): string {
+function formatTimestamp(value: string | null): string {
   if (!value) {
     return "Not available";
   }
@@ -102,14 +115,10 @@ function formatSubmittedAt(value: string | null): string {
 }
 
 function formatDateForInput(value: string): string {
-  if (!value) {
-    return "";
-  }
-
-  return value;
+  return value || "";
 }
 
-function getDateRange(filters: HealthCheckFilters): {
+function getDateRange(from: string, to: string): {
   fromIso?: string;
   toIsoExclusive?: string;
 } {
@@ -118,12 +127,12 @@ function getDateRange(filters: HealthCheckFilters): {
     toIsoExclusive?: string;
   } = {};
 
-  if (filters.from) {
-    result.fromIso = `${filters.from}T00:00:00.000Z`;
+  if (from) {
+    result.fromIso = `${from}T00:00:00.000Z`;
   }
 
-  if (filters.to) {
-    const toDate = new Date(`${filters.to}T00:00:00.000Z`);
+  if (to) {
+    const toDate = new Date(`${to}T00:00:00.000Z`);
 
     if (!Number.isNaN(toDate.getTime())) {
       toDate.setUTCDate(toDate.getUTCDate() + 1);
@@ -135,11 +144,20 @@ function getDateRange(filters: HealthCheckFilters): {
 }
 
 function buildSort(sort: string): {
-  column: "contact_submitted_at" | "score" | "contact_name";
+  column:
+    | "completed_at"
+    | "contact_submitted_at"
+    | "score"
+    | "contact_name"
+    | "email";
   ascending: boolean;
 } {
   switch (sort) {
-    case "submitted_asc":
+    case "completed_asc":
+      return { column: "completed_at", ascending: true };
+    case "enquiry_desc":
+      return { column: "contact_submitted_at", ascending: false };
+    case "enquiry_asc":
       return { column: "contact_submitted_at", ascending: true };
     case "score_desc":
       return { column: "score", ascending: false };
@@ -149,10 +167,22 @@ function buildSort(sort: string): {
       return { column: "contact_name", ascending: true };
     case "name_desc":
       return { column: "contact_name", ascending: false };
-    case "submitted_desc":
+    case "email_asc":
+      return { column: "email", ascending: true };
+    case "completed_desc":
     default:
-      return { column: "contact_submitted_at", ascending: false };
+      return { column: "completed_at", ascending: false };
   }
+}
+
+function uniqueSorted(values: Array<string | null | undefined>): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ).sort((a, b) => a.localeCompare(b, "en-GB"));
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
@@ -166,11 +196,12 @@ async function getFilterOptions(): Promise<FilterOptions> {
         role,
         company_size,
         band,
-        contact_source
+        contact_source,
+        submission_source
       `,
     )
-    .not("contact_submitted_at", "is", null)
-    .limit(1000);
+    .or("completed_at.not.is.null,contact_submitted_at.not.is.null")
+    .limit(2000);
 
   if (error) {
     throw new Error(
@@ -184,44 +215,17 @@ async function getFilterOptions(): Promise<FilterOptions> {
     company_size: string | null;
     band: string | null;
     contact_source: string | null;
+    submission_source: string | null;
   }>;
 
   return {
-    industries: Array.from(
-      new Set(
-        rows
-          .map((row) => row.industry?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "en-GB")),
-    roles: Array.from(
-      new Set(
-        rows
-          .map((row) => row.role?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "en-GB")),
-    companySizes: Array.from(
-      new Set(
-        rows
-          .map((row) => row.company_size?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "en-GB")),
-    bands: Array.from(
-      new Set(
-        rows
-          .map((row) => row.band?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "en-GB")),
-    sources: Array.from(
-      new Set(
-        rows
-          .map((row) => row.contact_source?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "en-GB")),
+    industries: uniqueSorted(rows.map((row) => row.industry)),
+    roles: uniqueSorted(rows.map((row) => row.role)),
+    companySizes: uniqueSorted(rows.map((row) => row.company_size)),
+    bands: uniqueSorted(rows.map((row) => row.band)),
+    sources: uniqueSorted(
+      rows.flatMap((row) => [row.contact_source, row.submission_source]),
+    ),
   };
 }
 
@@ -230,13 +234,22 @@ async function getHealthChecks(
 ): Promise<HealthCheckRow[]> {
   const supabase = createSupabaseAdminClient();
   const sort = buildSort(filters.sort);
-  const dateRange = getDateRange(filters);
+  const completedRange = getDateRange(
+    filters.completedFrom,
+    filters.completedTo,
+  );
+  const enquiryRange = getDateRange(filters.enquiryFrom, filters.enquiryTo);
 
   let query = supabase
     .from("diagnostic_submissions")
     .select(
       `
         submission_id,
+        completed_at,
+        contact_submitted_at,
+        submission_source,
+        completion_version,
+        email,
         contact_name,
         contact_email,
         contact_company,
@@ -248,17 +261,16 @@ async function getHealthChecks(
         country_region,
         score,
         band,
-        contact_submitted_at,
         advisor_brief,
         contact_message
       `,
     )
-    .not("contact_submitted_at", "is", null);
+    .not("completed_at", "is", null);
 
   if (filters.q) {
     const safeQuery = filters.q.replace(/,/g, " ");
     query = query.or(
-      `contact_name.ilike.%${safeQuery}%,contact_email.ilike.%${safeQuery}%,contact_company.ilike.%${safeQuery}%`,
+      `contact_name.ilike.%${safeQuery}%,contact_email.ilike.%${safeQuery}%,contact_company.ilike.%${safeQuery}%,email.ilike.%${safeQuery}%`,
     );
   }
 
@@ -279,15 +291,36 @@ async function getHealthChecks(
   }
 
   if (filters.source) {
-    query = query.eq("contact_source", filters.source);
+    query = query.or(
+      `contact_source.eq.${filters.source},submission_source.eq.${filters.source}`,
+    );
   }
 
-  if (dateRange.fromIso) {
-    query = query.gte("contact_submitted_at", dateRange.fromIso);
+  if (completedRange.fromIso) {
+    query = query.gte("completed_at", completedRange.fromIso);
   }
 
-  if (dateRange.toIsoExclusive) {
-    query = query.lt("contact_submitted_at", dateRange.toIsoExclusive);
+  if (completedRange.toIsoExclusive) {
+    query = query.lt("completed_at", completedRange.toIsoExclusive);
+  }
+
+  if (enquiryRange.fromIso) {
+    query = query.gte("contact_submitted_at", enquiryRange.fromIso);
+  }
+
+  if (enquiryRange.toIsoExclusive) {
+    query = query.lt("contact_submitted_at", enquiryRange.toIsoExclusive);
+  }
+
+  switch (filters.status) {
+    case "completion_only":
+      query = query.is("contact_submitted_at", null);
+      break;
+    case "contact_request":
+      query = query.not("contact_submitted_at", "is", null);
+      break;
+    default:
+      break;
   }
 
   const { data, error } = await query
@@ -303,10 +336,7 @@ async function getHealthChecks(
 
 function getSummaryStats(rows: HealthCheckRow[]) {
   const withScore = rows.filter((row) => typeof row.score === "number");
-  const withAdvisorBrief = rows.filter((row) => Boolean(row.advisor_brief));
-  const withMessage = rows.filter(
-    (row) => Boolean(row.contact_message && row.contact_message.trim()),
-  );
+  const withEnquiry = rows.filter((row) => Boolean(row.contact_submitted_at));
 
   const averageScore =
     withScore.length > 0
@@ -319,8 +349,8 @@ function getSummaryStats(rows: HealthCheckRow[]) {
   return {
     total: rows.length,
     averageScore,
-    withAdvisorBrief: withAdvisorBrief.length,
-    withMessage: withMessage.length,
+    withEnquiry: withEnquiry.length,
+    completionOnly: rows.length - withEnquiry.length,
   };
 }
 
@@ -346,14 +376,14 @@ function badgeClasses(band: string | null): string {
   return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
-function signalBadgeClasses(kind: "message" | "brief" | "topic"): string {
+function signalBadgeClasses(kind: "completed" | "enquiry" | "topic"): string {
   switch (kind) {
-    case "message":
-      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200";
-    case "brief":
-      return "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200";
-    case "topic":
+    case "completed":
       return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
+    case "enquiry":
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    case "topic":
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200";
   }
 }
 
@@ -364,23 +394,30 @@ function cellValue(value: string | null): string {
 function hasActiveFilters(filters: HealthCheckFilters): boolean {
   return Boolean(
     filters.q ||
-      filters.from ||
-      filters.to ||
+      filters.completedFrom ||
+      filters.completedTo ||
+      filters.enquiryFrom ||
+      filters.enquiryTo ||
       filters.industry ||
       filters.role ||
       filters.companySize ||
       filters.band ||
       filters.source ||
+      filters.status ||
       (filters.sort && filters.sort !== DEFAULT_SORT),
   );
 }
 
-function hasMessage(value: string | null): boolean {
+function hasTopic(value: string | null): boolean {
   return Boolean(value && value.trim());
 }
 
-function hasTopic(value: string | null): boolean {
-  return Boolean(value && value.trim());
+function getPrimaryEmail(row: HealthCheckRow): string {
+  return row.contact_email || row.email || "Not provided";
+}
+
+function getPrimaryName(row: HealthCheckRow): string {
+  return row.contact_name || "No enquiry yet";
 }
 
 export default async function AdvisorHealthChecksPage({
@@ -411,10 +448,10 @@ export default async function AdvisorHealthChecksPage({
               Health Check repository
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Browse, filter, and review HR Health Check enquiries from one
-              advisor workspace. Use this view to triage recent follow-up
-              interest, identify patterns, and open the full advisor detail when
-              needed.
+              Browse, filter, and review all HR Health Check completions and
+              linked contact requests from one advisor workspace. Use this view
+              to see which submissions remain as completion only and which have
+              moved into conversation.
             </p>
           </div>
 
@@ -425,9 +462,23 @@ export default async function AdvisorHealthChecksPage({
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Results</p>
+            <p className="text-sm font-medium text-slate-500">Completions</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.total}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Contact requests</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {stats.withEnquiry}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Completion only</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {stats.completionOnly}
             </p>
           </div>
 
@@ -435,22 +486,6 @@ export default async function AdvisorHealthChecksPage({
             <p className="text-sm font-medium text-slate-500">Average score</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.averageScore ?? "N/A"}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              With advisor brief
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {stats.withAdvisorBrief}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">With message</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {stats.withMessage}
             </p>
           </div>
         </section>
@@ -477,34 +512,87 @@ export default async function AdvisorHealthChecksPage({
 
               <div>
                 <label
-                  htmlFor="from"
+                  htmlFor="completedFrom"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Enquiry from
+                  Completed from
                 </label>
                 <input
-                  id="from"
-                  name="from"
+                  id="completedFrom"
+                  name="completedFrom"
                   type="date"
-                  defaultValue={formatDateForInput(filters.from)}
+                  defaultValue={formatDateForInput(filters.completedFrom)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
                 />
               </div>
 
               <div>
                 <label
-                  htmlFor="to"
+                  htmlFor="completedTo"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Enquiry to
+                  Completed to
                 </label>
                 <input
-                  id="to"
-                  name="to"
+                  id="completedTo"
+                  name="completedTo"
                   type="date"
-                  defaultValue={formatDateForInput(filters.to)}
+                  defaultValue={formatDateForInput(filters.completedTo)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
                 />
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[180px_180px_minmax(0,1fr)]">
+              <div>
+                <label
+                  htmlFor="enquiryFrom"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Contact request from
+                </label>
+                <input
+                  id="enquiryFrom"
+                  name="enquiryFrom"
+                  type="date"
+                  defaultValue={formatDateForInput(filters.enquiryFrom)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="enquiryTo"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Contact request to
+                </label>
+                <input
+                  id="enquiryTo"
+                  name="enquiryTo"
+                  type="date"
+                  defaultValue={formatDateForInput(filters.enquiryTo)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="status"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Lifecycle status
+                </label>
+                <select
+                  id="status"
+                  name="status"
+                  defaultValue={filters.status}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                >
+                  <option value="">All records</option>
+                  <option value="completion_only">Health Check completion only</option>
+                  <option value="contact_request">Contact request</option>
+                </select>
               </div>
             </div>
 
@@ -623,8 +711,8 @@ export default async function AdvisorHealthChecksPage({
             <div className="flex flex-col gap-4 border-t border-slate-200 pt-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="text-sm text-slate-500">
                 {hasActiveFilters(filters)
-                  ? "Filters applied to Health Check enquiries."
-                  : "Showing all recent Health Check enquiries."}
+                  ? "Filters applied to Health Check records."
+                  : "Showing all recent Health Check completions and linked contact requests."}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -641,12 +729,15 @@ export default async function AdvisorHealthChecksPage({
                     defaultValue={filters.sort}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
                   >
-                    <option value="submitted_desc">Most recent</option>
-                    <option value="submitted_asc">Oldest first</option>
+                    <option value="completed_desc">Latest completion</option>
+                    <option value="completed_asc">Oldest completion</option>
+                    <option value="enquiry_desc">Latest contact request</option>
+                    <option value="enquiry_asc">Oldest contact request</option>
                     <option value="score_desc">Highest score</option>
                     <option value="score_asc">Lowest score</option>
                     <option value="name_asc">Name A to Z</option>
                     <option value="name_desc">Name Z to A</option>
+                    <option value="email_asc">Email A to Z</option>
                   </select>
                 </div>
 
@@ -673,11 +764,11 @@ export default async function AdvisorHealthChecksPage({
           {healthChecks.length === 0 ? (
             <div className="p-8">
               <h2 className="text-lg font-semibold text-slate-900">
-                No matching Health Check enquiries found
+                No matching Health Check records found
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Try widening the enquiry date range or removing one or more
-                filters to see more records.
+                Try widening the completion or contact request date range, or
+                removing one or more filters to see more records.
               </p>
             </div>
           ) : (
@@ -687,7 +778,10 @@ export default async function AdvisorHealthChecksPage({
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Enquiry submitted
+                        Health Check completed
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        Contact request submitted
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                         Contact
@@ -699,7 +793,7 @@ export default async function AdvisorHealthChecksPage({
                         Diagnostic
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Signals
+                        Lifecycle / signals
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                         Action
@@ -711,14 +805,20 @@ export default async function AdvisorHealthChecksPage({
                     {healthChecks.map((submission) => (
                       <tr key={submission.submission_id} className="align-top">
                         <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
-                          {formatSubmittedAt(submission.contact_submitted_at)}
+                          {formatTimestamp(submission.completed_at)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
+                          {submission.contact_submitted_at
+                            ? formatTimestamp(submission.contact_submitted_at)
+                            : "No contact request yet"}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-700">
                           <div className="font-medium text-slate-900">
-                            {submission.contact_name}
+                            {getPrimaryName(submission)}
                           </div>
-                          <div className="mt-1">{submission.contact_email}</div>
+                          <div className="mt-1">{getPrimaryEmail(submission)}</div>
                           <div className="mt-1 text-xs text-slate-500">
                             {cellValue(submission.role)} ·{" "}
                             {cellValue(submission.country_region)}
@@ -751,7 +851,11 @@ export default async function AdvisorHealthChecksPage({
                             </span>
                           </div>
                           <div className="mt-2 text-xs text-slate-500">
-                            Source: {submission.contact_source || "website"}
+                            Submission source:{" "}
+                            {submission.submission_source || "Not available"}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Contact source: {submission.contact_source || "None"}
                           </div>
                           {hasTopic(submission.contact_topic) ? (
                             <div className="mt-1 text-xs text-slate-500">
@@ -762,23 +866,21 @@ export default async function AdvisorHealthChecksPage({
 
                         <td className="px-4 py-4 text-sm">
                           <div className="flex flex-wrap gap-2">
-                            {hasMessage(submission.contact_message) ? (
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
-                                  "message",
-                                )}`}
-                              >
-                                Message
-                              </span>
-                            ) : null}
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
+                                "completed",
+                              )}`}
+                            >
+                              Completed
+                            </span>
 
-                            {submission.advisor_brief ? (
+                            {submission.contact_submitted_at ? (
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
-                                  "brief",
+                                  "enquiry",
                                 )}`}
                               >
-                                Brief
+                                Contact request
                               </span>
                             ) : null}
 
@@ -789,14 +891,6 @@ export default async function AdvisorHealthChecksPage({
                                 )}`}
                               >
                                 Topic
-                              </span>
-                            ) : null}
-
-                            {!hasMessage(submission.contact_message) &&
-                            !submission.advisor_brief &&
-                            !hasTopic(submission.contact_topic) ? (
-                              <span className="text-xs text-slate-400">
-                                No additional signals
                               </span>
                             ) : null}
                           </div>
@@ -825,13 +919,13 @@ export default async function AdvisorHealthChecksPage({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-sm text-slate-500">
-                          {formatSubmittedAt(submission.contact_submitted_at)}
+                          Completed: {formatTimestamp(submission.completed_at)}
                         </p>
                         <h2 className="mt-1 text-base font-semibold text-slate-900">
-                          {submission.contact_name}
+                          {getPrimaryName(submission)}
                         </h2>
                         <p className="mt-1 text-sm text-slate-700">
-                          {submission.contact_email}
+                          {getPrimaryEmail(submission)}
                         </p>
                       </div>
 
@@ -856,6 +950,12 @@ export default async function AdvisorHealthChecksPage({
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
                           {cellValue(submission.country_region)}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Contact request:{" "}
+                          {submission.contact_submitted_at
+                            ? formatTimestamp(submission.contact_submitted_at)
+                            : "No contact request yet"}
                         </p>
                       </div>
 
@@ -882,7 +982,11 @@ export default async function AdvisorHealthChecksPage({
                           Score: {submission.score ?? "N/A"}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
-                          Source: {submission.contact_source || "website"}
+                          Submission source:{" "}
+                          {submission.submission_source || "Not available"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Contact source: {submission.contact_source || "None"}
                         </p>
                         {hasTopic(submission.contact_topic) ? (
                           <p className="mt-1 text-sm text-slate-500">
@@ -893,26 +997,24 @@ export default async function AdvisorHealthChecksPage({
 
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Signals
+                          Lifecycle / signals
                         </p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {hasMessage(submission.contact_message) ? (
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
-                                "message",
-                              )}`}
-                            >
-                              Message
-                            </span>
-                          ) : null}
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
+                              "completed",
+                            )}`}
+                          >
+                            Completed
+                          </span>
 
-                          {submission.advisor_brief ? (
+                          {submission.contact_submitted_at ? (
                             <span
                               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
-                                "brief",
+                                "enquiry",
                               )}`}
                             >
-                              Brief
+                              Contact request
                             </span>
                           ) : null}
 
@@ -923,14 +1025,6 @@ export default async function AdvisorHealthChecksPage({
                               )}`}
                             >
                               Topic
-                            </span>
-                          ) : null}
-
-                          {!hasMessage(submission.contact_message) &&
-                          !submission.advisor_brief &&
-                          !hasTopic(submission.contact_topic) ? (
-                            <span className="text-xs text-slate-400">
-                              No additional signals
                             </span>
                           ) : null}
                         </div>

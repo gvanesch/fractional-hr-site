@@ -31,6 +31,7 @@ type DiagnosticDraftState = {
 };
 
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
+const HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY = "health-check-submission-id";
 
 const scaleOptions: { label: string; value: AnswerValue }[] = [
   { label: "Strongly disagree", value: 1 },
@@ -303,13 +304,24 @@ export default function DiagnosticPage() {
     });
 
     const payload = (await response.json().catch(() => null)) as
-      | { error?: string }
+      | { submissionId?: string; error?: string }
       | null;
 
     if (!response.ok) {
       throw new Error(
         payload?.error || "Failed to send diagnostic completion email.",
       );
+    }
+
+    if (payload?.submissionId) {
+      try {
+        window.localStorage.setItem(
+          HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY,
+          payload.submissionId,
+        );
+      } catch (error) {
+        console.error("Failed to persist health check submission id:", error);
+      }
     }
 
     setCompletionEmailStatus("sent");
@@ -381,6 +393,7 @@ export default function DiagnosticPage() {
 
     try {
       window.localStorage.removeItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
+      window.localStorage.removeItem(HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY);
       clearDiagnosticState();
     } catch (error) {
       console.error("Failed to clear diagnostic storage:", error);

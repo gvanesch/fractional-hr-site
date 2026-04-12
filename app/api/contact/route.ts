@@ -7,7 +7,6 @@ import {
   type AdvisorBrief,
 } from "../../../lib/diagnostic";
 
-
 type ContactRequestBody = {
   name: string;
   email: string;
@@ -15,6 +14,7 @@ type ContactRequestBody = {
   topic?: string;
   message: string;
   source?: string;
+  submissionId?: string;
   diagnosticAnswers?: DiagnosticAnswers;
   companySize?: string;
   industry?: string;
@@ -209,6 +209,7 @@ function parseRequestBody(input: unknown): ContactRequestBody {
   }
 
   const website = normaliseOptionalString(raw.website, 200);
+  const submissionId = normaliseOptionalString(raw.submissionId, 120);
 
   return {
     name,
@@ -217,6 +218,7 @@ function parseRequestBody(input: unknown): ContactRequestBody {
     company: normaliseOptionalString(raw.company, MAX_COMPANY_LENGTH),
     topic: normaliseOptionalString(raw.topic, MAX_TOPIC_LENGTH),
     source: normaliseOptionalString(raw.source, MAX_TOPIC_LENGTH) || "website",
+    submissionId,
     companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
     industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
     role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
@@ -247,7 +249,7 @@ async function createLeadSubmission(params: {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  const rowToInsert = {
+  const rowPayload = {
     contact_name: body.name,
     contact_email: body.email,
     contact_company: body.company || null,
@@ -265,29 +267,65 @@ async function createLeadSubmission(params: {
     contact_submitted_at: new Date().toISOString(),
   };
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(rowToInsert),
-  });
+  if (body.submissionId) {
+    const updateResponse = await fetch(
+      `${supabaseUrl}/rest/v1/diagnostic_submissions?submission_id=eq.${encodeURIComponent(
+        body.submissionId,
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(rowPayload),
+      },
+    );
 
-  if (!response.ok) {
-    const errorText = await response.text();
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      throw new Error(`Supabase update failed: ${errorText}`);
+    }
+
+    const updatedData = await updateResponse.json();
+
+    if (!Array.isArray(updatedData) || !updatedData[0]?.submission_id) {
+      throw new Error(
+        "Supabase update succeeded but no submission_id was returned.",
+      );
+    }
+
+    return updatedData[0].submission_id as string;
+  }
+
+  const insertResponse = await fetch(
+    `${supabaseUrl}/rest/v1/diagnostic_submissions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(rowPayload),
+    },
+  );
+
+  if (!insertResponse.ok) {
+    const errorText = await insertResponse.text();
     throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
-  const data = await response.json();
+  const insertedData = await insertResponse.json();
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (!Array.isArray(insertedData) || !insertedData[0]?.submission_id) {
     throw new Error("Supabase insert succeeded but no submission_id returned.");
   }
 
-  return data[0].submission_id as string;
+  return insertedData[0].submission_id as string;
 }
 
 function buildListHtml(items: string[]): string {
@@ -724,7 +762,11 @@ export async function POST(request: Request) {
   try {
     const rawBody = (await request.json()) as unknown;
     const body = parseRequestBody(rawBody);
-
+    console.log("contact api debug", {
+      submissionId: body.submissionId,
+      source: body.source,
+      topic: body.topic,
+    });
     if (isNonEmptyString(body.website)) {
       return jsonResponse({ ok: true }, 200);
     }
