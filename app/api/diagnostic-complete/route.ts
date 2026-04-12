@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import {
   calculatePercentageScore,
   calculateRawScore,
+  getDimensionScores,
   questions,
   scoreToBand,
   type AnswerValue,
 } from "../../../lib/diagnostic";
-
 
 type DiagnosticCompleteRequestBody = {
   answers: Record<number, AnswerValue | undefined>;
@@ -28,12 +28,17 @@ type ResendSendResponse = {
   message?: string;
 };
 
+type DimensionScoreRow = {
+  label: string;
+  score: number;
+};
+
 const MAX_CONTEXT_LENGTH = 120;
 const MAX_EMAIL_LENGTH = 320;
 
 function jsonResponse(
   body: Record<string, unknown>,
-  status = 200
+  status = 200,
 ): NextResponse {
   return NextResponse.json(body, {
     status,
@@ -62,7 +67,7 @@ function isValidEmail(email: string): boolean {
 
 function normaliseOptionalString(
   value: unknown,
-  maxLength: number
+  maxLength: number,
 ): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -92,7 +97,7 @@ function normaliseOptionalEmail(value: unknown): string | undefined {
 }
 
 function normaliseAnswers(
-  value: unknown
+  value: unknown,
 ): Record<number, AnswerValue | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Diagnostic answers are invalid.");
@@ -126,15 +131,15 @@ function normaliseAnswers(
 }
 
 function getAnsweredCount(
-  answers: Record<number, AnswerValue | undefined>
+  answers: Record<number, AnswerValue | undefined>,
 ): number {
   return Object.values(answers).filter(
-    (value): value is AnswerValue => value !== undefined
+    (value): value is AnswerValue => value !== undefined,
   ).length;
 }
 
 function buildAnswersHtml(
-  answers: Record<number, AnswerValue | undefined>
+  answers: Record<number, AnswerValue | undefined>,
 ): string {
   return questions
     .map((question) => {
@@ -255,10 +260,117 @@ function parseRequestBody(input: unknown): DiagnosticCompleteRequestBody {
     role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
     countryRegion: normaliseOptionalString(
       raw.countryRegion,
-      MAX_CONTEXT_LENGTH
+      MAX_CONTEXT_LENGTH,
     ),
     email: normaliseOptionalEmail(raw.email),
     website: normaliseOptionalString(raw.website, 200),
+  };
+}
+
+function buildDimensionScoreColumns(
+  dimensionScores: DimensionScoreRow[],
+): Record<string, number | null> {
+  const scoreMap = new Map(
+    dimensionScores.map((dimension) => [dimension.label, dimension.score]),
+  );
+
+  return {
+    process_clarity_score: scoreMap.get("Process clarity") ?? null,
+    consistency_score: scoreMap.get("Consistency") ?? null,
+    service_access_score: scoreMap.get("Service access") ?? null,
+    ownership_score: scoreMap.get("Ownership") ?? null,
+    onboarding_score: scoreMap.get("Onboarding") ?? null,
+    technology_alignment_score: scoreMap.get("Technology alignment") ?? null,
+    knowledge_self_service_score:
+      scoreMap.get("Knowledge and self-service") ?? null,
+    operational_capacity_score: scoreMap.get("Operational capacity") ?? null,
+    data_handoffs_score: scoreMap.get("Data and handoffs") ?? null,
+    change_resilience_score: scoreMap.get("Change resilience") ?? null,
+  };
+}
+
+async function createCompletionSubmission(params: {
+  answers: Record<number, AnswerValue | undefined>;
+  rawScore: number;
+  score: number;
+  bandLabel: string;
+  companySize?: string;
+  industry?: string;
+  role?: string;
+  countryRegion?: string;
+  email?: string;
+}) {
+  const {
+    answers,
+    rawScore,
+    score,
+    bandLabel,
+    companySize,
+    industry,
+    role,
+    countryRegion,
+    email,
+  } = params;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  const dimensionScores = getDimensionScores(answers);
+  const submissionId = crypto.randomUUID();
+  const completedAt = new Date().toISOString();
+
+  const rowToInsert = {
+    submission_id: submissionId,
+    completed_at: completedAt,
+    submission_source: "health-check",
+    completion_version: "v1",
+    company_size: companySize || null,
+    industry: industry || null,
+    role: role || null,
+    country_region: countryRegion || null,
+    email: email || null,
+    answers,
+    score,
+    band: bandLabel,
+    ...buildDimensionScoreColumns(dimensionScores),
+  };
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(rowToInsert),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase insert failed: ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data) || !data[0]?.submission_id) {
+    throw new Error(
+      "Supabase insert succeeded but no submission_id was returned.",
+    );
+  }
+
+  return {
+    submissionId: data[0].submission_id as string,
+    completedAt,
+    rawScore,
   };
 }
 
@@ -320,7 +432,7 @@ async function sendDiagnosticEmail(params: {
     throw new Error(
       result?.error?.message ||
         result?.message ||
-        `Resend request failed with status ${response.status}`
+        `Resend request failed with status ${response.status}`,
     );
   }
 
@@ -343,13 +455,25 @@ export async function POST(request: Request) {
         {
           error: `All diagnostic questions must be answered. Received ${answeredCount} of ${questions.length}.`,
         },
-        400
+        400,
       );
     }
 
     const rawScore = calculateRawScore(body.answers);
     const score = calculatePercentageScore(rawScore);
     const band = scoreToBand(score);
+
+    const completion = await createCompletionSubmission({
+      answers: body.answers,
+      rawScore,
+      score,
+      bandLabel: band.label,
+      companySize: body.companySize,
+      industry: body.industry,
+      role: body.role,
+      countryRegion: body.countryRegion,
+      email: body.email,
+    });
 
     const resendResponse = await sendDiagnosticEmail({
       score,
@@ -365,6 +489,8 @@ export async function POST(request: Request) {
 
     return jsonResponse({
       ok: true,
+      submissionId: completion.submissionId,
+      completedAt: completion.completedAt,
       score,
       band: band.label,
       resendId: resendResponse.id ?? null,
@@ -383,7 +509,7 @@ export async function POST(request: Request) {
 
     return jsonResponse(
       { error: "Unable to process diagnostic submission at the moment." },
-      500
+      500,
     );
   }
 }
