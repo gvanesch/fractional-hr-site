@@ -8,23 +8,9 @@ export const metadata = {
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { AdvisorBrief } from "../../../lib/diagnostic";
 
 export const dynamic = "force-dynamic";
-
-type AdvisorBrief = {
-  headline?: string;
-  overallAssessment?: string;
-  executiveReadout?: string;
-  recommendedCallAngle?: string;
-  keyThemes?: string[];
-  likelyFrictionPoints?: string[];
-  businessImplications?: string[];
-  likelyOperationalRisks?: string[];
-  whatTypicallyHappensNext?: string[];
-  first30DayPriorities?: string[];
-  discussionPrompts?: string[];
-  suggestedFocusAreas?: string[];
-};
 
 type AdvisorPageProps = {
   params: Promise<{
@@ -199,6 +185,8 @@ export default async function AdvisorSubmissionPage({
   const first30DayPriorities = advisorBrief?.first30DayPriorities ?? [];
   const discussionPrompts = advisorBrief?.discussionPrompts ?? [];
   const suggestedFocusAreas = advisorBrief?.suggestedFocusAreas ?? [];
+  const conversationFlow = advisorBrief?.conversationFlow ?? [];
+  const conversionPositioning = advisorBrief?.conversionPositioning ?? [];
 
   return (
     <main className="min-h-screen bg-[#F4F6FA] px-6 py-16">
@@ -265,30 +253,68 @@ export default async function AdvisorSubmissionPage({
               Call focus
             </h2>
 
-            {advisorBrief.headline ? (
-              <p className="mb-3 text-lg font-semibold text-slate-900">
-                {advisorBrief.headline}
-              </p>
-            ) : null}
+            <div className="space-y-6">
+              {advisorBrief.headline ? (
+                <div>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {advisorBrief.headline}
+                  </p>
+                </div>
+              ) : null}
 
-            {advisorBrief.recommendedCallAngle ? (
-              <p className="mb-5 leading-7 text-slate-700">
-                {advisorBrief.recommendedCallAngle}
-              </p>
-            ) : null}
+              {advisorBrief.recommendedCallAngle ? (
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Recommended call angle
+                  </p>
+                  <p className="leading-7 text-slate-700">
+                    {advisorBrief.recommendedCallAngle}
+                  </p>
+                </div>
+              ) : null}
 
-            {discussionPrompts.length > 0 ? (
-              <div>
-                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  First questions to explore
-                </p>
-                <ul className="list-disc space-y-2 pl-5 text-slate-700">
-                  {discussionPrompts.slice(0, 3).map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+              {advisorBrief.callOpening ? (
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Suggested call opening
+                  </p>
+                  <p className="leading-7 text-slate-700">
+                    {advisorBrief.callOpening}
+                  </p>
+                </div>
+              ) : null}
+
+              {conversationFlow.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Conversation flow
+                  </p>
+                  {renderList(conversationFlow)}
+                </div>
+              ) : null}
+
+              {conversionPositioning.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Positioning into next step
+                  </p>
+                  {renderList(conversionPositioning)}
+                </div>
+              ) : null}
+
+              {discussionPrompts.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    First questions to explore
+                  </p>
+                  <ul className="list-disc space-y-2 pl-5 text-slate-700">
+                    {discussionPrompts.slice(0, 3).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           </section>
         ) : null}
 
@@ -445,6 +471,35 @@ export default async function AdvisorSubmissionPage({
                 <p className="mt-2 leading-7 text-slate-700">
                   {advisorBrief.recommendedCallAngle}
                 </p>
+              </div>
+            ) : null}
+
+            {advisorBrief.callOpening ? (
+              <div className="mb-5">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Suggested call opening
+                </h3>
+                <p className="mt-2 leading-7 text-slate-700">
+                  {advisorBrief.callOpening}
+                </p>
+              </div>
+            ) : null}
+
+            {conversationFlow.length > 0 ? (
+              <div className="mb-5">
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Conversation flow
+                </h3>
+                {renderList(conversationFlow)}
+              </div>
+            ) : null}
+
+            {conversionPositioning.length > 0 ? (
+              <div className="mb-5">
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Positioning into next step
+                </h3>
+                {renderList(conversionPositioning)}
               </div>
             ) : null}
 

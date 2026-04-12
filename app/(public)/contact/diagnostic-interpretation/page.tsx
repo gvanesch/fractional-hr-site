@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { SavedDiagnosticState } from "@/lib/diagnostic"
-import { loadDiagnosticState } from "@/lib/diagnostic-storage"
+import type { SavedDiagnosticState } from "@/lib/diagnostic";
+import { loadDiagnosticState } from "@/lib/diagnostic-storage";
 
 type AdvisoryNarrative = {
   interpretation: string[];
@@ -31,27 +31,27 @@ function formatLabelList(labels: string[]): string {
 function getDimensionTheme(label: string): string {
   switch (label) {
     case "Process clarity":
-      return "core HR processes may not yet be clear enough to support consistent execution";
+      return "core HR processes may benefit from greater clarity to support more consistent execution";
     case "Consistency":
       return "similar people issues may be handled differently across teams or managers";
     case "Service access":
-      return "routes into HR support may be too mixed or informal";
+      return "routes into HR support may be more mixed or informal than intended";
     case "Ownership":
-      return "ownership for decisions, approvals, or escalations may not be explicit enough";
+      return "ownership for decisions, approvals, or escalations may not always be fully explicit in practice";
     case "Onboarding":
       return "onboarding may still depend too heavily on local manager practice";
     case "Technology alignment":
-      return "systems and workflows may not fully match how work actually happens";
+      return "systems and workflows may not yet fully match how work actually happens";
     case "Knowledge and self-service":
-      return "people may still rely too heavily on HR for clarification of routine issues";
+      return "people may still rely more heavily on HR for routine clarification than intended";
     case "Operational capacity":
-      return "the team may be spending too much time reacting to day-to-day demand";
+      return "the team may be spending a high proportion of time responding to day-to-day demand";
     case "Data and handoffs":
-      return "handoffs and transitions may be creating rework, delay, or correction effort";
+      return "handoffs and transitions may be creating avoidable delay or extra effort";
     case "Change resilience":
-      return "the current operating model may be showing strain under growth or change";
+      return "the current operating model may be under more pressure during growth or change than it first appears";
     default:
-      return `${label.toLowerCase()} may be contributing to operational friction`;
+      return `${label.toLowerCase()} may be one of the areas shaping current operational experience`;
   }
 }
 
@@ -59,46 +59,46 @@ function getBandNarrative(bandLabel: string) {
   switch (bandLabel) {
     case "Operationally Chaotic":
     case "Emerging Foundations":
-      return "At this stage, HR operations often rely heavily on individual knowledge, informal workarounds, and manual coordination. Processes may exist in parts, but they are not yet embedded strongly enough to create consistent execution across the organisation.";
+      return "At this stage, HR operations often still rely heavily on individual knowledge, informal coordination, and manual follow-through. Processes may exist in parts, but they are not yet embedded strongly enough to create dependable delivery across the organisation.";
     case "Friction Building":
     case "Developing Structure":
-      return "At this stage, organisations often have some useful structure in place, but not yet enough consistency to make delivery feel dependable across teams, managers, or workflows. The model is functioning, but still carrying hidden friction.";
+      return "At this stage, organisations often have useful structure in place, but not yet enough consistency to make delivery feel dependable across teams, managers, or workflows. The model is functioning, but still carrying areas that would benefit from closer attention.";
     case "Partially Structured":
     case "Structured but Improving":
-      return "At this stage, the organisation usually has a reasonably solid operating base, with more targeted weaknesses than broad instability. The opportunity is typically to tighten weaker areas before they create more visible drag.";
+      return "At this stage, the organisation usually has a reasonably solid operating base, with more targeted weaknesses than broad instability. The opportunity is typically to strengthen a smaller number of areas before they create more visible inefficiency or inconsistency.";
     case "Operationally Strong":
     case "Operationally Mature":
-      return "At this stage, HR operations appear to have a relatively mature structural base. The main opportunity is usually refinement, optimisation, and reducing hidden friction in more complex or cross-functional areas.";
+      return "At this stage, HR operations appear to have a relatively mature structural base. The main opportunity is usually refinement, optimisation, and reducing hidden complexity in more cross-functional or fast-moving areas.";
     default:
-      return "This result provides a directional view of how HR operations may currently be functioning in practice, including where friction may be building and where a deeper read may be useful.";
+      return "This result provides a directional view of how HR operations may currently be functioning in practice, including where a deeper read may be useful.";
   }
 }
 
-function getFrictionNarrative(dimensions: { label: string; score: number }[]) {
+function getOperationalNarrative(dimensions: { label: string; score: number }[]) {
   if (!dimensions.length) return [];
 
   return dimensions.map((d) => {
     switch (d.label) {
       case "Process clarity":
-        return "Processes may exist but are not always clearly defined, leading to variation in how work is executed across teams.";
+        return "Processes may exist but are not always clear enough to support consistent execution across teams.";
       case "Consistency":
         return "Employees and managers may experience HR processes differently depending on function, team, or location.";
       case "Service access":
-        return "It may not always be clear where employees or managers should go for HR support, increasing reliance on informal routes.";
+        return "It may not always be fully clear where employees or managers should go for HR support, increasing reliance on informal routes.";
       case "Knowledge and self-service":
-        return "Information may be harder to find than it should be, increasing dependence on HR for routine questions or clarification.";
+        return "Information may be harder to find or use than it should be, increasing dependence on HR for routine questions or clarification.";
       case "Operational capacity":
-        return "The HR team may be operating reactively, with too little space for process improvement or operational strengthening.";
+        return "The HR team may be operating with limited headroom, reducing space for process improvement or operational strengthening.";
       case "Ownership":
         return "Responsibilities across HR, managers, and escalation routes may not always be clearly defined in practice.";
       case "Onboarding":
         return "Onboarding may still depend too heavily on local manager practice rather than a reliably structured operating model.";
       case "Technology alignment":
-        return "Systems and workflows may not yet reflect how work actually happens, creating workaround behaviour or duplicate effort.";
+        return "Systems and workflows may not yet reflect how work actually happens, encouraging workaround behaviour or duplicate effort.";
       case "Data and handoffs":
-        return "Workflow transitions, handoffs, or data movement may be creating avoidable delay, correction effort, or rework.";
+        return "Workflow transitions, handoffs, or data movement may be creating avoidable delay, extra effort, or correction work.";
       case "Change resilience":
-        return "The current model may be more fragile than it first appears when the organisation grows, restructures, or changes pace.";
+        return "The current model may require stronger operating discipline to remain effective through growth, restructuring, or change.";
       default:
         return `${d.label} may benefit from closer review and stronger operating discipline.`;
     }
@@ -137,25 +137,25 @@ function buildAdvisoryNarrative(params: {
       `In practice, this often shows up as ${weakestTheme}. It can also mean ${
         secondTheme || "other parts of the model are not yet fully embedded"
       }, which makes consistent execution harder as the organisation grows.`,
-      `This does not typically reflect capability gaps within the HR team itself. More often, it reflects that the operating structure around HR has not yet caught up with the pace or complexity of the business.`,
+      `This does not usually point to capability gaps within the HR team itself. More often, it reflects that the operating structure around HR has not yet caught up with the pace or complexity of the business.`,
     ];
 
     implications = [
-      "Managers may handle similar issues differently, creating inconsistency.",
-      "HR may absorb too much coordination work because structure is not doing enough of the work.",
-      "Manual workarounds can become embedded before the organisation recognises the cost.",
-      "Growth or change is likely to make these issues more visible.",
+      "Managers may handle similar issues differently, creating uneven experience.",
+      "HR may absorb more coordination work than intended because structure is not yet doing enough of the work.",
+      "Manual workarounds can become embedded before the organisation fully recognises the cost.",
+      "Growth or change is likely to make these themes more visible.",
     ];
 
     whatUsuallyHappensNext = [
-      "More exceptions appear because standard routes are not clear enough.",
-      "Managers rely more heavily on HR for judgement calls.",
+      "More exceptions appear because standard routes are not yet clear enough.",
+      "Managers rely more heavily on HR for judgement calls and clarification.",
       "Operational consistency becomes harder to maintain as complexity increases.",
     ];
 
     diagnosticClarifies = [
       "Where structure is missing versus where execution varies.",
-      "Which areas are creating the most friction across roles.",
+      "Which areas are creating the most inconsistency across roles.",
       "What should be stabilised first before adding further complexity.",
     ];
   } else if (
@@ -163,16 +163,16 @@ function buildAdvisoryNarrative(params: {
     bandLabel === "Developing Structure"
   ) {
     interpretation = [
-      `This result suggests that useful HR foundations are in place, but not yet consistently embedded. The pattern across ${joinedLabels} points to a model that is functioning, but still carrying avoidable friction.`,
-      `In practice, this often reflects a situation where ${weakestTheme}. The organisation may feel broadly operational, but with uneven execution depending on team, manager, or workflow.`,
-      `The opportunity at this stage is not to redesign everything. It is to strengthen consistency, clarify ownership, and reduce friction in the areas that matter most.`,
+      `This result suggests that useful HR foundations are in place, but not yet consistently embedded. The pattern across ${joinedLabels} points to a model that is functioning, but still carrying avoidable inefficiency or unevenness.`,
+      `In practice, this often reflects a situation where ${weakestTheme}. The organisation may feel broadly operational, but with variable experience depending on team, manager, or workflow.`,
+      `The opportunity at this stage is not to redesign everything. It is to strengthen consistency, clarify ownership, and improve the areas that matter most.`,
     ];
 
     implications = [
       "Execution quality may vary more than leadership expects.",
-      "Some processes may exist but are not consistently followed.",
+      "Some processes may exist but are not consistently followed in practice.",
       "HR may still be more reactive than intended.",
-      "Operational friction can build quietly before becoming visible.",
+      "Operational inefficiency can build quietly before becoming more visible.",
     ];
 
     whatUsuallyHappensNext = [
@@ -191,39 +191,39 @@ function buildAdvisoryNarrative(params: {
     bandLabel === "Structured but Improving"
   ) {
     interpretation = [
-      `This result suggests a solid HR operating base overall, with targeted areas for refinement rather than fundamental gaps. The pattern across ${joinedLabels} points to specific pressure points rather than systemic weakness.`,
+      `This result suggests a solid HR operating base overall, with targeted areas for refinement rather than fundamental gaps. The pattern across ${joinedLabels} points to specific pressure points rather than broad structural weakness.`,
       `In practice, this typically means the core model is working, but ${weakestTheme}. These are the kinds of issues that do not prevent delivery, but can reduce efficiency, consistency, or confidence over time.`,
       `At this stage, the opportunity is to sharpen what already exists. Focused improvements in a small number of areas can have a disproportionate impact on overall performance.`,
     ];
 
     implications = [
       "The organisation is likely more capable than it sometimes feels.",
-      "Friction may sit in specific workflows rather than across the whole model.",
+      "Inefficiency may sit in specific workflows rather than across the whole model.",
       "Small improvements can materially improve consistency and confidence.",
-      "The biggest risk is not weakness, but leaving known friction unaddressed.",
+      "The biggest risk is not weakness, but leaving known issues unaddressed for too long.",
     ];
 
     whatUsuallyHappensNext = [
       "The same few areas continue to absorb disproportionate effort.",
-      "The model works, but certain workflows remain frustrating.",
+      "The model works, but certain workflows remain harder than they need to be.",
       "Growth or change exposes where refinement is still needed.",
     ];
 
     diagnosticClarifies = [
       "Which areas are worth prioritising now versus later.",
-      "Where friction is structural versus situational.",
+      "Where the issue is structural versus situational.",
       "How to sequence targeted improvements effectively.",
     ];
   } else {
     interpretation = [
       `This result suggests a well-developed HR operating model overall. The pattern across ${joinedLabels} points to areas of refinement rather than structural weakness.`,
-      `At this level, the question is not whether HR operations are working, but how efficiently and consistently they are working. Even in strong models, ${weakestTheme} can create subtle drag that becomes more visible over time.`,
+      `At this level, the question is not whether HR operations are working, but how efficiently and consistently they are working. Even in strong models, ${weakestTheme} can create subtle complexity that becomes more visible over time.`,
       `The opportunity is to optimise, not rebuild. Targeted improvements in specific areas can further strengthen scalability, resilience, and overall confidence in the model.`,
     ];
 
     implications = [
       "The organisation likely has strong operational foundations in place.",
-      "Remaining friction is likely more subtle and localised.",
+      "Remaining inefficiency is likely more subtle and localised.",
       "Improvements at this stage tend to be targeted and high-impact.",
       "The focus shifts from building structure to refining performance.",
     ];
@@ -244,7 +244,7 @@ function buildAdvisoryNarrative(params: {
   if (score < 35) {
     implications = [
       ...implications,
-      "There is a meaningful risk that operational strain is already affecting delivery and manager experience.",
+      "There is a meaningful chance that current operating pressure is already affecting delivery quality and manager experience.",
     ];
   }
 
@@ -306,7 +306,7 @@ export default function DiagnosticInterpretationPage() {
         <div className="brand-hero-content brand-container brand-section">
           <div className="max-w-4xl brand-stack-md">
             <div className="brand-stack-sm">
-              <p className="brand-kicker">Detailed interpretation</p>
+              <p className="brand-kicker">Health Check interpretation</p>
 
               <h1 className="brand-heading-xl">
                 Your HR Health Check interpretation
@@ -315,8 +315,8 @@ export default function DiagnosticInterpretationPage() {
               <p className="brand-subheading brand-body-on-dark max-w-3xl">
                 This page provides a more developed interpretation of your
                 result, including what the score pattern is likely to mean in
-                practice, where friction may be building, and what a deeper
-                diagnostic would clarify.
+                practice, where greater attention may be useful, and what a
+                deeper diagnostic would clarify.
               </p>
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function DiagnosticInterpretationPage() {
           {!hasLoaded ? (
             <div className="brand-surface-card p-8">
               <p className="text-slate-600">
-                Loading your diagnostic interpretation...
+                Loading your Health Check interpretation...
               </p>
             </div>
           ) : result && advisoryNarrative ? (
@@ -360,7 +360,7 @@ export default function DiagnosticInterpretationPage() {
 
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Lowest areas
+                      Areas to watch
                     </p>
                     <p className="mt-2 text-base font-medium leading-7 text-slate-950">
                       {formatLabelList(
@@ -390,9 +390,9 @@ export default function DiagnosticInterpretationPage() {
 
               {lowestDimensions.length > 0 ? (
                 <div className="brand-surface-card p-8">
-                  <p className="brand-section-kicker">Likely friction points</p>
+                  <p className="brand-section-kicker">Areas for closer attention</p>
                   <h2 className="brand-heading-lg mt-3 text-slate-950">
-                    Areas most likely to be creating operational drag
+                    Where the current operating model may benefit most from focus
                   </h2>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -408,7 +408,7 @@ export default function DiagnosticInterpretationPage() {
                           {dimension.score} / 5
                         </p>
                         <p className="mt-3 text-sm leading-7 text-slate-700">
-                          {getFrictionNarrative([dimension])[0]}
+                          {getOperationalNarrative([dimension])[0]}
                         </p>
                       </div>
                     ))}
@@ -440,7 +440,7 @@ export default function DiagnosticInterpretationPage() {
                     What usually happens next
                   </p>
                   <h2 className="brand-heading-md mt-3 text-slate-950">
-                    How this pattern tends to develop
+                    How this pattern tends to develop over time
                   </h2>
 
                   <div className="mt-6 space-y-3">
@@ -466,15 +466,16 @@ export default function DiagnosticInterpretationPage() {
                   <p className="brand-subheading text-slate-700">
                     This interpretation provides a stronger read on what your
                     result is likely to mean in practice. The next step is to
-                    discuss where friction may be building, what is most likely
-                    driving it, and what should be prioritised first.
+                    discuss where greater attention may be useful, what is most
+                    likely driving the pattern, and what should be prioritised
+                    first.
                   </p>
 
                   <p className="brand-body">
                     The enquiry will be linked to your Health Check result so it
-                    can be reviewed in context. From there, a short feedback
-                    conversation can be arranged to discuss the result and,
-                    where useful, whether a deeper diagnostic or focused Sprint
+                    can be reviewed in context. From there, a short conversation
+                    can be arranged to discuss the result and, where useful,
+                    whether a deeper Diagnostic Assessment or a focused Sprint
                     would be the right next step.
                   </p>
 
@@ -483,7 +484,7 @@ export default function DiagnosticInterpretationPage() {
                       href={contactHref}
                       className="brand-button-primary px-6 py-3 text-base font-medium"
                     >
-                      Discuss Your Results
+                      Discuss your result
                     </Link>
                   </div>
                 </div>
@@ -538,7 +539,7 @@ export default function DiagnosticInterpretationPage() {
             <div className="brand-stack-md">
               <div className="brand-surface-card p-8">
                 <h2 className="text-lg font-semibold text-slate-900">
-                  No saved diagnostic result found
+                  No saved Health Check result found
                 </h2>
 
                 <p className="mt-3 text-slate-700">
@@ -557,9 +558,9 @@ export default function DiagnosticInterpretationPage() {
                   </h2>
 
                   <p className="brand-subheading text-slate-700">
-                    The Health Check gives a quick first read on where HR
-                    operations may be starting to strain and whether a deeper
-                    diagnostic is likely to be worthwhile.
+                    The Health Check gives a quick first read on how HR
+                    operations appear to be functioning today and whether a
+                    deeper diagnostic is likely to be worthwhile.
                   </p>
 
                   <div className="flex flex-wrap gap-4 pt-2">

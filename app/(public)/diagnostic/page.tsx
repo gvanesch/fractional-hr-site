@@ -14,7 +14,7 @@ import {
 import {
   saveDiagnosticState,
   clearDiagnosticState,
-} from "@/lib/diagnostic-storage"
+} from "@/lib/diagnostic-storage";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type CompletionEmailStatus = "idle" | "sending" | "sent" | "error";
@@ -76,19 +76,19 @@ const roleOptions = [
 const healthCheckDeliverables = [
   {
     title: "Overall assessment",
-    text: "A clear view of current HR operational maturity and whether the function appears stable, developing, or under strain.",
+    text: "A clear first view of current HR operational maturity and whether the function appears well-established, developing, or likely to benefit from closer attention.",
   },
   {
     title: "10-dimension insight",
     text: "A structured read across process clarity, ownership, service access, systems enablement, handoffs, and delivery consistency.",
   },
   {
-    title: "Likely friction points",
-    text: "Early signals of where operational drag may be building, including inconsistent practice, unclear ownership, or overly manual work.",
+    title: "Early pattern signals",
+    text: "An initial indication of where greater consistency, clearer ownership, or stronger operating discipline may add value.",
   },
   {
     title: "Practical focus areas",
-    text: "A first indication of which areas are most likely to benefit from closer attention before issues become more embedded.",
+    text: "A first indication of which areas are most likely to benefit from attention before they become more embedded or harder to resolve.",
   },
 ];
 
@@ -353,11 +353,11 @@ export default function DiagnosticPage() {
 
       if (errorMessage === "A valid email address is required.") {
         setSubmitError(
-          "Your score has been calculated. The diagnostic notification could not be sent because the optional email address entered appears to be invalid.",
+          "Your result has been calculated. The diagnostic notification could not be sent because the optional email address entered appears to be invalid.",
         );
       } else {
         setSubmitError(
-          "Your score has been calculated, but the diagnostic completion notification could not be sent.",
+          "Your result has been calculated, but the diagnostic completion notification could not be sent.",
         );
       }
     }
@@ -396,26 +396,25 @@ export default function DiagnosticPage() {
           <div className="max-w-4xl">
             <p className="brand-kicker">HR Health Check</p>
             <h1 className="brand-heading-xl mt-3">
-              A quick first read on where HR operations may be starting to strain
+              A quick first read on how HR operations are functioning today
             </h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Answer 10 questions to assess how HR is operating across process
-              clarity, ownership, service access, and delivery consistency.
+              Answer 10 questions to get an initial view across process clarity,
+              ownership, service access, systems enablement, and delivery consistency.
             </p>
             <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              This is not a generic HR survey. It is designed to surface how HR
-              operations actually function in practice across process clarity,
-              ownership, service access, and delivery consistency.
+              This is designed as a structured first signal, not a generic HR survey.
+              It helps indicate how HR operations appear to be working in practice and
+              where greater clarity, consistency, or operating discipline may be useful.
             </p>
             <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              The result is a structured view of where operational friction may
-              be building and where improvement is likely to have the most
-              impact. For organisations that need a deeper view, it can lead
-              into the HR Operations Diagnostic Assessment.
+              For some organisations, this will be enough to sharpen priorities.
+              For others, it will indicate whether a deeper cross-role review through
+              the HR Operations Diagnostic Assessment is likely to add value.
             </p>
             <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              Based on experience designing and operating HR functions across
-              complex organisations.
+              Based on experience designing, leading, and improving HR operations
+              across complex organisations.
             </p>
           </div>
         </div>
@@ -432,9 +431,9 @@ export default function DiagnosticPage() {
                 <p className="text-base leading-7 text-slate-700">
                   The Health Check is designed to do more than produce a score.
                   It gives you an initial operational read on how HR appears to
-                  be functioning in practice, where strain may be accumulating,
-                  and which issues are more likely to reflect systemic patterns
-                  rather than isolated frustrations.
+                  be functioning in practice, where stronger consistency may be
+                  beneficial, and which signals are more likely to reflect broader
+                  operating patterns rather than isolated frustrations.
                 </p>
                 <p className="text-base leading-7 text-slate-700">
                   It is intended as a structured first layer of clarity. For
@@ -465,17 +464,17 @@ export default function DiagnosticPage() {
                   How this is used
                 </h3>
                 <p className="mt-3 text-sm leading-7 text-slate-700">
-                  The HR Health Check is the starting point. It helps identify
-                  whether the issues you are seeing are isolated or part of a
-                  wider operational pattern.
+                  The HR Health Check is the starting point. It helps indicate
+                  whether the themes you are seeing are likely to be localised
+                  or part of a wider operational pattern.
                 </p>
                 <p className="mt-3 text-sm leading-7 text-slate-700">
                   For organisations that need a deeper view, this can lead into
                   the HR Operations Diagnostic Assessment. That next step
                   gathers structured input across leadership, managers, and HR
                   to build a more complete picture of how work actually flows
-                  through the organisation and where gaps are most likely to
-                  matter.
+                  through the organisation and where greater attention is most
+                  likely to create value.
                 </p>
               </div>
             </div>
@@ -642,9 +641,9 @@ export default function DiagnosticPage() {
 
           <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
             <p className="text-sm leading-7 text-slate-600">
-              If helpful, results can also be discussed in a short follow-up
-              conversation to interpret the findings and talk through what they
-              may mean in practice.
+              If helpful, the result can also be discussed in a short follow-up
+              conversation to interpret what the pattern may mean in practice
+              and whether a deeper review would be useful.
             </p>
 
             <label className="flex items-start gap-3 text-sm text-slate-700">
@@ -685,7 +684,7 @@ export default function DiagnosticPage() {
               >
                 {saveStatus === "saving" || completionEmailStatus === "sending"
                   ? "Calculating..."
-                  : "Get My Diagnostic Result"}
+                  : "Get My Health Check Result"}
               </button>
 
               <button
@@ -700,7 +699,7 @@ export default function DiagnosticPage() {
           {showResults && score !== null && band && (
             <div ref={resultsRef} className="mt-16 rounded-lg bg-white p-8 shadow">
               <h2 className="mb-2 text-2xl font-semibold text-slate-950">
-                Your HR Operations Maturity Score: {score} / 100
+                Your HR Operations Health Check Score: {score} / 100
               </h2>
 
               <p className="mb-1 text-lg font-medium text-[#1E6FD9]">
@@ -710,7 +709,7 @@ export default function DiagnosticPage() {
               <p className="mb-6 text-slate-700">{band.summary}</p>
 
               <h3 className="mb-4 text-lg font-semibold text-slate-950">
-                Operational Profile
+                Operational profile
               </h3>
 
               <div className="mb-10 space-y-3">
@@ -738,12 +737,13 @@ export default function DiagnosticPage() {
               {lowestDimensions.length > 0 && (
                 <div className="mb-10">
                   <h3 className="mb-3 text-lg font-semibold text-slate-950">
-                    Areas likely to benefit from attention
+                    Areas most likely to benefit from attention
                   </h3>
 
                   <p className="mb-4 text-sm text-slate-600">
-                    These dimensions may be the most likely sources of operational
-                    friction or inconsistency at the moment.
+                    These dimensions may be the most likely areas where greater
+                    clarity, consistency, or operational focus would add value
+                    at the moment.
                   </p>
 
                   <div className="space-y-2">
@@ -764,7 +764,7 @@ export default function DiagnosticPage() {
                 {saveStatus === "saved" && completionEmailStatus === "sent" && (
                   <p>
                     Your result has been saved locally in this browser and your
-                    diagnostic completion has been recorded.
+                    health check completion has been recorded.
                   </p>
                 )}
                 {saveStatus === "saved" && completionEmailStatus === "idle" && (
@@ -776,7 +776,7 @@ export default function DiagnosticPage() {
                 {saveStatus === "saved" && completionEmailStatus === "error" && (
                   <p>
                     Your result has been saved locally in this browser, but the
-                    diagnostic completion notification could not be sent.
+                    completion notification could not be sent.
                   </p>
                 )}
                 {saveStatus === "error" && (
@@ -789,14 +789,15 @@ export default function DiagnosticPage() {
 
               <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-[#F4F6FA] p-6">
                 <h4 className="mb-2 text-lg font-semibold text-slate-950">
-                  View a more detailed interpretation of your result
+                  Want a more detailed interpretation of what this pattern may mean?
                 </h4>
 
                 <p className="mb-4 text-sm leading-7 text-slate-700">
-                  This score gives a structured first read on where operational
-                  friction may be building. If you want a more developed
-                  interpretation of what the pattern is likely to mean in
-                  practice, continue to the detailed interpretation page.
+                  This Health Check gives a structured first read. If you want a
+                  more developed interpretation of what the result is likely to
+                  mean in practice, continue to the detailed interpretation page.
+                  If you need a deeper, cross-role view, the HR Operations
+                  Diagnostic Assessment is the next step.
                 </p>
 
                 <div className="flex flex-wrap gap-4">
