@@ -74,9 +74,7 @@ function formatDate(value: string | null | undefined): string | null {
   });
 }
 
-function getDiagnosticPath(
-  inviteToken: string,
-): string {
+function getDiagnosticPath(inviteToken: string): string {
   return `/client-diagnostic/respond/${inviteToken}`;
 }
 
@@ -101,6 +99,8 @@ function getQuestionnaireAudienceCopy(
   questionnaireType: ParticipantEmailQuestionnaireType,
 ): {
   title: string;
+  titleShort: string;
+  positioning: string;
   purpose: string;
   actionLabel: string;
 } {
@@ -108,37 +108,56 @@ function getQuestionnaireAudienceCopy(
     case "hr":
       return {
         title: "HR operations diagnostic",
+        titleShort: "HR diagnostic",
+        positioning:
+          "This diagnostic provides a structured view of how HR services are designed, governed, and delivered across the organisation.",
         purpose:
-          "This version focuses on operational structure, service delivery, controls, and how HR services are designed and run.",
-        actionLabel: "Start HR diagnostic",
+          "It is designed to support a clear and consistent understanding of current operating practices, helping identify opportunities to strengthen delivery, scalability, and operational clarity over time.",
+        actionLabel: "Access HR diagnostic",
       };
+
     case "manager":
       return {
-        title: "Manager diagnostic",
+        title: "manager diagnostic",
+        titleShort: "Manager diagnostic",
+        positioning:
+          "This diagnostic captures how people processes are experienced in day-to-day management.",
         purpose:
-          "This version focuses on how HR processes are experienced in practice, including clarity, responsiveness, and day-to-day delivery.",
-        actionLabel: "Start manager diagnostic",
+          "It helps build a clearer view of how consistently processes are applied in practice and where the manager experience can be further strengthened.",
+        actionLabel: "Access manager diagnostic",
       };
+
     case "leadership":
       return {
-        title: "Leadership diagnostic",
+        title: "leadership diagnostic",
+        titleShort: "Leadership diagnostic",
+        positioning:
+          "This diagnostic provides a leadership-level view of how people operations support organisational effectiveness and delivery confidence.",
         purpose:
-          "This version focuses on organisational effectiveness, operating discipline, and how people operations support business performance.",
-        actionLabel: "Start leadership diagnostic",
+          "It is designed to support informed decisions on how people operations can continue to scale, strengthen delivery, and enable business performance over time.",
+        actionLabel: "Access leadership diagnostic",
       };
+
     case "client_fact_pack":
       return {
         title: "Client Fact Pack",
+        titleShort: "Client Fact Pack",
+        positioning:
+          "This input captures the structural and technical context behind current people operations.",
         purpose:
-          "This captures contextual information on systems, tooling, infrastructure, and delivery environment. It supports final interpretation, but is not included in scored statistical analysis.",
-        actionLabel: "Start fact pack",
+          "It provides system, tooling, and delivery context that supports interpretation and advisory output, but is not included in scored analysis.",
+        actionLabel: "Access Client Fact Pack",
       };
+
     default:
       return {
-        title: "Diagnostic",
+        title: "diagnostic",
+        titleShort: "Diagnostic",
+        positioning:
+          "This diagnostic provides a structured view of how people operations are designed, delivered, and experienced.",
         purpose:
-          "This diagnostic is used to assess how HR operations are designed, delivered, and experienced across the organisation.",
-        actionLabel: "Open diagnostic",
+          "It is intended to support a clearer understanding of current operations and where service delivery can continue to be strengthened.",
+        actionLabel: "Access diagnostic",
       };
   }
 }
@@ -153,64 +172,114 @@ function getEmailSubject(params: {
 
   switch (eventType) {
     case "invite":
-      return `Input requested: ${projectName} ${label}`;
+      return `Diagnostic participation request: ${projectName} ${label}`;
     case "invite_extended":
-      return `Completion window updated: ${projectName} ${label}`;
+      return `Response window extended: ${projectName} ${label}`;
     case "participant_withdrawn":
       return `Participation update: ${projectName} ${label}`;
     case "participant_reinstated":
-      return `Participation reinstated: ${projectName} ${label}`;
+      return `Participation restored: ${projectName} ${label}`;
     default:
       return `Update: ${projectName} ${label}`;
   }
 }
 
+function buildDetailRow(params: {
+  label: string;
+  value: string;
+}): string {
+  const { label, value } = params;
+
+  return `
+    <tr>
+      <td style="padding:0 0 10px 0;font-size:13px;line-height:1.6;color:#64748b;vertical-align:top;width:155px;">
+        ${escapeHtml(label)}
+      </td>
+      <td style="padding:0 0 10px 0;font-size:13px;line-height:1.6;color:#0f172a;vertical-align:top;font-weight:600;">
+        ${escapeHtml(value)}
+      </td>
+    </tr>
+  `;
+}
+
+function buildDetailsPanel(params: {
+  rows: Array<{ label: string; value: string }>;
+}): string {
+  const rows = params.rows.filter((row) => row.value.trim().length > 0);
+
+  if (rows.length === 0) {
+    return "";
+  }
+
+  return `
+    <div style="margin-top:24px;padding:18px 20px;border:1px solid #dbe3ef;border-radius:16px;background:#f8fafc;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        ${rows.map(buildDetailRow).join("")}
+      </table>
+    </div>
+  `;
+}
+
 function buildEmailShell(params: {
   previewLabel: string;
   heading: string;
-  introHtml: string;
+  leadHtml: string;
+  detailPanelHtml?: string;
   bodyHtml: string;
   ctaHtml?: string;
   footerHtml?: string;
 }): string {
-  const { previewLabel, heading, introHtml, bodyHtml, ctaHtml, footerHtml } =
-    params;
+  const {
+    previewLabel,
+    heading,
+    leadHtml,
+    detailPanelHtml,
+    bodyHtml,
+    ctaHtml,
+    footerHtml,
+  } = params;
 
   return `
-    <div style="margin:0;padding:32px 16px;background:#F4F6FA;font-family:Inter,Arial,sans-serif;color:#0f172a;">
-      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dbe3ef;border-radius:20px;overflow:hidden;">
-        <div style="padding:24px 28px;background:linear-gradient(135deg,#0A1628 0%,#0D1F3C 100%);">
-          <div style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#8AAAC8;font-weight:700;">
-            ${escapeHtml(previewLabel)}
-          </div>
-          <div style="margin-top:10px;font-size:28px;line-height:1.2;color:#ffffff;font-weight:700;">
-            Van Esch
-          </div>
-          <div style="margin-top:6px;font-size:14px;line-height:1.6;color:#c7d6e6;">
-            HR Operations &amp; Transformation Advisory
-          </div>
-        </div>
+    <div style="margin:0;padding:36px 16px;background:#F4F6FA;font-family:Inter,Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:680px;margin:0 auto;">
+        <div style="overflow:hidden;border:1px solid #d6e0eb;border-radius:24px;background:#ffffff;box-shadow:0 8px 30px rgba(15,23,42,0.06);">
+          <div style="padding:26px 30px;background:linear-gradient(135deg,#0A1628 0%,#0D1F3C 100%);">
+            <div style="font-size:11px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#8AAAC8;font-weight:700;">
+              ${escapeHtml(previewLabel)}
+            </div>
 
-        <div style="padding:32px 28px;">
-          <div style="font-size:24px;line-height:1.3;font-weight:700;color:#0f172a;">
-            ${escapeHtml(heading)}
+            <div style="margin-top:14px;font-size:30px;line-height:1.1;color:#ffffff;font-weight:700;">
+              Van Esch
+            </div>
+
+            <div style="margin-top:8px;font-size:14px;line-height:1.7;color:#d4dfeb;">
+              HR Operations &amp; Transformation Advisory
+            </div>
           </div>
 
-          <div style="margin-top:20px;font-size:15px;line-height:1.8;color:#334155;">
-            ${introHtml}
-          </div>
+          <div style="padding:34px 30px 32px 30px;">
+            <div style="font-size:28px;line-height:1.2;font-weight:700;color:#0f172a;letter-spacing:-0.02em;">
+              ${escapeHtml(heading)}
+            </div>
 
-          <div style="margin-top:20px;font-size:15px;line-height:1.8;color:#334155;">
-            ${bodyHtml}
-          </div>
+            <div style="margin-top:22px;font-size:15px;line-height:1.9;color:#334155;">
+              ${leadHtml}
+            </div>
 
-          ${ctaHtml ? `<div style="margin-top:28px;">${ctaHtml}</div>` : ""}
+            ${detailPanelHtml ? detailPanelHtml : ""}
 
-          <div style="margin-top:28px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:14px;line-height:1.8;color:#475569;">
-            ${
-              footerHtml ??
-              `Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory`
-            }
+            <div style="margin-top:24px;font-size:15px;line-height:1.9;color:#334155;">
+              ${bodyHtml}
+            </div>
+
+            ${ctaHtml ? `<div style="margin-top:30px;">${ctaHtml}</div>` : ""}
+
+            <div style="margin-top:34px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;line-height:1.9;color:#64748b;">
+              ${
+                footerHtml ??
+                `Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory<br/>www.vanesch.uk`
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -227,7 +296,7 @@ function buildButton(params: {
   return `
     <a
       href="${escapeHtml(href)}"
-      style="display:inline-block;padding:13px 18px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;"
+      style="display:inline-block;padding:14px 20px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:14px;letter-spacing:0.01em;"
     >
       ${escapeHtml(label)}
     </a>
@@ -259,74 +328,90 @@ function buildInviteEmail(params: {
   const expiresLabel = formatDate(inviteExpiresAt);
   const organisationLabel = companyName?.trim() || projectName;
 
-  const introHtml = `
+  const leadHtml = `
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
-      You’ve been asked to contribute to the <strong>${escapeHtml(
+      You’ve been invited to contribute to the <strong>${escapeHtml(
         audienceCopy.title,
       )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong>.
     </p>
+    <p style="margin:16px 0 0 0;">
+      ${escapeHtml(audienceCopy.positioning)}
+    </p>
   `;
+
+  const detailPanelHtml = buildDetailsPanel({
+    rows: [
+      {
+        label: "Participation type",
+        value: audienceCopy.titleShort,
+      },
+      ...(expiresLabel
+        ? [
+            {
+              label: "Response window",
+              value: `Please respond by ${expiresLabel}`,
+            },
+          ]
+        : []),
+    ],
+  });
 
   const bodyHtml = `
     <p style="margin:0;">
       ${escapeHtml(audienceCopy.purpose)}
     </p>
     <p style="margin:16px 0 0 0;">
-      Your input will be combined with other perspectives to identify where processes are working, where they are inconsistent, and where operational friction exists.
-    </p>
-    <p style="margin:16px 0 0 0;">
-      <strong>${
+      ${
         questionnaireType === "client_fact_pack"
-          ? "This input should only be completed once for the project."
-          : "The questionnaire takes around 8 to 10 minutes to complete."
-      }</strong>
+          ? "This input should be completed once to establish the operating context for this engagement."
+          : "The diagnostic typically takes around 8 to 10 minutes to complete."
+      }
     </p>
-    ${
-      expiresLabel
-        ? `<p style="margin:16px 0 0 0;"><strong>Completion window:</strong> please respond by ${escapeHtml(
-            expiresLabel,
-          )}.</p>`
-        : ""
-    }
     <p style="margin:16px 0 0 0;">
-      If you need to pause, you can return to the same link at any time.
+      You can return to the same link if you need to pause and continue later.
     </p>
   `;
 
   const html = buildEmailShell({
-    previewLabel: "Participation request",
-    heading: audienceCopy.title,
-    introHtml,
+    previewLabel: "Diagnostic participation request",
+    heading:
+      questionnaireType === "client_fact_pack"
+        ? "Client Fact Pack request"
+        : "Diagnostic participation request",
+    leadHtml,
+    detailPanelHtml,
     bodyHtml,
     ctaHtml: buildButton({
       href: inviteUrl,
       label: audienceCopy.actionLabel,
     }),
     footerHtml:
-      "Thank you for your input.<br/><br/>Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory",
+      "This message relates to an active diagnostic engagement managed by Van Esch Advisory Ltd.<br/><br/>Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory<br/>www.vanesch.uk",
   });
 
   const text = [
     `Hi ${name},`,
     ``,
-    `You’ve been asked to contribute to the ${audienceCopy.title} for ${organisationLabel}.`,
+    `You’ve been invited to contribute to the ${audienceCopy.title} for ${organisationLabel}.`,
+    ``,
+    audienceCopy.positioning,
+    ``,
+    `Participation type: ${audienceCopy.titleShort}`,
+    expiresLabel ? `Response window: Please respond by ${expiresLabel}` : "",
     ``,
     audienceCopy.purpose,
     ``,
-    `Your input will be combined with other perspectives to identify where processes are working, where they are inconsistent, and where operational friction exists.`,
-    ``,
     questionnaireType === "client_fact_pack"
-      ? "This input should only be completed once for the project."
-      : "The questionnaire takes around 8 to 10 minutes to complete.",
-    expiresLabel ? `Completion window: please respond by ${expiresLabel}.` : "",
+      ? "This input should be completed once to establish the operating context for this engagement."
+      : "The diagnostic typically takes around 8 to 10 minutes to complete.",
     ``,
     `Access link: ${inviteUrl}`,
     ``,
-    `If you need to pause, you can return to the same link at any time.`,
+    `You can return to the same link if you need to pause and continue later.`,
     ``,
-    `Thank you,`,
     `Van Esch Advisory`,
+    `www.vanesch.uk`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -367,35 +452,49 @@ function buildInviteExtendedEmail(params: {
   const expiresLabel = formatDate(updatedInviteExpiresAt);
   const organisationLabel = companyName?.trim() || projectName;
 
-  const introHtml = `
+  const leadHtml = `
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
-      Additional time has been provided for your <strong>${escapeHtml(
+      Your response window for the <strong>${escapeHtml(
         audienceCopy.title,
-      )}</strong> response for <strong>${escapeHtml(organisationLabel)}</strong>.
+      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been extended.
+    </p>
+    <p style="margin:16px 0 0 0;">
+      This is to ensure your perspective can still be included in the active diagnostic collection.
     </p>
   `;
 
+  const detailPanelHtml = buildDetailsPanel({
+    rows: [
+      {
+        label: "Participation type",
+        value: audienceCopy.titleShort,
+      },
+      ...(expiresLabel
+        ? [
+            {
+              label: "Updated response window",
+              value: `Please respond by ${expiresLabel}`,
+            },
+          ]
+        : []),
+    ],
+  });
+
   const bodyHtml = `
     <p style="margin:0;">
-      Your participation is still active, and your input remains important to the final diagnostic picture.
+      Your input remains an important part of building a complete and balanced view of current operations.
     </p>
-    ${
-      expiresLabel
-        ? `<p style="margin:16px 0 0 0;"><strong>Updated completion window:</strong> please respond by ${escapeHtml(
-            expiresLabel,
-          )}.</p>`
-        : ""
-    }
     <p style="margin:16px 0 0 0;">
       You can continue using the same link below.
     </p>
   `;
 
   const html = buildEmailShell({
-    previewLabel: "Completion window updated",
-    heading: "Additional time has been provided",
-    introHtml,
+    previewLabel: "Response window extended",
+    heading: "Your response window has been extended",
+    leadHtml,
+    detailPanelHtml,
     bodyHtml,
     ctaHtml: buildButton({
       href: inviteUrl,
@@ -406,16 +505,19 @@ function buildInviteExtendedEmail(params: {
   const text = [
     `Hi ${name},`,
     ``,
-    `Additional time has been provided for your ${audienceCopy.title} response for ${organisationLabel}.`,
+    `Your response window for the ${audienceCopy.title} for ${organisationLabel} has been extended.`,
     ``,
-    `Your participation is still active, and your input remains important to the final diagnostic picture.`,
-    expiresLabel ? `Updated completion window: please respond by ${expiresLabel}.` : "",
+    `This is to ensure your perspective can still be included in the active diagnostic collection.`,
+    ``,
+    `Participation type: ${audienceCopy.titleShort}`,
+    expiresLabel ? `Updated response window: Please respond by ${expiresLabel}` : "",
+    ``,
+    `Your input remains an important part of building a complete and balanced view of current operations.`,
     ``,
     `Access link: ${inviteUrl}`,
     ``,
-    `You can continue using the same link below.`,
-    ``,
     `Van Esch Advisory`,
+    `www.vanesch.uk`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -436,37 +538,63 @@ function buildWithdrawnEmail(params: {
   projectName: string;
   companyName?: string | null;
   questionnaireType: ParticipantEmailQuestionnaireType;
+  withdrawReasonLabel?: string | null;
 }): {
   subject: string;
   html: string;
   text: string;
 } {
-  const { name, projectName, companyName, questionnaireType } = params;
+  const {
+    name,
+    projectName,
+    companyName,
+    questionnaireType,
+    withdrawReasonLabel,
+  } = params;
+
   const audienceCopy = getQuestionnaireAudienceCopy(questionnaireType);
   const organisationLabel = companyName?.trim() || projectName;
 
-  const introHtml = `
+  const leadHtml = `
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       Your participation in the <strong>${escapeHtml(
         audienceCopy.title,
       )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been withdrawn.
     </p>
+    <p style="margin:16px 0 0 0;">
+      You no longer need to take any action. This update has been made to keep the participant set aligned with the current scope of the engagement.
+    </p>
   `;
+
+  const detailPanelHtml = buildDetailsPanel({
+    rows: [
+      {
+        label: "Participation type",
+        value: audienceCopy.titleShort,
+      },
+      ...(withdrawReasonLabel
+        ? [
+            {
+              label: "Recorded reason",
+              value: withdrawReasonLabel,
+            },
+          ]
+        : []),
+    ],
+  });
 
   const bodyHtml = `
     <p style="margin:0;">
-      This means you no longer need to complete the diagnostic, and your participation will not be included in the active collection set.
-    </p>
-    <p style="margin:16px 0 0 0;">
-      If you believe this has been sent in error, please reply to this email or contact the project sponsor.
+      If you believe this update has been made in error, please reply to this email so it can be reviewed.
     </p>
   `;
 
   const html = buildEmailShell({
     previewLabel: "Participation update",
     heading: "Your participation has been withdrawn",
-    introHtml,
+    leadHtml,
+    detailPanelHtml,
     bodyHtml,
   });
 
@@ -475,12 +603,18 @@ function buildWithdrawnEmail(params: {
     ``,
     `Your participation in the ${audienceCopy.title} for ${organisationLabel} has been withdrawn.`,
     ``,
-    `This means you no longer need to complete the diagnostic, and your participation will not be included in the active collection set.`,
+    `You no longer need to take any action. This update has been made to keep the participant set aligned with the current scope of the engagement.`,
     ``,
-    `If you believe this has been sent in error, please reply to this email or contact the project sponsor.`,
+    `Participation type: ${audienceCopy.titleShort}`,
+    withdrawReasonLabel ? `Recorded reason: ${withdrawReasonLabel}` : "",
+    ``,
+    `If you believe this update has been made in error, please reply to this email so it can be reviewed.`,
     ``,
     `Van Esch Advisory`,
-  ].join("\n");
+    `www.vanesch.uk`,
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 
   return {
     subject: getEmailSubject({
@@ -500,6 +634,7 @@ function buildReinstatedEmail(params: {
   questionnaireType: ParticipantEmailQuestionnaireType;
   inviteUrl: string;
   updatedInviteExpiresAt?: string | null;
+  reinstateReasonLabel?: string | null;
 }): {
   subject: string;
   html: string;
@@ -512,41 +647,61 @@ function buildReinstatedEmail(params: {
     questionnaireType,
     inviteUrl,
     updatedInviteExpiresAt,
+    reinstateReasonLabel,
   } = params;
 
   const audienceCopy = getQuestionnaireAudienceCopy(questionnaireType);
   const expiresLabel = formatDate(updatedInviteExpiresAt);
   const organisationLabel = companyName?.trim() || projectName;
 
-  const introHtml = `
+  const leadHtml = `
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       Your participation in the <strong>${escapeHtml(
         audienceCopy.title,
-      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been reinstated.
+      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been restored.
+    </p>
+    <p style="margin:16px 0 0 0;">
+      Your perspective is once again included in the active diagnostic collection for this engagement.
     </p>
   `;
 
+  const detailPanelHtml = buildDetailsPanel({
+    rows: [
+      {
+        label: "Participation type",
+        value: audienceCopy.titleShort,
+      },
+      ...(expiresLabel
+        ? [
+            {
+              label: "Response window",
+              value: `Please respond by ${expiresLabel}`,
+            },
+          ]
+        : []),
+      ...(reinstateReasonLabel
+        ? [
+            {
+              label: "Recorded reason",
+              value: reinstateReasonLabel,
+            },
+          ]
+        : []),
+    ],
+  });
+
   const bodyHtml = `
     <p style="margin:0;">
-      You can now access and complete the diagnostic again. Your response will be included in the active collection set and final analysis.
-    </p>
-    ${
-      expiresLabel
-        ? `<p style="margin:16px 0 0 0;"><strong>Updated completion window:</strong> please respond by ${escapeHtml(
-            expiresLabel,
-          )}.</p>`
-        : ""
-    }
-    <p style="margin:16px 0 0 0;">
-      Please use the link below to continue.
+      Please use the link below to access and complete your response.
     </p>
   `;
 
   const html = buildEmailShell({
-    previewLabel: "Participation reinstated",
-    heading: "Your participation has been reinstated",
-    introHtml,
+    previewLabel: "Participation restored",
+    heading: "Your participation has been restored",
+    leadHtml,
+    detailPanelHtml,
     bodyHtml,
     ctaHtml: buildButton({
       href: inviteUrl,
@@ -557,16 +712,20 @@ function buildReinstatedEmail(params: {
   const text = [
     `Hi ${name},`,
     ``,
-    `Your participation in the ${audienceCopy.title} for ${organisationLabel} has been reinstated.`,
+    `Your participation in the ${audienceCopy.title} for ${organisationLabel} has been restored.`,
     ``,
-    `You can now access and complete the diagnostic again. Your response will be included in the active collection set and final analysis.`,
-    expiresLabel ? `Updated completion window: please respond by ${expiresLabel}.` : "",
+    `Your perspective is once again included in the active diagnostic collection for this engagement.`,
+    ``,
+    `Participation type: ${audienceCopy.titleShort}`,
+    expiresLabel ? `Response window: Please respond by ${expiresLabel}` : "",
+    reinstateReasonLabel ? `Recorded reason: ${reinstateReasonLabel}` : "",
+    ``,
+    `Please use the link below to access and complete your response.`,
     ``,
     `Access link: ${inviteUrl}`,
     ``,
-    `Please use the link below to continue.`,
-    ``,
     `Van Esch Advisory`,
+    `www.vanesch.uk`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -643,6 +802,7 @@ function buildParticipantEventEmail(params: {
         projectName,
         companyName,
         questionnaireType,
+        withdrawReasonLabel: metadata?.withdrawReasonLabel ?? null,
       });
 
     case "participant_reinstated":
@@ -658,6 +818,7 @@ function buildParticipantEventEmail(params: {
         inviteUrl,
         updatedInviteExpiresAt:
           metadata?.updatedInviteExpiresAt ?? inviteExpiresAt ?? null,
+        reinstateReasonLabel: metadata?.reinstateReasonLabel ?? null,
       });
 
     default:

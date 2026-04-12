@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +11,54 @@ type ExtendInviteRequestBody = {
   days?: number;
 };
 
+type ParticipantRow = {
+  participant_id: string;
+  project_id: string;
+  name: string | null;
+  email: string;
+  questionnaire_type: "hr" | "manager" | "leadership" | "client_fact_pack";
+  participant_status: string;
+  completed_at: string | null;
+  invite_token: string | null;
+  invite_expires_at: string | null;
+  invite_revoked_at: string | null;
+  client_projects:
+    | {
+        project_id: string;
+        project_status: string;
+        project_name: string | null;
+        company_name: string | null;
+      }
+    | Array<{
+        project_id: string;
+        project_status: string;
+        project_name: string | null;
+        company_name: string | null;
+      }>;
+};
+
+type UpdatedParticipantRow = {
+  participant_id: string;
+  name: string | null;
+  email: string;
+  questionnaire_type: "hr" | "manager" | "leadership" | "client_fact_pack";
+  participant_status: string;
+  invite_token: string | null;
+  invite_expires_at: string | null;
+  invite_revoked_at: string | null;
+};
+
 const ALLOWED_EXTENSION_DAYS = [7, 14, 21, 30] as const;
+
+function getEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`);
+  }
+
+  return value;
+}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -47,6 +96,11 @@ function getExtendedInviteExpiry(
   const expiresAt = new Date(baseDate);
   expiresAt.setDate(expiresAt.getDate() + days);
   return expiresAt.toISOString();
+}
+
+function getParticipantDisplayName(name: string | null, email: string): string {
+  const cleanName = typeof name === "string" ? name.trim() : "";
+  return cleanName || email;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -90,6 +144,7 @@ export async function POST(request: Request): Promise<Response> {
         `
           participant_id,
           project_id,
+          name,
           email,
           questionnaire_type,
           participant_status,
@@ -97,11 +152,11 @@ export async function POST(request: Request): Promise<Response> {
           invite_token,
           invite_expires_at,
           invite_revoked_at,
-          client_projects!inner(project_id, project_status)
+          client_projects!inner(project_id, project_status, project_name, company_name)
         `,
       )
       .eq("participant_id", participantId)
-      .single();
+      .single<ParticipantRow>();
 
     if (participantError || !participant) {
       return NextResponse.json(
@@ -154,6 +209,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    const previousInviteExpiresAt = participant.invite_expires_at;
     const inviteExpiresAt = getExtendedInviteExpiry(
       participant.invite_expires_at,
       days,
@@ -168,9 +224,9 @@ export async function POST(request: Request): Promise<Response> {
       })
       .eq("participant_id", participantId)
       .select(
-        "participant_id, email, questionnaire_type, participant_status, invite_expires_at, invite_revoked_at",
+        "participant_id, name, email, questionnaire_type, participant_status, invite_token, invite_expires_at, invite_revoked_at",
       )
-      .single();
+      .single<UpdatedParticipantRow>();
 
     if (updateError || !updatedParticipant) {
       console.error("Invite extension failed", updateError);
@@ -181,10 +237,62 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    let emailWarning: string | null = null;
+
+    try {
+      const resend = new Resend(getEnv("RESEND_API_KEY"));
+      const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
+      const fromEmail = getEnv("CONTACT_FROM_EMAIL");
+      const replyToEmail = getEnv("CONTACT_TO_EMAIL");
+
+      const emailResult = await sendParticipantEventEmail({
+        resend,
+        fromEmail,
+        replyToEmail,
+        siteUrl,
+        projectName: project.project_name?.trim() || project.company_name || "Project",
+        companyName: project.company_name,
+        eventType: "invite_extended",
+        participant: {
+          name: getParticipantDisplayName(
+            updatedParticipant.name,
+            updatedParticipant.email,
+          ),
+          email: updatedParticipant.email,
+          questionnaireType: updatedParticipant.questionnaire_type,
+          inviteToken: updatedParticipant.invite_token,
+          inviteExpiresAt: updatedParticipant.invite_expires_at,
+        },
+        metadata: {
+          previousInviteExpiresAt,
+          updatedInviteExpiresAt: updatedParticipant.invite_expires_at,
+        },
+      });
+
+      if (!emailResult.success) {
+        emailWarning = "Invite expiry was updated, but the confirmation email could not be sent.";
+
+        console.error("Invite extension email failed", {
+          participantId: updatedParticipant.participant_id,
+          email: updatedParticipant.email,
+          error: emailResult.error,
+        });
+      }
+    } catch (emailError) {
+      emailWarning =
+        "Invite expiry was updated, but the confirmation email could not be sent.";
+
+      console.error("Unexpected error sending invite extension email", {
+        participantId: updatedParticipant.participant_id,
+        error: emailError,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       participant: updatedParticipant,
       extendedByDays: days,
+      emailWarning,
     });
   } catch (error) {
     console.error("Unexpected error extending invite", error);

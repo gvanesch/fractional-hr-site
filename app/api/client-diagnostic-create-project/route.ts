@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
 import {
   validateSegmentationSchema,
   validateSegmentationValues,
@@ -86,140 +87,6 @@ function mapQuestionnaireTypeToDatabaseValue(
   }
 }
 
-function buildDiagnosticEmailSubject(projectName: string): string {
-  return `Input requested: ${projectName} HR operations diagnostic`;
-}
-
-function buildDiagnosticEmailHtml(params: {
-  name: string;
-  projectName: string;
-  inviteUrl: string;
-}): string {
-  const { name, projectName, inviteUrl } = params;
-
-  return `
-    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; max-width: 560px;">
-      <p>Hi ${name},</p>
-
-      <p>You’ve been asked to contribute to an HR operations diagnostic for <strong>${projectName}</strong>.</p>
-
-      <p>This is not a generic survey. It is used to assess how HR services are designed, delivered, and experienced across the organisation.</p>
-
-      <p>Your input will be combined with other perspectives to identify where processes are working, where they are inconsistent, and where operational friction exists.</p>
-
-      <p><strong>The questionnaire takes around 8–10 minutes to complete.</strong></p>
-
-      <p style="margin: 24px 0;">
-        <a href="${inviteUrl}" 
-           style="display:inline-block;padding:12px 18px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
-          Start questionnaire
-        </a>
-      </p>
-
-      <p>If you need to pause, you can return to the same link at any time.</p>
-
-      <p style="margin-top: 24px;">
-        Thank you for your input,<br/>
-        Van Esch Advisory
-      </p>
-    </div>
-  `;
-}
-
-function buildDiagnosticEmailText(params: {
-  name: string;
-  projectName: string;
-  inviteUrl: string;
-}): string {
-  const { name, projectName, inviteUrl } = params;
-
-  return [
-    `Hi ${name},`,
-    ``,
-    `You’ve been asked to contribute to an HR operations diagnostic for ${projectName}.`,
-    ``,
-    `This is not a generic survey. It is used to assess how HR services are designed, delivered, and experienced across the organisation.`,
-    ``,
-    `Your input will be combined with other perspectives to identify where processes are working, where they are inconsistent, and where operational friction exists.`,
-    ``,
-    `The questionnaire takes around 8–10 minutes to complete.`,
-    ``,
-    `Start questionnaire: ${inviteUrl}`,
-    ``,
-    `If you need to pause, you can return to the same link at any time.`,
-    ``,
-    `Thank you for your input,`,
-    `Van Esch Advisory`,
-  ].join("\n");
-}
-
-function buildFactPackEmailSubject(projectName: string): string {
-  return `Input requested: ${projectName} client fact pack`;
-}
-
-function buildFactPackEmailHtml(params: {
-  name: string;
-  projectName: string;
-  inviteUrl: string;
-}): string {
-  const { name, projectName, inviteUrl } = params;
-
-  return `
-    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; max-width: 560px;">
-      <p>Hi ${name},</p>
-
-      <p>You’ve been asked to complete the Client Fact Pack for <strong>${projectName}</strong>.</p>
-
-      <p>This captures contextual information on the current people operations environment, including systems, tooling, infrastructure, and delivery context.</p>
-
-      <p>It is used to strengthen final interpretation and advisory output, but it is not included in scored statistical analysis.</p>
-
-      <p><strong>This input should only be completed once for the project.</strong></p>
-
-      <p style="margin: 24px 0;">
-        <a href="${inviteUrl}" 
-           style="display:inline-block;padding:12px 18px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
-          Start fact pack
-        </a>
-      </p>
-
-      <p>If you need to pause, you can return to the same link at any time.</p>
-
-      <p style="margin-top: 24px;">
-        Thank you,<br/>
-        Van Esch Advisory
-      </p>
-    </div>
-  `;
-}
-
-function buildFactPackEmailText(params: {
-  name: string;
-  projectName: string;
-  inviteUrl: string;
-}): string {
-  const { name, projectName, inviteUrl } = params;
-
-  return [
-    `Hi ${name},`,
-    ``,
-    `You’ve been asked to complete the Client Fact Pack for ${projectName}.`,
-    ``,
-    `This captures contextual information on the current people operations environment, including systems, tooling, infrastructure, and delivery context.`,
-    ``,
-    `It is used to strengthen final interpretation and advisory output, but it is not included in scored statistical analysis.`,
-    ``,
-    `This input should only be completed once for the project.`,
-    ``,
-    `Start fact pack: ${inviteUrl}`,
-    ``,
-    `If you need to pause, you can return to the same link at any time.`,
-    ``,
-    `Thank you,`,
-    `Van Esch Advisory`,
-  ].join("\n");
-}
-
 function getCleanFactPackRecipient(
   input: FactPackRecipientInput | null | undefined,
 ): FactPackRecipientInput | null {
@@ -273,120 +140,6 @@ function getDuplicateQuestionnaireParticipantEmails(
   return [...seen.entries()]
     .filter(([, count]) => count > 1)
     .map(([email]) => email);
-}
-
-async function sendParticipantInvite(params: {
-  resend: Resend;
-  fromEmail: string;
-  replyToEmail: string;
-  siteUrl: string;
-  projectName: string;
-  participant: InsertedParticipantRow;
-}): Promise<EmailSendResult> {
-  const { resend, fromEmail, replyToEmail, siteUrl, projectName, participant } =
-    params;
-
-  if (!participant.invite_token) {
-    return {
-      email: participant.email,
-      success: false,
-      resendId: null,
-      error: "Missing invite token on participant row.",
-    };
-  }
-
-  const inviteUrl = `${siteUrl}/client-diagnostic/respond/${participant.invite_token}`;
-  const isFactPack = participant.questionnaire_type === "client_fact_pack";
-
-  try {
-    const resendResponse = await resend.emails.send({
-      from: `Van Esch Advisory <${fromEmail}>`,
-      to: participant.email,
-      replyTo: replyToEmail,
-      subject: isFactPack
-        ? buildFactPackEmailSubject(projectName)
-        : buildDiagnosticEmailSubject(projectName),
-      html: isFactPack
-        ? buildFactPackEmailHtml({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          })
-        : buildDiagnosticEmailHtml({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          }),
-      text: isFactPack
-        ? buildFactPackEmailText({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          })
-        : buildDiagnosticEmailText({
-            name: participant.name,
-            projectName,
-            inviteUrl,
-          }),
-    });
-
-    const resendError =
-      resendResponse && "error" in resendResponse
-        ? resendResponse.error
-        : null;
-
-    const resendData =
-      resendResponse && "data" in resendResponse ? resendResponse.data : null;
-
-    if (resendError) {
-      console.error("Resend returned an error", {
-        participantEmail: participant.email,
-        resendError,
-      });
-
-      return {
-        email: participant.email,
-        success: false,
-        resendId: null,
-        error:
-          typeof resendError.message === "string"
-            ? resendError.message
-            : "Resend returned an error.",
-      };
-    }
-
-    console.info("Resend accepted email send", {
-      participantEmail: participant.email,
-      resendId: resendData?.id ?? null,
-      questionnaireType: participant.questionnaire_type,
-      inviteExpiresAt: participant.invite_expires_at,
-    });
-
-    return {
-      email: participant.email,
-      success: true,
-      resendId: resendData?.id ?? null,
-      error: null,
-    };
-  } catch (emailError) {
-    const message =
-      emailError instanceof Error
-        ? emailError.message
-        : "Unknown email send error.";
-
-    console.error("Email send threw an exception", {
-      participantEmail: participant.email,
-      error: message,
-      questionnaireType: participant.questionnaire_type,
-    });
-
-    return {
-      email: participant.email,
-      success: false,
-      resendId: null,
-      error: message,
-    };
-  }
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -603,13 +356,21 @@ export async function POST(request: Request): Promise<Response> {
 
     const emailResults: EmailSendResult[] = await Promise.all(
       insertedParticipants.map((participant) =>
-        sendParticipantInvite({
+        sendParticipantEventEmail({
           resend,
           fromEmail,
           replyToEmail,
           siteUrl,
           projectName,
-          participant,
+          companyName,
+          eventType: "invite",
+          participant: {
+            name: participant.name,
+            email: participant.email,
+            questionnaireType: participant.questionnaire_type,
+            inviteToken: participant.invite_token,
+            inviteExpiresAt: participant.invite_expires_at,
+          },
         }),
       ),
     );

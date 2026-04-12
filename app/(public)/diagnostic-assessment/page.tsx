@@ -3,40 +3,40 @@ import Link from "next/link";
 const participantGroups = [
   {
     title: "HR",
-    text: "Input from HR helps show how processes, ownership, service access, and operating discipline are intended to work, and how consistently they are being carried through in practice.",
+    text: "Input from HR helps build a structured view of how processes, ownership, service access, and operating discipline are intended to work, and how consistently they are being carried through in practice.",
   },
   {
     title: "Managers",
-    text: "Manager input highlights how people processes are experienced day to day, where guidance is clear or unclear, and where handoffs, approvals, or support models may be slowing work down.",
+    text: "Manager input helps show how people processes are experienced day to day, where guidance is clear, where support is easy to access, and where delivery can be made more consistent.",
   },
   {
     title: "Leadership",
-    text: "Leadership input helps surface whether HR operations are supporting organisational execution effectively, where alignment is strong, and where operational maturity may be constraining scale or consistency.",
+    text: "Leadership input adds a broader view of whether HR operations are supporting organisational execution effectively, where alignment is strong, and where greater clarity or consistency would support scale.",
   },
 ];
 
 const revealPoints = [
-  "Where handoffs are slowing work down",
-  "Where ownership is becoming unclear",
-  "Where manual workarounds are filling system gaps",
-  "Where guidance is hard to find or trust",
-  "Where operational capacity is acting as a constraint",
-  "Where experience differs materially by role",
+  "Where delivery is working well across roles",
+  "Where ownership would benefit from greater clarity",
+  "Where systems and manual activity are not yet working as cleanly together as they could",
+  "Where guidance and self-service can be strengthened",
+  "Where operational capacity may be shaping service experience",
+  "Where perspectives differ materially by role or level",
 ];
 
 const deliverables = [
   "Cross-role scoring across core operational dimensions",
-  "Prioritised gaps and areas of lowest maturity",
+  "A clear view of the areas that would benefit most from attention",
   "Narrative insight across observation, implication, and next step",
   "A client-ready diagnostic report",
-  "Practical next steps for where to focus first",
+  "Practical priorities for where to focus first",
   "A structured basis for deciding whether execution support is needed",
 ];
 
 const flowSteps = [
   {
     title: "1. HR Health Check",
-    text: "A quick initial signal to identify whether wider operational strain may be building.",
+    text: "A quick initial signal to indicate whether a deeper review would be valuable.",
     href: "/diagnostic",
     cta: "View the Health Check",
     isCurrent: false,
@@ -50,7 +50,7 @@ const flowSteps = [
   },
   {
     title: "3. HR Foundations Sprint",
-    text: "A focused engagement to act on structured insight and improve what matters first, where appropriate.",
+    text: "A focused engagement to turn structured insight into practical improvements, where appropriate.",
     href: "/services/hr-foundations-sprint",
     cta: "View the Sprint",
     isCurrent: false,
@@ -74,16 +74,16 @@ export default function DiagnosticAssessmentPage() {
                 </h1>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  A structured, multi-perspective diagnostic of how HR actually
-                  operates across your organisation.
+                  A structured, multi-perspective diagnostic of how HR operates
+                  across your organisation.
                 </p>
 
                 <p className="brand-body-on-dark max-w-3xl text-lg leading-8 text-[#C7D8EA]">
-                  This goes beyond the Health Check and uses structured input
-                  across leadership, managers, and HR to identify where
-                  operations feel weak, where alignment is strong, where
-                  experience differs by role, and what should be prioritised
-                  first.
+                  This goes beyond the Health Check and brings together
+                  structured input from leadership, managers, and HR to build a
+                  clearer view of how operations are experienced, where
+                  alignment is strong, where consistency varies, and where focus
+                  is likely to have the greatest value.
                 </p>
               </div>
 
@@ -115,19 +115,20 @@ export default function DiagnosticAssessmentPage() {
                   </h2>
                   <p className="mt-4 text-base leading-7 text-slate-200">
                     The assessment is designed to show how HR is experienced
-                    across the organisation, where operational patterns are
-                    holding up well, and where they are starting to create drag,
-                    inconsistency, or avoidable complexity.
+                    across the organisation, where delivery is already working
+                    well, and where greater clarity, consistency, or operational
+                    discipline would strengthen performance over time.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
-                    This is not a survey
+                    This is not a general survey
                   </p>
                   <p className="mt-3 text-base leading-7 text-slate-200">
-                    It is a structured diagnostic of how HR actually operates
-                    across leadership, managers, and HR.
+                    It is a structured diagnostic designed to compare how HR
+                    operations are understood and experienced across leadership,
+                    managers, and HR.
                   </p>
                 </div>
 
@@ -136,11 +137,64 @@ export default function DiagnosticAssessmentPage() {
                     Best suited to
                   </p>
                   <p className="mt-3 text-base leading-7 text-slate-200">
-                    Organisations that need more than a quick signal and want a
-                    more structured view of how work actually flows across HR,
-                    managers, and leadership.
+                    Organisations that want a more complete view than a quick
+                    signal can provide, and need stronger evidence to support
+                    priorities, sequencing, and next-step decisions.
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white">
+        <div className="brand-container brand-section">
+          <div className="max-w-3xl brand-stack-sm">
+            <p className="brand-section-kicker">How this differs from the Health Check</p>
+            <h2 className="brand-heading-lg text-slate-950">
+              The Health Check gives you a signal. The Diagnostic Assessment
+              gives you a structured view.
+            </h2>
+            <p className="brand-subheading text-slate-700">
+              The Health Check is designed as a quick entry point. The
+              Diagnostic Assessment goes further by combining multiple
+              perspectives to build a more grounded and decision-useful picture
+              of how HR operations are working across the organisation.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            <div className="brand-surface-card p-8">
+              <div className="brand-stack-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  HR Health Check
+                </p>
+                <h3 className="brand-heading-md text-slate-950">
+                  A fast initial signal
+                </h3>
+                <p className="brand-body">
+                  A short 10-question assessment designed to indicate whether a
+                  wider operational review may be valuable and to open an
+                  informed conversation.
+                </p>
+              </div>
+            </div>
+
+            <div className="brand-surface-card p-8">
+              <div className="brand-stack-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Diagnostic Assessment
+                </p>
+                <h3 className="brand-heading-md text-slate-950">
+                  A deeper, cross-role diagnostic
+                </h3>
+                <p className="brand-body">
+                  A more structured piece of work that compares input across HR,
+                  managers, and leadership to clarify priorities, support
+                  decision-making, and identify where focused execution support
+                  may be useful.
+                </p>
               </div>
             </div>
           </div>
@@ -182,14 +236,14 @@ export default function DiagnosticAssessmentPage() {
             <div className="brand-stack-sm">
               <p className="brand-section-kicker">What it reveals</p>
               <h2 className="brand-heading-lg text-slate-950">
-                Where HR is working, where it is straining, and where alignment
-                starts to break down.
+                A clearer view of where operations are working well and where
+                they would benefit from attention.
               </h2>
               <p className="brand-subheading text-slate-700">
-                The value is not just in a score. It is in identifying where
-                the experience of HR differs across roles, where operational
-                friction is becoming normalised, and where improvement is likely
-                to have the greatest effect.
+                The value is not just in a score. It is in understanding where
+                experience differs across roles, where processes are interpreted
+                differently, and where greater consistency or clarity would have
+                the greatest effect.
               </p>
             </div>
 
@@ -240,15 +294,16 @@ export default function DiagnosticAssessmentPage() {
         <div className="brand-container brand-section">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div className="brand-stack-sm">
-              <p className="brand-section-kicker">Investment</p>
+              <p className="brand-section-kicker">Value and decision support</p>
               <h2 className="brand-heading-lg text-slate-950">
                 A structured piece of work with a clear output.
               </h2>
               <p className="brand-subheading text-slate-700">
                 The Diagnostic Assessment is designed as a serious diagnostic,
                 not a light-touch add-on. It creates a more complete view of how
-                HR actually operates and produces structured insight that can be
-                used to clarify priorities and next steps.
+                HR operates and produces structured insight that can be used to
+                clarify priorities, support internal conversations, and decide
+                what should happen next.
               </p>
             </div>
 
@@ -266,7 +321,7 @@ export default function DiagnosticAssessmentPage() {
                 </p>
                 <p className="text-base leading-7 text-slate-700">
                   This includes structured cross-role input, scored insight,
-                  narrative output, prioritised gaps, and a client-ready
+                  narrative output, prioritised observations, and a client-ready
                   diagnostic report.
                 </p>
               </div>
@@ -285,8 +340,8 @@ export default function DiagnosticAssessmentPage() {
             <p className="brand-subheading text-slate-700">
               The Diagnostic Assessment sits between the initial Health Check
               and a more focused execution engagement. It provides the deeper
-              clarity that helps determine what matters most and what should
-              happen next.
+              clarity that helps determine what matters most and whether a
+              targeted sprint would add value.
             </p>
           </div>
 
@@ -330,14 +385,14 @@ export default function DiagnosticAssessmentPage() {
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
                 <h2 className="brand-heading-lg">
-                  Need a deeper view of how HR actually operates across the
+                  Need a more structured view of how HR operates across the
                   organisation?
                 </h2>
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
                   The Diagnostic Assessment is designed for organisations that
-                  need more than a quick signal. It creates a more structured,
-                  multi-perspective view of where friction sits, where alignment
-                  is weak, and what should be prioritised first.
+                  need more than a quick signal. It creates a more complete,
+                  multi-perspective view of current operations and helps clarify
+                  where focus is likely to create the greatest value.
                 </p>
               </div>
 

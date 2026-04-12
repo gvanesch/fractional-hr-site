@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/services/growing-companies", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/services/hr-chaos-signals", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/services/hr-foundations-sprint", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/diagnostic-assessment", changeFrequency: "weekly" as const, priority: 0.9 },
     { path: "/diagnostic", changeFrequency: "weekly" as const, priority: 0.8 },
     { path: "/approach", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/case-studies", changeFrequency: "monthly" as const, priority: 0.8 },
