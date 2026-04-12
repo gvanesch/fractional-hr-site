@@ -1,644 +1,423 @@
-export type AnswerValue = 1 | 2 | 3 | 4 | 5;
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import {
+  calculateDiagnosticResult,
+  type DiagnosticAnswers,
+  type AdvisorBrief,
+} from "../../../lib/diagnostic";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
 
-export type Question = {
-  id: number;
-  dimension: string;
-  text: string;
+export const dynamic = "force-dynamic";
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
 };
 
-export type ResultBand = {
-  label: string;
-  summary: string;
-  freeInsights: string[];
+type SubmissionRow = {
+  submission_id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_company: string | null;
+  contact_topic: string | null;
+  contact_message: string;
+  contact_source: string | null;
+  company_size: string | null;
+  industry: string | null;
+  role: string | null;
+  country_region: string | null;
+  answers: JsonValue;
+  score: number | null;
+  band: string | null;
+  advisor_brief: JsonValue;
+  contact_submitted_at: string | null;
 };
 
-export type DiagnosticAnswers = Record<number, AnswerValue | undefined>;
-
-export type DiagnosticDimensionScore = {
-  label: string;
-  score: number;
+type ErrorResponse = {
+  success: false;
+  error: string;
 };
 
-export type DiagnosticResult = {
-  rawScore: number;
-  score: number;
-  band: ResultBand;
-  dimensions: DiagnosticDimensionScore[];
-  lowestDimensions: DiagnosticDimensionScore[];
-};
-
-export type SavedDiagnosticState = {
-  answers: DiagnosticAnswers;
-  result: DiagnosticResult;
-  completedAt: string;
-};
-
-export type AdvisorBrief = {
-  headline: string;
-  overallAssessment: string;
-  keyThemes: string[];
-  likelyOperationalRisks: string[];
-  discussionPrompts: string[];
-  suggestedFocusAreas: string[];
-
-  // Existing richer advisory layers
-  executiveReadout: string;
-  likelyFrictionPoints: string[];
-  businessImplications: string[];
-  whatTypicallyHappensNext: string[];
-  first30DayPriorities: string[];
-  recommendedCallAngle: string;
-
-  // New call-support layers
-  callOpening: string;
-  conversationFlow: string[];
-  conversionPositioning: string[];
-};
-
-export const questions: Question[] = [
-  {
-    id: 1,
-    dimension: "Process clarity",
-    text: "Our core HR processes are documented clearly enough that managers and HR team members can follow them consistently.",
-  },
-  {
-    id: 2,
-    dimension: "Consistency",
-    text: "Employees and managers generally receive a consistent HR experience across teams, departments, or locations.",
-  },
-  {
-    id: 3,
-    dimension: "Service access",
-    text: "Employees know where to go for HR help, and the route for getting support is clear.",
-  },
-  {
-    id: 4,
-    dimension: "Ownership",
-    text: "Ownership for key HR processes, approvals, and escalations is clearly defined.",
-  },
-  {
-    id: 5,
-    dimension: "Onboarding",
-    text: "Onboarding is structured and repeatable rather than depending heavily on individual managers or manual follow-up.",
-  },
-  {
-    id: 6,
-    dimension: "Technology alignment",
-    text: "Our HR systems and workflows reflect how work actually happens in the organisation.",
-  },
-  {
-    id: 7,
-    dimension: "Knowledge and self-service",
-    text: "Managers and employees can find answers to common HR questions without always needing direct help from HR.",
-  },
-  {
-    id: 8,
-    dimension: "Operational capacity",
-    text: "HR has enough structure and capacity to improve operations proactively, rather than spending most of its time reacting.",
-  },
-  {
-    id: 9,
-    dimension: "Data and handoffs",
-    text: "HR data, handoffs, and workflow transitions are reliable enough that work does not regularly get stuck, repeated, or corrected.",
-  },
-  {
-    id: 10,
-    dimension: "Change resilience",
-    text: "When the organisation grows or changes, HR processes can adapt without becoming confusing or chaotic.",
-  },
-];
-
-export function scoreToBand(score: number): ResultBand {
-  if (score <= 24) {
-    return {
-      label: "Emerging Foundations",
-      summary:
-        "HR processes may still be evolving and some operational responsibilities may be handled informally. As organisations grow, this can begin to create friction for managers and employees.",
-      freeInsights: [
-        "Core HR processes may still need clearer structure or documentation.",
-        "Managers may experience inconsistency in how people processes are handled.",
-        "Strengthening operational foundations can improve consistency and reduce management overhead.",
-      ],
-    };
-  }
-
-  if (score <= 49) {
-    return {
-      label: "Developing Structure",
-      summary:
-        "The organisation likely has some HR operational foundations in place, though inconsistencies may still appear across teams or processes as the business grows.",
-      freeInsights: [
-        "Some processes may rely too heavily on individual judgement or workarounds.",
-        "Clearer process ownership can improve consistency across the organisation.",
-        "More structured HR service delivery can support growth more effectively.",
-      ],
-    };
-  }
-
-  if (score <= 74) {
-    return {
-      label: "Structured but Improving",
-      summary:
-        "Many HR operational foundations appear to be in place. However, some areas may still benefit from refinement to improve efficiency, consistency, and resilience.",
-      freeInsights: [
-        "Core structures likely exist but may not yet be fully embedded.",
-        "Some friction may still appear in handoffs, service access, or process execution.",
-        "Targeted improvements could strengthen scalability and operational confidence.",
-      ],
-    };
-  }
-
-  return {
-    label: "Operationally Mature",
-    summary:
-      "HR operations appear well structured and capable of supporting organisational growth. Continued refinement can help maintain efficiency and keep HR aligned with business priorities.",
-    freeInsights: [
-      "Processes appear relatively well established and consistent.",
-      "Operational governance is likely supporting delivery effectively.",
-      "Targeted optimisation may still unlock additional value over time.",
-    ],
+type SuccessResponse = {
+  success: true;
+  submission: {
+    submissionId: string;
+    contactName: string;
+    contactEmail: string;
+    contactCompany: string | null;
+    contactTopic: string | null;
+    contactMessage: string;
+    contactSource: string | null;
+    companySize: string | null;
+    industry: string | null;
+    role: string | null;
+    countryRegion: string | null;
+    contactSubmittedAt: string | null;
   };
-}
-
-export function getDimensionScores(
-  answers: DiagnosticAnswers,
-): DiagnosticDimensionScore[] {
-  return questions.map((question) => ({
-    label: question.dimension,
-    score: Number(answers[question.id] ?? 0),
-  }));
-}
-
-export function calculateRawScore(answers: DiagnosticAnswers): number {
-  return questions.reduce((sum, question) => {
-    return sum + Number(answers[question.id] ?? 0);
-  }, 0);
-}
-
-export function calculatePercentageScore(rawScore: number): number {
-  return Math.round(((rawScore - 10) / 40) * 100);
-}
-
-export function calculateDiagnosticResult(
-  answers: DiagnosticAnswers,
-): DiagnosticResult {
-  const rawScore = calculateRawScore(answers);
-  const score = calculatePercentageScore(rawScore);
-  const band = scoreToBand(score);
-  const dimensions = getDimensionScores(answers).sort((a, b) => a.score - b.score);
-  const lowestDimensions = dimensions.slice(0, 3);
-
-  return {
-    rawScore,
-    score,
-    band,
-    dimensions,
-    lowestDimensions,
+  diagnostic: {
+    score: number;
+    band: {
+      label: string;
+      summary: string;
+    };
+    lowestDimensions: Array<{
+      label: string;
+      score: number;
+    }>;
+  } | null;
+  derived: {
+    narrative: string | null;
+    impact: string | null;
+    priorities: string[];
+    callOpener: string | null;
+    lowestDimensionInsights: Array<{
+      label: string;
+      score: number;
+      insight: string;
+    }>;
   };
-}
+  advisorBrief: AdvisorBrief | null;
+};
 
-function getThemeNarrative(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Core HR processes may not yet be consistently defined or documented, which can create variability in execution.";
-    case "Consistency":
-      return "Employees and managers may be experiencing HR support differently across teams, managers, or locations.";
-    case "Service access":
-      return "Routes into HR support may not be sufficiently clear, making it harder for employees and managers to know where to go.";
-    case "Ownership":
-      return "Responsibility for key process steps, approvals, or escalations may not always be fully clear.";
-    case "Onboarding":
-      return "Onboarding may rely too heavily on individual managers or manual follow-up, increasing variability in experience.";
-    case "Technology alignment":
-      return "Systems and workflows may not yet reflect operational reality closely enough, creating workarounds or friction.";
-    case "Knowledge and self-service":
-      return "Common HR guidance may be difficult to access, increasing reliance on direct HR support for routine queries.";
-    case "Operational capacity":
-      return "The HR team may be spending most of its time reacting, leaving limited capacity for process improvement.";
-    case "Data and handoffs":
-      return "Workflow transitions, ownership handoffs, or data quality issues may be contributing to rework or delays.";
-    case "Change resilience":
-      return "The current operating approach may begin to show strain when the organisation grows or changes.";
-    default:
-      return `${label} may be contributing to operational friction and would benefit from further review.`;
+function createSupabaseServerClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase server environment variables.");
   }
+
+  return createClient(supabaseUrl, serviceRoleKey);
 }
 
-function getRiskNarratives(labels: string[]): string[] {
-  const risks = labels.map((label) => {
-    switch (label) {
-      case "Process clarity":
-        return "Managers may interpret HR processes differently, increasing inconsistency and reliance on informal guidance.";
-      case "Consistency":
-        return "Employee experience may vary across the organisation, which can undermine confidence in HR service delivery.";
-      case "Service access":
-        return "Queries may reach HR through ad hoc channels, reducing visibility and making prioritisation harder.";
-      case "Ownership":
-        return "Delays or escalations may occur because accountability is not always obvious at each process step.";
-      case "Onboarding":
-        return "New joiner experience may be uneven, with avoidable administrative gaps or missed handoffs.";
-      case "Technology alignment":
-        return "Manual workarounds may increase operational drag and reduce confidence in underlying processes.";
-      case "Knowledge and self-service":
-        return "HR may remain overloaded with repeat queries that could otherwise be handled through clearer self-service.";
-      case "Operational capacity":
-        return "Improvement work may be repeatedly deferred because urgent operational demands consume available capacity.";
-      case "Data and handoffs":
-        return "Work may be duplicated, corrected, or delayed where transitions between teams or systems are weak.";
-      case "Change resilience":
-        return "Growth, restructuring, or policy change may expose fragility in the current HR operating model.";
-      default:
-        return `${label} may introduce operational inefficiency or inconsistency if left unresolved.`;
+async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
+  const supabase = createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("diagnostic_submissions")
+    .select(
+      `
+        submission_id,
+        contact_name,
+        contact_email,
+        contact_company,
+        contact_topic,
+        contact_message,
+        contact_source,
+        company_size,
+        industry,
+        role,
+        country_region,
+        answers,
+        score,
+        band,
+        advisor_brief,
+        contact_submitted_at
+      `,
+    )
+    .eq("submission_id", submissionId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
     }
-  });
 
-  return Array.from(new Set(risks));
+    throw new Error(`Supabase read failed: ${error.message}`);
+  }
+
+  return data as SubmissionRow;
 }
 
-function getDiscussionPrompt(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Which HR processes are most reliant on tribal knowledge rather than documented steps?";
-    case "Consistency":
-      return "Where do managers or employees appear to receive different HR experiences today?";
-    case "Service access":
-      return "How do employees and managers currently know where to go for HR support?";
-    case "Ownership":
-      return "Where do approvals, escalations, or handoffs tend to become unclear?";
-    case "Onboarding":
-      return "How structured is onboarding across different teams or hiring managers?";
-    case "Technology alignment":
-      return "Where do current HR systems fail to reflect how work actually happens?";
-    case "Knowledge and self-service":
-      return "What proportion of routine HR queries could be solved through stronger guidance or self-service?";
-    case "Operational capacity":
-      return "How much HR capacity is spent on reactive work versus improvement activity?";
-    case "Data and handoffs":
-      return "Where does work most often get stuck, repeated, or corrected?";
-    case "Change resilience":
-      return "What happens to HR operations when the business scales, restructures, or changes policy quickly?";
-    default:
-      return `What is currently driving friction in ${label.toLowerCase()}?`;
-    }
+function asObject(value: JsonValue): JsonObject | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as JsonObject;
 }
 
-function getSuggestedFocusAreas(labels: string[]): string[] {
-  const focusAreas = labels.map((label) => {
-    switch (label) {
-      case "Process clarity":
-        return "Clarify and document core HR processes and decision points.";
-      case "Consistency":
-        return "Improve consistency of execution across teams, managers, or geographies.";
-      case "Service access":
-        return "Create clearer entry points and service pathways for HR support.";
-      case "Ownership":
-        return "Strengthen accountability for process steps, approvals, and escalations.";
-      case "Onboarding":
-        return "Standardise onboarding foundations while preserving manager flexibility where useful.";
-      case "Technology alignment":
-        return "Reduce manual workarounds by aligning systems and workflows more closely to real operations.";
-      case "Knowledge and self-service":
-        return "Strengthen knowledge management and self-service guidance for common HR queries.";
-      case "Operational capacity":
-        return "Create more room for proactive improvement by reducing avoidable operational drag.";
-      case "Data and handoffs":
-        return "Tighten workflow transitions, handoffs, and data reliability across the employee lifecycle.";
-      case "Change resilience":
-        return "Improve the resilience of HR processes under growth or organisational change.";
-      default:
-        return `Review and strengthen ${label.toLowerCase()}.`;
-    }
-  });
-
-  return Array.from(new Set(focusAreas));
+function asString(value: JsonValue | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
-function getFrictionPointNarrative(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Managers and HR team members may be handling similar people processes differently, with too much reliance on informal interpretation.";
-    case "Consistency":
-      return "The employee and manager experience is likely varying by team, manager, or geography rather than feeling reliably repeatable.";
-    case "Service access":
-      return "HR support may be coming through mixed channels such as Slack, email, direct messages, or ad hoc conversations, making demand harder to manage.";
-    case "Ownership":
-      return "Work may stall around approvals, escalations, or exceptions because it is not always obvious who owns each step.";
-    case "Onboarding":
-      return "New joiner setup and early experience may be uneven, especially where manager capability or follow-through differs.";
-    case "Technology alignment":
-      return "People are likely compensating for system gaps with spreadsheets, side processes, manual reminders, or duplicated work.";
-    case "Knowledge and self-service":
-      return "The HR team may be absorbing avoidable volume because answers to common questions are not easy to find or trusted enough to use.";
-    case "Operational capacity":
-      return "The team may be trapped in a reactive cycle, with improvement work repeatedly deprioritised in favour of immediate case handling.";
-    case "Data and handoffs":
-      return "Breakdowns are likely appearing where work moves between teams, systems, or owners, creating rework and delays.";
-    case "Change resilience":
-      return "Operational strain may become most visible during growth, restructuring, policy shifts, or leadership change.";
-    default:
-      return `${label} is likely contributing to day-to-day operating friction.`;
+function asStringArray(value: JsonValue | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
+
+  return value.filter((item): item is string => typeof item === "string");
 }
 
-function getBusinessImplicationNarrative(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Operational ambiguity can increase manager dependency on HR and make execution quality harder to control at scale.";
-    case "Consistency":
-      return "Inconsistent HR delivery can reduce confidence in the function and create uneven employee experience across the organisation.";
-    case "Service access":
-      return "Unclear access routes can hide true demand, increase response variability, and make service delivery harder to improve.";
-    case "Ownership":
-      return "Weak accountability can slow decisions, increase escalations, and create avoidable friction between HR, managers, and other stakeholders.";
-    case "Onboarding":
-      return "An inconsistent onboarding experience can slow time to effectiveness and create early confidence gaps for new hires.";
-    case "Technology alignment":
-      return "Misaligned systems can create persistent manual drag, lower trust in HR operations, and limit scale efficiency.";
-    case "Knowledge and self-service":
-      return "Low self-service maturity can keep HR tied up in repeat transactions rather than higher-value advisory or improvement work.";
-    case "Operational capacity":
-      return "A reactive operating model reduces the organisation’s ability to improve before issues become more visible and expensive.";
-    case "Data and handoffs":
-      return "Poor handoffs and unreliable data can create avoidable correction work and weaken confidence in process control.";
-    case "Change resilience":
-      return "Low resilience increases the risk that growth or change will expose structural weaknesses at exactly the point the business needs stability.";
-    default:
-      return `${label} may be constraining operational confidence and scalability.`;
-  }
-}
+function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
+  const objectValue = asObject(value);
 
-function getTypicalNextNarrative(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Exception handling tends to increase because people are forced to interpret process rather than execute it consistently.";
-    case "Consistency":
-      return "Leadership often starts noticing that outcomes differ by team even when policies appear similar on paper.";
-    case "Service access":
-      return "HR support requests become harder to triage and prioritise because work enters through too many informal routes.";
-    case "Ownership":
-      return "Escalations grow because stakeholders become unsure who should decide, approve, or resolve specific issues.";
-    case "Onboarding":
-      return "As hiring grows, gaps become more visible and onboarding quality becomes more dependent on individual manager discipline.";
-    case "Technology alignment":
-      return "The business adds more workarounds instead of solving the underlying workflow design problem.";
-    case "Knowledge and self-service":
-      return "HR volume increases without proportional value because the same routine questions keep returning to the team.";
-    case "Operational capacity":
-      return "The backlog of improvement work grows while the team stays busy solving symptoms rather than root causes.";
-    case "Data and handoffs":
-      return "More work gets repeated, corrected, or chased because transitions are not reliable enough first time.";
-    case "Change resilience":
-      return "Periods of change start to feel disproportionately disruptive because the operating model is not absorbing variation well.";
-    default:
-      return `The organisation may see more visible friction if ${label.toLowerCase()} remains under-developed.`;
-  }
-}
-
-function getFirst30DayPriority(label: string): string {
-  switch (label) {
-    case "Process clarity":
-      return "Map and simplify the highest-friction HR processes so managers and HR are working from the same baseline.";
-    case "Consistency":
-      return "Identify where execution differs most by team or manager and define a tighter minimum service standard.";
-    case "Service access":
-      return "Clarify the main routes into HR support and reduce unnecessary channel sprawl.";
-    case "Ownership":
-      return "Make ownership of approvals, exceptions, and escalations explicit for the most business-critical workflows.";
-    case "Onboarding":
-      return "Stabilise the core onboarding journey with clearer handoffs, checklists, and manager expectations.";
-    case "Technology alignment":
-      return "Pinpoint the biggest system-driven workarounds and prioritise the ones creating the most operational drag.";
-    case "Knowledge and self-service":
-      return "Surface the most repeated HR questions and turn them into clearer, usable guidance.";
-    case "Operational capacity":
-      return "Create protected space for a small number of operational fixes that reduce repeat reactive workload.";
-    case "Data and handoffs":
-      return "Tighten one or two failure-prone handoff points across the employee lifecycle and reduce correction work.";
-    case "Change resilience":
-      return "Stress-test where current HR processes are most likely to break under growth or organisational change.";
-    default:
-      return `Prioritise practical stabilisation in ${label.toLowerCase()}.`;
-  }
-}
-
-function buildExecutiveReadout(
-  result: DiagnosticResult,
-  weakestLabels: string[],
-): string {
-  const weakestSummary = weakestLabels.join(", ");
-
-  if (result.band.label === "Emerging Foundations") {
-    return `This lead’s responses suggest an HR operating model that is still forming in several important areas. The score pattern points to operational dependence on individual knowledge, manual coordination, and inconsistent execution. The weakest areas (${weakestSummary}) are likely creating friction for managers and employees already, and that friction is likely to become more visible as complexity grows.`;
+  if (!objectValue) {
+    return null;
   }
 
-  if (result.band.label === "Developing Structure") {
-    return `This lead appears to have some useful HR structure in place, but not yet enough consistency or control to make delivery feel reliably scalable. The weakest areas (${weakestSummary}) suggest that process discipline, ownership, or service design may not yet be fully embedded across the organisation.`;
+  const headline = asString(objectValue.headline);
+  const overallAssessment = asString(objectValue.overallAssessment);
+  const executiveReadout = asString(objectValue.executiveReadout);
+  const recommendedCallAngle = asString(objectValue.recommendedCallAngle);
+  const callOpening = asString(objectValue.callOpening);
+
+  if (
+    !headline ||
+    !overallAssessment ||
+    !executiveReadout ||
+    !recommendedCallAngle ||
+    !callOpening
+  ) {
+    return null;
   }
-
-  if (result.band.label === "Structured but Improving") {
-    return `This lead’s responses suggest a reasonably solid HR operating base with identifiable pressure points rather than wholesale breakdown. The weakest areas (${weakestSummary}) are likely where operational confidence drops, especially across handoffs, service execution, or periods of growth and change.`;
-  }
-
-  return `This lead appears broadly operationally mature, but the weakest areas (${weakestSummary}) may still be limiting efficiency, resilience, or scale readiness. The call should likely focus less on foundational repair and more on optimisation, cross-functional friction, and reducing hidden drag.`;
-}
-
-function buildOverallAssessment(result: DiagnosticResult): string {
-  if (result.band.label === "Emerging Foundations") {
-    return "The organisation is likely operating with some important HR foundations still evolving. There may be meaningful dependence on individual knowledge, informal process handling, or manual coordination.";
-  }
-
-  if (result.band.label === "Developing Structure") {
-    return "The organisation appears to have some useful HR operational structure in place, but it is likely not yet fully embedded across all workflows or stakeholder groups.";
-  }
-
-  if (result.band.label === "Structured but Improving") {
-    return "The organisation appears to have a reasonably solid HR operating base, with targeted opportunities to reduce friction, strengthen consistency, and improve resilience.";
-  }
-
-  return "The organisation appears operationally mature overall, with the greatest opportunity likely in optimisation, scalability, and the refinement of more complex cross-functional workflows.";
-}
-
-function buildRecommendedCallAngle(
-  result: DiagnosticResult,
-  weakestLabels: string[],
-): string {
-  const joined = weakestLabels.join(", ");
-
-  if (result.band.label === "Emerging Foundations") {
-    return `Position the conversation around stabilising core HR operations before friction becomes more expensive. Anchor on ${joined}, then explore where managers are compensating for missing structure today.`;
-  }
-
-  if (result.band.label === "Developing Structure") {
-    return `Position the conversation around moving from partial structure to repeatable operational confidence. Use ${joined} to explore where current processes exist in theory but are not landing consistently in practice.`;
-  }
-
-  if (result.band.label === "Structured but Improving") {
-    return `Position the conversation around targeted improvement rather than wholesale redesign. Use ${joined} to identify where a relatively solid model is still creating avoidable drag or inconsistency.`;
-  }
-
-  return `Position the conversation around optimisation and scale-readiness. Use ${joined} to test where a mature HR operation still has hidden inefficiency, fragile handoffs, or opportunities for smarter service design.`;
-}
-
-function buildCallOpening(result: DiagnosticResult, weakestLabels: string[]): string {
-  const weakestSummary = weakestLabels.join(", ");
-
-  if (result.band.label === "Emerging Foundations") {
-    return `Based on your Health Check, the signal is that some core HR foundations may still be forming, particularly around ${weakestSummary}. What would be useful first is understanding where that is creating the most day-to-day friction for you today, rather than jumping straight into solutions.`;
-  }
-
-  if (result.band.label === "Developing Structure") {
-    return `Based on your Health Check, it looks like you already have some useful structure in place, but it may not be landing consistently in practice, particularly around ${weakestSummary}. Before discussing solutions, it would be useful to understand where that is being felt most clearly today.`;
-  }
-
-  if (result.band.label === "Structured but Improving") {
-    return `Based on your Health Check, the picture looks reasonably solid overall, but there are a few areas, particularly ${weakestSummary}, where the model may still be creating avoidable friction. It would be useful to start by understanding where that is most visible in practice.`;
-  }
-
-  return `Based on your Health Check, the operating model looks broadly mature, but there are still some areas, particularly ${weakestSummary}, where optimisation or hidden friction may be worth exploring. A useful place to start is understanding where you feel the current model is not working quite as cleanly as it should.`;
-}
-
-function buildConversationFlow(
-  result: DiagnosticResult,
-  weakestLabels: string[],
-): string[] {
-  const firstWeakest = weakestLabels[0]?.toLowerCase() || "the operating model";
-
-  if (result.band.label === "Emerging Foundations") {
-    return [
-      "Start by confirming whether the result broadly resonates with their current experience.",
-      `Explore where ${firstWeakest} is creating the most visible friction for managers, employees, or HR today.`,
-      "Test whether issues are localised or showing up across multiple teams or workflows.",
-      "Understand what is currently being handled through informal judgement or manual workaround.",
-      "Close by framing the value of moving from reactive handling to more deliberate operating design.",
-    ];
-  }
-
-  if (result.band.label === "Developing Structure") {
-    return [
-      "Start by validating where the current structure is helping and where it is falling short in practice.",
-      "Explore where inconsistency is most visible across teams, managers, or locations.",
-      "Test whether current issues reflect partial process design, weak ownership, or lack of operational discipline.",
-      "Understand whether the organisation sees the problem clearly but lacks prioritised action.",
-      "Close by positioning the diagnostic as a way to validate root causes before broader improvement work.",
-    ];
-  }
-
-  if (result.band.label === "Structured but Improving") {
-    return [
-      "Start by confirming which parts of the current HR model already feel dependable.",
-      "Explore where targeted friction continues to absorb disproportionate effort.",
-      "Test whether pain points sit in handoffs, service execution, or manager experience rather than total process absence.",
-      "Understand what is currently preventing more focused optimisation.",
-      "Close by framing the diagnostic as a way to identify the highest-value improvements rather than redesign everything.",
-    ];
-  }
-
-  return [
-    "Start by confirming where the current operating model already feels strong and dependable.",
-    "Explore where hidden inefficiency, cross-functional friction, or fragile handoffs still remain.",
-    "Test whether the organisation is dealing with refinement opportunities rather than foundational gaps.",
-    "Understand which pressure points matter enough to prioritise now.",
-    "Close by positioning the diagnostic as a way to separate normal variation from material optimisation opportunity.",
-  ];
-}
-
-function buildConversionPositioning(
-  result: DiagnosticResult,
-  weakestLabels: string[],
-): string[] {
-  const weakestSummary = weakestLabels.join(", ");
-
-  if (result.band.label === "Emerging Foundations") {
-    return [
-      "Position the Diagnostic Assessment as a way to validate whether current friction is structural rather than isolated.",
-      `Use ${weakestSummary} to show why greater clarity across HR, managers, and leadership would reduce guesswork.`,
-      "Position the Sprint as focused execution once the highest-friction issues are clear.",
-    ];
-  }
-
-  if (result.band.label === "Developing Structure") {
-    return [
-      "Position the Diagnostic Assessment as the next step to distinguish between partial structure and true operational consistency.",
-      `Use ${weakestSummary} to show where cross-role insight would sharpen prioritisation.`,
-      "Position the Sprint as targeted follow-through once the most material gaps are clear.",
-    ];
-  }
-
-  if (result.band.label === "Structured but Improving") {
-    return [
-      "Position the Diagnostic Assessment as a way to identify the most valuable targeted improvements rather than broad redesign.",
-      `Use ${weakestSummary} to explain how deeper evidence across roles would help sequence action.`,
-      "Position the Sprint as a practical route to act on a smaller number of high-value improvements.",
-    ];
-  }
-
-  return [
-    "Position the Diagnostic Assessment as a way to validate optimisation opportunities across multiple stakeholder viewpoints.",
-    `Use ${weakestSummary} to test whether current concerns are meaningful enough to prioritise now.`,
-    "Position the Sprint as a focused route to remove hidden drag once the best improvement opportunities are confirmed.",
-  ];
-}
-
-function dedupe(items: string[]): string[] {
-  return Array.from(new Set(items));
-}
-
-export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
-  const weakestLabels = result.lowestDimensions.map((dimension) => dimension.label);
-
-  const headline = `${result.band.label}: score ${result.score}/100`;
-  const overallAssessment = buildOverallAssessment(result);
-
-  const keyThemes = weakestLabels.map(getThemeNarrative);
-  const likelyOperationalRisks = getRiskNarratives(weakestLabels);
-  const discussionPrompts = weakestLabels.map(getDiscussionPrompt);
-  const suggestedFocusAreas = getSuggestedFocusAreas(weakestLabels);
-
-  const executiveReadout = buildExecutiveReadout(result, weakestLabels);
-  const likelyFrictionPoints = dedupe(weakestLabels.map(getFrictionPointNarrative));
-  const businessImplications = dedupe(
-    weakestLabels.map(getBusinessImplicationNarrative),
-  );
-  const whatTypicallyHappensNext = dedupe(
-    weakestLabels.map(getTypicalNextNarrative),
-  );
-  const first30DayPriorities = dedupe(
-    weakestLabels.map(getFirst30DayPriority),
-  );
-  const recommendedCallAngle = buildRecommendedCallAngle(result, weakestLabels);
-
-  const callOpening = buildCallOpening(result, weakestLabels);
-  const conversationFlow = buildConversationFlow(result, weakestLabels);
-  const conversionPositioning = buildConversionPositioning(
-    result,
-    weakestLabels,
-  );
 
   return {
     headline,
     overallAssessment,
-    keyThemes,
-    likelyOperationalRisks,
-    discussionPrompts,
-    suggestedFocusAreas,
+    keyThemes: asStringArray(objectValue.keyThemes),
+    likelyOperationalRisks: asStringArray(objectValue.likelyOperationalRisks),
+    discussionPrompts: asStringArray(objectValue.discussionPrompts),
+    suggestedFocusAreas: asStringArray(objectValue.suggestedFocusAreas),
     executiveReadout,
-    likelyFrictionPoints,
-    businessImplications,
-    whatTypicallyHappensNext,
-    first30DayPriorities,
+    likelyFrictionPoints: asStringArray(objectValue.likelyFrictionPoints),
+    businessImplications: asStringArray(objectValue.businessImplications),
+    whatTypicallyHappensNext: asStringArray(objectValue.whatTypicallyHappensNext),
+    first30DayPriorities: asStringArray(objectValue.first30DayPriorities),
     recommendedCallAngle,
     callOpening,
-    conversationFlow,
-    conversionPositioning,
+    conversationFlow: asStringArray(objectValue.conversationFlow),
+    conversionPositioning: asStringArray(objectValue.conversionPositioning),
   };
 }
 
-export function buildDiagnosticState(
-  answers: DiagnosticAnswers,
-): SavedDiagnosticState {
-  return {
-    answers,
-    result: calculateDiagnosticResult(answers),
-    completedAt: new Date().toISOString(),
-  };
+function asDiagnosticAnswers(value: JsonValue): DiagnosticAnswers | null {
+  const objectValue = asObject(value);
+
+  if (!objectValue) {
+    return null;
+  }
+
+  const parsed: Record<number, 1 | 2 | 3 | 4 | 5 | undefined> = {};
+
+  for (const [key, rawValue] of Object.entries(objectValue)) {
+    const questionId = Number(key);
+
+    if (!Number.isInteger(questionId)) {
+      return null;
+    }
+
+    if (
+      rawValue === 1 ||
+      rawValue === 2 ||
+      rawValue === 3 ||
+      rawValue === 4 ||
+      rawValue === 5
+    ) {
+      parsed[questionId] = rawValue;
+      continue;
+    }
+
+    if (rawValue !== null && rawValue !== undefined) {
+      return null;
+    }
+  }
+
+  return parsed as DiagnosticAnswers;
+}
+
+function getInsight(label: string): string {
+  switch (label) {
+    case "Process clarity":
+      return "Lack of documented and repeatable processes.";
+    case "Consistency":
+      return "Inconsistent HR experience across teams.";
+    case "Service access":
+      return "Employees unclear where to go for support.";
+    case "Ownership":
+      return "Responsibility unclear across workflows.";
+    case "Onboarding":
+      return "Onboarding varies by manager.";
+    case "Technology alignment":
+      return "Systems not aligned to real workflows.";
+    case "Knowledge and self-service":
+      return "Over-reliance on HR for basic queries.";
+    case "Operational capacity":
+      return "HR operating reactively.";
+    case "Data and handoffs":
+      return "Breakdowns and duplication in processes.";
+    case "Change resilience":
+      return "Difficulty adapting to growth or change.";
+    default:
+      return "This area may be contributing to operational friction.";
+  }
+}
+
+function buildNarrative(score: number, submission: SubmissionRow): string {
+  const size = submission.company_size || "a growing organisation";
+
+  if (score < 40) {
+    return `This looks like an early-stage HR operating model where processes have evolved organically. At ${size}, this typically shows up as inconsistency, unclear ownership, and reliance on individuals rather than systems.`;
+  }
+
+  if (score < 70) {
+    return `This suggests a developing HR function where structure exists but is not consistently applied. At ${size}, this often creates friction and operational inefficiency.`;
+  }
+
+  return "This reflects a relatively mature HR operation. The focus is likely optimisation, scalability, and alignment with future growth.";
+}
+
+function buildImpact(score: number): string {
+  if (score < 40) {
+    return "High management overhead, inconsistent employee experience, and growing operational risk as the organisation scales.";
+  }
+
+  if (score < 70) {
+    return "Hidden inefficiencies, duplication of effort, and increasing friction between teams.";
+  }
+
+  return "Opportunities to optimise efficiency, reduce cost-to-serve, and improve scalability.";
+}
+
+function buildPriorities(score: number): string[] {
+  if (score < 40) {
+    return [
+      "Define and document core HR processes",
+      "Clarify ownership across the employee lifecycle",
+      "Establish a single entry point for HR support",
+    ];
+  }
+
+  if (score < 70) {
+    return [
+      "Standardise processes across teams",
+      "Improve system alignment and automation",
+      "Introduce clearer service structure",
+    ];
+  }
+
+  return [
+    "Optimise workflows and reduce friction",
+    "Enhance reporting and insights",
+    "Align HR operations with strategic growth",
+  ];
+}
+
+function buildCallOpener(score: number, submission: SubmissionRow): string {
+  const size = submission.company_size || "your organisation";
+
+  if (score < 40) {
+    return `From what I’ve seen, organisations at ${size} often reach a point where HR starts to feel reactive and inconsistent. I’d be interested to understand where that’s showing up most for you right now.`;
+  }
+
+  if (score < 70) {
+    return "It looks like you’ve got some structure in place, but it’s not fully consistent yet. I’d like to explore where that’s creating friction day-to-day.";
+  }
+
+  return "You seem to have a solid foundation in place. I’d be interested to understand where you’re seeing limitations as you scale further.";
+}
+
+export async function GET(request: Request): Promise<Response> {
+  try {
+    const advisorUser = await requireAdvisorUser();
+
+    if (!advisorUser) {
+      return NextResponse.json<ErrorResponse>(
+        { success: false, error: "Unauthorized." },
+        { status: 403 },
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const submissionId = searchParams.get("submissionId");
+
+    if (!submissionId) {
+      return NextResponse.json<ErrorResponse>(
+        { success: false, error: "submissionId is required." },
+        { status: 400 },
+      );
+    }
+
+    const submission = await getSubmission(submissionId);
+
+    if (!submission) {
+      return NextResponse.json<ErrorResponse>(
+        { success: false, error: "Submission not found." },
+        { status: 404 },
+      );
+    }
+
+    const diagnosticAnswers = asDiagnosticAnswers(submission.answers);
+    const result = diagnosticAnswers
+      ? calculateDiagnosticResult(diagnosticAnswers)
+      : null;
+
+    const advisorBrief = asAdvisorBrief(submission.advisor_brief);
+
+    const response: SuccessResponse = {
+      success: true,
+      submission: {
+        submissionId: submission.submission_id,
+        contactName: submission.contact_name,
+        contactEmail: submission.contact_email,
+        contactCompany: submission.contact_company,
+        contactTopic: submission.contact_topic,
+        contactMessage: submission.contact_message,
+        contactSource: submission.contact_source,
+        companySize: submission.company_size,
+        industry: submission.industry,
+        role: submission.role,
+        countryRegion: submission.country_region,
+        contactSubmittedAt: submission.contact_submitted_at,
+      },
+      diagnostic: result
+        ? {
+            score: result.score,
+            band: {
+              label: result.band.label,
+              summary: result.band.summary,
+            },
+            lowestDimensions: result.lowestDimensions.map((dimension) => ({
+              label: dimension.label,
+              score: dimension.score,
+            })),
+          }
+        : null,
+      derived: result
+        ? {
+            narrative: buildNarrative(result.score, submission),
+            impact: buildImpact(result.score),
+            priorities: buildPriorities(result.score),
+            callOpener: buildCallOpener(result.score, submission),
+            lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
+              label: dimension.label,
+              score: dimension.score,
+              insight: getInsight(dimension.label),
+            })),
+          }
+        : {
+            narrative: null,
+            impact: null,
+            priorities: [],
+            callOpener: null,
+            lowestDimensionInsights: [],
+          },
+      advisorBrief,
+    };
+
+    return NextResponse.json<SuccessResponse>(response, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected error.";
+
+    return NextResponse.json<ErrorResponse>(
+      { success: false, error: message },
+      { status: 500 },
+    );
+  }
 }

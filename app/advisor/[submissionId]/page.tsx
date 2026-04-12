@@ -141,6 +141,8 @@ async function getAdvisorSubmission(
   submissionId: string,
 ): Promise<SuccessResponse> {
   const baseUrl = await getBaseUrl();
+  const requestHeaders = await headers();
+  const cookieHeader = requestHeaders.get("cookie") ?? "";
 
   const response = await fetch(
     `${baseUrl}/api/advisor-submission?submissionId=${encodeURIComponent(
@@ -148,11 +150,29 @@ async function getAdvisorSubmission(
     )}`,
     {
       cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+      },
     },
   );
 
+  console.log("Advisor fetch debug", {
+    baseUrl,
+    submissionId,
+    status: response.status,
+    ok: response.ok,
+    url: `${baseUrl}/api/advisor-submission?submissionId=${encodeURIComponent(
+      submissionId,
+    )}`,
+    forwardedCookie: cookieHeader ? "present" : "missing",
+  });
+
   if (response.status === 404) {
     notFound();
+  }
+
+  if (response.status === 403) {
+    redirect(`/advisor/login?next=/advisor/${submissionId}`);
   }
 
   const data = (await response.json()) as SuccessResponse | ErrorResponse;
@@ -228,7 +248,7 @@ export default async function AdvisorSubmissionPage({
                 Diagnostic profile
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-[#0A1628]">
-                {result.score} / 100 — {result.band.label}
+                {result.score} / 100 - {result.band.label}
               </h2>
               <p className="mt-2 text-slate-700">{result.band.summary}</p>
             </div>
@@ -405,7 +425,7 @@ export default async function AdvisorSubmissionPage({
                     className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                   >
                     <p className="font-semibold text-slate-900">
-                      {dimension.label} — {dimension.score}/5
+                      {dimension.label} - {dimension.score}/5
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
                       {dimension.insight}
