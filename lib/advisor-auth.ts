@@ -1,19 +1,16 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 
 export async function requireAdvisorUser() {
   try {
     const supabase = await createSupabaseServerClient();
 
     const {
-      data: { user },
+      data: { session },
       error,
-    } = await supabase.auth.getUser();
-
-    const userEmail = user?.email ?? null;
+    } = await supabase.auth.getSession();
 
     if (error) {
-      console.error("[advisor-auth] supabase.auth.getUser() returned error", {
+      console.error("[advisor-auth] supabase.auth.getSession() returned error", {
         message: error.message,
         name: error.name,
         status: (error as { status?: number }).status,
@@ -21,15 +18,22 @@ export async function requireAdvisorUser() {
       return null;
     }
 
-    if (!user) {
+    if (!session?.user) {
       return null;
     }
 
-    if (!isAllowedAdvisorEmail(userEmail)) {
+    const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+
+    const userEmail = session.user.email?.toLowerCase() ?? "";
+
+    if (!userEmail || !allowedEmails.includes(userEmail)) {
       return null;
     }
 
-    return user;
+    return session.user;
   } catch (error) {
     console.error("[advisor-auth] requireAdvisorUser failed", {
       error,
