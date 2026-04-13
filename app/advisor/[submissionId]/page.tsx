@@ -137,7 +137,7 @@ function formatSubmittedAt(value: string | null): string {
 }
 
 function formatDateValue(value: string | null): string {
-  if (!value) return "empty";
+  if (!value) return "Empty";
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     try {
@@ -150,20 +150,6 @@ function formatDateValue(value: string | null): string {
   }
 
   return value;
-}
-
-function renderList(items: string[]) {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="list-disc space-y-2 pl-5 text-slate-700">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
 }
 
 function formatProspectStatusValue(value: string | null): string {
@@ -183,7 +169,22 @@ function formatProspectStatusValue(value: string | null): string {
     case "lost":
       return "Lost";
     default:
-      return value || "empty";
+      return value || "Empty";
+  }
+}
+
+function formatRelationshipValue(
+  value: ProspectRecord["relationship"] | null | undefined,
+): string {
+  switch (value) {
+    case "weak":
+      return "Weak";
+    case "medium":
+      return "Medium";
+    case "strong":
+      return "Strong";
+    default:
+      return "Not set";
   }
 }
 
@@ -191,10 +192,66 @@ function formatFieldLabel(value: string | null): string {
   switch (value) {
     case "status":
       return "status";
+    case "relationship":
+      return "relationship";
+    case "last_contact_date":
+      return "last contact date";
     case "next_action_date":
       return "next action date";
+    case "notes":
+      return "notes";
     default:
       return value || "field";
+  }
+}
+
+function renderList(items: string[]) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="list-disc space-y-2 pl-5 text-slate-700">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function getProspectStatusTone(status: string): string {
+  switch (status) {
+    case "not_contacted":
+      return "border-slate-200 bg-slate-100 text-slate-700";
+    case "contacted":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    case "replied":
+      return "border-violet-200 bg-violet-50 text-violet-700";
+    case "call_booked":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "opportunity":
+      return "border-cyan-200 bg-cyan-50 text-cyan-700";
+    case "won":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "lost":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+}
+
+function getRelationshipTone(
+  relationship: ProspectRecord["relationship"] | null | undefined,
+): string {
+  switch (relationship) {
+    case "weak":
+      return "border-slate-200 bg-slate-100 text-slate-700";
+    case "medium":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "strong":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
   }
 }
 
@@ -207,15 +264,33 @@ function formatActivityDescription(activity: ProspectActivityRecord): string {
     )} to ${formatProspectStatusValue(activity.new_value)}.`;
   }
 
+  if (activity.activity_type === "relationship_changed") {
+    return `${actor} changed relationship from ${formatRelationshipValue(
+      activity.old_value as ProspectRecord["relationship"] | null,
+    )} to ${formatRelationshipValue(
+      activity.new_value as ProspectRecord["relationship"] | null,
+    )}.`;
+  }
+
+  if (activity.activity_type === "last_contact_date_changed") {
+    return `${actor} changed last contact date from ${formatDateValue(
+      activity.old_value,
+    )} to ${formatDateValue(activity.new_value)}.`;
+  }
+
   if (activity.activity_type === "next_action_date_changed") {
     return `${actor} changed next action date from ${formatDateValue(
       activity.old_value,
     )} to ${formatDateValue(activity.new_value)}.`;
   }
 
+  if (activity.activity_type === "notes_changed") {
+    return `${actor} updated internal prospect notes.`;
+  }
+
   return `${actor} changed ${formatFieldLabel(
     activity.field_name,
-  )} from ${activity.old_value || "empty"} to ${activity.new_value || "empty"}.`;
+  )} from ${activity.old_value || "Empty"} to ${activity.new_value || "Empty"}.`;
 }
 
 function asObject(value: JsonValue): JsonObject | null {
@@ -603,6 +678,83 @@ async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
   };
 }
 
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  secondary,
+}: {
+  label: string;
+  value: string;
+  secondary?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-base font-semibold text-slate-900">
+        {value}
+      </p>
+      {secondary ? (
+        <p className="mt-2 break-words text-sm leading-6 text-slate-600">
+          {secondary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function NotesCard({
+  title,
+  content,
+}: {
+  title: string;
+  content: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
+      <div className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+        {content}
+      </div>
+    </div>
+  );
+}
+
+function SignalCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-3 text-sm leading-7 text-slate-700">{children}</div>
+    </div>
+  );
+}
+
 export default async function AdvisorSubmissionPage({
   params,
 }: AdvisorPageProps) {
@@ -633,441 +785,372 @@ export default async function AdvisorSubmissionPage({
   const conversionPositioning = advisorBrief?.conversionPositioning ?? [];
 
   return (
-    <main className="min-h-screen bg-[#F4F6FA] px-6 py-16">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#1E6FD9]">
-            Van Esch
-          </p>
-          <h1 className="mb-2 text-3xl font-bold text-[#0A1628]">
-            Advisor View
-          </h1>
-          <p className="mb-6 text-base text-slate-600">
-            HR Operations &amp; Transformation Advisory
-          </p>
+    <main className="brand-light-section min-h-screen">
+      <section className="brand-hero">
+        <div className="brand-container brand-section brand-hero-content">
+          <div className="max-w-4xl">
+            <p className="brand-kicker">Advisor workspace</p>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-500">
-                Submission ID
-              </p>
-              <p className="mt-1 break-all text-sm text-slate-900">
-                {submission.submissionId}
-              </p>
-            </div>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <h1 className="brand-heading-lg text-white">
+                {submission.contactCompany || submission.contactName || "Health Check"}
+              </h1>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-500">
-                Submitted
-              </p>
-              <p className="mt-1 text-sm text-slate-900">
-                {formatSubmittedAt(submission.contactSubmittedAt)}
-              </p>
-            </div>
-          </div>
-
-          {result ? (
-            <div className="mt-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1E6FD9]">
-                Diagnostic profile
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[#0A1628]">
-                {result.score} / 100 - {result.band.label}
-              </h2>
-              <p className="mt-2 text-slate-700">{result.band.summary}</p>
-            </div>
-          ) : (
-            <div className="mt-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1E6FD9]">
-                Enquiry type
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[#0A1628]">
-                Standard website enquiry
-              </h2>
-              <p className="mt-2 text-slate-700">
-                This submission did not include diagnostic answers.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <ProspectCrmPanel prospect={prospect} />
-
-        {prospect ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-[#0A1628]">
-                Prospect activity timeline
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                Read-only history of meaningful CRM changes made against this
-                prospect record.
-              </p>
-            </div>
-
-            {activity.length > 0 ? (
-              <div className="space-y-4">
-                {activity.map((item) => (
-                  <div
-                    key={item.activity_id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+              {prospect ? (
+                <>
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProspectStatusTone(
+                      prospect.status,
+                    )}`}
                   >
-                    <p className="text-sm font-medium text-slate-900">
-                      {formatActivityDescription(item)}
-                    </p>
+                    {formatProspectStatusValue(prospect.status)}
+                  </span>
 
-                    <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">
-                      {formatSubmittedAt(item.created_at)}
-                    </p>
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getRelationshipTone(
+                      prospect.relationship,
+                    )}`}
+                  >
+                    {formatRelationshipValue(prospect.relationship)}
+                  </span>
+                </>
+              ) : null}
+            </div>
 
-                    {item.note?.trim() ? (
-                      <p className="mt-3 text-sm leading-7 text-slate-700">
-                        {item.note}
-                      </p>
+            <p className="brand-subheading brand-body-on-dark mt-5 max-w-3xl">
+              Health Check submission view for contact context, advisory call
+              preparation, commercial workflow, and activity history.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="brand-light-section">
+        <div className="brand-container py-8 sm:py-10">
+          <div className="space-y-8">
+            <section className="brand-surface-card p-6 sm:p-8">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="brand-section-kicker">Submission overview</p>
+                  <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                    At-a-glance context
+                  </h2>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-4">
+                  <MetricCard
+                    label="Submission ID"
+                    value={submission.submissionId}
+                  />
+                  <MetricCard
+                    label="Submitted"
+                    value={formatSubmittedAt(submission.contactSubmittedAt)}
+                  />
+                  <MetricCard
+                    label="Profile"
+                    value={result ? result.band.label : "Website enquiry"}
+                  />
+                  <MetricCard
+                    label="Score"
+                    value={result ? `${result.score} / 100` : "Not applicable"}
+                  />
+                </div>
+
+                {result ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Health Check summary
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">
+                      {result.band.summary}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Enquiry type
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">
+                      This submission did not include Health Check answers and is
+                      being treated as a standard website enquiry.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <ProspectCrmPanel prospect={prospect} />
+
+            {advisorBrief ? (
+              <section className="brand-surface-card p-6 sm:p-8">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="brand-section-kicker">Advisor call prep</p>
+                    <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                      Conversation framing and positioning
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {advisorBrief.headline ? (
+                      <SignalCard title="Headline">
+                        {advisorBrief.headline}
+                      </SignalCard>
+                    ) : null}
+
+                    {advisorBrief.executiveReadout ? (
+                      <SignalCard title="Executive readout">
+                        {advisorBrief.executiveReadout}
+                      </SignalCard>
+                    ) : null}
+
+                    {advisorBrief.recommendedCallAngle ? (
+                      <SignalCard title="Recommended call angle">
+                        {advisorBrief.recommendedCallAngle}
+                      </SignalCard>
+                    ) : null}
+
+                    {advisorBrief.callOpening ? (
+                      <SignalCard title="Suggested call opening">
+                        {advisorBrief.callOpening}
+                      </SignalCard>
                     ) : null}
                   </div>
-                ))}
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {conversationFlow.length > 0 ? (
+                      <SignalCard title="Conversation flow">
+                        {renderList(conversationFlow)}
+                      </SignalCard>
+                    ) : null}
+
+                    {conversionPositioning.length > 0 ? (
+                      <SignalCard title="Positioning into next step">
+                        {renderList(conversionPositioning)}
+                      </SignalCard>
+                    ) : null}
+
+                    {discussionPrompts.length > 0 ? (
+                      <SignalCard title="First questions to explore">
+                        {renderList(discussionPrompts.slice(0, 3))}
+                      </SignalCard>
+                    ) : null}
+
+                    {advisorBrief.overallAssessment ? (
+                      <SignalCard title="Overall assessment">
+                        {advisorBrief.overallAssessment}
+                      </SignalCard>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {result ? (
+              <section className="brand-surface-card p-6 sm:p-8">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="brand-section-kicker">Diagnostic interpretation</p>
+                    <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                      Operating signals and priorities
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {data.derived.narrative ? (
+                      <SignalCard title="Narrative">
+                        {data.derived.narrative}
+                      </SignalCard>
+                    ) : null}
+
+                    {data.derived.impact ? (
+                      <SignalCard title="Business impact">
+                        {data.derived.impact}
+                      </SignalCard>
+                    ) : null}
+
+                    {data.derived.priorities.length > 0 ? (
+                      <SignalCard title="Priority actions">
+                        {renderList(data.derived.priorities)}
+                      </SignalCard>
+                    ) : null}
+
+                    {advisorBrief?.suggestedFocusAreas?.length ? (
+                      <SignalCard title="Suggested focus areas">
+                        {renderList(suggestedFocusAreas)}
+                      </SignalCard>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {data.derived.lowestDimensionInsights.length > 0 ? (
+                      <div className="rounded-xl border border-slate-200 bg-white p-5">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Lowest scoring areas
+                        </p>
+                        <div className="mt-4 space-y-3">
+                          {data.derived.lowestDimensionInsights.map((dimension) => (
+                            <div
+                              key={dimension.label}
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4"
+                            >
+                              <p className="text-sm font-semibold text-slate-900">
+                                {dimension.label} - {dimension.score}/5
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-slate-700">
+                                {dimension.insight}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {data.derived.callOpener ? (
+                      <SignalCard title="Derived call opener">
+                        {data.derived.callOpener}
+                      </SignalCard>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    {keyThemes.length > 0 ? (
+                      <SignalCard title="Key themes">
+                        {renderList(keyThemes)}
+                      </SignalCard>
+                    ) : null}
+
+                    {likelyFrictionPoints.length > 0 ? (
+                      <SignalCard title="Likely operational friction">
+                        {renderList(likelyFrictionPoints)}
+                      </SignalCard>
+                    ) : null}
+
+                    {businessImplications.length > 0 ? (
+                      <SignalCard title="Business implications">
+                        {renderList(businessImplications)}
+                      </SignalCard>
+                    ) : null}
+
+                    {likelyOperationalRisks.length > 0 ? (
+                      <SignalCard title="Likely operational risks">
+                        {renderList(likelyOperationalRisks)}
+                      </SignalCard>
+                    ) : null}
+
+                    {whatTypicallyHappensNext.length > 0 ? (
+                      <SignalCard title="What typically happens next">
+                        {renderList(whatTypicallyHappensNext)}
+                      </SignalCard>
+                    ) : null}
+
+                    {first30DayPriorities.length > 0 ? (
+                      <SignalCard title="First 30-day priorities">
+                        {renderList(first30DayPriorities)}
+                      </SignalCard>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            <section className="brand-surface-card p-6 sm:p-8">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="brand-section-kicker">Contact and context</p>
+                  <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                    Submitted details
+                  </h2>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <InfoCard
+                    label="Contact"
+                    value={submission.contactName}
+                    secondary={submission.contactEmail}
+                  />
+                  <InfoCard
+                    label="Organisation"
+                    value={submission.contactCompany || "Not provided"}
+                  />
+                  <InfoCard
+                    label="Topic"
+                    value={submission.contactTopic || "Not provided"}
+                  />
+                  <InfoCard
+                    label="Source"
+                    value={submission.contactSource || "Website"}
+                  />
+                  <InfoCard
+                    label="Company size"
+                    value={submission.companySize || "Not provided"}
+                  />
+                  <InfoCard
+                    label="Industry"
+                    value={submission.industry || "Not provided"}
+                  />
+                  <InfoCard
+                    label="Role"
+                    value={submission.role || "Not provided"}
+                  />
+                  <InfoCard
+                    label="Region"
+                    value={submission.countryRegion || "Not provided"}
+                  />
+                </div>
+
+                <NotesCard title="Message" content={submission.contactMessage} />
               </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                <p className="text-sm leading-7 text-slate-700">
-                  No prospect activity has been recorded yet.
-                </p>
-              </div>
-            )}
-          </section>
-        ) : null}
+            </section>
 
-        {advisorBrief ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-              Call focus
-            </h2>
-
-            <div className="space-y-6">
-              {advisorBrief.headline ? (
-                <div>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {advisorBrief.headline}
+            {prospect ? (
+              <section className="brand-surface-card p-6 sm:p-8">
+                <div className="mb-6">
+                  <p className="brand-section-kicker">Activity history</p>
+                  <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                    Prospect activity timeline
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm text-slate-600">
+                    Read-only history of meaningful CRM changes made against this
+                    Health Check prospect record.
                   </p>
                 </div>
-              ) : null}
 
-              {advisorBrief.recommendedCallAngle ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Recommended call angle
-                  </p>
-                  <p className="leading-7 text-slate-700">
-                    {advisorBrief.recommendedCallAngle}
-                  </p>
-                </div>
-              ) : null}
+                {activity.length > 0 ? (
+                  <div className="space-y-4">
+                    {activity.map((item) => (
+                      <div
+                        key={item.activity_id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                      >
+                        <p className="text-sm font-medium text-slate-900">
+                          {formatActivityDescription(item)}
+                        </p>
 
-              {advisorBrief.callOpening ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Suggested call opening
-                  </p>
-                  <p className="leading-7 text-slate-700">
-                    {advisorBrief.callOpening}
-                  </p>
-                </div>
-              ) : null}
+                        <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">
+                          {formatSubmittedAt(item.created_at)}
+                        </p>
 
-              {conversationFlow.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Conversation flow
-                  </p>
-                  {renderList(conversationFlow)}
-                </div>
-              ) : null}
-
-              {conversionPositioning.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Positioning into next step
-                  </p>
-                  {renderList(conversionPositioning)}
-                </div>
-              ) : null}
-
-              {discussionPrompts.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    First questions to explore
-                  </p>
-                  <ul className="list-disc space-y-2 pl-5 text-slate-700">
-                    {discussionPrompts.slice(0, 3).map((item) => (
-                      <li key={item}>{item}</li>
+                        {item.note?.trim() ? (
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            {item.note}
+                          </p>
+                        ) : null}
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-            Contact details
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <p>
-              <strong>Name:</strong> {submission.contactName}
-            </p>
-            <p>
-              <strong>Email:</strong> {submission.contactEmail}
-            </p>
-            <p>
-              <strong>Organisation:</strong>{" "}
-              {submission.contactCompany || "Not provided"}
-            </p>
-            <p>
-              <strong>Topic:</strong> {submission.contactTopic || "Not provided"}
-            </p>
-            <p>
-              <strong>Source:</strong> {submission.contactSource || "website"}
-            </p>
-            <p>
-              <strong>Company size:</strong>{" "}
-              {submission.companySize || "Not provided"}
-            </p>
-            <p>
-              <strong>Industry:</strong> {submission.industry || "Not provided"}
-            </p>
-            <p>
-              <strong>Role:</strong> {submission.role || "Not provided"}
-            </p>
-            <p>
-              <strong>Region:</strong>{" "}
-              {submission.countryRegion || "Not provided"}
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-            Message
-          </h2>
-          <div className="whitespace-pre-wrap leading-7 text-slate-700">
-            {submission.contactMessage}
-          </div>
-        </section>
-
-        {result ? (
-          <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-                Diagnostic summary
-              </h2>
-              <p className="leading-7 text-slate-700">
-                {data.derived.narrative}
-              </p>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-                Business impact
-              </h2>
-              <p className="leading-7 text-slate-700">{data.derived.impact}</p>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-                Priority actions
-              </h2>
-              <ul className="list-disc space-y-2 pl-5 text-slate-700">
-                {data.derived.priorities.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-                Lowest scoring areas
-              </h2>
-              <div className="space-y-4">
-                {data.derived.lowestDimensionInsights.map((dimension) => (
-                  <div
-                    key={dimension.label}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <p className="font-semibold text-slate-900">
-                      {dimension.label} - {dimension.score}/5
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {dimension.insight}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                    <p className="text-sm leading-7 text-slate-700">
+                      No prospect activity has been recorded yet.
                     </p>
                   </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-[#0A1628]">
-                Call opener
-              </h2>
-              <p className="leading-7 text-slate-700">
-                {data.derived.callOpener}
-              </p>
-            </section>
-          </>
-        ) : null}
-
-        {advisorBrief ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="mb-6 text-xl font-semibold text-[#0A1628]">
-              Internal advisor brief
-            </h2>
-
-            {advisorBrief.headline ? (
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Headline
-                </h3>
-                <p className="mt-2 text-slate-900">{advisorBrief.headline}</p>
-              </div>
+                )}
+              </section>
             ) : null}
-
-            {advisorBrief.overallAssessment ? (
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Overall assessment
-                </h3>
-                <p className="mt-2 leading-7 text-slate-700">
-                  {advisorBrief.overallAssessment}
-                </p>
-              </div>
-            ) : null}
-
-            {advisorBrief.executiveReadout ? (
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Executive readout
-                </h3>
-                <p className="mt-2 leading-7 text-slate-700">
-                  {advisorBrief.executiveReadout}
-                </p>
-              </div>
-            ) : null}
-
-            {advisorBrief.recommendedCallAngle ? (
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Recommended call angle
-                </h3>
-                <p className="mt-2 leading-7 text-slate-700">
-                  {advisorBrief.recommendedCallAngle}
-                </p>
-              </div>
-            ) : null}
-
-            {advisorBrief.callOpening ? (
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Suggested call opening
-                </h3>
-                <p className="mt-2 leading-7 text-slate-700">
-                  {advisorBrief.callOpening}
-                </p>
-              </div>
-            ) : null}
-
-            {conversationFlow.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Conversation flow
-                </h3>
-                {renderList(conversationFlow)}
-              </div>
-            ) : null}
-
-            {conversionPositioning.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Positioning into next step
-                </h3>
-                {renderList(conversionPositioning)}
-              </div>
-            ) : null}
-
-            {keyThemes.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Key themes
-                </h3>
-                {renderList(keyThemes)}
-              </div>
-            ) : null}
-
-            {likelyFrictionPoints.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Likely operational friction
-                </h3>
-                {renderList(likelyFrictionPoints)}
-              </div>
-            ) : null}
-
-            {businessImplications.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Business implications
-                </h3>
-                {renderList(businessImplications)}
-              </div>
-            ) : null}
-
-            {likelyOperationalRisks.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Likely operational risks
-                </h3>
-                {renderList(likelyOperationalRisks)}
-              </div>
-            ) : null}
-
-            {whatTypicallyHappensNext.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  What typically happens next
-                </h3>
-                {renderList(whatTypicallyHappensNext)}
-              </div>
-            ) : null}
-
-            {first30DayPriorities.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  First 30-day priorities
-                </h3>
-                {renderList(first30DayPriorities)}
-              </div>
-            ) : null}
-
-            {discussionPrompts.length > 0 ? (
-              <div className="mb-5">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Discussion prompts
-                </h3>
-                {renderList(discussionPrompts)}
-              </div>
-            ) : null}
-
-            {suggestedFocusAreas.length > 0 ? (
-              <div>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Suggested focus areas
-                </h3>
-                {renderList(suggestedFocusAreas)}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
