@@ -14,13 +14,13 @@ type ContactRequestBody = {
   topic?: string;
   message: string;
   source?: string;
-  submissionId?: string;
   diagnosticAnswers?: DiagnosticAnswers;
   companySize?: string;
   industry?: string;
   role?: string;
   countryRegion?: string;
   website?: string;
+  submissionId?: string;
 };
 
 type ResendSendResponse = {
@@ -209,7 +209,6 @@ function parseRequestBody(input: unknown): ContactRequestBody {
   }
 
   const website = normaliseOptionalString(raw.website, 200);
-  const submissionId = normaliseOptionalString(raw.submissionId, 120);
 
   return {
     name,
@@ -218,7 +217,6 @@ function parseRequestBody(input: unknown): ContactRequestBody {
     company: normaliseOptionalString(raw.company, MAX_COMPANY_LENGTH),
     topic: normaliseOptionalString(raw.topic, MAX_TOPIC_LENGTH),
     source: normaliseOptionalString(raw.source, MAX_TOPIC_LENGTH) || "website",
-    submissionId,
     companySize: normaliseOptionalString(raw.companySize, MAX_CONTEXT_LENGTH),
     industry: normaliseOptionalString(raw.industry, MAX_CONTEXT_LENGTH),
     role: normaliseOptionalString(raw.role, MAX_CONTEXT_LENGTH),
@@ -228,6 +226,7 @@ function parseRequestBody(input: unknown): ContactRequestBody {
     ),
     diagnosticAnswers: normaliseDiagnosticAnswers(raw.diagnosticAnswers),
     website,
+    submissionId: normaliseOptionalString(raw.submissionId, 100),
   };
 }
 
@@ -249,7 +248,7 @@ async function createLeadSubmission(params: {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  const rowPayload = {
+  const rowToInsert = {
     contact_name: body.name,
     contact_email: body.email,
     contact_company: body.company || null,
@@ -267,65 +266,143 @@ async function createLeadSubmission(params: {
     contact_submitted_at: new Date().toISOString(),
   };
 
-  if (body.submissionId) {
-    const updateResponse = await fetch(
-      `${supabaseUrl}/rest/v1/diagnostic_submissions?submission_id=eq.${encodeURIComponent(
-        body.submissionId,
-      )}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-          Prefer: "return=representation",
-        },
-        body: JSON.stringify(rowPayload),
-      },
-    );
+  const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(rowToInsert),
+  });
 
-    if (!updateResponse.ok) {
-      const errorText = await updateResponse.text();
-      throw new Error(`Supabase update failed: ${errorText}`);
-    }
-
-    const updatedData = await updateResponse.json();
-
-    if (!Array.isArray(updatedData) || !updatedData[0]?.submission_id) {
-      throw new Error(
-        "Supabase update succeeded but no submission_id was returned.",
-      );
-    }
-
-    return updatedData[0].submission_id as string;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
-  const insertResponse = await fetch(
-    `${supabaseUrl}/rest/v1/diagnostic_submissions`,
+  const data = await response.json();
+
+  if (!Array.isArray(data) || !data[0]?.submission_id) {
+    throw new Error("Supabase insert succeeded but no submission_id returned.");
+  }
+
+  return data[0].submission_id as string;
+}
+
+async function updateExistingLeadSubmission(params: {
+  submissionId: string;
+  body: ContactRequestBody;
+  result: DiagnosticResult | null;
+  advisorBrief: AdvisorBrief | null;
+}) {
+  const { submissionId, body, result, advisorBrief } = params;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  const rowToUpdate = {
+    contact_name: body.name,
+    contact_email: body.email,
+    contact_company: body.company || null,
+    contact_topic: body.topic || null,
+    contact_message: body.message,
+    contact_source: body.source || "website",
+    company_size: body.companySize || null,
+    industry: body.industry || null,
+    role: body.role || null,
+    country_region: body.countryRegion || null,
+    answers: body.diagnosticAnswers || null,
+    score: result?.score ?? null,
+    band: result?.band.label ?? null,
+    advisor_brief: advisorBrief ?? null,
+    contact_submitted_at: new Date().toISOString(),
+  };
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/diagnostic_submissions?submission_id=eq.${encodeURIComponent(
+      submissionId,
+    )}`,
     {
-      method: "POST",
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         apikey: supabaseKey,
         Authorization: `Bearer ${supabaseKey}`,
         Prefer: "return=representation",
       },
-      body: JSON.stringify(rowPayload),
+      body: JSON.stringify(rowToUpdate),
     },
   );
 
-  if (!insertResponse.ok) {
-    const errorText = await insertResponse.text();
-    throw new Error(`Supabase insert failed: ${errorText}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase update failed: ${errorText}`);
   }
 
-  const insertedData = await insertResponse.json();
+  const data = await response.json();
 
-  if (!Array.isArray(insertedData) || !insertedData[0]?.submission_id) {
-    throw new Error("Supabase insert succeeded but no submission_id returned.");
+  if (!Array.isArray(data) || !data[0]?.submission_id) {
+    throw new Error("Supabase update succeeded but no submission_id returned.");
   }
 
-  return insertedData[0].submission_id as string;
+  return data[0].submission_id as string;
+}
+
+async function upsertProspect(params: {
+  submissionId: string;
+  body: ContactRequestBody;
+}) {
+  const { submissionId, body } = params;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  const payload = {
+    submission_id: submissionId,
+    name: body.name,
+    company: body.company || null,
+    source: "website",
+    status: "not_contacted",
+    relationship: "weak",
+    updated_at: new Date().toISOString(),
+  };
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/health_check_prospects?on_conflict=submission_id`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Prospect upsert failed: ${errorText}`);
+  }
 }
 
 function buildListHtml(items: string[]): string {
@@ -379,7 +456,7 @@ function buildEmailHtml(params: {
       .map(
         (item) => `
           <li style="margin: 0 0 12px; color: #334155; line-height: 1.7;">
-            <strong>${escapeHtml(item.label)} — ${item.score} / 5</strong><br />
+            <strong>${escapeHtml(item.label)} - ${item.score} / 5</strong><br />
             ${escapeHtml(getDimensionInsight(item.label))}
           </li>
         `,
@@ -721,11 +798,11 @@ async function sendEnquiryEmail(params: {
     ? "New HR Health Check enquiry"
     : "New website enquiry";
 
-  const companyPart = params.body.company ? ` – ${params.body.company}` : "";
+  const companyPart = params.body.company ? ` - ${params.body.company}` : "";
 
   const enrichedSubject =
     params.result && isHealthCheckEnquiry
-      ? `${subjectPrefix} – ${params.result.band.label} (${params.result.score}/100)${companyPart}`
+      ? `${subjectPrefix} - ${params.result.band.label} (${params.result.score}/100)${companyPart}`
       : `${subjectPrefix}${companyPart}`;
 
   const response = await fetch("https://api.resend.com/emails", {
@@ -762,11 +839,13 @@ export async function POST(request: Request) {
   try {
     const rawBody = (await request.json()) as unknown;
     const body = parseRequestBody(rawBody);
+
     console.log("contact api debug", {
       submissionId: body.submissionId,
       source: body.source,
       topic: body.topic,
     });
+
     if (isNonEmptyString(body.website)) {
       return jsonResponse({ ok: true }, 200);
     }
@@ -777,10 +856,22 @@ export async function POST(request: Request) {
 
     const advisorBrief = result ? buildAdvisorBrief(result) : null;
 
-    const submissionId = await createLeadSubmission({
+    const submissionId = body.submissionId
+      ? await updateExistingLeadSubmission({
+          submissionId: body.submissionId,
+          body,
+          result,
+          advisorBrief,
+        })
+      : await createLeadSubmission({
+          body,
+          result,
+          advisorBrief,
+        });
+
+    await upsertProspect({
+      submissionId,
       body,
-      result,
-      advisorBrief,
     });
 
     const advisorUrl = buildAdvisorUrl(submissionId);
