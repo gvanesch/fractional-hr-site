@@ -112,6 +112,20 @@ function buildAdvisorUrl(submissionId: string): string {
   return `${siteUrl.replace(/\/$/, "")}/advisor/${submissionId}`;
 }
 
+function inferSubmissionSource(body: ContactRequestBody): string {
+  const normalizedSource = body.source?.trim().toLowerCase() ?? "";
+  const normalizedTopic = body.topic?.trim().toLowerCase() ?? "";
+
+  if (
+    normalizedSource === "diagnostic-interpretation" ||
+    normalizedTopic === "hr health check interpretation"
+  ) {
+    return "health-check-interpretation";
+  }
+
+  return "website-contact";
+}
+
 function getDimensionInsight(label: string): string {
   switch (label) {
     case "Process clarity":
@@ -255,6 +269,7 @@ async function createLeadSubmission(params: {
     contact_topic: body.topic || null,
     contact_message: body.message,
     contact_source: body.source || "website",
+    submission_source: inferSubmissionSource(body),
     company_size: body.companySize || null,
     industry: body.industry || null,
     role: body.role || null,
