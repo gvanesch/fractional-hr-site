@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireAdvisorUser } from "@/lib/advisor-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -185,6 +185,35 @@ function uniqueSorted(values: Array<string | null | undefined>): string[] {
   ).sort((a, b) => a.localeCompare(b, "en-GB"));
 }
 
+async function requireAdvisorSessionForHealthChecks() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  console.log("[advisor-health-checks] auth debug", {
+    hasSession: Boolean(session),
+    email: session?.user.email ?? null,
+  });
+
+  if (!session) {
+    redirect("/advisor/login?next=/advisor/health-checks");
+  }
+
+  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = session.user.email?.toLowerCase() ?? "";
+
+  if (!userEmail || !allowedEmails.includes(userEmail)) {
+    redirect("/advisor/login?error=forbidden");
+  }
+
+  return session.user;
+}
+
 async function getFilterOptions(): Promise<FilterOptions> {
   const supabase = createSupabaseAdminClient();
 
@@ -316,7 +345,7 @@ async function getHealthChecks(
     case "completion_only":
       query = query.is("contact_submitted_at", null);
       break;
-    case "contact_request":
+    case "with_enquiry":
       query = query.not("contact_submitted_at", "is", null);
       break;
     default:
@@ -337,6 +366,7 @@ async function getHealthChecks(
 function getSummaryStats(rows: HealthCheckRow[]) {
   const withScore = rows.filter((row) => typeof row.score === "number");
   const withEnquiry = rows.filter((row) => Boolean(row.contact_submitted_at));
+  const withAdvisorBrief = rows.filter((row) => Boolean(row.advisor_brief));
 
   const averageScore =
     withScore.length > 0
@@ -348,9 +378,10 @@ function getSummaryStats(rows: HealthCheckRow[]) {
 
   return {
     total: rows.length,
-    averageScore,
     withEnquiry: withEnquiry.length,
     completionOnly: rows.length - withEnquiry.length,
+    averageScore,
+    withAdvisorBrief: withAdvisorBrief.length,
   };
 }
 
@@ -376,12 +407,16 @@ function badgeClasses(band: string | null): string {
   return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
-function signalBadgeClasses(kind: "completed" | "enquiry" | "topic"): string {
+function signalBadgeClasses(
+  kind: "completed" | "enquiry" | "brief" | "topic",
+): string {
   switch (kind) {
     case "completed":
       return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
     case "enquiry":
       return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    case "brief":
+      return "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200";
     case "topic":
       return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200";
   }
@@ -423,11 +458,7 @@ function getPrimaryName(row: HealthCheckRow): string {
 export default async function AdvisorHealthChecksPage({
   searchParams,
 }: AdvisorHealthChecksPageProps) {
-  const advisorUser = await requireAdvisorUser();
-
-  if (!advisorUser) {
-    redirect("/advisor/login");
-  }
+  const advisorUser = await requireAdvisorSessionForHealthChecks();
 
   const resolvedSearchParams = await searchParams;
   const filters = getFilters(resolvedSearchParams);
@@ -449,9 +480,7 @@ export default async function AdvisorHealthChecksPage({
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
               Browse, filter, and review all HR Health Check completions and
-              linked contact requests from one advisor workspace. Use this view
-              to see which submissions remain as completion only and which have
-              moved into conversation.
+              linked enquiries from one advisor workspace.
             </p>
           </div>
 
@@ -460,7 +489,7 @@ export default async function AdvisorHealthChecksPage({
           </div>
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-500">Completions</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
@@ -469,7 +498,7 @@ export default async function AdvisorHealthChecksPage({
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Contact requests</p>
+            <p className="text-sm font-medium text-slate-500">With enquiry</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.withEnquiry}
             </p>
@@ -486,6 +515,13 @@ export default async function AdvisorHealthChecksPage({
             <p className="text-sm font-medium text-slate-500">Average score</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.averageScore ?? "N/A"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">With advisor brief</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {stats.withAdvisorBrief}
             </p>
           </div>
         </section>
@@ -549,7 +585,7 @@ export default async function AdvisorHealthChecksPage({
                   htmlFor="enquiryFrom"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Contact request from
+                  Enquiry from
                 </label>
                 <input
                   id="enquiryFrom"
@@ -565,7 +601,7 @@ export default async function AdvisorHealthChecksPage({
                   htmlFor="enquiryTo"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Contact request to
+                  Enquiry to
                 </label>
                 <input
                   id="enquiryTo"
@@ -590,8 +626,8 @@ export default async function AdvisorHealthChecksPage({
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
                 >
                   <option value="">All records</option>
-                  <option value="completion_only">Health Check completion only</option>
-                  <option value="contact_request">Contact request</option>
+                  <option value="completion_only">Completion only</option>
+                  <option value="with_enquiry">With enquiry</option>
                 </select>
               </div>
             </div>
@@ -712,7 +748,7 @@ export default async function AdvisorHealthChecksPage({
               <div className="text-sm text-slate-500">
                 {hasActiveFilters(filters)
                   ? "Filters applied to Health Check records."
-                  : "Showing all recent Health Check completions and linked contact requests."}
+                  : "Showing all recent Health Check completions and linked enquiries."}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -731,8 +767,8 @@ export default async function AdvisorHealthChecksPage({
                   >
                     <option value="completed_desc">Latest completion</option>
                     <option value="completed_asc">Oldest completion</option>
-                    <option value="enquiry_desc">Latest contact request</option>
-                    <option value="enquiry_asc">Oldest contact request</option>
+                    <option value="enquiry_desc">Latest enquiry</option>
+                    <option value="enquiry_asc">Oldest enquiry</option>
                     <option value="score_desc">Highest score</option>
                     <option value="score_asc">Lowest score</option>
                     <option value="name_asc">Name A to Z</option>
@@ -767,8 +803,8 @@ export default async function AdvisorHealthChecksPage({
                 No matching Health Check records found
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Try widening the completion or contact request date range, or
-                removing one or more filters to see more records.
+                Try widening the completion or enquiry date range, or removing
+                one or more filters to see more records.
               </p>
             </div>
           ) : (
@@ -781,7 +817,7 @@ export default async function AdvisorHealthChecksPage({
                         Health Check completed
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Contact request submitted
+                        Enquiry submitted
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                         Contact
@@ -811,7 +847,7 @@ export default async function AdvisorHealthChecksPage({
                         <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
                           {submission.contact_submitted_at
                             ? formatTimestamp(submission.contact_submitted_at)
-                            : "No contact request yet"}
+                            : "No enquiry yet"}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-700">
@@ -855,7 +891,7 @@ export default async function AdvisorHealthChecksPage({
                             {submission.submission_source || "Not available"}
                           </div>
                           <div className="mt-1 text-xs text-slate-500">
-                            Contact source: {submission.contact_source || "None"}
+                            Enquiry source: {submission.contact_source || "None"}
                           </div>
                           {hasTopic(submission.contact_topic) ? (
                             <div className="mt-1 text-xs text-slate-500">
@@ -880,7 +916,17 @@ export default async function AdvisorHealthChecksPage({
                                   "enquiry",
                                 )}`}
                               >
-                                Contact request
+                                Enquiry
+                              </span>
+                            ) : null}
+
+                            {submission.advisor_brief ? (
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
+                                  "brief",
+                                )}`}
+                              >
+                                Brief
                               </span>
                             ) : null}
 
@@ -952,10 +998,10 @@ export default async function AdvisorHealthChecksPage({
                           {cellValue(submission.country_region)}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
-                          Contact request:{" "}
+                          Enquiry:{" "}
                           {submission.contact_submitted_at
                             ? formatTimestamp(submission.contact_submitted_at)
-                            : "No contact request yet"}
+                            : "No enquiry yet"}
                         </p>
                       </div>
 
@@ -986,7 +1032,7 @@ export default async function AdvisorHealthChecksPage({
                           {submission.submission_source || "Not available"}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">
-                          Contact source: {submission.contact_source || "None"}
+                          Enquiry source: {submission.contact_source || "None"}
                         </p>
                         {hasTopic(submission.contact_topic) ? (
                           <p className="mt-1 text-sm text-slate-500">
@@ -1014,7 +1060,17 @@ export default async function AdvisorHealthChecksPage({
                                 "enquiry",
                               )}`}
                             >
-                              Contact request
+                              Enquiry
+                            </span>
+                          ) : null}
+
+                          {submission.advisor_brief ? (
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${signalBadgeClasses(
+                                "brief",
+                              )}`}
+                            >
+                              Brief
                             </span>
                           ) : null}
 
