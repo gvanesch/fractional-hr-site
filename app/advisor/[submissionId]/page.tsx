@@ -9,6 +9,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import ProspectCrmPanel from "@/app/components/advisor/ProspectCrmPanel";
 import type { AdvisorBrief } from "../../../lib/diagnostic";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,19 @@ type ProspectRecord = {
   updated_at: string;
 };
 
+type ProspectActivityRecord = {
+  activity_id: string;
+  prospect_id: string;
+  submission_id: string;
+  activity_type: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  note: string | null;
+  changed_by: string | null;
+  created_at: string;
+};
+
 function formatSubmittedAt(value: string | null): string {
   if (!value) return "Not available";
 
@@ -100,16 +114,20 @@ function formatSubmittedAt(value: string | null): string {
   }
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Not set";
+function formatDateValue(value: string | null): string {
+  if (!value) return "empty";
 
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      dateStyle: "medium",
-    }).format(new Date(value));
-  } catch {
-    return value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        dateStyle: "medium",
+      }).format(new Date(`${value}T00:00:00`));
+    } catch {
+      return value;
+    }
   }
+
+  return value;
 }
 
 function renderList(items: string[]) {
@@ -126,7 +144,7 @@ function renderList(items: string[]) {
   );
 }
 
-function formatProspectStatus(value: ProspectRecord["status"]): string {
+function formatProspectStatusValue(value: string | null): string {
   switch (value) {
     case "not_contacted":
       return "Not Contacted";
@@ -142,63 +160,40 @@ function formatProspectStatus(value: ProspectRecord["status"]): string {
       return "Won";
     case "lost":
       return "Lost";
+    default:
+      return value || "empty";
   }
 }
 
-function formatRelationship(value: ProspectRecord["relationship"]): string {
+function formatFieldLabel(value: string | null): string {
   switch (value) {
-    case "weak":
-      return "Weak";
-    case "medium":
-      return "Medium";
-    case "strong":
-      return "Strong";
+    case "status":
+      return "status";
+    case "next_action_date":
+      return "next action date";
+    default:
+      return value || "field";
   }
 }
 
-function formatSource(value: ProspectRecord["source"]): string {
-  switch (value) {
-    case "network":
-      return "Network";
-    case "referral":
-      return "Referral";
-    case "website":
-      return "Website";
-    case "other":
-      return "Other";
-  }
-}
+function formatActivityDescription(activity: ProspectActivityRecord): string {
+  const actor = activity.changed_by || "Unknown advisor";
 
-function prospectStatusBadgeClasses(status: ProspectRecord["status"]): string {
-  switch (status) {
-    case "not_contacted":
-      return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
-    case "contacted":
-      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200";
-    case "replied":
-      return "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200";
-    case "call_booked":
-      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200";
-    case "opportunity":
-      return "bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200";
-    case "won":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
-    case "lost":
-      return "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200";
+  if (activity.activity_type === "status_changed") {
+    return `${actor} changed status from ${formatProspectStatusValue(
+      activity.old_value,
+    )} to ${formatProspectStatusValue(activity.new_value)}.`;
   }
-}
 
-function relationshipBadgeClasses(
-  relationship: ProspectRecord["relationship"],
-): string {
-  switch (relationship) {
-    case "weak":
-      return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
-    case "medium":
-      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200";
-    case "strong":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+  if (activity.activity_type === "next_action_date_changed") {
+    return `${actor} changed next action date from ${formatDateValue(
+      activity.old_value,
+    )} to ${formatDateValue(activity.new_value)}.`;
   }
+
+  return `${actor} changed ${formatFieldLabel(
+    activity.field_name,
+  )} from ${activity.old_value || "empty"} to ${activity.new_value || "empty"}.`;
 }
 
 async function getBaseUrl(): Promise<string> {
@@ -327,6 +322,42 @@ async function getHealthCheckProspect(
   return (data as ProspectRecord | null) ?? null;
 }
 
+async function getProspectActivity(
+  prospectId: string | null,
+): Promise<ProspectActivityRecord[]> {
+  if (!prospectId) {
+    return [];
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  const { data, error } = await supabase
+    .from("health_check_prospect_activity")
+    .select(
+      `
+        activity_id,
+        prospect_id,
+        submission_id,
+        activity_type,
+        field_name,
+        old_value,
+        new_value,
+        note,
+        changed_by,
+        created_at
+      `,
+    )
+    .eq("prospect_id", prospectId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new Error(`Unable to load prospect activity: ${error.message}`);
+  }
+
+  return (data ?? []) as ProspectActivityRecord[];
+}
+
 export default async function AdvisorSubmissionPage({
   params,
 }: AdvisorPageProps) {
@@ -338,6 +369,8 @@ export default async function AdvisorSubmissionPage({
     getAdvisorSubmission(submissionId),
     getHealthCheckProspect(submissionId),
   ]);
+
+  const activity = await getProspectActivity(prospect?.prospect_id ?? null);
 
   const submission = data.submission;
   const result = data.diagnostic;
@@ -413,125 +446,52 @@ export default async function AdvisorSubmissionPage({
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
+        <ProspectCrmPanel prospect={prospect} />
+
+        {prospect ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="mb-6">
               <h2 className="text-xl font-semibold text-[#0A1628]">
-                Prospect CRM
+                Prospect activity timeline
               </h2>
               <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                Light commercial workflow record linked to this Health Check
-                submission.
+                Read-only history of meaningful CRM changes made against this
+                prospect record.
               </p>
             </div>
 
-            {prospect ? (
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${prospectStatusBadgeClasses(
-                    prospect.status,
-                  )}`}
-                >
-                  {formatProspectStatus(prospect.status)}
-                </span>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${relationshipBadgeClasses(
-                    prospect.relationship,
-                  )}`}
-                >
-                  {formatRelationship(prospect.relationship)}
-                </span>
+            {activity.length > 0 ? (
+              <div className="space-y-4">
+                {activity.map((item) => (
+                  <div
+                    key={item.activity_id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <p className="text-sm font-medium text-slate-900">
+                      {formatActivityDescription(item)}
+                    </p>
+
+                    <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">
+                      {formatSubmittedAt(item.created_at)}
+                    </p>
+
+                    {item.note?.trim() ? (
+                      <p className="mt-3 text-sm leading-7 text-slate-700">
+                        {item.note}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-            ) : null}
-          </div>
-
-          {prospect ? (
-            <>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Prospect status
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatProspectStatus(prospect.status)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Relationship
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatRelationship(prospect.relationship)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">Source</p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatSource(prospect.source)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Last contact date
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatDate(prospect.last_contact_date)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Next action date
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatDate(prospect.next_action_date)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Prospect updated
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">
-                    {formatSubmittedAt(prospect.updated_at)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Notes
-                </p>
-                <div className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                  {prospect.notes?.trim()
-                    ? prospect.notes
-                    : "No internal prospect notes have been added yet."}
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-4">
-                <p className="text-sm text-slate-600">
-                  Editing comes next. This first step makes the linked prospect
-                  record visible here so the advisor view becomes the single
-                  place to review both the Health Check submission and its
-                  current commercial follow-up state.
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                <p className="text-sm leading-7 text-slate-700">
+                  No prospect activity has been recorded yet.
                 </p>
               </div>
-            </>
-          ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
-              <p className="text-sm leading-7 text-slate-700">
-                No prospect record exists yet for this submission. A prospect is
-                created when a Health Check moves into a contact request. That
-                keeps passive completions separate from active commercial
-                follow-up.
-              </p>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+        ) : null}
 
         {advisorBrief ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
