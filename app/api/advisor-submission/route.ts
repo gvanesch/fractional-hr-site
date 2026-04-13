@@ -1,3 +1,10 @@
+// ⚠️ LEGACY ROUTE - DO NOT USE FOR NEW DEVELOPMENT
+// This endpoint was previously used by advisor pages via server-side fetch.
+// The application now uses direct Supabase reads in server components instead.
+// 
+// This route is retained temporarily for backward compatibility (e.g. email links or manual access).
+// 
+// If no external dependencies are confirmed, this route should be removed in a future cleanup.
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
