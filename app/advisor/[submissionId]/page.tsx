@@ -152,6 +152,20 @@ function formatDateValue(value: string | null): string {
   return value;
 }
 
+function renderList(items: string[]) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="list-disc space-y-2 pl-5 text-slate-700">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
 function formatProspectStatusValue(value: string | null): string {
   switch (value) {
     case "not_contacted":
@@ -173,9 +187,7 @@ function formatProspectStatusValue(value: string | null): string {
   }
 }
 
-function formatRelationshipValue(
-  value: ProspectRecord["relationship"] | null | undefined,
-): string {
+function formatRelationshipValue(value: string | null): string {
   switch (value) {
     case "weak":
       return "Weak";
@@ -184,12 +196,29 @@ function formatRelationshipValue(
     case "strong":
       return "Strong";
     default:
-      return "Not set";
+      return value || "Empty";
+  }
+}
+
+function formatSourceValue(value: string | null): string {
+  switch (value) {
+    case "network":
+      return "Network";
+    case "referral":
+      return "Referral";
+    case "website":
+      return "Website";
+    case "other":
+      return "Other";
+    default:
+      return value || "Empty";
   }
 }
 
 function formatFieldLabel(value: string | null): string {
   switch (value) {
+    case "source":
+      return "source";
     case "status":
       return "status";
     case "relationship":
@@ -205,58 +234,14 @@ function formatFieldLabel(value: string | null): string {
   }
 }
 
-function renderList(items: string[]) {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="list-disc space-y-2 pl-5 text-slate-700">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
-function getProspectStatusTone(status: string): string {
-  switch (status) {
-    case "not_contacted":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "contacted":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "replied":
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    case "call_booked":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "opportunity":
-      return "border-cyan-200 bg-cyan-50 text-cyan-700";
-    case "won":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "lost":
-      return "border-rose-200 bg-rose-50 text-rose-700";
-    default:
-      return "border-slate-200 bg-slate-100 text-slate-700";
-  }
-}
-
-function getRelationshipTone(
-  relationship: ProspectRecord["relationship"] | null | undefined,
-): string {
-  switch (relationship) {
-    case "weak":
-      return "border-slate-200 bg-slate-100 text-slate-700";
-    case "medium":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "strong":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    default:
-      return "border-slate-200 bg-slate-100 text-slate-700";
-  }
-}
-
 function formatActivityDescription(activity: ProspectActivityRecord): string {
   const actor = activity.changed_by || "Unknown advisor";
+
+  if (activity.activity_type === "source_changed") {
+    return `${actor} changed source from ${formatSourceValue(
+      activity.old_value,
+    )} to ${formatSourceValue(activity.new_value)}.`;
+  }
 
   if (activity.activity_type === "status_changed") {
     return `${actor} changed status from ${formatProspectStatusValue(
@@ -266,10 +251,8 @@ function formatActivityDescription(activity: ProspectActivityRecord): string {
 
   if (activity.activity_type === "relationship_changed") {
     return `${actor} changed relationship from ${formatRelationshipValue(
-      activity.old_value as ProspectRecord["relationship"] | null,
-    )} to ${formatRelationshipValue(
-      activity.new_value as ProspectRecord["relationship"] | null,
-    )}.`;
+      activity.old_value,
+    )} to ${formatRelationshipValue(activity.new_value)}.`;
   }
 
   if (activity.activity_type === "last_contact_date_changed") {
@@ -798,20 +781,14 @@ export default async function AdvisorSubmissionPage({
 
               {prospect ? (
                 <>
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProspectStatusTone(
-                      prospect.status,
-                    )}`}
-                  >
-                    {formatProspectStatusValue(prospect.status)}
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {formatSourceValue(prospect.source)}
                   </span>
-
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getRelationshipTone(
-                      prospect.relationship,
-                    )}`}
-                  >
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                     {formatRelationshipValue(prospect.relationship)}
+                  </span>
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {formatProspectStatusValue(prospect.status)}
                   </span>
                 </>
               ) : null}

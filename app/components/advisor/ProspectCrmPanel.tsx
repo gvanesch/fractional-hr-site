@@ -121,12 +121,15 @@ function relationshipBadgeClasses(
 export default function ProspectCrmPanel({
   prospect,
 }: ProspectCrmPanelProps) {
-  const [status, setStatus] = useState<ProspectRecord["status"] | "">(
-    prospect?.status ?? "",
+  const [source, setSource] = useState<ProspectRecord["source"] | "">(
+    prospect?.source ?? "",
   );
   const [relationship, setRelationship] = useState<
     ProspectRecord["relationship"] | ""
   >(prospect?.relationship ?? "");
+  const [status, setStatus] = useState<ProspectRecord["status"] | "">(
+    prospect?.status ?? "",
+  );
   const [lastContactDate, setLastContactDate] = useState(
     prospect?.last_contact_date ?? "",
   );
@@ -156,6 +159,7 @@ export default function ProspectCrmPanel({
         },
         body: JSON.stringify({
           prospect_id: prospect.prospect_id,
+          source,
           relationship,
           status,
           last_contact_date: lastContactDate || null,
@@ -211,11 +215,13 @@ export default function ProspectCrmPanel({
             </span>
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${relationshipBadgeClasses(
-                (relationship || prospect.relationship) as ProspectRecord["relationship"],
+                (relationship ||
+                  prospect.relationship) as ProspectRecord["relationship"],
               )}`}
             >
               {formatRelationship(
-                (relationship || prospect.relationship) as ProspectRecord["relationship"],
+                (relationship ||
+                  prospect.relationship) as ProspectRecord["relationship"],
               )}
             </span>
           </div>
@@ -227,26 +233,23 @@ export default function ProspectCrmPanel({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <label
-                htmlFor="prospect-status"
+                htmlFor="prospect-source"
                 className="text-sm font-semibold text-slate-500"
               >
-                Prospect status
+                Source
               </label>
               <select
-                id="prospect-status"
-                value={status}
+                id="prospect-source"
+                value={source}
                 onChange={(event) =>
-                  setStatus(event.target.value as ProspectRecord["status"])
+                  setSource(event.target.value as ProspectRecord["source"])
                 }
                 className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
               >
-                <option value="not_contacted">Not Contacted</option>
-                <option value="contacted">Contacted</option>
-                <option value="replied">Replied</option>
-                <option value="call_booked">Call Booked</option>
-                <option value="opportunity">Opportunity</option>
-                <option value="won">Won</option>
-                <option value="lost">Lost</option>
+                <option value="network">Network</option>
+                <option value="referral">Referral</option>
+                <option value="website">Website</option>
+                <option value="other">Other</option>
               </select>
             </div>
 
@@ -274,10 +277,28 @@ export default function ProspectCrmPanel({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-500">Source</p>
-              <p className="mt-2 text-sm text-slate-900">
-                {formatSource(prospect.source)}
-              </p>
+              <label
+                htmlFor="prospect-status"
+                className="text-sm font-semibold text-slate-500"
+              >
+                Prospect status
+              </label>
+              <select
+                id="prospect-status"
+                value={status}
+                onChange={(event) =>
+                  setStatus(event.target.value as ProspectRecord["status"])
+                }
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+              >
+                <option value="not_contacted">Not Contacted</option>
+                <option value="contacted">Contacted</option>
+                <option value="replied">Replied</option>
+                <option value="call_booked">Call Booked</option>
+                <option value="opportunity">Opportunity</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -340,7 +361,7 @@ export default function ProspectCrmPanel({
           <div className="mt-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-slate-600">
               {saveState === "idle" &&
-                "Update relationship, status, contact dates, or notes."}
+                "Update source, relationship, status, contact dates, or notes."}
               {saveState === "saving" && "Saving changes..."}
               {saveState === "saved" && "Prospect updated successfully."}
               {saveState === "error" && errorMessage}

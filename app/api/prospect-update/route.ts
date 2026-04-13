@@ -3,6 +3,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 
+type ProspectSource = "network" | "referral" | "website" | "other";
+
 type ProspectStatus =
   | "not_contacted"
   | "contacted"
@@ -17,6 +19,7 @@ type ProspectRelationship = "weak" | "medium" | "strong";
 type ProspectRow = {
   prospect_id: string;
   submission_id: string;
+  source: ProspectSource;
   relationship: ProspectRelationship;
   status: ProspectStatus;
   last_contact_date: string | null;
@@ -35,6 +38,13 @@ type ActivityInsert = {
   changed_by: string;
 };
 
+const VALID_SOURCES: ProspectSource[] = [
+  "network",
+  "referral",
+  "website",
+  "other",
+];
+
 const VALID_STATUSES: ProspectStatus[] = [
   "not_contacted",
   "contacted",
@@ -47,7 +57,10 @@ const VALID_STATUSES: ProspectStatus[] = [
 
 const VALID_RELATIONSHIPS: ProspectRelationship[] = ["weak", "medium", "strong"];
 
-function normaliseOptionalDate(value: unknown, fieldName: string): string | null | undefined {
+function normaliseOptionalDate(
+  value: unknown,
+  fieldName: string,
+): string | null | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -122,6 +135,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       prospect_id?: string;
+      source?: string;
       relationship?: string;
       status?: string;
       last_contact_date?: string | null;
@@ -134,6 +148,13 @@ export async function POST(request: Request) {
     if (!prospectId) {
       return NextResponse.json(
         { success: false, error: "Missing prospect_id" },
+        { status: 400 },
+      );
+    }
+
+    if (!body.source || !VALID_SOURCES.includes(body.source as ProspectSource)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid source" },
         { status: 400 },
       );
     }
@@ -155,6 +176,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const nextSource = body.source as ProspectSource;
     const nextStatus = body.status as ProspectStatus;
     const nextRelationship = body.relationship as ProspectRelationship;
     const lastContactDate = normaliseOptionalDate(
@@ -175,6 +197,7 @@ export async function POST(request: Request) {
         `
           prospect_id,
           submission_id,
+          source,
           relationship,
           status,
           last_contact_date,
@@ -202,6 +225,7 @@ export async function POST(request: Request) {
     const current = currentRow as ProspectRow;
 
     const updatePayload: {
+      source: ProspectSource;
       relationship: ProspectRelationship;
       status: ProspectStatus;
       last_contact_date?: string | null;
@@ -209,6 +233,7 @@ export async function POST(request: Request) {
       notes?: string | null;
       updated_at: string;
     } = {
+      source: nextSource,
       relationship: nextRelationship,
       status: nextStatus,
       updated_at: new Date().toISOString(),
@@ -239,6 +264,19 @@ export async function POST(request: Request) {
     }
 
     const activityRows: ActivityInsert[] = [];
+
+    if (current.source !== nextSource) {
+      activityRows.push({
+        prospect_id: current.prospect_id,
+        submission_id: current.submission_id,
+        activity_type: "source_changed",
+        field_name: "source",
+        old_value: current.source,
+        new_value: nextSource,
+        note: null,
+        changed_by: safeUserEmail,
+      });
+    }
 
     if (current.relationship !== nextRelationship) {
       activityRows.push({
