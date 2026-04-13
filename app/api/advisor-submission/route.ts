@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   calculateDiagnosticResult,
   type DiagnosticAnswers,
   type AdvisorBrief,
 } from "../../../lib/diagnostic";
-import { requireAdvisorUser } from "@/lib/advisor-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +80,7 @@ type SuccessResponse = {
   advisorBrief: AdvisorBrief | null;
 };
 
-function createSupabaseServerClient() {
+function createSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -91,8 +91,39 @@ function createSupabaseServerClient() {
   return createClient(supabaseUrl, serviceRoleKey);
 }
 
+async function requireAdvisorSessionForApi() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  console.log("[api/advisor-submission] auth debug", {
+    hasSession: Boolean(session),
+    email: session?.user.email ?? null,
+    error: error?.message ?? null,
+  });
+
+  if (error || !session) {
+    return null;
+  }
+
+  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = session.user.email?.toLowerCase() ?? "";
+
+  if (!userEmail || !allowedEmails.includes(userEmail)) {
+    return null;
+  }
+
+  return session.user;
+}
+
 async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
     .from("diagnostic_submissions")
@@ -320,7 +351,7 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const advisorUser = await requireAdvisorUser();
+    const advisorUser = await requireAdvisorSessionForApi();
 
     if (!advisorUser) {
       return NextResponse.json<ErrorResponse>(
@@ -414,6 +445,11 @@ export async function GET(request: Request): Promise<Response> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected error.";
+
+    console.error("[api/advisor-submission] route error", {
+      message,
+      error,
+    });
 
     return NextResponse.json<ErrorResponse>(
       { success: false, error: message },
