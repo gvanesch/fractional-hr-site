@@ -13,6 +13,7 @@ type AdvisoryNarrative = {
 };
 
 const HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY = "health-check-submission-id";
+const CALENDLY_URL = "https://calendly.com/greg-vanesch/20min";
 
 function formatLabelList(labels: string[]): string {
   if (labels.length === 0) {
@@ -485,27 +486,44 @@ export default function DiagnosticInterpretationPage() {
 
                   <p className="brand-subheading text-slate-700">
                     This interpretation provides a stronger read on what your
-                    result is likely to mean in practice. The next step is to
-                    discuss where greater attention may be useful, what is most
-                    likely driving the pattern, and what should be prioritised
-                    first.
+                    result is likely to mean in practice.
                   </p>
 
                   <p className="brand-body">
-                    The enquiry will be linked to your Health Check result so it
-                    can be reviewed in context. From there, a short conversation
-                    can be arranged to discuss the result and, where useful,
-                    whether a deeper Diagnostic Assessment or a focused Sprint
-                    would be the right next step.
+                    The next step is to clarify where HR operations may not be
+                    working as cleanly as they should, what is driving that, and
+                    where attention is most likely to have impact.
+                  </p>
+
+                  <p className="brand-body">
+                    You can book a short discussion now and we will use your result as the starting point.
+                    If you want a more tailored conversation, submit an enquiry with additional context. 
+                    Your input will be reviewed alongside your Health Check result so the discussion is more focused from the outset.
                   </p>
 
                   <div className="flex flex-wrap gap-4 pt-2">
-                    <Link
-                      href={contactHref}
+                    <a
+                      href={CALENDLY_URL}
+                      target="_blank"
+                      rel="noreferrer"
                       className="brand-button-primary px-6 py-3 text-base font-medium"
                     >
-                      Discuss your result
+                      Book a 20-min discussion
+                    </a>
+
+                    <Link
+                      href={contactHref}
+                      className="brand-button-dark px-6 py-3 text-base font-medium"
+                    >
+                      Prefer to send context first
                     </Link>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5">
+                    <p className="text-sm leading-7 text-slate-700">
+                      This is not a generic introductory call. It is a focused
+                      discussion based on your result and your context.
+                    </p>
                   </div>
                 </div>
               </div>
