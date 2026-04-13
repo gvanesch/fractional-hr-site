@@ -72,6 +72,12 @@ export default function AdvisorLoginForm({
         return;
       }
 
+// Force cookie propagation before navigation
+await wait(100);
+
+// Hard reload ensures middleware sees fresh cookies
+window.location.href = nextPath;
+
       window.location.assign(nextPath);
     } catch {
       setError("Something went wrong during login. Please try again.");
