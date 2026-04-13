@@ -840,12 +840,6 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as unknown;
     const body = parseRequestBody(rawBody);
 
-    console.log("contact api debug", {
-      submissionId: body.submissionId,
-      source: body.source,
-      topic: body.topic,
-    });
-
     if (isNonEmptyString(body.website)) {
       return jsonResponse({ ok: true }, 200);
     }

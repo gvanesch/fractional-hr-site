@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 
 type ProspectStatus =
   | "not_contacted"
@@ -40,13 +41,8 @@ const VALID_STATUSES: ProspectStatus[] = [
 ];
 
 function normaliseOptionalDate(value: unknown): string | null | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value === null || value === "") {
-    return null;
-  }
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
 
   if (typeof value !== "string") {
     throw new Error("Invalid next_action_date");
@@ -54,9 +50,7 @@ function normaliseOptionalDate(value: unknown): string | null | undefined {
 
   const trimmed = value.trim();
 
-  if (!trimmed) {
-    return null;
-  }
+  if (!trimmed) return null;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     throw new Error("Invalid next_action_date");
@@ -79,19 +73,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-      .split(",")
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean);
+    const userEmail = session.user.email;
 
-    const userEmail = session.user.email?.toLowerCase() ?? "";
-
-    if (!userEmail || !allowedEmails.includes(userEmail)) {
+    if (!isAllowedAdvisorEmail(userEmail)) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
         { status: 403 },
       );
     }
+
+    // Safe after validation
+    const safeUserEmail = userEmail as string;
 
     const body = (await request.json()) as {
       prospect_id?: string;
@@ -185,7 +177,7 @@ export async function POST(request: Request) {
         old_value: current.status,
         new_value: nextStatus,
         note: null,
-        changed_by: userEmail,
+        changed_by: safeUserEmail,
       });
     }
 
@@ -201,7 +193,7 @@ export async function POST(request: Request) {
         old_value: current.next_action_date,
         new_value: nextActionDate,
         note: null,
-        changed_by: userEmail,
+        changed_by: safeUserEmail,
       });
     }
 
