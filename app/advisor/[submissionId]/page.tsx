@@ -5,12 +5,15 @@ export const metadata = {
   },
 };
 
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import ProspectCrmPanel from "@/app/components/advisor/ProspectCrmPanel";
-import type { AdvisorBrief } from "../../../lib/diagnostic";
+import {
+  calculateDiagnosticResult,
+  type DiagnosticAnswers,
+  type AdvisorBrief,
+} from "../../../lib/diagnostic";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +23,67 @@ type AdvisorPageProps = {
   }>;
 };
 
-type SuccessResponse = {
-  success: true;
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
+type SubmissionRow = {
+  submission_id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_company: string | null;
+  contact_topic: string | null;
+  contact_message: string;
+  contact_source: string | null;
+  company_size: string | null;
+  industry: string | null;
+  role: string | null;
+  country_region: string | null;
+  answers: JsonValue;
+  score: number | null;
+  band: string | null;
+  advisor_brief: JsonValue;
+  contact_submitted_at: string | null;
+};
+
+type ProspectRecord = {
+  prospect_id: string;
+  submission_id: string;
+  name: string | null;
+  company: string | null;
+  relationship: "weak" | "medium" | "strong";
+  status:
+    | "not_contacted"
+    | "contacted"
+    | "replied"
+    | "call_booked"
+    | "opportunity"
+    | "won"
+    | "lost";
+  last_contact_date: string | null;
+  next_action_date: string | null;
+  source: "network" | "referral" | "website" | "other";
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ProspectActivityRecord = {
+  activity_id: string;
+  prospect_id: string;
+  submission_id: string;
+  activity_type: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  note: string | null;
+  changed_by: string | null;
+  created_at: string;
+};
+
+type DerivedResult = {
   submission: {
     submissionId: string;
     contactName: string;
@@ -59,46 +121,6 @@ type SuccessResponse = {
     }>;
   };
   advisorBrief: AdvisorBrief | null;
-};
-
-type ErrorResponse = {
-  success: false;
-  error: string;
-};
-
-type ProspectRecord = {
-  prospect_id: string;
-  submission_id: string;
-  name: string | null;
-  company: string | null;
-  relationship: "weak" | "medium" | "strong";
-  status:
-    | "not_contacted"
-    | "contacted"
-    | "replied"
-    | "call_booked"
-    | "opportunity"
-    | "won"
-    | "lost";
-  last_contact_date: string | null;
-  next_action_date: string | null;
-  source: "network" | "referral" | "website" | "other";
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type ProspectActivityRecord = {
-  activity_id: string;
-  prospect_id: string;
-  submission_id: string;
-  activity_type: string;
-  field_name: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  note: string | null;
-  changed_by: string | null;
-  created_at: string;
 };
 
 function formatSubmittedAt(value: string | null): string {
@@ -196,26 +218,192 @@ function formatActivityDescription(activity: ProspectActivityRecord): string {
   )} from ${activity.old_value || "empty"} to ${activity.new_value || "empty"}.`;
 }
 
-async function getBaseUrl(): Promise<string> {
-  const envSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-
-  if (envSiteUrl) {
-    return envSiteUrl.replace(/\/$/, "");
+function asObject(value: JsonValue): JsonObject | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
   }
 
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("host");
+  return value as JsonObject;
+}
 
-  if (!host) {
-    throw new Error("Unable to determine site host.");
+function asString(value: JsonValue | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asStringArray(value: JsonValue | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  const protocol =
-    host.includes("localhost") || host.startsWith("127.0.0.1")
-      ? "http"
-      : "https";
+  return value.filter((item): item is string => typeof item === "string");
+}
 
-  return `${protocol}://${host}`;
+function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
+  const objectValue = asObject(value);
+
+  if (!objectValue) {
+    return null;
+  }
+
+  const headline = asString(objectValue.headline);
+  const overallAssessment = asString(objectValue.overallAssessment);
+  const executiveReadout = asString(objectValue.executiveReadout);
+  const recommendedCallAngle = asString(objectValue.recommendedCallAngle);
+  const callOpening = asString(objectValue.callOpening);
+
+  if (
+    !headline ||
+    !overallAssessment ||
+    !executiveReadout ||
+    !recommendedCallAngle ||
+    !callOpening
+  ) {
+    return null;
+  }
+
+  return {
+    headline,
+    overallAssessment,
+    keyThemes: asStringArray(objectValue.keyThemes),
+    likelyOperationalRisks: asStringArray(objectValue.likelyOperationalRisks),
+    discussionPrompts: asStringArray(objectValue.discussionPrompts),
+    suggestedFocusAreas: asStringArray(objectValue.suggestedFocusAreas),
+    executiveReadout,
+    likelyFrictionPoints: asStringArray(objectValue.likelyFrictionPoints),
+    businessImplications: asStringArray(objectValue.businessImplications),
+    whatTypicallyHappensNext: asStringArray(objectValue.whatTypicallyHappensNext),
+    first30DayPriorities: asStringArray(objectValue.first30DayPriorities),
+    recommendedCallAngle,
+    callOpening,
+    conversationFlow: asStringArray(objectValue.conversationFlow),
+    conversionPositioning: asStringArray(objectValue.conversionPositioning),
+  };
+}
+
+function asDiagnosticAnswers(value: JsonValue): DiagnosticAnswers | null {
+  const objectValue = asObject(value);
+
+  if (!objectValue) {
+    return null;
+  }
+
+  const parsed: Record<number, 1 | 2 | 3 | 4 | 5 | undefined> = {};
+
+  for (const [key, rawValue] of Object.entries(objectValue)) {
+    const questionId = Number(key);
+
+    if (!Number.isInteger(questionId)) {
+      return null;
+    }
+
+    if (
+      rawValue === 1 ||
+      rawValue === 2 ||
+      rawValue === 3 ||
+      rawValue === 4 ||
+      rawValue === 5
+    ) {
+      parsed[questionId] = rawValue;
+      continue;
+    }
+
+    if (rawValue !== null && rawValue !== undefined) {
+      return null;
+    }
+  }
+
+  return parsed as DiagnosticAnswers;
+}
+
+function getInsight(label: string): string {
+  switch (label) {
+    case "Process clarity":
+      return "Lack of documented and repeatable processes.";
+    case "Consistency":
+      return "Inconsistent HR experience across teams.";
+    case "Service access":
+      return "Employees unclear where to go for support.";
+    case "Ownership":
+      return "Responsibility unclear across workflows.";
+    case "Onboarding":
+      return "Onboarding varies by manager.";
+    case "Technology alignment":
+      return "Systems not aligned to real workflows.";
+    case "Knowledge and self-service":
+      return "Over-reliance on HR for basic queries.";
+    case "Operational capacity":
+      return "HR operating reactively.";
+    case "Data and handoffs":
+      return "Breakdowns and duplication in processes.";
+    case "Change resilience":
+      return "Difficulty adapting to growth or change.";
+    default:
+      return "This area may be contributing to operational friction.";
+  }
+}
+
+function buildNarrative(score: number, submission: SubmissionRow): string {
+  const size = submission.company_size || "a growing organisation";
+
+  if (score < 40) {
+    return `This looks like an early-stage HR operating model where processes have evolved organically. At ${size}, this typically shows up as inconsistency, unclear ownership, and reliance on individuals rather than systems.`;
+  }
+
+  if (score < 70) {
+    return `This suggests a developing HR function where structure exists but is not consistently applied. At ${size}, this often creates friction and operational inefficiency.`;
+  }
+
+  return "This reflects a relatively mature HR operation. The focus is likely optimisation, scalability, and alignment with future growth.";
+}
+
+function buildImpact(score: number): string {
+  if (score < 40) {
+    return "High management overhead, inconsistent employee experience, and growing operational risk as the organisation scales.";
+  }
+
+  if (score < 70) {
+    return "Hidden inefficiencies, duplication of effort, and increasing friction between teams.";
+  }
+
+  return "Opportunities to optimise efficiency, reduce cost-to-serve, and improve scalability.";
+}
+
+function buildPriorities(score: number): string[] {
+  if (score < 40) {
+    return [
+      "Define and document core HR processes",
+      "Clarify ownership across the employee lifecycle",
+      "Establish a single entry point for HR support",
+    ];
+  }
+
+  if (score < 70) {
+    return [
+      "Standardise processes across teams",
+      "Improve system alignment and automation",
+      "Introduce clearer service structure",
+    ];
+  }
+
+  return [
+    "Optimise workflows and reduce friction",
+    "Enhance reporting and insights",
+    "Align HR operations with strategic growth",
+  ];
+}
+
+function buildCallOpener(score: number, submission: SubmissionRow): string {
+  const size = submission.company_size || "your organisation";
+
+  if (score < 40) {
+    return `From what I’ve seen, organisations at ${size} often reach a point where HR starts to feel reactive and inconsistent. I’d be interested to understand where that’s showing up most for you right now.`;
+  }
+
+  if (score < 70) {
+    return "It looks like you’ve got some structure in place, but it’s not fully consistent yet. I’d like to explore where that’s creating friction day-to-day.";
+  }
+
+  return "You seem to have a solid foundation in place. I’d be interested to understand where you’re seeing limitations as you scale further.";
 }
 
 async function requireAdvisorSession(submissionId: string) {
@@ -242,51 +430,43 @@ async function requireAdvisorSession(submissionId: string) {
   return session;
 }
 
-async function getAdvisorSubmission(
-  submissionId: string,
-): Promise<SuccessResponse> {
-  const baseUrl = await getBaseUrl();
-  const requestHeaders = await headers();
-  const cookieHeader = requestHeaders.get("cookie") ?? "";
+async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
+  const supabase = createSupabaseAdminClient();
 
-  const response = await fetch(
-    `${baseUrl}/api/advisor-submission?submissionId=${encodeURIComponent(
-      submissionId,
-    )}`,
-    {
-      cache: "no-store",
-      headers: {
-        cookie: cookieHeader,
-      },
-    },
-  );
+  const { data, error } = await supabase
+    .from("diagnostic_submissions")
+    .select(
+      `
+        submission_id,
+        contact_name,
+        contact_email,
+        contact_company,
+        contact_topic,
+        contact_message,
+        contact_source,
+        company_size,
+        industry,
+        role,
+        country_region,
+        answers,
+        score,
+        band,
+        advisor_brief,
+        contact_submitted_at
+      `,
+    )
+    .eq("submission_id", submissionId)
+    .single();
 
-  console.log("Advisor fetch debug", {
-    baseUrl,
-    submissionId,
-    status: response.status,
-    ok: response.ok,
-    url: `${baseUrl}/api/advisor-submission?submissionId=${encodeURIComponent(
-      submissionId,
-    )}`,
-    forwardedCookie: cookieHeader ? "present" : "missing",
-  });
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
+    }
 
-  if (response.status === 404) {
-    notFound();
+    throw new Error(`Supabase read failed: ${error.message}`);
   }
 
-  if (response.status === 403) {
-    redirect(`/advisor/login?next=/advisor/${submissionId}`);
-  }
-
-  const data = (await response.json()) as SuccessResponse | ErrorResponse;
-
-  if (!response.ok || !data.success) {
-    throw new Error("Unable to load advisor submission.");
-  }
-
-  return data;
+  return data as SubmissionRow;
 }
 
 async function getHealthCheckProspect(
@@ -358,6 +538,71 @@ async function getProspectActivity(
   return (data ?? []) as ProspectActivityRecord[];
 }
 
+async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
+  const submission = await getSubmission(submissionId);
+
+  if (!submission) {
+    notFound();
+  }
+
+  const diagnosticAnswers = asDiagnosticAnswers(submission.answers);
+  const result = diagnosticAnswers
+    ? calculateDiagnosticResult(diagnosticAnswers)
+    : null;
+
+  const advisorBrief = asAdvisorBrief(submission.advisor_brief);
+
+  return {
+    submission: {
+      submissionId: submission.submission_id,
+      contactName: submission.contact_name,
+      contactEmail: submission.contact_email,
+      contactCompany: submission.contact_company,
+      contactTopic: submission.contact_topic,
+      contactMessage: submission.contact_message,
+      contactSource: submission.contact_source,
+      companySize: submission.company_size,
+      industry: submission.industry,
+      role: submission.role,
+      countryRegion: submission.country_region,
+      contactSubmittedAt: submission.contact_submitted_at,
+    },
+    diagnostic: result
+      ? {
+          score: result.score,
+          band: {
+            label: result.band.label,
+            summary: result.band.summary,
+          },
+          lowestDimensions: result.lowestDimensions.map((dimension) => ({
+            label: dimension.label,
+            score: dimension.score,
+          })),
+        }
+      : null,
+    derived: result
+      ? {
+          narrative: buildNarrative(result.score, submission),
+          impact: buildImpact(result.score),
+          priorities: buildPriorities(result.score),
+          callOpener: buildCallOpener(result.score, submission),
+          lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
+            label: dimension.label,
+            score: dimension.score,
+            insight: getInsight(dimension.label),
+          })),
+        }
+      : {
+          narrative: null,
+          impact: null,
+          priorities: [],
+          callOpener: null,
+          lowestDimensionInsights: [],
+        },
+    advisorBrief,
+  };
+}
+
 export default async function AdvisorSubmissionPage({
   params,
 }: AdvisorPageProps) {
@@ -366,7 +611,7 @@ export default async function AdvisorSubmissionPage({
   await requireAdvisorSession(submissionId);
 
   const [data, prospect] = await Promise.all([
-    getAdvisorSubmission(submissionId),
+    getSubmissionView(submissionId),
     getHealthCheckProspect(submissionId),
   ]);
 
