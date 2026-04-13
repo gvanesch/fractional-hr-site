@@ -12,11 +12,16 @@ type ProspectStatus =
   | "won"
   | "lost";
 
+type ProspectRelationship = "weak" | "medium" | "strong";
+
 type ProspectRow = {
   prospect_id: string;
   submission_id: string;
+  relationship: ProspectRelationship;
   status: ProspectStatus;
+  last_contact_date: string | null;
   next_action_date: string | null;
+  notes: string | null;
 };
 
 type ActivityInsert = {
@@ -40,23 +45,54 @@ const VALID_STATUSES: ProspectStatus[] = [
   "lost",
 ];
 
-function normaliseOptionalDate(value: unknown): string | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
+const VALID_RELATIONSHIPS: ProspectRelationship[] = ["weak", "medium", "strong"];
+
+function normaliseOptionalDate(value: unknown, fieldName: string): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || value === "") {
+    return null;
+  }
 
   if (typeof value !== "string") {
-    throw new Error("Invalid next_action_date");
+    throw new Error(`Invalid ${fieldName}`);
   }
 
   const trimmed = value.trim();
 
-  if (!trimmed) return null;
+  if (!trimmed) {
+    return null;
+  }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    throw new Error("Invalid next_action_date");
+    throw new Error(`Invalid ${fieldName}`);
   }
 
   return trimmed;
+}
+
+function normaliseOptionalNotes(value: unknown): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error("Invalid notes");
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.slice(0, 5000);
 }
 
 export async function POST(request: Request) {
@@ -82,13 +118,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Safe after validation
     const safeUserEmail = userEmail as string;
 
     const body = (await request.json()) as {
       prospect_id?: string;
+      relationship?: string;
       status?: string;
+      last_contact_date?: string | null;
       next_action_date?: string | null;
+      notes?: string | null;
     };
 
     const prospectId = body.prospect_id?.trim();
@@ -107,8 +145,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const nextActionDate = normaliseOptionalDate(body.next_action_date);
+    if (
+      !body.relationship ||
+      !VALID_RELATIONSHIPS.includes(body.relationship as ProspectRelationship)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid relationship" },
+        { status: 400 },
+      );
+    }
+
     const nextStatus = body.status as ProspectStatus;
+    const nextRelationship = body.relationship as ProspectRelationship;
+    const lastContactDate = normaliseOptionalDate(
+      body.last_contact_date,
+      "last_contact_date",
+    );
+    const nextActionDate = normaliseOptionalDate(
+      body.next_action_date,
+      "next_action_date",
+    );
+    const nextNotes = normaliseOptionalNotes(body.notes);
 
     const admin = createSupabaseAdminClient();
 
@@ -118,8 +175,11 @@ export async function POST(request: Request) {
         `
           prospect_id,
           submission_id,
+          relationship,
           status,
-          next_action_date
+          last_contact_date,
+          next_action_date,
+          notes
         `,
       )
       .eq("prospect_id", prospectId)
@@ -142,16 +202,28 @@ export async function POST(request: Request) {
     const current = currentRow as ProspectRow;
 
     const updatePayload: {
+      relationship: ProspectRelationship;
       status: ProspectStatus;
+      last_contact_date?: string | null;
       next_action_date?: string | null;
+      notes?: string | null;
       updated_at: string;
     } = {
+      relationship: nextRelationship,
       status: nextStatus,
       updated_at: new Date().toISOString(),
     };
 
+    if (lastContactDate !== undefined) {
+      updatePayload.last_contact_date = lastContactDate;
+    }
+
     if (nextActionDate !== undefined) {
       updatePayload.next_action_date = nextActionDate;
+    }
+
+    if (nextNotes !== undefined) {
+      updatePayload.notes = nextNotes;
     }
 
     const { error: updateError } = await admin
@@ -168,6 +240,19 @@ export async function POST(request: Request) {
 
     const activityRows: ActivityInsert[] = [];
 
+    if (current.relationship !== nextRelationship) {
+      activityRows.push({
+        prospect_id: current.prospect_id,
+        submission_id: current.submission_id,
+        activity_type: "relationship_changed",
+        field_name: "relationship",
+        old_value: current.relationship,
+        new_value: nextRelationship,
+        note: null,
+        changed_by: safeUserEmail,
+      });
+    }
+
     if (current.status !== nextStatus) {
       activityRows.push({
         prospect_id: current.prospect_id,
@@ -176,6 +261,22 @@ export async function POST(request: Request) {
         field_name: "status",
         old_value: current.status,
         new_value: nextStatus,
+        note: null,
+        changed_by: safeUserEmail,
+      });
+    }
+
+    if (
+      lastContactDate !== undefined &&
+      (current.last_contact_date ?? null) !== lastContactDate
+    ) {
+      activityRows.push({
+        prospect_id: current.prospect_id,
+        submission_id: current.submission_id,
+        activity_type: "last_contact_date_changed",
+        field_name: "last_contact_date",
+        old_value: current.last_contact_date,
+        new_value: lastContactDate,
         note: null,
         changed_by: safeUserEmail,
       });
@@ -192,6 +293,19 @@ export async function POST(request: Request) {
         field_name: "next_action_date",
         old_value: current.next_action_date,
         new_value: nextActionDate,
+        note: null,
+        changed_by: safeUserEmail,
+      });
+    }
+
+    if (nextNotes !== undefined && (current.notes ?? null) !== nextNotes) {
+      activityRows.push({
+        prospect_id: current.prospect_id,
+        submission_id: current.submission_id,
+        activity_type: "notes_changed",
+        field_name: "notes",
+        old_value: current.notes,
+        new_value: nextNotes,
         note: null,
         changed_by: safeUserEmail,
       });
@@ -227,7 +341,12 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Unexpected error";
 
-    const status = message === "Invalid next_action_date" ? 400 : 500;
+    const status =
+      message === "Invalid last_contact_date" ||
+      message === "Invalid next_action_date" ||
+      message === "Invalid notes"
+        ? 400
+        : 500;
 
     return NextResponse.json(
       { success: false, error: message },

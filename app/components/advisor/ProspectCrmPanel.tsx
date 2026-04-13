@@ -43,29 +43,6 @@ function formatSubmittedAt(value: string | null): string {
   }
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Not set";
-
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      dateStyle: "medium",
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
-}
-
-function formatRelationship(value: ProspectRecord["relationship"]): string {
-  switch (value) {
-    case "weak":
-      return "Weak";
-    case "medium":
-      return "Medium";
-    case "strong":
-      return "Strong";
-  }
-}
-
 function formatSource(value: ProspectRecord["source"]): string {
   switch (value) {
     case "network":
@@ -95,6 +72,17 @@ function formatProspectStatus(value: ProspectRecord["status"]): string {
       return "Won";
     case "lost":
       return "Lost";
+  }
+}
+
+function formatRelationship(value: ProspectRecord["relationship"]): string {
+  switch (value) {
+    case "weak":
+      return "Weak";
+    case "medium":
+      return "Medium";
+    case "strong":
+      return "Strong";
   }
 }
 
@@ -136,9 +124,16 @@ export default function ProspectCrmPanel({
   const [status, setStatus] = useState<ProspectRecord["status"] | "">(
     prospect?.status ?? "",
   );
+  const [relationship, setRelationship] = useState<
+    ProspectRecord["relationship"] | ""
+  >(prospect?.relationship ?? "");
+  const [lastContactDate, setLastContactDate] = useState(
+    prospect?.last_contact_date ?? "",
+  );
   const [nextActionDate, setNextActionDate] = useState(
     prospect?.next_action_date ?? "",
   );
+  const [notes, setNotes] = useState(prospect?.notes ?? "");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [updatedAtLabel, setUpdatedAtLabel] = useState(
@@ -161,8 +156,11 @@ export default function ProspectCrmPanel({
         },
         body: JSON.stringify({
           prospect_id: prospect.prospect_id,
+          relationship,
           status,
+          last_contact_date: lastContactDate || null,
           next_action_date: nextActionDate || null,
+          notes: notes || null,
         }),
       });
 
@@ -204,17 +202,21 @@ export default function ProspectCrmPanel({
           <div className="flex flex-wrap gap-2">
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${prospectStatusBadgeClasses(
-                status || prospect.status,
+                (status || prospect.status) as ProspectRecord["status"],
               )}`}
             >
-              {formatProspectStatus((status || prospect.status) as ProspectRecord["status"])}
+              {formatProspectStatus(
+                (status || prospect.status) as ProspectRecord["status"],
+              )}
             </span>
             <span
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${relationshipBadgeClasses(
-                prospect.relationship,
+                (relationship || prospect.relationship) as ProspectRecord["relationship"],
               )}`}
             >
-              {formatRelationship(prospect.relationship)}
+              {formatRelationship(
+                (relationship || prospect.relationship) as ProspectRecord["relationship"],
+              )}
             </span>
           </div>
         ) : null}
@@ -249,12 +251,26 @@ export default function ProspectCrmPanel({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-500">
+              <label
+                htmlFor="prospect-relationship"
+                className="text-sm font-semibold text-slate-500"
+              >
                 Relationship
-              </p>
-              <p className="mt-2 text-sm text-slate-900">
-                {formatRelationship(prospect.relationship)}
-              </p>
+              </label>
+              <select
+                id="prospect-relationship"
+                value={relationship}
+                onChange={(event) =>
+                  setRelationship(
+                    event.target.value as ProspectRecord["relationship"],
+                  )
+                }
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+              >
+                <option value="weak">Weak</option>
+                <option value="medium">Medium</option>
+                <option value="strong">Strong</option>
+              </select>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -265,12 +281,19 @@ export default function ProspectCrmPanel({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-500">
+              <label
+                htmlFor="last-contact-date"
+                className="text-sm font-semibold text-slate-500"
+              >
                 Last contact date
-              </p>
-              <p className="mt-2 text-sm text-slate-900">
-                {formatDate(prospect.last_contact_date)}
-              </p>
+              </label>
+              <input
+                id="last-contact-date"
+                type="date"
+                value={lastContactDate}
+                onChange={(event) => setLastContactDate(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+              />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -298,19 +321,26 @@ export default function ProspectCrmPanel({
           </div>
 
           <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <label
+              htmlFor="prospect-notes"
+              className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500"
+            >
               Notes
-            </p>
-            <div className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-              {prospect.notes?.trim()
-                ? prospect.notes
-                : "No internal prospect notes have been added yet."}
-            </div>
+            </label>
+            <textarea
+              id="prospect-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              rows={6}
+              className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-7 text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+              placeholder="Add internal commercial notes for this prospect..."
+            />
           </div>
 
           <div className="mt-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-slate-600">
-              {saveState === "idle" && "Update prospect status or next action date."}
+              {saveState === "idle" &&
+                "Update relationship, status, contact dates, or notes."}
               {saveState === "saving" && "Saving changes..."}
               {saveState === "saved" && "Prospect updated successfully."}
               {saveState === "error" && errorMessage}
