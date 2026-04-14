@@ -4,8 +4,10 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Fractional HR Advisory | Van Esch Advisory Ltd",
   description:
-    "Fractional HR advisory support for organisations that need structure, direction, and operational improvement without a full-time hire.",
+    "Fractional HR leadership and advisory support for organisations that need structure, direction, and operational improvement without a full-time hire.",
 };
+const fractionalContactHref =
+  "/contact?topic=Fractional%20HR%20Advisory";
 
 const coverageAreas = [
   "HR operating model and service delivery structure",
@@ -31,7 +33,7 @@ const notFit = [
 
 const valuePoints = [
   {
-    title: "Senior capability without a full-time cost base",
+    title: "Senior capability with limited cost",
     text: "Access structured HR leadership and operational direction without committing to a full-time senior hire before the business is ready.",
   },
   {
@@ -39,8 +41,8 @@ const valuePoints = [
     text: "Bring more consistency to ownership, service delivery, onboarding, manager support, and the day-to-day mechanics of how HR actually works.",
   },
   {
-    title: "Practical prioritisation",
-    text: "Focus effort on the operational improvements most likely to strengthen clarity, reduce drag, and support scale.",
+    title: "Practical prioritisation and optimisation",
+    text: "Focus effort on the few operational improvements most likely to strengthen clarity, reduce drag, and support scale.",
   },
 ];
 
@@ -60,76 +62,50 @@ const heroHelpAreas = [
   "Businesses that need clearer ownership, better process discipline, and more reliable execution",
 ];
 
-type StandardCardProps = {
-  kicker?: string;
+type SectionCardProps = {
+  kicker: string;
   title: string;
-  body?: string;
-  children?: React.ReactNode;
-  tone?: "white" | "soft" | "dark";
-  titleSize?: "md" | "lg";
+  children: React.ReactNode;
+  tone?: "white" | "soft";
+  titleMinHeightClass?: string;
 };
 
-function StandardCard({
+function SectionCard({
   kicker,
   title,
-  body,
   children,
   tone = "white",
-  titleSize = "md",
-}: StandardCardProps) {
-  const toneClass =
-    tone === "white"
-      ? "border-slate-300 bg-white shadow-sm"
-      : tone === "soft"
-        ? "border-slate-300 bg-slate-50"
-        : "border-white/10 bg-white/5";
-
-  const kickerClass =
-    tone === "dark"
-      ? "text-[#8AAAC8]"
-      : "text-[var(--brand-accent)]";
-
-  const titleClass =
-    tone === "dark" ? "text-white" : "text-slate-950";
-
-  const bodyClass =
-    tone === "dark" ? "text-slate-200" : "text-slate-700";
-
-  const headingSizeClass =
-    titleSize === "lg" ? "brand-heading-lg" : "brand-heading-md";
+  titleMinHeightClass = "min-h-[10.5rem] lg:min-h-[9rem]",
+}: SectionCardProps) {
+  const toneClasses =
+    tone === "soft"
+      ? "border-slate-300 bg-slate-50"
+      : "border-slate-300 bg-white shadow-sm";
 
   return (
-    <div className={`h-full rounded-[1.75rem] border p-8 ${toneClass}`}>
+    <div className={`h-full rounded-[1.75rem] border p-8 ${toneClasses}`}>
       <div className="flex h-full flex-col">
-        {kicker ? (
-          <p
-            className={`text-xs font-semibold uppercase tracking-[0.18em] ${kickerClass}`}
-          >
-            {kicker}
-          </p>
-        ) : null}
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand-accent)]">
+          {kicker}
+        </p>
 
-        <div className="min-h-[112px] pt-3">
-          <h2 className={`${headingSizeClass} ${titleClass}`}>{title}</h2>
+        <div className={`pt-3 ${titleMinHeightClass}`}>
+          <h2 className="brand-heading-lg text-slate-950">{title}</h2>
         </div>
 
-        {body ? (
-          <p className={`flex-1 text-base leading-8 ${bodyClass}`}>{body}</p>
-        ) : null}
-
-        {children ? <div className="flex-1 pt-5">{children}</div> : null}
+        <div className="flex-1">{children}</div>
       </div>
     </div>
   );
 }
 
-function ListBox({ items }: { items: string[] }) {
+function ListStack({ items }: { items: string[] }) {
   return (
     <div className="space-y-3">
       {items.map((item) => (
         <div
           key={item}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 text-slate-700"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 text-slate-700 shadow-sm"
         >
           {item}
         </div>
@@ -138,7 +114,7 @@ function ListBox({ items }: { items: string[] }) {
   );
 }
 
-function CompactValueCard({
+function ValueCard({
   title,
   text,
 }: {
@@ -148,10 +124,13 @@ function CompactValueCard({
   return (
     <div className="h-full rounded-[1.5rem] border border-slate-300 bg-white p-6 shadow-sm">
       <div className="flex h-full flex-col">
-        <div className="min-h-[96px]">
+        <div className="min-h-[5.5rem] lg:min-h-[5rem]">
           <h3 className="brand-heading-md text-slate-950">{title}</h3>
         </div>
-        <p className="flex-1 text-base leading-8 text-slate-700">{text}</p>
+
+        <p className="mt-3 flex-1 text-base leading-8 text-slate-700">
+          {text}
+        </p>
       </div>
     </div>
   );
@@ -159,8 +138,8 @@ function CompactValueCard({
 
 function ScopeCard({ text }: { text: string }) {
   return (
-    <div className="h-full rounded-[1.5rem] border border-slate-300 bg-white p-6 shadow-sm">
-      <div className="flex h-full items-start">
+    <div className="h-full rounded-[1.5rem] border border-slate-300 bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+      <div className="flex h-full items-start rounded-[1rem] bg-slate-50 px-4 py-4">
         <p className="text-base leading-8 text-slate-700">{text}</p>
       </div>
     </div>
@@ -206,11 +185,11 @@ export default function FractionalHRPage() {
                   </a>
 
                   <Link
-                    href="/contact"
+                    href="/contact?topic=Fractional%20HR%20Advisory"
                     className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
-                  >
+                    >
                     Request a tailored discussion
-                  </Link>
+                   </Link>
                 </div>
 
                 <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
@@ -243,11 +222,10 @@ export default function FractionalHRPage() {
       <section className="brand-light-section">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
           <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
+            <SectionCard
               kicker="Context"
               title="When HR is too important to leave informal, but not yet a full-time role"
               tone="white"
-              titleSize="lg"
             >
               <div className="space-y-4 text-base leading-8 text-slate-700">
                 <p>
@@ -255,27 +233,28 @@ export default function FractionalHRPage() {
                   finance, or operations. Processes evolve organically, onboarding
                   varies by manager, and ownership is not always fully clear.
                 </p>
+
                 <p>
                   This often works for a period of time. As the organisation grows,
                   it can begin to create inconsistency, operational drag, and
                   increasing reliance on individual judgement.
                 </p>
+
                 <p>
                   Hiring a full-time senior HR leader may feel premature. Leaving
                   the model unchanged can make day-to-day execution harder than it
                   needs to be.
                 </p>
               </div>
-            </StandardCard>
+            </SectionCard>
 
-            <StandardCard
+            <SectionCard
               kicker="Typical signals"
               title="Signs this model may be worth considering"
               tone="white"
-              titleSize="lg"
             >
-              <ListBox items={operatingSignals} />
-            </StandardCard>
+              <ListStack items={operatingSignals} />
+            </SectionCard>
           </div>
         </div>
       </section>
@@ -283,48 +262,56 @@ export default function FractionalHRPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
           <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
+            <SectionCard
               kicker="What this is"
               title="Structured HR leadership, part-time"
-              body="This is not administrative support or ad hoc consulting. It is structured, senior-level HR operations leadership delivered on a part-time basis."
               tone="soft"
-              titleSize="lg"
-            >
-              <p className="text-base leading-8 text-slate-700">
-                The focus is on bringing clarity to how HR operates, improving
-                consistency across the employee lifecycle, and ensuring the
-                organisation has a model that can support growth.
-              </p>
-            </StandardCard>
-
-            <StandardCard
-              kicker="How it works"
-              title="A structured, part-time engagement"
-              body="Engagements are typically structured on a part-time basis, often one to two days per week or an equivalent allocation."
-              tone="soft"
-              titleSize="lg"
+              titleMinHeightClass="min-h-[8.5rem] lg:min-h-[8rem]"
             >
               <div className="space-y-4 text-base leading-8 text-slate-700">
+                <p>
+                  This is not administrative support or ad hoc consulting. It is
+                  structured, senior-level HR operations leadership delivered on a
+                  part-time basis.
+                </p>
+
+                <p>
+                  The focus is on bringing clarity to how HR operates, improving
+                  consistency across the employee lifecycle, and ensuring the
+                  organisation has a model that can support growth.
+                </p>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              kicker="How it works"
+              title="A structured, part-time engagement"
+              tone="soft"
+              titleMinHeightClass="min-h-[8.5rem] lg:min-h-[8rem]"
+            >
+              <div className="space-y-4 text-base leading-8 text-slate-700">
+                <p>
+                  Engagements are typically structured on a part-time basis, often
+                  one to two days per week or an equivalent allocation.
+                </p>
+
                 <p>
                   Work is prioritised around the areas that will have the most
                   operational impact, with a clear cadence, defined focus, and
                   ongoing alignment with leadership.
                 </p>
+
                 <p>
                   The aim is to move from reactive handling to a more deliberate
                   and scalable operating model.
                 </p>
               </div>
-            </StandardCard>
+            </SectionCard>
           </div>
 
           <div className="mt-6 grid gap-6 md:grid-cols-3 md:items-stretch">
             {valuePoints.map((item) => (
-              <CompactValueCard
-                key={item.title}
-                title={item.title}
-                text={item.text}
-              />
+              <ValueCard key={item.title} title={item.title} text={item.text} />
             ))}
           </div>
         </div>
@@ -332,14 +319,16 @@ export default function FractionalHRPage() {
 
       <section className="brand-light-section">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="rounded-[1.75rem] border border-slate-300 bg-slate-50 p-8 lg:p-10">
+          <div className="rounded-[1.75rem] border border-slate-300 bg-slate-50 p-8 lg:p-10 shadow-sm">
             <div className="max-w-4xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand-accent)]">
                 Scope
               </p>
+
               <h2 className="brand-heading-lg mt-3 text-slate-950">
                 What this can cover
               </h2>
+
               <p className="mt-4 max-w-4xl text-base leading-8 text-slate-700">
                 The exact scope depends on the business, but the work usually
                 focuses on the areas most likely to improve clarity, consistency,
@@ -359,23 +348,23 @@ export default function FractionalHRPage() {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
           <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
+            <SectionCard
               kicker="Good fit"
               title="Where this works well"
               tone="white"
-              titleSize="lg"
+              titleMinHeightClass="min-h-[8rem] lg:min-h-[7.5rem]"
             >
-              <ListBox items={goodFit} />
-            </StandardCard>
+              <ListStack items={goodFit} />
+            </SectionCard>
 
-            <StandardCard
+            <SectionCard
               kicker="Not the right fit"
               title="Where a different model is better"
               tone="white"
-              titleSize="lg"
+              titleMinHeightClass="min-h-[8rem] lg:min-h-[7.5rem]"
             >
-              <ListBox items={notFit} />
-            </StandardCard>
+              <ListStack items={notFit} />
+            </SectionCard>
           </div>
         </div>
       </section>
@@ -386,13 +375,14 @@ export default function FractionalHRPage() {
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
+
                 <h2 className="brand-heading-lg">
                   Decide whether this is the right level of support
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can book a short discussion now, or request a tailored
-                  discussion if you want your context reviewed in advance.
+                  Book a short discussion now, or request a tailored discussion if
+                  you want your context reviewed in advance.
                 </p>
               </div>
 
@@ -407,10 +397,10 @@ export default function FractionalHRPage() {
                 </a>
 
                 <Link
-                  href="/contact"
-                  className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
-                >
-                  Request a tailored discussion
+                    href={fractionalContactHref}
+                    className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
+                    >
+                    Request a tailored discussion
                 </Link>
               </div>
 

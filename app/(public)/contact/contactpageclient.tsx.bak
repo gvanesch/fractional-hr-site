@@ -199,7 +199,8 @@ export default function ContactPageClient() {
   const displayScore =
     diagnosticState?.result?.score ?? (scoreParam ? Number(scoreParam) : null);
 
-  const displayBand = diagnosticState?.result?.band?.label ?? bandParam ?? null;
+  const displayBand =
+    diagnosticState?.result?.band?.label ?? bandParam ?? null;
 
   const effectiveTopic = isHealthCheckJourney
     ? "HR Health Check Interpretation"
