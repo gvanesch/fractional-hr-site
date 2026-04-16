@@ -44,7 +44,7 @@ const valuePoints = [
   },
   {
     title: "Focused operational progress",
-    text: "Concentrate effort on the few improvements most likely to strengthen clarity, consistency, and scalability.",
+    text: "Concentrate effort on the improvements most likely to strengthen clarity, consistency, and scalability.",
   },
 ];
 
