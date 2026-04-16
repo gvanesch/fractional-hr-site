@@ -39,7 +39,7 @@ const valuePoints = [
     text: "Bring in experienced HR operations and service delivery leadership without committing to a full-time senior hire before the business is ready.",
   },
   {
-    title: "A clearer operating model",
+    title: "A clearer HR operating model",
     text: "Create more consistency across ownership, service delivery, onboarding, manager support, and the day-to-day mechanics of how HR runs.",
   },
   {
