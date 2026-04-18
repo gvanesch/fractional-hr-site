@@ -107,7 +107,7 @@ function OutcomeStatement({
         {title}
       </h3>
 
-      <p className="mt-4 max-w-sm text-[0.98rem] leading-8 text-white/60">
+      <p className="mt-4 max-w-md text-[0.98rem] leading-8 text-white/60">
         {text}
       </p>
     </div>
@@ -227,23 +227,23 @@ export default function GrowingCompaniesPage() {
       {/* SECTION B */}
       <section className="brand-dark-section">
         <div className="brand-container brand-section">
-          <div className="max-w-5xl">
+          <div className="brand-section-intro-tight brand-stack-sm">
             <p className="brand-kicker">What needs to change</p>
 
-            <div className="pt-6 lg:pt-8">
-              <h2 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white lg:text-[3.45rem]">
-                The work is usually about creating clarity, consistency, and
-                control.
-              </h2>
+            <h2 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white lg:text-[3.45rem]">
+              The work is usually about creating clarity, consistency, and
+              control.
+            </h2>
 
-              <p className="mt-6 max-w-3xl text-[1.05rem] leading-8 text-white/90">
-                At this point, the issue is rarely effort. It is that the model no
-                longer produces consistent outcomes without increasing reliance on
-                workarounds.
-              </p>
-            </div>
+            <p className="max-w-3xl text-[1.05rem] leading-8 text-white/90">
+              At this point, the issue is rarely effort. It is that the model no
+              longer produces consistent outcomes without increasing reliance on
+              workarounds.
+            </p>
+          </div>
 
-            <div className="grid gap-10 pt-12 lg:grid-cols-3 lg:gap-10 lg:pt-16">
+          <div className="brand-section-body-xl">
+            <div className="grid gap-10 lg:grid-cols-3 lg:gap-12">
               {outcomeAreas.map((item) => (
                 <OutcomeStatement
                   key={item.title}

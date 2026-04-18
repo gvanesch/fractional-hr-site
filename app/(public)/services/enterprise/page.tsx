@@ -45,30 +45,18 @@ const outcomeAreas = [
   },
 ];
 
-const deliverableAreas = [
+const improvementAreas = [
   {
     title: "Clear operating control",
-    points: [
-      "Defined ownership across the business",
-      "Clear escalation and decision paths",
-      "More predictable service delivery",
-    ],
+    text: "Defined ownership, clearer escalation paths, and more predictable service delivery across the business.",
   },
   {
     title: "Stronger workflow discipline",
-    points: [
-      "Cleaner approvals and handoffs",
-      "More reliable process execution",
-      "Reduced manual workarounds",
-    ],
+    text: "Cleaner approvals, more reliable process execution, and fewer manual workarounds where the model is under pressure.",
   },
   {
     title: "Better organisational coherence",
-    points: [
-      "Shared services and business units aligned",
-      "Technology and workflows working together",
-      "Integration complexity better managed",
-    ],
+    text: "Shared services, business units, technologies, and integration points working together with greater consistency.",
   },
 ];
 
@@ -113,37 +101,9 @@ function OutcomeStatement({
         {title}
       </h3>
 
-      <p className="mt-4 max-w-sm text-[0.98rem] leading-8 text-white/60">
+      <p className="mt-4 max-w-md text-[0.98rem] leading-8 text-white/60">
         {text}
       </p>
-    </div>
-  );
-}
-
-function DeliverableBlock({
-  title,
-  points,
-}: {
-  title: string;
-  points: string[];
-}) {
-  return (
-    <div className="border-t border-slate-200 pt-8 lg:pt-10">
-      <h3 className="min-h-[3.25rem] text-[1.1rem] font-semibold leading-[1.3] text-slate-950 lg:min-h-[3.5rem] lg:text-[1.2rem]">
-        {title}
-      </h3>
-
-      <ul className="mt-5 space-y-3">
-        {points.map((point) => (
-          <li
-            key={point}
-            className="relative pl-4 text-[0.98rem] leading-7 text-slate-600"
-          >
-            <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-            {point}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -230,21 +190,23 @@ export default function EnterprisePage() {
       {/* SECTION B */}
       <section className="brand-dark-section">
         <div className="brand-container brand-section">
-          <div className="max-w-5xl">
+          <div className="brand-section-intro-tight brand-stack-sm">
             <p className="brand-kicker">What needs to change</p>
 
-            <div className="pt-6 lg:pt-8">
-              <h2 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white lg:text-[3.45rem]">
-                The work is usually about restoring consistency, control, and
-                confidence.
-              </h2>
-            </div>
-            <p className="mt-6 max-w-3xl text-[1.05rem] leading-8 text-white/90">
+            <h2 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white lg:text-[3.45rem]">
+              The work is usually about restoring consistency, control, and
+              confidence.
+            </h2>
+
+            <p className="max-w-3xl text-[1.05rem] leading-8 text-white/90">
               At this point, the issue is rarely effort. It is that the model no
               longer produces consistent outcomes without increasing reliance on
               workarounds.
             </p>
-            <div className="grid gap-10 pt-14 lg:grid-cols-3 lg:gap-10 lg:pt-20">
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="grid gap-10 lg:grid-cols-3 lg:gap-12">
               {outcomeAreas.map((item) => (
                 <OutcomeStatement
                   key={item.title}
@@ -274,68 +236,17 @@ export default function EnterprisePage() {
             </p>
           </div>
 
-          <div className="brand-section-body-xl border-t border-slate-200">
-            <div className="grid gap-10 py-8 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-16 lg:py-10">
-              <h3 className="text-[1.1rem] font-semibold leading-[1.3] text-slate-950 lg:text-[1.2rem]">
-                Clear operating control
-              </h3>
+          <div className="brand-section-body-xl">
+            <div className="brand-rule-columns">
+              {improvementAreas.map((item) => (
+                <div key={item.title} className="brand-rule-col">
+                  <h3 className="brand-heading-sm text-slate-950">
+                    {item.title}
+                  </h3>
 
-              <ul className="space-y-3">
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Defined ownership across the business
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Clear escalation and decision paths
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  More predictable service delivery
-                </li>
-              </ul>
-            </div>
-
-            <div className="grid gap-10 border-t border-slate-200 py-8 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-16 lg:py-10">
-              <h3 className="text-[1.1rem] font-semibold leading-[1.3] text-slate-950 lg:text-[1.2rem]">
-                Stronger workflow discipline
-              </h3>
-
-              <ul className="space-y-3">
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Cleaner approvals and handoffs
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  More reliable process execution
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Reduced manual workarounds
-                </li>
-              </ul>
-            </div>
-
-            <div className="grid gap-10 border-t border-slate-200 py-8 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-16 lg:py-10">
-              <h3 className="text-[1.1rem] font-semibold leading-[1.3] text-slate-950 lg:text-[1.2rem]">
-                Better organisational coherence
-              </h3>
-
-              <ul className="space-y-3">
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Shared services and business units aligned
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Technology and workflows working together
-                </li>
-                <li className="relative pl-4 text-[0.98rem] leading-7 text-slate-600">
-                  <span className="absolute left-0 top-[0.95rem] h-px w-2 bg-slate-400" />
-                  Integration complexity better managed
-                </li>
-              </ul>
+                  <p className="mt-4 brand-body">{item.text}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>

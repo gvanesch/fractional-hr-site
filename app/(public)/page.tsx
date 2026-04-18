@@ -87,9 +87,7 @@ export default function HomePage() {
               </h1>
 
               <p className="brand-subheading brand-body-on-dark max-w-4xl">
-                Van Esch Advisory works with organisations where HR operations,
-                service delivery, and day-to-day execution need to operate with
-                greater clarity and consistency in organisations experiencing growth and emerging complexity.
+                Van Esch Advisory works with organisations where HR operations, service delivery, and day-to-day execution need to run with greater clarity and consistency as the business grows in scale and complexity.
               </p>
             </div>
           </div>
@@ -199,7 +197,7 @@ export default function HomePage() {
         <div className="brand-container brand-section-tight">
           <div className="brand-section-intro-tight brand-stack-sm">
             <p className="brand-kicker">
-              A structured path from early signal to focused improvement
+              Pathway
             </p>
 
             <h2 className="brand-heading-lg">
