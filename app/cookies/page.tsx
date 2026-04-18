@@ -17,7 +17,7 @@ export default function CookiesPage() {
             <h1 className="brand-heading-xl mt-3">Cookie Policy</h1>
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               This Cookie Policy explains how cookies and similar technologies
-              may be used on https://vanesch.uk.
+              are used on https://vanesch.uk.
             </p>
           </div>
         </div>
@@ -27,7 +27,7 @@ export default function CookiesPage() {
         <div className="brand-container brand-section">
           <div className="space-y-12">
             <section>
-              <p className="brand-section-kicker">What cookies are</p>
+              <p className="brand-section-kicker">What this page covers</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
                 Cookies and similar technologies
               </h2>
@@ -35,35 +35,75 @@ export default function CookiesPage() {
                 <p>
                   Cookies are small text files stored on your device when you
                   visit a website. Similar technologies can also be used to
-                  store or access information on your device.
+                  store information on, or access information from, your device.
+                </p>
+                <p>
+                  On this website, that may include browser storage such as
+                  local storage, as well as technologies used by infrastructure,
+                  security, and third-party service providers.
                 </p>
               </div>
             </section>
 
             <section>
-              <p className="brand-section-kicker">How this site uses them</p>
+              <p className="brand-section-kicker">Current use on this website</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                Current use on this website
+                How storage and access technologies are currently used
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  This website is intended to use only technologies that are
-                  strictly necessary for operation, security, and basic
-                  functionality, together with privacy-first analytics that do
-                  not rely on cookies or similar client-side tracking
-                  technologies.
+                  This website currently uses storage and access technologies
+                  where they are needed for basic functionality, security,
+                  resilience, or the operation of user-requested features.
                 </p>
                 <p>
-                  The website may also use infrastructure and security services
-                  provided by Cloudflare. These services may support website
-                  performance, resilience, and protection against malicious
-                  traffic.
+                  In particular, the public HR Health Check may store limited
+                  information locally in your browser so that progress can be
+                  retained during completion of the assessment and so that the
+                  results flow can continue more smoothly after submission.
                 </p>
                 <p>
-                  If non-essential analytics, advertising, tracking, or other
-                  technologies that require consent are introduced in the
-                  future, this policy and any required consent mechanisms will
-                  be updated accordingly.
+                  The website may also rely on infrastructure and security
+                  services provided by Cloudflare to support delivery,
+                  performance, and protection against malicious traffic.
+                </p>
+                <p>
+                  Certain features, such as embedded maps or other external
+                  content, may involve third-party services. Where those
+                  features are used, the relevant provider may set or access
+                  cookies or similar technologies in accordance with their own
+                  policies.
+                </p>
+                <p>
+                  As at the date of this policy, the website is not intended to
+                  use non-essential advertising or cross-site tracking cookies.
+                  If non-essential analytics, marketing, or similar technologies
+                  requiring consent are introduced in future, this page and any
+                  required consent mechanisms will be updated accordingly.
+                </p>
+              </div>
+            </section>
+
+            <section>
+              <p className="brand-section-kicker">Health Check browser storage</p>
+              <h2 className="brand-heading-md mt-3 text-slate-950">
+                Local storage used by the public diagnostic
+              </h2>
+              <div className="brand-body mt-4 space-y-4">
+                <p>
+                  When you use the public HR Health Check, information you enter
+                  may be stored locally in your browser to help preserve your
+                  progress and support the assessment journey.
+                </p>
+                <p>
+                  This may include draft response information and related
+                  identifiers needed to continue the flow within the same
+                  browser.
+                </p>
+                <p>
+                  This browser-stored information can usually be removed by
+                  resetting the assessment or clearing browser storage through
+                  your browser settings.
                 </p>
               </div>
             </section>
@@ -71,71 +111,66 @@ export default function CookiesPage() {
             <section>
               <p className="brand-section-kicker">Analytics</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                Privacy-first measurement
+                Measurement and performance monitoring
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Van Esch Advisory Ltd may use privacy-first website analytics
-                  to understand overall traffic, page performance, and broad
-                  usage patterns.
+                  Van Esch Advisory Ltd may use privacy-conscious methods to
+                  understand overall traffic, page performance, and broad usage
+                  patterns.
                 </p>
                 <p>
-                  The intention is to use analytics in a way that does not rely
-                  on analytics cookies, cross-site advertising identifiers, or
-                  invasive tracking techniques.
+                  Where possible, the intention is to avoid non-essential
+                  analytics cookies and invasive tracking techniques.
                 </p>
                 <p>
-                  If that approach changes and cookie-based or similar
-                  non-essential analytics tools are introduced, this page will
-                  be updated to describe those tools more specifically, including
-                  their purpose and any consent options made available to users.
+                  If that changes, this policy will be updated to describe the
+                  relevant tools, purposes, and any choices made available to
+                  users.
                 </p>
               </div>
             </section>
 
             <section>
-              <p className="brand-section-kicker">Types of cookies</p>
+              <p className="brand-section-kicker">Third-party services</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                Categories
+                External providers and their technologies
               </h2>
               <div className="brand-body mt-4 space-y-4">
-                <p>The following categories may be relevant on websites generally:</p>
-                <ul className="list-disc space-y-2 pl-6">
-                  <li>
-                    <strong>Strictly necessary cookies</strong> — used to make a
-                    site function properly, securely, and reliably
-                  </li>
-                  <li>
-                    <strong>Analytics cookies</strong> — used to measure usage
-                    and performance
-                  </li>
-                  <li>
-                    <strong>Preference cookies</strong> — used to remember
-                    choices or settings
-                  </li>
-                  <li>
-                    <strong>Marketing cookies</strong> — used for advertising or
-                    cross-site tracking
-                  </li>
-                </ul>
+                <p>
+                  Some third-party services used within or linked from this
+                  website, such as embedded maps or scheduling tools, may use
+                  their own cookies or similar technologies when you interact
+                  with them.
+                </p>
+                <p>
+                  These technologies are controlled by the relevant third party
+                  and are subject to their own terms, privacy notice, and cookie
+                  policy rather than by this website alone.
+                </p>
+                <p>
+                  Where those services are not essential to the operation of the
+                  site, they are used in a limited and proportionate way.
+                </p>
               </div>
             </section>
 
             <section>
-              <p className="brand-section-kicker">Managing cookies</p>
+              <p className="brand-section-kicker">Your choices</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                Your choices
+                Managing cookies and browser storage
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Most browsers allow you to manage or remove cookies through
-                  their settings. You can usually block cookies, delete existing
-                  cookies, or choose to be notified when cookies are being
-                  placed.
+                  Most browsers allow you to manage or remove cookies and other
+                  browser-stored data through their settings. You can usually
+                  block cookies, delete existing cookies, and clear local
+                  storage or similar data stored in your browser.
                 </p>
                 <p>
-                  Please note that blocking strictly necessary cookies or
-                  related technologies may affect how the website works.
+                  Please note that blocking or removing strictly necessary
+                  technologies may affect how some parts of the website,
+                  including the HR Health Check flow, operate in practice.
                 </p>
               </div>
             </section>
@@ -147,9 +182,11 @@ export default function CookiesPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  If non-essential cookies or similar technologies are added in
-                  future, this page will be updated to describe them more
-                  specifically, including their purpose and duration.
+                  If the technologies used on this website change materially,
+                  this page will be updated to reflect those changes in a more
+                  specific way, including where relevant the purpose of the
+                  technology, whether a third party is involved, and what user
+                  choices are available.
                 </p>
               </div>
             </section>

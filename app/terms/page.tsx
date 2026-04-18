@@ -37,10 +37,29 @@ export default function TermsPage() {
                   service delivery, and transformation topics.
                 </p>
                 <p>
-                  You may use the site only for lawful purposes and in a way
-                  that does not interfere with the operation, security, or
-                  availability of the website.
+                  You may use the website only for lawful purposes and in a way
+                  that does not interfere with the operation, security,
+                  integrity, or availability of the site.
                 </p>
+                <p>You must not:</p>
+                <ul className="list-disc space-y-2 pl-6">
+                  <li>
+                    attempt to gain unauthorised access to the website, its
+                    infrastructure, or any connected systems
+                  </li>
+                  <li>
+                    introduce malicious code, harmful material, or any form of
+                    interference intended to disrupt the site
+                  </li>
+                  <li>
+                    use automated means to scrape, probe, overload, or test the
+                    website without prior written permission
+                  </li>
+                  <li>
+                    submit information that is unlawful, misleading, defamatory,
+                    malicious, or intended to misuse the website or its tools
+                  </li>
+                </ul>
               </div>
             </section>
 
@@ -56,9 +75,10 @@ export default function TermsPage() {
                 </p>
                 <p>
                   Nothing on this site constitutes legal, tax, regulatory, HR,
-                  employment, or other professional advice. It should not be
-                  relied upon as a substitute for advice tailored to the facts
-                  and circumstances of a particular organisation or situation.
+                  employment, compliance, or other professional advice. It
+                  should not be relied upon as a substitute for advice tailored
+                  to the facts, circumstances, and operational context of a
+                  particular organisation or situation.
                 </p>
               </div>
             </section>
@@ -70,21 +90,30 @@ export default function TermsPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  The HR Operations Health Check is designed as a high-level
-                  self-assessment tool. It is intended to provide an indicative
-                  view of operational maturity and potential areas of friction.
+                  The HR Operations Health Check is a public-facing, high-level
+                  self-assessment tool. It is designed to generate an indicative
+                  score, summary, and initial pattern signals based solely on
+                  the information submitted by the user.
                 </p>
                 <p>
-                  Diagnostic results, scores, summaries, or interpretations are
-                  provided for general informational purposes only. They do not
-                  constitute formal advice and should not be relied upon as the
-                  sole basis for business, people, legal, compliance, or
-                  operational decisions.
+                  The Health Check is not a comprehensive organisational
+                  diagnostic, audit, assurance exercise, or substitute for
+                  tailored professional advice. Outputs are general and
+                  indicative only. They are not independently verified and
+                  should not be relied upon as a basis for legal, tax,
+                  regulatory, employment, compliance, operational, or other
+                  business decisions.
                 </p>
                 <p>
-                  Use of the diagnostic does not create a client, advisory, or
-                  professional relationship between you and Van Esch Advisory
-                  Ltd.
+                  Use of the Health Check does not create a client, advisory,
+                  fiduciary, or professional relationship between you and Van
+                  Esch Advisory Ltd.
+                </p>
+                <p>
+                  Any fuller diagnostic assessment, stakeholder questionnaire
+                  process, formal report, or advisory engagement is separate and
+                  will be governed only by specific written terms agreed with
+                  the relevant client.
                 </p>
               </div>
             </section>
@@ -97,12 +126,15 @@ export default function TermsPage() {
               <div className="brand-body mt-4 space-y-4">
                 <p>
                   Accessing this website, submitting a contact form, or using
-                  the diagnostic does not by itself create a contract for
-                  services.
+                  the HR Operations Health Check does not by itself create a
+                  contract for services.
                 </p>
                 <p>
-                  Any advisory services provided by Van Esch Advisory Ltd will
-                  be governed by separate written terms agreed with the client.
+                  Any advisory, diagnostic, reporting, or consulting services
+                  provided by Van Esch Advisory Ltd will be governed by separate
+                  written terms agreed with the client. Where applicable, those
+                  arrangements may also include separate data protection and
+                  confidentiality provisions.
                 </p>
               </div>
             </section>
@@ -120,8 +152,8 @@ export default function TermsPage() {
                 <p>
                   You may view and use the content for personal or internal
                   business evaluation purposes. You may not reproduce,
-                  republish, distribute, modify, or exploit it commercially
-                  without prior written permission.
+                  republish, distribute, modify, adapt, extract, or exploit it
+                  commercially without prior written permission.
                 </p>
               </div>
             </section>
@@ -135,8 +167,14 @@ export default function TermsPage() {
                 <p>
                   Reasonable efforts are made to keep the website available and
                   its content up to date. However, uninterrupted access,
-                  complete accuracy, or freedom from errors cannot be
-                  guaranteed.
+                  complete accuracy, availability, compatibility, or freedom
+                  from errors, bugs, or harmful components cannot be guaranteed.
+                </p>
+                <p>
+                  Van Esch Advisory Ltd may change, suspend, withdraw, or
+                  restrict the availability of the website or any part of it,
+                  including the HR Operations Health Check, at any time and
+                  without notice.
                 </p>
               </div>
             </section>
@@ -149,13 +187,27 @@ export default function TermsPage() {
               <div className="brand-body mt-4 space-y-4">
                 <p>
                   To the fullest extent permitted by law, Van Esch Advisory Ltd
-                  shall not be liable for any loss or damage arising from use
-                  of, or reliance on, this website, its content, or outputs from
-                  the HR Operations Health Check.
+                  excludes all liability for any loss, damage, cost, or claim
+                  arising from or in connection with use of, inability to use,
+                  or reliance on this website, its content, or outputs generated
+                  by the HR Operations Health Check.
                 </p>
                 <p>
-                  Nothing in these terms excludes or limits liability that
-                  cannot lawfully be excluded or limited.
+                  No representation, warranty, or guarantee is given that the
+                  website, its content, or Health Check outputs are complete,
+                  accurate, current, suitable for any particular purpose, or
+                  free from errors or omissions.
+                </p>
+                <p>
+                  Health Check outputs depend on the completeness and accuracy
+                  of the information submitted by the user and are provided on
+                  an indicative, informational-only basis.
+                </p>
+                <p>
+                  Nothing in these terms excludes or limits liability for death
+                  or personal injury caused by negligence, fraud or fraudulent
+                  misrepresentation, or any other liability which cannot
+                  lawfully be excluded or limited.
                 </p>
               </div>
             </section>
@@ -163,7 +215,7 @@ export default function TermsPage() {
             <section>
               <p className="brand-section-kicker">Links</p>
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                Third-party websites
+                Third-party websites and services
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
@@ -171,12 +223,15 @@ export default function TermsPage() {
                   convenience or reference.
                 </p>
                 <p>
-                  This website may use third-party services such as scheduling platforms to facilitate communication and service delivery. Use of those services is subject to their own terms and policies.
+                  This website may also use third-party services, such as
+                  scheduling platforms, to support communication or service
+                  delivery. Use of those services is subject to their own terms
+                  and policies.
                 </p>
                 <p>
                   Van Esch Advisory Ltd is not responsible for the content,
                   availability, security, or privacy practices of external
-                  sites.
+                  websites or services.
                 </p>
               </div>
             </section>
