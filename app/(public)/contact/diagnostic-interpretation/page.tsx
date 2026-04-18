@@ -391,8 +391,7 @@ export default function FractionalHRPage() {
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can book a short discussion now, or request a tailored
-                  discussion if you want your context reviewed in advance.
+                  You can book a short discussion now, or start a conversation.
                 </p>
               </div>
 
@@ -410,13 +409,12 @@ export default function FractionalHRPage() {
                   href="/contact"
                   className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
                 >
-                  Request a tailored discussion
+                  Start a conversation
                 </Link>
               </div>
 
               <p className="text-sm text-[#8AAAC8]">
-                Book now for a direct conversation, or request a tailored
-                discussion if you want your context reviewed in advance.
+                Book now for a direct conversation, or start a conversation.
               </p>
             </div>
           </div>

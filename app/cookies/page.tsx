@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Cookie Policy | Van Esch Advisory Ltd",
   description:
-    "Cookie Policy for vanesch.uk, explaining how cookies and similar technologies are used on the website.",
+    "Cookie Policy for https://www.vanesch.uk, explaining how cookies and similar technologies are used on the website.",
 };
 
 export default function CookiesPage() {

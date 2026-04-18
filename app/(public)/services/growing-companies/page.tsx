@@ -316,8 +316,7 @@ export default function GrowingCompaniesPage() {
 
                 <p className="brand-subheading brand-body-on-dark">
                   Start with the Health Check, move into the Diagnostic
-                  Assessment for deeper clarity, or request a tailored
-                  discussion if the pattern is already clear.
+                  Assessment for deeper clarity, or start a conversation if the pattern is already clear.
                 </p>
               </div>
 
@@ -333,7 +332,7 @@ export default function GrowingCompaniesPage() {
                   href="/contact?topic=HR%20Foundations%20for%20Growing%20Companies"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Request a tailored discussion
+                  Start a conversation
                 </Link>
               </div>
             </div>

@@ -138,17 +138,17 @@ export default function EnterprisePage() {
 
             <div className="brand-actions">
               <Link
-                href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
+                href="/diagnostic"
                 className="brand-button-primary px-6 py-3 text-base font-medium"
               >
-                Request a tailored discussion
+                Take the Health Check
               </Link>
 
               <Link
-                href="/diagnostic"
+                href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
                 className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
               >
-                Take the Health Check
+                Start a conversation
               </Link>
             </div>
           </div>
@@ -261,30 +261,28 @@ export default function EnterprisePage() {
                 <p className="brand-kicker">Next step</p>
 
                 <h2 className="brand-heading-lg">
-                  Get clear on what needs stabilising in a more complex HR
-                  environment.
+                  Get a clearer view of how your HR model is running.
                 </h2>
 
-                <p className="brand-subheading brand-body-on-dark">
-                  Start with a tailored discussion if the challenge is already
-                  visible, or use the Health Check to get an initial view of
-                  where operational strain may be building.
+                <p className="brand-subheading brand-body-on-dark max-w-3xl">
+                  Start with the Health Check for an immediate view, or start a
+                  conversation if the challenge is already clear.
                 </p>
               </div>
 
               <div className="brand-actions">
                 <Link
-                  href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
+                  href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Request a tailored discussion
+                  Take the Health Check
                 </Link>
 
                 <Link
-                  href="/diagnostic"
+                  href="/contact?topic=Enterprise%20HR%20Operations%20%26%20Transformation"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Health Check
+                  Start a conversation
                 </Link>
               </div>
             </div>

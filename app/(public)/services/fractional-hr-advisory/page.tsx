@@ -112,20 +112,18 @@ export default function FractionalHRPage() {
             </div>
 
             <div className="brand-actions">
-              <a
-                href="https://calendly.com/greg-vanesch/20min"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/diagnostic"
                 className="brand-button-primary px-6 py-3 text-base font-medium"
               >
-                Book a 20-minute discussion
-              </a>
+                Take the Health Check
+              </Link>
 
               <Link
                 href={fractionalContactHref}
                 className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
               >
-                Request a tailored discussion
+                Start a conversation
               </Link>
             </div>
           </div>
@@ -341,41 +339,38 @@ export default function FractionalHRPage() {
       </section>
 
       {/* CTA */}
-      <section className="brand-dark-section">
-        <div className="brand-container brand-section">
+      <section className="brand-dark-section-plain">
+        <div className="brand-container brand-section-tight">
           <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
 
                 <h2 className="brand-heading-lg">
-                  Decide whether this is the right level of support.
+                  Get a clearer view of how your HR model is running.
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  Book a short discussion now, or request a tailored discussion if
-                  you want your context reviewed in advance.
+                  Start with the Health Check for an immediate view, or start a
+                  conversation if the pattern is already clear.
                 </p>
               </div>
 
               <div className="brand-actions">
-                <a
-                  href="https://calendly.com/greg-vanesch/20min"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Book a 20-minute discussion
-                </a>
+                  Take the Health Check
+                </Link>
 
                 <Link
                   href={fractionalContactHref}
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Request a tailored discussion
+                  Start a conversation
                 </Link>
               </div>
-
             </div>
           </div>
         </div>

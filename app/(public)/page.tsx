@@ -87,7 +87,10 @@ export default function HomePage() {
               </h1>
 
               <p className="brand-subheading brand-body-on-dark max-w-4xl">
-                Van Esch Advisory works with organisations where HR operations, service delivery, and day-to-day execution need to run with greater clarity and consistency as the business grows in scale and complexity.
+                Van Esch Advisory works with organisations where HR operations,
+                service delivery, and day-to-day execution need to run with
+                greater clarity and consistency as the business grows in scale
+                and complexity.
               </p>
             </div>
           </div>
@@ -196,9 +199,7 @@ export default function HomePage() {
       <section className="brand-dark-section-plain">
         <div className="brand-container brand-section-tight">
           <div className="brand-section-intro-tight brand-stack-sm">
-            <p className="brand-kicker">
-              Pathway
-            </p>
+            <p className="brand-kicker">Pathway</p>
 
             <h2 className="brand-heading-lg">
               A structured path from early signal to focused improvement.
@@ -301,7 +302,8 @@ export default function HomePage() {
             </h2>
 
             <p className="brand-body-lg">
-              Examples of operating environments and improvement work across HR operations, governance, and organisational transformation.
+              Examples of operating environments and improvement work across HR
+              operations, governance, and organisational transformation.
             </p>
           </div>
 
@@ -346,8 +348,8 @@ export default function HomePage() {
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  Start with the Health Check for an immediate diagnostic view,
-                  or request a discussion if the challenge is already visible.
+                  Start with the Health Check for an immediate view, or start a
+                  conversation if the challenge is already clear.
                 </p>
               </div>
 
@@ -357,7 +359,7 @@ export default function HomePage() {
                 </Link>
 
                 <Link href="/contact" className="brand-button-secondary-dark">
-                  Request a discussion
+                  Start a conversation
                 </Link>
               </div>
             </div>
