@@ -32,9 +32,9 @@ export default function CookieBanner() {
               Cookies
             </p>
             <p className="mt-2 text-base leading-7 text-[#8AAAC8]">
-              This website is intended to use only essential technologies needed for
-              basic functionality unless additional tools are introduced later.
-              You can read more in the{" "}
+              This website uses technologies necessary for its operation and
+              limited third-party services, such as embedded maps, which may set
+              their own cookies when used. You can read more in the{" "}
               <Link
                 href="/cookies"
                 className="font-medium text-white underline underline-offset-4"
