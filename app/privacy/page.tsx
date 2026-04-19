@@ -151,30 +151,38 @@ export default function PrivacyPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  The HR Operations Health Check is a public-facing,
-                  self-assessment tool. It uses the information you submit to
-                  generate an automated score, band, and indicative output
-                  reflecting your responses.
+                  The HR Operations Health Check is designed as a practical
+                  self-assessment tool. Information submitted through the tool is
+                  used to generate your result, provide an indicative view of HR
+                  operational maturity, and support understanding of common
+                  operational patterns over time.
                 </p>
+
                 <p>
-                  Outputs are based solely on submitted information and are not
-                  independently verified.
+                  Where benchmark or trend information is created from diagnostic
+                  submissions, it is intended to be used in aggregated, anonymised,
+                  or de-identified form so that individual organisations are not
+                  identified.
                 </p>
+
                 <p>
-                  Where you choose to provide contact details or continue to a
-                  follow-up enquiry, your diagnostic responses, scores, and
-                  contextual information may be linked to that enquiry to allow
-                  it to be reviewed in context.
+                  If you choose to provide contact details or submit an enquiry,
+                  your diagnostic responses, scores, and related contextual
+                  information may be linked to your enquiry and associated with
+                  your contact details.
                 </p>
+
                 <p>
-                  Aggregated and anonymised patterns may be used to improve the
-                  diagnostic and develop broader insight, without identifying
-                  individual organisations.
+                  This linkage is used to allow your enquiry to be reviewed in
+                  context and to support a more informed, relevant, and practical
+                  response. It is not used for automated decision-making,
+                  profiling, or unrelated marketing activity.
                 </p>
+
                 <p>
-                  This public Health Check is distinct from any formal client
-                  diagnostic or advisory engagement, which is governed by
-                  separate contractual terms.
+                  Diagnostic information linked to an enquiry is used only for
+                  handling that enquiry, supporting follow-up discussion, and
+                  providing advisory services where relevant.
                 </p>
               </div>
             </section>

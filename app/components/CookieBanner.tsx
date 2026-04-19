@@ -10,14 +10,24 @@ function getInitialVisibility(): boolean {
     return false;
   }
 
-  return window.localStorage.getItem(STORAGE_KEY) !== "true";
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== "true";
+  } catch {
+    // If storage is blocked or unavailable, show banner
+    return true;
+  }
 }
 
 export default function CookieBanner() {
   const [visible, setVisible] = useState<boolean>(getInitialVisibility);
 
   const handleAccept = () => {
-    window.localStorage.setItem(STORAGE_KEY, "true");
+    try {
+      window.localStorage.setItem(STORAGE_KEY, "true");
+    } catch {
+      // Ignore storage failures, still hide banner for session
+    }
+
     setVisible(false);
   };
 
@@ -33,8 +43,7 @@ export default function CookieBanner() {
             </p>
             <p className="mt-2 text-base leading-7 text-[#8AAAC8]">
               This website uses technologies necessary for its operation and
-              limited third-party services, such as embedded maps, which may set
-              their own cookies when used. You can read more in the{" "}
+              limited infrastructure and service providers that support the operation of the website You can read more in the{" "}
               <Link
                 href="/cookies"
                 className="font-medium text-white underline underline-offset-4"

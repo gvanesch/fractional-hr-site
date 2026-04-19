@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { loadDiagnosticState } from "@/lib/diagnostic-storage";
 import type { DiagnosticAnswers } from "@/lib/diagnostic";
@@ -261,7 +262,7 @@ export default function ContactPageClient() {
       setSubmitState("success");
       setSuccessMessage(
         data.message ||
-          "Thanks, your enquiry has been sent. We will come back to you shortly.",
+        "Thanks. Your message has been sent and we will come back to you shortly.",
       );
 
       setFormState({
@@ -285,31 +286,43 @@ export default function ContactPageClient() {
     <>
       <section className="brand-hero">
         <div className="brand-hero-content brand-container brand-section">
-          <div className="max-w-3xl">
-            <p className="brand-kicker">Contact</p>
-            <h1 className="brand-heading-xl mt-6 text-white">
-              Make an enquiry
-            </h1>
-            <p className="brand-body-on-dark mt-6 max-w-2xl">
-              Share a little context about your organisation and what you would
-              like to explore.
+          <div className="brand-section-intro brand-stack-md">
+            <div className="brand-stack-sm">
+              <p className="brand-kicker">Contact</p>
+
+              <h1 className="brand-heading-xl">Start a conversation.</h1>
+            </div>
+
+            <p className="brand-subheading brand-body-on-dark max-w-4xl">
+              A short initial conversation to understand what is happening,
+              where the pressure is showing up, and whether it makes sense to
+              look at this in more detail.
+            </p>
+
+            <p className="max-w-4xl text-base leading-8 text-[#C7D8EA]">
+              In many cases, the Health Check is the best first step because it
+              provides a structured initial read before a conversation takes
+              place.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="brand-light-section">
-        <div className="brand-container brand-section">
-          <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+      <section className="bg-white">
+        <div className="brand-container brand-section-tight">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14">
             <div className="brand-surface-card p-8 lg:p-10">
-              <div className="max-w-3xl">
-                <p className="brand-section-kicker">Enquiry form</p>
-                <h2 className="brand-heading-lg mt-3 text-slate-950">
-                  Discuss your context
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">Conversation form</p>
+
+                <h2 className="brand-heading-lg text-slate-950">
+                  Share the basics.
                 </h2>
-                <p className="mt-4 text-base leading-7 text-slate-700">
-                  A short summary of the situation, what is proving difficult,
-                  and what would be most useful to explore is enough.
+
+                <p className="brand-body-lg">
+                  A short summary of what is not running as it should, where it
+                  is creating friction, and what would be most useful to explore
+                  is enough.
                 </p>
               </div>
 
@@ -342,10 +355,9 @@ export default function ContactPageClient() {
                   </div>
 
                   <p className="mt-4 text-sm leading-7 text-slate-600">
-                    Because this enquiry is linked to your HR Health Check,
-                    previously submitted responses, result, and related context
-                    may be attached to this enquiry so it can be reviewed and
-                    discussed appropriately.
+                    Because this message is linked to your Health Check, the
+                    related responses and result may be attached so they can be
+                    reviewed in context.
                   </p>
 
                   <p className="mt-2 text-xs text-slate-500">
@@ -399,7 +411,7 @@ export default function ContactPageClient() {
 
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-slate-900">
-                    Enquiry type
+                    Topic
                   </label>
                   <select
                     value={effectiveTopic}
@@ -414,26 +426,27 @@ export default function ContactPageClient() {
                       </option>
                     ))}
                   </select>
+
                   {isHealthCheckJourney ? (
                     <p className="mt-2 text-xs text-slate-500">
                       This has been selected automatically because you arrived
-                      from the HR Health Check interpretation journey.
+                      from the Health Check journey.
                     </p>
                   ) : null}
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-slate-900">
-                    What would you like to discuss?
+                    What would be useful to discuss?
                   </label>
                   <textarea
                     value={formState.message}
                     onChange={(e) => updateField("message", e.target.value)}
-                    className={`${baseFieldClassName()} min-h-[190px] resize-y`}
+                    className={`${baseFieldClassName()} min-h-[380px] resize-y`}
                     placeholder={`Briefly describe:
 • what is currently not working as it should
 • where this is creating friction
-• what would be most useful to get from the conversation`}
+• what would be most useful to explore`}
                     required
                   />
                 </div>
@@ -455,57 +468,84 @@ export default function ContactPageClient() {
                   className="brand-button-primary"
                   disabled={submitState === "submitting"}
                 >
-                  {submitState === "submitting" ? "Sending..." : "Send enquiry"}
+                  {submitState === "submitting"
+                    ? "Sending..."
+                    : "Start a conversation"}
                 </button>
+
               </form>
             </div>
 
-            <div className="space-y-6">
-              <div className="brand-surface-card p-6 lg:p-8">
-                <p className="brand-section-kicker">Location</p>
-                <h3 className="brand-heading-md text-slate-950">
-                  Oxford, United Kingdom
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  Based in Oxford and supporting growing and complex
-                  organisations across the UK and internationally.
+            <div className="brand-stack-lg">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">Recommended first step</p>
+
+                <h2 className="brand-heading-lg text-slate-950">
+                  In many cases, take the Health Check first.
+                </h2>
+
+                <p className="brand-body-lg">
+                  The Health Check is often the best first step when something
+                  feels off but the underlying issue is not yet clear. It gives
+                  you a structured initial read and gives the conversation a
+                  stronger starting point.
                 </p>
 
-                <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  <iframe
-                    src="https://www.google.com/maps?q=Oxford%2C%20UK&z=12&output=embed"
-                    width="100%"
-                    height="220"
-                    loading="lazy"
-                    title="Map showing Oxford, United Kingdom"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="block border-0"
-                  />
+                <div className="pt-2">
+                  <Link
+                    href="/diagnostic"
+                    className="brand-button-dark px-6 py-3 text-base font-medium"
+                  >
+                    Take the Health Check
+                  </Link>
                 </div>
               </div>
 
-              <div className="brand-surface-card p-6 lg:p-8">
-                <p className="brand-section-kicker">What happens next</p>
-                <h3 className="brand-heading-md text-slate-950">
-                  From enquiry to a focused conversation
-                </h3>
-
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700">
-                    We review your enquiry alongside any Health Check context
-                    linked to it.
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700">
-                    We then arrange a short feedback conversation to walk
-                    through what the result is likely to mean in practice.
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700">
-                    Where useful, that conversation can lead into the HR
-                    Operations Diagnostic Assessment or a focused Sprint.
+              <div className="brand-ruled-list">
+                <div className="brand-ruled-item">
+                  <p className="brand-ruled-item-num">01</p>
+                  <div>
+                    <h3 className="brand-ruled-item-title">
+                      Use the Health Check when
+                    </h3>
+                    <p className="brand-ruled-item-body">
+                      The pattern is visible, but you want a clearer initial view
+                      before deciding what to do next.
+                    </p>
                   </div>
                 </div>
+
+                <div className="brand-ruled-item">
+                  <p className="brand-ruled-item-num">02</p>
+                  <div>
+                    <h3 className="brand-ruled-item-title">
+                      Use the form now when
+                    </h3>
+                    <p className="brand-ruled-item-body">
+                      The issue is already clear enough that a direct conversation
+                      would be more useful than a first diagnostic read.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="brand-ruled-item">
+                  <p className="brand-ruled-item-num">03</p>
+                  <div>
+                    <h3 className="brand-ruled-item-title">
+                      What happens next
+                    </h3>
+                    <p className="brand-ruled-item-body">
+                      We review the message and come back to you with a clear next step. That is usually a focused discussion based on your context, with any further diagnostic or structured work shaped from there.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pb-8 border-b border-slate-200">
+                <p className="text-sm leading-7 text-slate-600">
+                  Please avoid including sensitive personal employee data in
+                  your message.
+                </p>
               </div>
             </div>
           </div>
