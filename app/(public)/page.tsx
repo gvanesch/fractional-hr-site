@@ -291,7 +291,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* SELECTED WORK */}
+      {/* OPERATING EXPERIENCE */}
       <section className="bg-[#f4f6fa]">
         <div className="brand-container brand-section-tight">
           <div className="brand-section-intro-tight brand-stack-sm">

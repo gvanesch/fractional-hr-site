@@ -295,14 +295,11 @@ export default function ContactPageClient() {
 
             <p className="brand-subheading brand-body-on-dark max-w-4xl">
               A short initial conversation to understand what is happening,
-              where the pressure is showing up, and whether it makes sense to
-              look at this in more detail.
+              where greater clarity may be useful, and what a sensible next step looks like.
             </p>
 
             <p className="max-w-4xl text-base leading-8 text-[#C7D8EA]">
-              In many cases, the Health Check is the best first step because it
-              provides a structured initial read before a conversation takes
-              place.
+              In many cases, the Health Check is the right first step. It provides a structured initial read that helps shape a more focused conversation.
             </p>
           </div>
         </div>
@@ -485,10 +482,7 @@ export default function ContactPageClient() {
                 </h2>
 
                 <p className="brand-body-lg">
-                  The Health Check is often the best first step when something
-                  feels off but the underlying issue is not yet clear. It gives
-                  you a structured initial read and gives the conversation a
-                  stronger starting point.
+                  The Health Check is often the most useful starting point when the situation would benefit from a clearer view before deciding what to do next.
                 </p>
 
                 <div className="pt-2">

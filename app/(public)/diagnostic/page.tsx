@@ -74,22 +74,18 @@ const roleOptions = [
   "Other",
 ];
 
-const healthCheckDeliverables = [
+const openingPoints = [
   {
-    title: "Overall assessment",
-    text: "A clear first view of current HR operational maturity and whether the function appears well-established, developing, or likely to benefit from closer attention.",
+    title: "Structured first view",
+    text: "A structured read across clarity, ownership, service access, systems, and delivery.",
   },
   {
-    title: "10-dimension insight",
-    text: "A structured read across process clarity, ownership, service access, systems enablement, handoffs, and delivery consistency.",
+    title: "Focus for attention",
+    text: "Highlights where improvement is most likely to strengthen how HR operates.",
   },
   {
-    title: "Early pattern signals",
-    text: "An initial indication of where greater consistency, clearer ownership, or stronger operating discipline may add value.",
-  },
-  {
-    title: "Practical focus areas",
-    text: "A first indication of which areas are most likely to benefit from attention before they become more embedded or harder to resolve.",
+    title: "Next-step route",
+    text: "Creates a stronger basis for interpretation, discussion, and deeper diagnostic work.",
   },
 ];
 
@@ -404,433 +400,418 @@ export default function DiagnosticPage() {
 
   return (
     <>
+      {/* HERO */}
       <section className="brand-hero">
-        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="max-w-4xl">
-            <p className="brand-kicker">HR Health Check</p>
-            <h1 className="brand-heading-xl mt-3">
-              A quick first read on how HR operations are functioning today
-            </h1>
-            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Answer 10 questions to get an initial view across process clarity,
-              ownership, service access, systems enablement, and delivery consistency.
+        <div className="brand-container brand-section brand-hero-content">
+          <div className="brand-section-intro brand-stack-md">
+            <div className="brand-stack-sm">
+              <p className="brand-kicker">HR Health Check</p>
+
+              <h1 className="brand-heading-xl max-w-5xl">
+                See how clearly your HR model is actually running.
+              </h1>
+            </div>
+
+            <p className="brand-subheading brand-body-on-dark max-w-4xl">
+              Answer 10 questions to get a structured view across clarity,
+              ownership, service access, systems, and delivery.
             </p>
-            <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              This is designed as a structured first signal, not a generic HR survey.
-              It helps indicate how HR operations appear to be working in practice and
-              where greater clarity, consistency, or operating discipline may be useful.
-            </p>
-            <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              For some organisations, this will be enough to sharpen priorities.
-              For others, it will indicate whether a deeper cross-role review through
-              the HR Operations Diagnostic Assessment is likely to add value.
-            </p>
-            <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-              Based on experience designing, leading, and improving HR operations
-              across complex organisations.
+
+            <p className="max-w-4xl text-base leading-8 text-[#C7D8EA]">
+              Designed to surface where attention is most likely to strengthen
+              how HR runs and to shape the next conversation from a stronger
+              starting point.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="brand-light-section">
-        <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16 lg:py-20">
-          <div className="mb-10 rounded-[1.75rem] bg-white p-6 shadow-sm sm:p-8">
-            <div className="brand-stack-md">
-              <div className="brand-stack-sm">
-                <h2 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
-                  What you will receive
-                </h2>
-                <p className="text-base leading-7 text-slate-700">
-                  The Health Check is designed to do more than produce a score.
-                  It gives you an initial operational read on how HR appears to
-                  be functioning in practice, where stronger consistency may be
-                  beneficial, and which signals are more likely to reflect broader
-                  operating patterns rather than isolated frustrations.
-                </p>
-                <p className="text-base leading-7 text-slate-700">
-                  It is intended as a structured first layer of clarity. For
-                  some organisations, that will be enough to sharpen internal
-                  priorities. For others, it will indicate where a deeper
-                  diagnostic is likely to be worthwhile.
-                </p>
-              </div>
+      {/* SECTION 1 */}
+      <section className="bg-white">
+        <div className="brand-container brand-section-tight">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">What this is designed to do</p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                {healthCheckDeliverables.map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-                  >
-                    <h3 className="text-base font-semibold text-slate-950">
-                      {item.title}
-                    </h3>
-                    <p className="mt-3 text-sm leading-7 text-slate-700">
-                      {item.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-5">
-                <h3 className="text-lg font-semibold text-slate-950">
-                  How this is used
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  The HR Health Check is the starting point. It helps indicate
-                  whether the themes you are seeing are likely to be localised
-                  or part of a wider operational pattern.
-                </p>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  For organisations that need a deeper view, this can lead into
-                  the HR Operations Diagnostic Assessment. That next step
-                  gathers structured input across leadership, managers, and HR
-                  to build a more complete picture of how work actually flows
-                  through the organisation and where greater attention is most
-                  likely to create value.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm sm:p-8">
-            <h2 className="mb-6 text-xl font-semibold text-slate-950">
-              A little context first
+            <h2 className="brand-heading-lg text-slate-950">
+              A structured starting point.
             </h2>
 
-            <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Company size <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={companySize}
-                  onChange={(e) => {
-                    setCompanySize(e.target.value);
-                    setCompletionEmailStatus("idle");
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                >
-                  <option value="">Select company size</option>
-                  {companySizeOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <p className="brand-body-lg">
+              The Health Check gives a structured starting point for how HR
+              appears to be operating in practice, where attention is most
+              likely to add value, and what the next step should be.
+            </p>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Industry <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={industry}
-                  onChange={(e) => {
-                    setIndustry(e.target.value);
-                    setCompletionEmailStatus("idle");
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                >
-                  <option value="">Select industry</option>
-                  {industryOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Your role <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) => {
-                    setRole(e.target.value);
-                    setCompletionEmailStatus("idle");
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                >
-                  <option value="">Select your role</option>
-                  {roleOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Country / region
-                </label>
-                <input
-                  type="text"
-                  value={countryRegion}
-                  onChange={(e) => {
-                    setCountryRegion(e.target.value);
-                    setCompletionEmailStatus("idle");
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Email address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setCompletionEmailStatus("idle");
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
-                  placeholder="Optional"
-                />
-                <p className="mt-2 text-sm text-slate-500">
-                  You will not be added to a mailing list or contacted without
-                  context. If you choose to provide your email, it is only used
-                  to share your result or respond to a specific enquiry.
-                </p>
-              </div>
-            </div>
+            <p className="brand-body">
+              It is designed to surface patterns and priorities, not replace a
+              fuller diagnostic.
+            </p>
           </div>
 
-          <div className="space-y-8">
-            <div className="sticky top-[calc(var(--site-header-height)+1rem)] z-30">
-              <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full bg-[#1E6FD9] transition-all duration-300"
-                    style={{ width: `${progress}%` }}
+          <div className="brand-section-body-xl">
+            <div className="brand-rule-columns">
+              {openingPoints.map((item) => (
+                <div key={item.title} className="brand-rule-col">
+                  <h3 className="brand-heading-sm text-slate-950">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-4 brand-body">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CONTEXT + QUESTIONNAIRE */}
+      <section className="bg-[#F4F6FA]">
+        <div className="brand-container brand-section-tight">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-10 rounded-[1.5rem] bg-white p-6 shadow-sm sm:p-8">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">A little context first</p>
+
+                <h2 className="brand-heading-md text-slate-950">
+                  A small amount of context helps make the result more useful.
+                </h2>
+
+                <p className="brand-body">Takes around 3 minutes to complete.</p>
+              </div>
+
+              <div className="mt-8 grid gap-5 md:grid-cols-2">
+                <div className="flex h-full flex-col">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Company size <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={companySize}
+                    onChange={(e) => {
+                      setCompanySize(e.target.value);
+                      setCompletionEmailStatus("idle");
+                    }}
+                    className="h-14 w-full appearance-none rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
+                  >
+                    <option value="">Select company size</option>
+                    {companySizeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex h-full flex-col">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Industry <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={industry}
+                    onChange={(e) => {
+                      setIndustry(e.target.value);
+                      setCompletionEmailStatus("idle");
+                    }}
+                    className="h-14 w-full appearance-none rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
+                  >
+                    <option value="">Select industry</option>
+                    {industryOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex h-full flex-col">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Your role <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={role}
+                    onChange={(e) => {
+                      setRole(e.target.value);
+                      setCompletionEmailStatus("idle");
+                    }}
+                    className="h-14 w-full appearance-none rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
+                  >
+                    <option value="">Select your role</option>
+                    {roleOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex h-full flex-col">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Country / region
+                  </label>
+                  <input
+                    type="text"
+                    value={countryRegion}
+                    onChange={(e) => {
+                      setCountryRegion(e.target.value);
+                      setCompletionEmailStatus("idle");
+                    }}
+                    placeholder="Optional"
+                    className="h-14 w-full rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
                   />
                 </div>
 
-                <p className="mt-2 text-sm text-slate-600">
-                  {answeredCount} / {questions.length} questions answered ({progress}
-                  %)
-                </p>
-              </div>
-            </div>
-
-            {questions.map((q) => (
-              <div
-                key={q.id}
-                ref={(element) => {
-                  questionRefs.current[q.id] = element;
-                }}
-                className="scroll-mt-40 rounded-lg bg-white p-6 shadow-sm"
-              >
-                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
-                  {q.dimension}
-                </p>
-
-                <p className="mb-4 font-medium text-slate-800">{q.text}</p>
-
-                <div className="space-y-2">
-                  {scaleOptions.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex items-center gap-3 rounded-lg px-2 py-1 text-sm text-slate-700"
-                    >
-                      <input
-                        type="radio"
-                        name={`q-${q.id}`}
-                        checked={answers[q.id] === option.value}
-                        onChange={() => updateAnswer(q.id, option.value)}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
+                <div className="md:col-span-2 flex h-full flex-col">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Email address
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setCompletionEmailStatus("idle");
+                    }}
+                    placeholder="Optional"
+                    className="h-14 w-full rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
+                  />
+                  <p className="mt-2 text-sm text-slate-500">
+                    Optional. Add your email if you would like a copy of your
+                    result. You will not be added to a mailing list.
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
-            <p className="text-sm leading-7 text-slate-600">
-              If helpful, the result can also be discussed in a short follow-up
-              conversation to interpret what the pattern may mean in practice
-              and whether a deeper review would be useful.
-            </p>
-
-            <label className="flex items-start gap-3 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={acceptedNotice}
-                onChange={(e) => {
-                  setAcceptedNotice(e.target.checked);
-                  setCompletionEmailStatus("idle");
-                }}
-              />
-              <span>
-                I understand this assessment provides general informational
-                guidance only and is not legal, regulatory, employment, tax, or
-                professional advice. I also understand that the information I
-                submit may be used to create aggregated or anonymised
-                benchmarking insights.
-              </span>
-            </label>
-
-            {submitError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {submitError}
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={calculateScore}
-                disabled={
-                  !allAnswered ||
-                  !acceptedNotice ||
-                  !contextComplete ||
-                  saveStatus === "saving" ||
-                  completionEmailStatus === "sending"
-                }
-                className="rounded-lg bg-[#1E6FD9] px-6 py-3 text-white disabled:bg-slate-400"
-              >
-                {saveStatus === "saving" || completionEmailStatus === "sending"
-                  ? "Calculating..."
-                  : "Get My Health Check Result"}
-              </button>
-
-              <button
-                onClick={resetDiagnostic}
-                className="rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
-              >
-                Reset
-              </button>
             </div>
-          </div>
 
-          {showResults && score !== null && band && (
-            <div ref={resultsRef} className="mt-16 rounded-lg bg-white p-8 shadow">
-              <h2 className="mb-2 text-2xl font-semibold text-slate-950">
-                Your HR Operations Health Check Score: {score} / 100
-              </h2>
+            <div className="space-y-8">
+              <div className="sticky top-[calc(var(--site-header-height)+1rem)] z-30">
+                <div className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85">
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full bg-[#1E6FD9] transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
 
-              <p className="mb-1 text-lg font-medium text-[#1E6FD9]">
-                {band.label}
-              </p>
-
-              <p className="mb-6 text-slate-700">{band.summary}</p>
-
-              <h3 className="mb-4 text-lg font-semibold text-slate-950">
-                Operational profile
-              </h3>
-
-              <div className="mb-10 space-y-3">
-                {dimensions.map((dimension) => {
-                  const percent = (dimension.score / 5) * 100;
-
-                  return (
-                    <div key={dimension.label}>
-                      <div className="mb-1 flex justify-between text-sm text-slate-700">
-                        <span>{dimension.label}</span>
-                        <span>{dimension.score} / 5</span>
-                      </div>
-
-                      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-full bg-[#1E6FD9]"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                  <p className="mt-2 text-sm text-slate-600">
+                    {answeredCount} / {questions.length} questions answered ({progress}
+                    %)
+                  </p>
+                </div>
               </div>
 
-              {lowestDimensions.length > 0 && (
-                <div className="mb-10">
-                  <h3 className="mb-3 text-lg font-semibold text-slate-950">
-                    Areas most likely to benefit from attention
-                  </h3>
-
-                  <p className="mb-4 text-sm text-slate-600">
-                    These dimensions may be the most likely areas where greater
-                    clarity, consistency, or operational focus would add value
-                    at the moment.
+              {questions.map((q) => (
+                <div
+                  key={q.id}
+                  ref={(element) => {
+                    questionRefs.current[q.id] = element;
+                  }}
+                  className="scroll-mt-40 rounded-lg bg-white p-6 shadow-sm"
+                >
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#1E6FD9]">
+                    {q.dimension}
                   </p>
 
+                  <p className="mb-4 font-medium text-slate-800">{q.text}</p>
+
                   <div className="space-y-2">
-                    {lowestDimensions.map((dimension) => (
-                      <div
-                        key={dimension.label}
-                        className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                    {scaleOptions.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
                       >
-                        <span>{dimension.label}</span>
-                        <span className="font-medium">{dimension.score} / 5</span>
-                      </div>
+                        <input
+                          type="radio"
+                          name={`q-${q.id}`}
+                          checked={answers[q.id] === option.value}
+                          onChange={() => updateAnswer(q.id, option.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
                     ))}
                   </div>
                 </div>
-              )}
+              ))}
+            </div>
 
-              <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
-                {saveStatus === "saved" && completionEmailStatus === "sent" && (
-                  <p>
-                    Your result has been saved locally in this browser and your
-                    health check completion has been recorded.
-                  </p>
-                )}
-                {saveStatus === "saved" && completionEmailStatus === "idle" && (
-                  <p>
-                    Your result has been saved locally in this browser so you can
-                    continue to the interpretation and enquiry flow.
-                  </p>
-                )}
-                {saveStatus === "saved" && completionEmailStatus === "error" && (
-                  <p>
-                    Your result has been saved locally in this browser, but the
-                    completion notification could not be sent.
-                  </p>
-                )}
-                {saveStatus === "error" && (
-                  <p>
-                    Your result has been calculated, but local saving failed in
-                    this browser.
-                  </p>
-                )}
-              </div>
+            <div className="mt-10 space-y-4 rounded-[1.5rem] bg-white p-6 shadow-sm">
+              <p className="text-sm leading-7 text-slate-600">
+                If helpful, the result can also be discussed in a short follow-up
+                conversation to interpret what the pattern may mean in practice
+                and whether a deeper review would be useful.
+              </p>
 
-              <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-[#F4F6FA] p-6">
-                <h4 className="mb-2 text-lg font-semibold text-slate-950">
-                  Want a more detailed interpretation of what this pattern may mean?
-                </h4>
+              <label className="flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={acceptedNotice}
+                  onChange={(e) => {
+                    setAcceptedNotice(e.target.checked);
+                    setCompletionEmailStatus("idle");
+                  }}
+                />
+                <span>
+                  I understand this assessment provides general informational
+                  guidance only and is not legal, regulatory, employment, tax, or
+                  professional advice. I also understand that the information I
+                  submit may be used to create aggregated or anonymised
+                  benchmarking insights.
+                </span>
+              </label>
 
-                <p className="mb-4 text-sm leading-7 text-slate-700">
-                  This Health Check gives a structured first read. If you want a
-                  more developed interpretation of what the result is likely to
-                  mean in practice, continue to the detailed interpretation page.
-                  If you need a deeper, cross-role view, the HR Operations
-                  Diagnostic Assessment is the next step.
-                </p>
-
-                <div className="flex flex-wrap gap-4">
-                  <Link
-                    href="/contact/diagnostic-interpretation"
-                    className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
-                  >
-                    View detailed interpretation
-                  </Link>
-
-                  <Link
-                    href="/diagnostic-assessment"
-                    className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
-                  >
-                    View Diagnostic Assessment
-                  </Link>
+              {submitError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submitError}
                 </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={calculateScore}
+                  disabled={
+                    !allAnswered ||
+                    !acceptedNotice ||
+                    !contextComplete ||
+                    saveStatus === "saving" ||
+                    completionEmailStatus === "sending"
+                  }
+                  className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saveStatus === "saving" || completionEmailStatus === "sending"
+                    ? "Calculating..."
+                    : "Get My Health Check Result"}
+                </button>
+
+                <button
+                  onClick={resetDiagnostic}
+                  className="rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
+                >
+                  Reset
+                </button>
               </div>
             </div>
-          )}
+
+            {showResults && score !== null && band ? (
+              <div ref={resultsRef} className="mt-16 rounded-lg bg-white p-8 shadow">
+                <h2 className="mb-2 text-2xl font-semibold text-slate-950">
+                  Your HR Operations Health Check Score: {score} / 100
+                </h2>
+
+                <p className="mb-1 text-lg font-medium text-[#1E6FD9]">
+                  {band.label}
+                </p>
+
+                <p className="mb-6 text-slate-700">{band.summary}</p>
+
+                <h3 className="mb-4 text-lg font-semibold text-slate-950">
+                  Operational profile
+                </h3>
+
+                <div className="mb-10 space-y-3">
+                  {dimensions.map((dimension) => {
+                    const percent = (dimension.score / 5) * 100;
+
+                    return (
+                      <div key={dimension.label}>
+                        <div className="mb-1 flex justify-between text-sm text-slate-700">
+                          <span>{dimension.label}</span>
+                          <span>{dimension.score} / 5</span>
+                        </div>
+
+                        <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full bg-[#1E6FD9]"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {lowestDimensions.length > 0 ? (
+                  <div className="mb-10">
+                    <h3 className="mb-3 text-lg font-semibold text-slate-950">
+                      Areas most likely to benefit from attention
+                    </h3>
+
+                    <p className="mb-4 text-sm text-slate-600">
+                      These dimensions may be the most likely areas where greater
+                      clarity, consistency, or operational focus would add value
+                      at the moment.
+                    </p>
+
+                    <div className="space-y-2">
+                      {lowestDimensions.map((dimension) => (
+                        <div
+                          key={dimension.label}
+                          className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                        >
+                          <span>{dimension.label}</span>
+                          <span className="font-medium">{dimension.score} / 5</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
+                  {saveStatus === "saved" && completionEmailStatus === "sent" ? (
+                    <p>
+                      Your result has been saved locally in this browser and your
+                      health check completion has been recorded.
+                    </p>
+                  ) : null}
+                  {saveStatus === "saved" && completionEmailStatus === "idle" ? (
+                    <p>
+                      Your result has been saved locally in this browser so you can
+                      continue to the interpretation and enquiry flow.
+                    </p>
+                  ) : null}
+                  {saveStatus === "saved" && completionEmailStatus === "error" ? (
+                    <p>
+                      Your result has been saved locally in this browser, but the
+                      completion notification could not be sent.
+                    </p>
+                  ) : null}
+                  {saveStatus === "error" ? (
+                    <p>
+                      Your result has been calculated, but local saving failed in
+                      this browser.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-[#F4F6FA] p-6">
+                  <h4 className="mb-2 text-lg font-semibold text-slate-950">
+                    Want a more detailed interpretation of what this pattern may mean?
+                  </h4>
+
+                  <p className="mb-4 text-sm leading-7 text-slate-700">
+                    This Health Check gives a structured first read. If you want a
+                    more developed interpretation of what the result is likely to
+                    mean in practice, continue to the detailed interpretation page.
+                    If you need a deeper, cross-role view, the HR Operations
+                    Diagnostic Assessment is the next step.
+                  </p>
+
+                  <div className="flex flex-wrap gap-4">
+                    <Link
+                      href="/contact/diagnostic-interpretation"
+                      className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
+                    >
+                      View detailed interpretation
+                    </Link>
+
+                    <Link
+                      href="/diagnostic-assessment"
+                      className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
+                    >
+                      View Diagnostic Assessment
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
     </>

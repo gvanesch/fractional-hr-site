@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Cookie Policy | Van Esch Advisory Ltd",
   description:
-    "Cookie Policy for https://www.vanesch.uk, explaining how cookies and similar technologies are used on the website.",
+    "Cookie Policy for vanesch.uk, explaining how cookies and similar technologies are used on the website.",
 };
 
 export default function CookiesPage() {
@@ -40,7 +40,8 @@ export default function CookiesPage() {
                 <p>
                   On this website, that may include browser storage such as
                   local storage, as well as technologies used by infrastructure,
-                  security, and third-party service providers.
+                  security, and service providers that support the operation of
+                  the website.
                 </p>
               </div>
             </section>
@@ -68,18 +69,9 @@ export default function CookiesPage() {
                   performance, and protection against malicious traffic.
                 </p>
                 <p>
-                  Certain features, such as embedded maps or other external
-                  content, may involve third-party services. Where those
-                  features are used, the relevant provider may set or access
-                  cookies or similar technologies in accordance with their own
-                  policies.
-                </p>
-                <p>
-                  As at the date of this policy, the website is not intended to
-                  use non-essential advertising or cross-site tracking cookies.
-                  If non-essential analytics, marketing, or similar technologies
-                  requiring consent are introduced in future, this page and any
-                  required consent mechanisms will be updated accordingly.
+                  As at the date of this policy, the website does not use
+                  non-essential advertising, marketing, or cross-site tracking
+                  cookies.
                 </p>
               </div>
             </section>
@@ -115,13 +107,8 @@ export default function CookiesPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Van Esch Advisory Ltd may use privacy-conscious methods to
-                  understand overall traffic, page performance, and broad usage
-                  patterns.
-                </p>
-                <p>
-                  Where possible, the intention is to avoid non-essential
-                  analytics cookies and invasive tracking techniques.
+                  This website does not currently use analytics tools that rely
+                  on cookies or similar client-side tracking technologies.
                 </p>
                 <p>
                   If that changes, this policy will be updated to describe the
@@ -138,19 +125,15 @@ export default function CookiesPage() {
               </h2>
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Some third-party services used within or linked from this
-                  website, such as embedded maps or scheduling tools, may use
-                  their own cookies or similar technologies when you interact
-                  with them.
+                  This website may use third-party infrastructure or service
+                  providers to support secure delivery, communications, or other
+                  operational functions.
                 </p>
                 <p>
-                  These technologies are controlled by the relevant third party
-                  and are subject to their own terms, privacy notice, and cookie
-                  policy rather than by this website alone.
-                </p>
-                <p>
-                  Where those services are not essential to the operation of the
-                  site, they are used in a limited and proportionate way.
+                  Where those providers use cookies or similar technologies in
+                  connection with their own services, those technologies are
+                  governed by the relevant third party’s own terms, privacy
+                  notice, and cookie policy.
                 </p>
               </div>
             </section>

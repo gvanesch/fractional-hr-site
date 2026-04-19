@@ -2,9 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 
 const exploreLinks = [
+  // Primary entry + core pathway
   { href: "/diagnostic", label: "Health Check" },
-  { href: "/services", label: "Services" },
   { href: "/diagnostic-assessment", label: "Diagnostic Assessment" },
+  { href: "/services", label: "Services" },
+
+  // Supporting pages
   { href: "/approach", label: "Approach" },
   { href: "/case-studies", label: "Case Studies" },
   { href: "/about", label: "About" },
