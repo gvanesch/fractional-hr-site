@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  buildAdvisorBrief,
   calculatePercentageScore,
   calculateRawScore,
   getDimensionScores,
@@ -160,6 +161,43 @@ function buildAnswersHtml(
     .join("");
 }
 
+function buildContextHtml(params: {
+  companySize?: string;
+  industry?: string;
+  role?: string;
+  countryRegion?: string;
+  email?: string;
+}): string {
+  const rows: Array<{ label: string; value: string | undefined }> = [
+    { label: "Company size", value: params.companySize },
+    { label: "Industry", value: params.industry },
+    { label: "Role", value: params.role },
+    { label: "Country / region", value: params.countryRegion },
+    { label: "Email", value: params.email },
+  ];
+
+  const presentRows = rows.filter((row) => row.value);
+
+  if (presentRows.length === 0) {
+    return "";
+  }
+
+  return `
+    <h2 style="margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: #0A1628;">
+      Context captured
+    </h2>
+    ${presentRows
+      .map(
+        (row, index) => `
+          <p style="margin: 0 0 ${index === presentRows.length - 1 ? "24px" : "8px"}; color: #334155;">
+            <strong>${escapeHtml(row.label)}:</strong> ${escapeHtml(row.value as string)}
+          </p>
+        `,
+      )
+      .join("")}
+  `;
+}
+
 function buildEmailHtml(params: {
   score: number;
   bandLabel: string;
@@ -183,11 +221,47 @@ function buildEmailHtml(params: {
     answers,
   } = params;
 
-  const safeCompanySize = escapeHtml(companySize || "Not provided");
-  const safeIndustry = escapeHtml(industry || "Not provided");
-  const safeRole = escapeHtml(role || "Not provided");
-  const safeCountryRegion = escapeHtml(countryRegion || "Not provided");
-  const safeEmail = escapeHtml(email || "Not provided");
+  const result = {
+    rawScore: calculateRawScore(answers),
+    score,
+    band: scoreToBand(score),
+    dimensions: getDimensionScores(answers).sort((a, b) => a.score - b.score),
+    lowestDimensions: getDimensionScores(answers)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3),
+  };
+
+  const brief = buildAdvisorBrief(result);
+  const keyThemes = brief.keyThemes.slice(0, 3);
+  const nextNarrative = brief.whatTypicallyHappensNext.slice(0, 1);
+
+  const keyThemesHtml = keyThemes
+    .map(
+      (theme) => `
+        <li style="margin: 0 0 8px; color: #334155; line-height: 1.7;">
+          ${escapeHtml(theme)}
+        </li>
+      `,
+    )
+    .join("");
+
+  const nextNarrativeHtml = nextNarrative
+    .map(
+      (item) => `
+        <li style="margin: 0 0 8px; color: #334155; line-height: 1.7;">
+          ${escapeHtml(item)}
+        </li>
+      `,
+    )
+    .join("");
+
+  const contextHtml = buildContextHtml({
+    companySize,
+    industry,
+    role,
+    countryRegion,
+    email,
+  });
 
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; background: #F8FAFC; padding: 32px;">
@@ -217,14 +291,40 @@ function buildEmailHtml(params: {
         </div>
 
         <h2 style="margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: #0A1628;">
-          Context captured
+          What this may suggest
         </h2>
 
-        <p style="margin: 0 0 8px; color: #334155;"><strong>Company size:</strong> ${safeCompanySize}</p>
-        <p style="margin: 0 0 8px; color: #334155;"><strong>Industry:</strong> ${safeIndustry}</p>
-        <p style="margin: 0 0 8px; color: #334155;"><strong>Role:</strong> ${safeRole}</p>
-        <p style="margin: 0 0 8px; color: #334155;"><strong>Country / region:</strong> ${safeCountryRegion}</p>
-        <p style="margin: 0 0 24px; color: #334155;"><strong>Email:</strong> ${safeEmail}</p>
+        <p style="margin: 0 0 16px; color: #334155; line-height: 1.8;">
+          ${escapeHtml(brief.overallAssessment)}
+        </p>
+
+        ${keyThemes.length > 0
+      ? `
+        <h2 style="margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: #0A1628;">
+          Where this pattern may be coming from
+        </h2>
+
+        <ul style="margin: 0 0 24px; padding-left: 20px;">
+          ${keyThemesHtml}
+        </ul>
+        `
+      : ""
+    }
+
+        ${nextNarrative.length > 0
+      ? `
+        <h2 style="margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: #0A1628;">
+          What often becomes more visible over time
+        </h2>
+
+        <ul style="margin: 0 0 24px; padding-left: 20px;">
+          ${nextNarrativeHtml}
+        </ul>
+        `
+      : ""
+    }
+
+        ${contextHtml}
 
         <h2 style="margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: #0A1628;">
           Answers
@@ -241,6 +341,12 @@ function buildEmailHtml(params: {
             ${buildAnswersHtml(answers)}
           </tbody>
         </table>
+
+        <div style="margin-top: 24px; padding: 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
+          <p style="margin: 0 0 12px; color: #334155; line-height: 1.8;">
+            If helpful, this can be explored in a short follow-up conversation to understand what may be driving the pattern in practice and whether a deeper diagnostic would be useful.
+          </p>
+        </div>
       </div>
     </div>
   `;
@@ -289,6 +395,10 @@ function buildDimensionScoreColumns(
   };
 }
 
+function createPublicToken(): string {
+  return crypto.randomUUID();
+}
+
 async function createCompletionSubmission(params: {
   answers: Record<number, AnswerValue | undefined>;
   rawScore: number;
@@ -325,10 +435,12 @@ async function createCompletionSubmission(params: {
 
   const dimensionScores = getDimensionScores(answers);
   const submissionId = crypto.randomUUID();
+  const publicToken = createPublicToken();
   const completedAt = new Date().toISOString();
 
   const rowToInsert = {
     submission_id: submissionId,
+    public_token: publicToken,
     completed_at: completedAt,
     submission_source: "health-check",
     completion_version: "v1",
@@ -369,6 +481,7 @@ async function createCompletionSubmission(params: {
 
   return {
     submissionId: data[0].submission_id as string,
+    publicToken: (data[0].public_token as string | null) ?? publicToken,
     completedAt,
     rawScore,
   };
@@ -431,8 +544,8 @@ async function sendDiagnosticEmail(params: {
   if (!response.ok) {
     throw new Error(
       result?.error?.message ||
-        result?.message ||
-        `Resend request failed with status ${response.status}`,
+      result?.message ||
+      `Resend request failed with status ${response.status}`,
     );
   }
 
@@ -490,6 +603,7 @@ export async function POST(request: Request) {
     return jsonResponse({
       ok: true,
       submissionId: completion.submissionId,
+      publicToken: completion.publicToken,
       completedAt: completion.completedAt,
       score,
       band: band.label,

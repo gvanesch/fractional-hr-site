@@ -1,421 +1,548 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { loadDiagnosticState } from "@/lib/diagnostic-storage";
+import {
+  buildAdvisorBrief,
+  type DiagnosticResult,
+  type SavedDiagnosticState,
+} from "@/lib/diagnostic";
 
-export const metadata: Metadata = {
-  title: "Fractional HR Advisory | Van Esch Advisory Ltd",
-  description:
-    "Fractional HR advisory support for organisations that need structure, direction, and operational improvement without a full-time hire.",
-};
+type InterpretationState = "loading" | "ready" | "missing";
+type SendEmailState = "idle" | "sending" | "sent" | "error";
 
-const coverageAreas = [
-  "HR operating model and service delivery structure",
-  "Onboarding, offboarding, and employee lifecycle design",
-  "HR process clarity, ownership, and governance",
-  "HR technology alignment and workflow design",
-  "Knowledge management and self-service enablement",
-  "Operational prioritisation and improvement roadmap",
-];
+type PublicDiagnosticResultResponse =
+  | {
+    ok: true;
+    result: DiagnosticResult;
+    context: {
+      companySize: string | null;
+      industry: string | null;
+      role: string | null;
+      emailPresent: boolean;
+    };
+    interpretation: {
+      overallAssessment: string;
+      focusAreas: string[];
+      whatTypicallyHappensNext: string[];
+    };
+  }
+  | {
+    ok: false;
+    error: string;
+  };
 
-const goodFit = [
-  "Scaling organisations without senior HR leadership in place",
-  "Businesses where HR is currently handled across founders, finance, or operations",
-  "Organisations experiencing inconsistency in HR processes or delivery",
-  "Post-acquisition or integration environments needing structure",
-];
+function buildInterpretationIntro(score: number): string {
+  if (score <= 24) {
+    return "This pattern suggests that some important HR foundations may still be taking shape.";
+  }
 
-const notFit = [
-  "Organisations primarily needing high-volume HR administration support",
-  "Very early-stage businesses without meaningful HR complexity",
-  "Fully mature HR functions with established senior leadership already in place",
-];
+  if (score <= 49) {
+    return "This pattern suggests that useful foundations are in place, but they may not yet be landing consistently enough across the organisation.";
+  }
 
-const valuePoints = [
-  {
-    title: "Senior capability without a full-time cost base",
-    text: "Access structured HR leadership and operational direction without committing to a full-time senior hire before the business is ready.",
-  },
-  {
-    title: "A clearer operating model",
-    text: "Bring more consistency to ownership, service delivery, onboarding, manager support, and the day-to-day mechanics of how HR actually works.",
-  },
-  {
-    title: "Practical prioritisation",
-    text: "Focus effort on the operational improvements most likely to strengthen clarity, reduce drag, and support scale.",
-  },
-];
+  if (score <= 74) {
+    return "This pattern suggests that the core HR model is reasonably well established, with clearer opportunities in refinement, consistency, and resilience.";
+  }
 
-const operatingSignals = [
-  "HR responsibilities sit across founders, finance, or operations",
-  "Managers handle similar people issues differently",
-  "Processes exist, but not always in a way that feels reliable",
-  "HR work is becoming more reactive as the business grows",
-  "The business needs more structure, but not necessarily a full-time HR leader yet",
-  "Leadership wants clearer priorities and stronger execution",
-];
+  return "This pattern suggests that the HR model is broadly well structured, with the greatest opportunity likely to sit in optimisation, resilience, and scale-readiness.";
+}
 
-const heroHelpAreas = [
-  "Scaling businesses that need more structure before problems become embedded",
-  "Leadership teams that need senior HR direction without a full-time hire",
-  "Organisations where HR is spread across founders, finance, or operations",
-  "Businesses that need clearer ownership, better process discipline, and more reliable execution",
-];
+function buildInterpretationMeaning(score: number): string {
+  if (score <= 24) {
+    return "In practice, that often means managers and HR are working hard, but too much still depends on individual judgement, manual coordination, or locally created ways of getting things done.";
+  }
 
-type StandardCardProps = {
-  kicker?: string;
-  title: string;
-  body?: string;
-  children?: React.ReactNode;
-  tone?: "white" | "soft" | "dark";
-  titleSize?: "md" | "lg";
-};
+  if (score <= 49) {
+    return "In practice, that often means the organisation has enough structure to support delivery in many areas, but not always enough consistency to make the model feel dependable as demands increase.";
+  }
 
-function StandardCard({
-  kicker,
-  title,
-  body,
-  children,
-  tone = "white",
-  titleSize = "md",
-}: StandardCardProps) {
-  const toneClass =
-    tone === "white"
-      ? "border-slate-300 bg-white shadow-sm"
-      : tone === "soft"
-        ? "border-slate-300 bg-slate-50"
-        : "border-white/10 bg-white/5";
+  if (score <= 74) {
+    return "In practice, that often means the model is working reasonably well overall, but there are still some areas where handoffs, ownership, service routes, or execution discipline could be made stronger.";
+  }
 
-  const kickerClass =
-    tone === "dark"
-      ? "text-[#8AAAC8]"
-      : "text-[var(--brand-accent)]";
+  return "In practice, that often means the model is doing its job well overall, with the greatest value likely to come from focused refinement rather than foundational repair.";
+}
 
-  const titleClass =
-    tone === "dark" ? "text-white" : "text-slate-950";
+function buildNextStepView(score: number): string {
+  if (score <= 24) {
+    return "The next step is usually to clarify where the current model is placing the most strain on managers, employees, and HR, then decide whether a deeper structured diagnostic would help prioritise the right improvements.";
+  }
 
-  const bodyClass =
-    tone === "dark" ? "text-slate-200" : "text-slate-700";
+  if (score <= 49) {
+    return "The next step is usually to confirm where inconsistency is most visible in practice, and whether a deeper diagnostic would help separate isolated issues from broader operating patterns.";
+  }
 
-  const headingSizeClass =
-    titleSize === "lg" ? "brand-heading-lg" : "brand-heading-md";
+  if (score <= 74) {
+    return "The next step is usually to identify which targeted improvements would make the biggest difference, and whether a deeper diagnostic would help sharpen sequencing and focus.";
+  }
 
-  return (
-    <div className={`h-full rounded-[1.75rem] border p-8 ${toneClass}`}>
-      <div className="flex h-full flex-col">
-        {kicker ? (
-          <p
-            className={`text-xs font-semibold uppercase tracking-[0.18em] ${kickerClass}`}
-          >
-            {kicker}
-          </p>
-        ) : null}
+  return "The next step is usually to decide whether there are enough meaningful optimisation opportunities to justify a deeper review, or whether the current model simply needs lighter-touch refinement.";
+}
 
-        <div className="min-h-[112px] pt-3">
-          <h2 className={`${headingSizeClass} ${titleClass}`}>{title}</h2>
+export default function DiagnosticInterpretationPage() {
+  const [state, setState] = useState<InterpretationState>("loading");
+  const [diagnosticState, setDiagnosticState] =
+    useState<SavedDiagnosticState | null>(null);
+  const [emailPresent, setEmailPresent] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+  const [sendEmailState, setSendEmailState] = useState<SendEmailState>("idle");
+  const [emailInput, setEmailInput] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [interpretation, setInterpretation] = useState<{
+    overallAssessment: string;
+    focusAreas: string[];
+    whatTypicallyHappensNext: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get("t")?.trim() ?? "";
+        const storedToken =
+          window.localStorage.getItem("health-check-public-token") ?? "";
+        const token = urlToken || storedToken;
+
+        if (token) {
+          setAccessToken(token);
+
+          const res = await fetch(
+            `/api/public-diagnostic-result?token=${encodeURIComponent(token)}`,
+            {
+              method: "GET",
+              cache: "no-store",
+            },
+          );
+
+          const data =
+            (await res.json().catch(() => null)) as
+            | PublicDiagnosticResultResponse
+            | null;
+
+          if (res.ok && data?.ok) {
+            setDiagnosticState({
+              result: data.result,
+            } as SavedDiagnosticState);
+            setEmailPresent(data.context.emailPresent);
+            setInterpretation(data.interpretation);
+            setState("ready");
+            return;
+          }
+        }
+
+        const stored = loadDiagnosticState() as SavedDiagnosticState | null;
+
+        if (!stored?.result) {
+          setState("missing");
+          return;
+        }
+
+        const brief = buildAdvisorBrief(stored.result);
+
+        setDiagnosticState(stored);
+        setInterpretation({
+          overallAssessment: brief.overallAssessment,
+          focusAreas: brief.suggestedFocusAreas,
+          whatTypicallyHappensNext: brief.whatTypicallyHappensNext,
+        });
+        setState("ready");
+      } catch (error) {
+        console.error("Failed to load interpretation:", error);
+        setState("missing");
+      }
+    }
+
+    load();
+  }, []);
+
+  const result = diagnosticState?.result ?? null;
+
+  const interpretationIntro = useMemo(() => {
+    if (!result) return "";
+    return buildInterpretationIntro(result.score);
+  }, [result]);
+
+  const interpretationMeaning = useMemo(() => {
+    if (!result) return "";
+    return buildInterpretationMeaning(result.score);
+  }, [result]);
+
+  const nextStepView = useMemo(() => {
+    if (!result) return "";
+    return buildNextStepView(result.score);
+  }, [result]);
+
+  async function handleSendEmail() {
+    if (!accessToken) {
+      setSendEmailState("error");
+      setEmailMessage("A secure result token could not be found.");
+      return;
+    }
+
+    setSendEmailState("sending");
+    setEmailMessage("");
+
+    try {
+      const response = await fetch("/api/public-diagnostic-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: accessToken,
+          email: emailInput,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Unable to send result email.");
+      }
+
+      setSendEmailState("sent");
+      setEmailPresent(true);
+      setEmailMessage("Your result has been sent.");
+    } catch (error) {
+      setSendEmailState("error");
+      setEmailMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to send result email.",
+      );
+    }
+  }
+
+  if (state === "loading") {
+    return (
+      <section className="bg-[#F4F6FA]">
+        <div className="brand-container brand-section">
+          <div className="mx-auto max-w-3xl rounded-[1.5rem] bg-white p-8 shadow-sm">
+            <p className="brand-body">Loading your Health Check interpretation...</p>
+          </div>
         </div>
+      </section>
+    );
+  }
 
-        {body ? (
-          <p className={`flex-1 text-base leading-8 ${bodyClass}`}>{body}</p>
-        ) : null}
+  if (state === "missing" || !result) {
+    return (
+      <section className="bg-[#F4F6FA]">
+        <div className="brand-container brand-section">
+          <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+            <div className="brand-stack-sm">
+              <p className="brand-section-kicker">Health Check interpretation</p>
 
-        {children ? <div className="flex-1 pt-5">{children}</div> : null}
-      </div>
-    </div>
-  );
-}
+              <h1 className="brand-heading-lg max-w-3xl text-balance text-slate-950">
+                No Health Check result found.
+              </h1>
 
-function ListBox({ items }: { items: string[] }) {
-  return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <div
-          key={item}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 text-slate-700"
-        >
-          {item}
+              <p className="brand-body">
+                This page works from a completed Health Check result. Please
+                complete the Health Check first, then return here for a more
+                detailed interpretation.
+              </p>
+
+              <div className="pt-2">
+                <Link href="/diagnostic" className="brand-button-dark">
+                  Take the Health Check
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
-      ))}
-    </div>
-  );
-}
+      </section>
+    );
+  }
 
-function CompactValueCard({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="h-full rounded-[1.5rem] border border-slate-300 bg-white p-6 shadow-sm">
-      <div className="flex h-full flex-col">
-        <div className="min-h-[96px]">
-          <h3 className="brand-heading-md text-slate-950">{title}</h3>
-        </div>
-        <p className="flex-1 text-base leading-8 text-slate-700">{text}</p>
-      </div>
-    </div>
-  );
-}
-
-function ScopeCard({ text }: { text: string }) {
-  return (
-    <div className="h-full rounded-[1.5rem] border border-slate-300 bg-white p-6 shadow-sm">
-      <div className="flex h-full items-start">
-        <p className="text-base leading-8 text-slate-700">{text}</p>
-      </div>
-    </div>
-  );
-}
-
-export default function FractionalHRPage() {
   return (
     <>
-      <section className="brand-hero">
-        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="grid gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-            <div className="flex h-full flex-col justify-between">
-              <div>
-                <p className="brand-kicker">Fractional HR Advisory</p>
+      <section className="bg-[#F4F6FA] pt-[calc(var(--site-header-height)+2.75rem)] sm:pt-[calc(var(--site-header-height)+3.25rem)]">
+        <div className="brand-container pb-16 sm:pb-20">
+          <div className="mx-auto max-w-5xl">
+            <div className="grid gap-6 lg:grid-cols-[1.12fr_0.88fr]">
+              <div className="rounded-[1.85rem] border border-slate-200 bg-white p-8 shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:p-10">
+                <div className="brand-stack-sm">
+                  <p className="brand-section-kicker">Health Check interpretation</p>
 
-                <h1 className="brand-heading-xl mt-3">
-                  Fractional HR advisory support, when full-time is not the right fit.
-                </h1>
+                  <h1 className="brand-heading-lg max-w-[34ch] text-balance text-slate-950 lg:max-w-[40ch]">
+                    A more developed view of what your Health Check pattern may mean.
+                  </h1>
 
-                <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-                  Senior HR operations and service delivery support on a part-time
-                  basis, providing structure, direction, and execution without the
-                  need for a full-time hire.
-                </p>
+                  <p className="brand-body-lg max-w-3xl text-slate-700">
+                    This builds on your Health Check result and translates the
+                    pattern into clearer operational meaning and next-step options.
+                  </p>
 
-                <p className="mt-4 max-w-3xl text-base leading-8 text-[#C7D8EA]">
-                  This is designed for organisations that need more clarity and
-                  stronger operational foundations, but do not yet need, or want,
-                  a full-time senior HR leader.
-                </p>
+                  <p className="brand-body max-w-3xl text-slate-600">
+                    It is designed as a more developed reading of the signal, not a
+                    full organisational diagnostic.
+                  </p>
+                </div>
               </div>
 
-              <div className="pt-8">
-                <div className="flex flex-wrap gap-4">
-                  <a
-                    href="https://calendly.com/greg-vanesch/20min"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    Book a 20-minute discussion
-                  </a>
+              <div className="rounded-[1.85rem] border border-white/10 bg-[linear-gradient(135deg,#0B1F3A_0%,#102C54_55%,#163867_100%)] p-8 shadow-[0_20px_40px_rgba(2,12,27,0.24)] sm:p-10">
+                <div className="brand-stack-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
+                    Current signal
+                  </p>
 
-                  <Link
-                    href="/contact"
-                    className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    Request a tailored discussion
-                  </Link>
+                  <h2 className="max-w-[10ch] text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    {result.band.label}
+                  </h2>
+
+                  <p className="text-lg font-medium text-[#C7D8EA]">
+                    {result.score} / 100
+                  </p>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-[#2D7EEA]"
+                      style={{ width: `${result.score}%` }}
+                    />
+                  </div>
+
+                  <p className="text-base leading-8 text-slate-200">
+                    This is an indicative signal from a short structured health
+                    check. It is most useful as a stronger starting point for
+                    reflection and follow-up discussion.
+                  </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-                <p className="mt-4 max-w-3xl text-sm text-[#8AAAC8]">
-                  Book now for a direct conversation, or request a tailored
-                  discussion if you want your context reviewed in advance.
+      <section className="bg-white">
+        <div className="brand-container brand-section-compact">
+          <div className="mx-auto max-w-4xl">
+            <div className="brand-stack-sm">
+              <p className="brand-section-kicker">What this pattern may suggest</p>
+
+              <h2 className="brand-heading-lg max-w-[34ch] text-slate-950 lg:max-w-[40ch]">
+                A deeper interpretation of the result.
+              </h2>
+            </div>
+
+            <div className="mt-8 rounded-[1.75rem] border border-slate-300 bg-white p-7 shadow-[0_14px_34px_rgba(15,23,42,0.07)] sm:p-8">
+              <div className="brand-stack-sm">
+                <p className="brand-body">
+                  {interpretation?.overallAssessment || interpretationIntro}
+                </p>
+
+                <p className="brand-body">{interpretationMeaning}</p>
+
+                <p className="brand-body text-slate-600">
+                  This is still an indicative read rather than a full
+                  organisational diagnosis, but it is usually enough to show
+                  whether the pattern is likely worth exploring in more detail.
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="brand-card-dark h-full p-8 lg:p-9">
-              <div className="flex h-full flex-col">
-                <p className="brand-kicker">Where this usually helps</p>
+      {interpretation?.focusAreas?.length ? (
+        <section className="bg-[#F4F6FA]">
+          <div className="brand-container brand-section-compact">
+            <div className="mx-auto max-w-4xl">
+              <div className="brand-stack-sm">
+                <p className="brand-section-kicker">What may be worth looking at first</p>
 
-                <div className="mt-5 grid flex-1 gap-4">
-                  {heroHelpAreas.map((item) => (
+                <h2 className="brand-heading-lg max-w-[34ch] text-balance text-slate-950 lg:max-w-[40ch]">
+                  Areas this pattern may point towards.
+                </h2>
+
+                <p className="brand-body-lg max-w-4xl text-slate-700">
+                  These are not firm conclusions. They are the areas most likely
+                  to benefit from closer attention based on your response pattern.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4">
+                {interpretation.focusAreas.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-[1.25rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]"
+                  >
+                    <p className="brand-body">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {interpretation?.whatTypicallyHappensNext?.length ? (
+        <section className="bg-[linear-gradient(180deg,#081B33_0%,#0D2748_100%)]">
+          <div className="brand-container brand-section-compact">
+            <div className="mx-auto max-w-4xl">
+              <div className="rounded-[1.9rem] border border-white/10 bg-white/5 p-8 shadow-[0_24px_50px_rgba(2,12,27,0.28)] backdrop-blur-sm sm:p-10">
+                <div className="brand-stack-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
+                    If this pattern continues
+                  </p>
+
+                  <h2 className="max-w-[34ch] text-[clamp(2rem,4.6vw,3.6rem)] font-semibold tracking-tight text-white lg:max-w-[40ch]">
+                    What often becomes more visible over time.
+                  </h2>
+
+                  <p className="max-w-4xl text-lg leading-8 text-[#C7D8EA]">
+                    These are common patterns that can become more noticeable if the
+                    underlying model is not landing as consistently as it needs to.
+                  </p>
+                </div>
+
+                <div className="mt-8 grid gap-4">
+                  {interpretation.whatTypicallyHappensNext.map((item) => (
                     <div
                       key={item}
-                      className="rounded-xl border border-white/10 bg-white/5 p-4 text-base leading-7 text-white"
+                      className="rounded-[1.2rem] border border-white/10 bg-white/7 px-6 py-5"
                     >
-                      {item}
+                      <p className="text-base leading-8 text-slate-100">{item}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section className="brand-light-section">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
-              kicker="Context"
-              title="When HR is too important to leave informal, but not yet a full-time role"
-              tone="white"
-              titleSize="lg"
-            >
-              <div className="space-y-4 text-base leading-8 text-slate-700">
-                <p>
-                  In many organisations, HR responsibilities sit across founders,
-                  finance, or operations. Processes evolve organically, onboarding
-                  varies by manager, and ownership is not always fully clear.
-                </p>
-                <p>
-                  This often works for a period of time. As the organisation grows,
-                  it can begin to create inconsistency, operational drag, and
-                  increasing reliance on individual judgement.
-                </p>
-                <p>
-                  Hiring a full-time senior HR leader may feel premature. Leaving
-                  the model unchanged can make day-to-day execution harder than it
-                  needs to be.
-                </p>
-              </div>
-            </StandardCard>
+      <section className="bg-white">
+        <div className="brand-container brand-section-compact">
+          <div className="mx-auto max-w-4xl">
+            <div className="brand-stack-sm">
+              <p className="brand-section-kicker">Where attention may be most useful</p>
 
-            <StandardCard
-              kicker="Typical signals"
-              title="Signs this model may be worth considering"
-              tone="white"
-              titleSize="lg"
-            >
-              <ListBox items={operatingSignals} />
-            </StandardCard>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
-              kicker="What this is"
-              title="Structured HR leadership, part-time"
-              body="This is not administrative support or ad hoc consulting. It is structured, senior-level HR operations leadership delivered on a part-time basis."
-              tone="soft"
-              titleSize="lg"
-            >
-              <p className="text-base leading-8 text-slate-700">
-                The focus is on bringing clarity to how HR operates, improving
-                consistency across the employee lifecycle, and ensuring the
-                organisation has a model that can support growth.
-              </p>
-            </StandardCard>
-
-            <StandardCard
-              kicker="How it works"
-              title="A structured, part-time engagement"
-              body="Engagements are typically structured on a part-time basis, often one to two days per week or an equivalent allocation."
-              tone="soft"
-              titleSize="lg"
-            >
-              <div className="space-y-4 text-base leading-8 text-slate-700">
-                <p>
-                  Work is prioritised around the areas that will have the most
-                  operational impact, with a clear cadence, defined focus, and
-                  ongoing alignment with leadership.
-                </p>
-                <p>
-                  The aim is to move from reactive handling to a more deliberate
-                  and scalable operating model.
-                </p>
-              </div>
-            </StandardCard>
-          </div>
-
-          <div className="mt-6 grid gap-6 md:grid-cols-3 md:items-stretch">
-            {valuePoints.map((item) => (
-              <CompactValueCard
-                key={item.title}
-                title={item.title}
-                text={item.text}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="brand-light-section">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="rounded-[1.75rem] border border-slate-300 bg-slate-50 p-8 lg:p-10">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand-accent)]">
-                Scope
-              </p>
-              <h2 className="brand-heading-lg mt-3 text-slate-950">
-                What this can cover
+              <h2 className="brand-heading-lg max-w-[34ch] text-balance text-slate-950 lg:max-w-[40ch]">
+                The strongest place to look first.
               </h2>
-              <p className="mt-4 max-w-4xl text-base leading-8 text-slate-700">
-                The exact scope depends on the business, but the work usually
-                focuses on the areas most likely to improve clarity, consistency,
-                and operating confidence.
+
+              <p className="brand-body-lg max-w-4xl text-slate-700">
+                These are the lowest-scoring dimensions in your current result.
+                They are not the whole story, but they are likely to be the
+                strongest starting point for deeper review.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3 lg:items-stretch">
-              {coverageAreas.map((item) => (
-                <ScopeCard key={item} text={item} />
+            <div className="mt-8 space-y-3">
+              {result.lowestDimensions.map((dimension) => (
+                <div
+                  key={dimension.label}
+                  className="flex items-center justify-between rounded-[1.15rem] border border-slate-200 bg-slate-50 px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
+                >
+                  <span className="text-base text-slate-800">{dimension.label}</span>
+                  <span className="text-base font-semibold text-slate-700">
+                    {dimension.score} / 5
+                  </span>
+                </div>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-            <StandardCard
-              kicker="Good fit"
-              title="Where this works well"
-              tone="white"
-              titleSize="lg"
-            >
-              <ListBox items={goodFit} />
-            </StandardCard>
+      {!emailPresent && accessToken ? (
+        <section className="bg-[#F4F6FA]">
+          <div className="brand-container brand-section-compact">
+            <div className="mx-auto max-w-4xl">
+              <div className="rounded-[1.8rem] border border-slate-200 bg-white p-8 shadow-[0_14px_34px_rgba(15,23,42,0.08)] sm:p-10">
+                <div className="brand-stack-sm">
+                  <p className="brand-section-kicker">Send this result to your inbox</p>
 
-            <StandardCard
-              kicker="Not the right fit"
-              title="Where a different model is better"
-              tone="white"
-              titleSize="lg"
-            >
-              <ListBox items={notFit} />
-            </StandardCard>
+                  <h2 className="brand-heading-lg max-w-[34ch] text-balance text-slate-950 lg:max-w-[40ch]">
+                    Keep a copy of this interpretation.
+                  </h2>
+
+                  <p className="brand-body-lg max-w-4xl text-slate-700">
+                    Add your email address and a copy of this result will be sent
+                    to you.
+                  </p>
+
+                  <div className="pt-2">
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(event) => {
+                        setEmailInput(event.target.value);
+                        setSendEmailState("idle");
+                        setEmailMessage("");
+                      }}
+                      placeholder="Work email"
+                      className="h-14 w-full rounded-xl border border-slate-300 bg-white px-4 text-base leading-none text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                    />
+                  </div>
+
+                  <p className="brand-body-sm text-slate-500">
+                    This is only used to send your result. You will not be contacted unless you request us to via the contact page. You will not be added to any mailing list and your information will not be sold.
+                  </p>
+
+                  {emailMessage ? (
+                    <div
+                      className={`rounded-lg px-4 py-3 text-sm ${sendEmailState === "sent"
+                        ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border border-red-200 bg-red-50 text-red-700"
+                        }`}
+                    >
+                      {emailMessage}
+                    </div>
+                  ) : null}
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSendEmail}
+                      disabled={sendEmailState === "sending"}
+                      className="brand-button-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {sendEmailState === "sending"
+                        ? "Sending..."
+                        : "Send my result"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section className="brand-dark-section py-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
+      <section className="brand-dark-section-plain">
+        <div className="brand-container brand-section-tight">
+          <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
-                <h2 className="brand-heading-lg">
-                  Decide whether this is the right level of support
+
+                <h2 className="brand-heading-lg max-w-[18ch] text-balance lg:max-w-[34ch]">
+                  Decide whether a deeper review would now be useful.
                 </h2>
 
-                <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can book a short discussion now, or start a conversation.
+                <p className="brand-subheading brand-body-on-dark max-w-4xl">
+                  {nextStepView}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
-                <a
-                  href="https://calendly.com/greg-vanesch/20min"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-                >
-                  Book a 20-minute discussion
-                </a>
-
-                <Link
-                  href="/contact"
-                  className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
-                >
+              <div className="flex flex-wrap gap-4">
+                <Link href="/contact" className="brand-button-primary">
                   Start a conversation
                 </Link>
-              </div>
 
-              <p className="text-sm text-[#8AAAC8]">
-                Book now for a direct conversation, or start a conversation.
-              </p>
+                <Link
+                  href="/diagnostic-assessment"
+                  className="brand-button-secondary-dark"
+                >
+                  View Diagnostic Assessment
+                </Link>
+              </div>
             </div>
           </div>
         </div>

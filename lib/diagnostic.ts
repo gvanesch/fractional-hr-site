@@ -113,11 +113,11 @@ export function scoreToBand(score: number): ResultBand {
     return {
       label: "Emerging Foundations",
       summary:
-        "HR processes may still be evolving and some operational responsibilities may be handled informally. As organisations grow, this can begin to create friction for managers and employees.",
+        "The Health Check suggests that some core HR foundations may still be taking shape. As the organisation grows, clearer structure, ownership, and more consistent operating discipline would usually help the model run more confidently.",
       freeInsights: [
-        "Core HR processes may still need clearer structure or documentation.",
-        "Managers may experience inconsistency in how people processes are handled.",
-        "Strengthening operational foundations can improve consistency and reduce management overhead.",
+        "Some core HR processes may still benefit from clearer structure or more consistent documentation.",
+        "Execution may currently depend too heavily on individual judgement, manager capability, or manual follow-through.",
+        "Strengthening the foundations now would usually make service delivery more consistent and easier to scale.",
       ],
     };
   }
@@ -126,11 +126,11 @@ export function scoreToBand(score: number): ResultBand {
     return {
       label: "Developing Structure",
       summary:
-        "The organisation likely has some HR operational foundations in place, though inconsistencies may still appear across teams or processes as the business grows.",
+        "The Health Check suggests that useful HR foundations are in place, but they may not yet be landing consistently across the organisation. Greater clarity in process, ownership, or service delivery would usually help the model run more reliably as demands increase.",
       freeInsights: [
-        "Some processes may rely too heavily on individual judgement or workarounds.",
-        "Clearer process ownership can improve consistency across the organisation.",
-        "More structured HR service delivery can support growth more effectively.",
+        "Some important HR processes may still rely on workarounds or individual interpretation more than they should.",
+        "Clearer ownership and more consistent operating discipline would likely strengthen delivery across teams.",
+        "There is likely a good base to build from, with targeted improvements that could make the model feel more dependable.",
       ],
     };
   }
@@ -139,11 +139,11 @@ export function scoreToBand(score: number): ResultBand {
     return {
       label: "Structured but Improving",
       summary:
-        "Many HR operational foundations appear to be in place. However, some areas may still benefit from refinement to improve efficiency, consistency, and resilience.",
+        "The Health Check suggests that many HR operational foundations are already in place. The opportunity is more likely to sit in refinement, consistency, and resilience, so the model continues to hold well as the organisation grows or becomes more complex.",
       freeInsights: [
-        "Core structures likely exist but may not yet be fully embedded.",
-        "Some friction may still appear in handoffs, service access, or process execution.",
-        "Targeted improvements could strengthen scalability and operational confidence.",
+        "A solid base appears to be in place, even if some areas would still benefit from tighter execution or clearer alignment.",
+        "Targeted improvements in handoffs, service access, or process discipline would likely strengthen confidence in how HR runs.",
+        "This looks less like a need for wholesale change and more like a need for focused improvement in the right areas.",
       ],
     };
   }
@@ -151,11 +151,11 @@ export function scoreToBand(score: number): ResultBand {
   return {
     label: "Operationally Mature",
     summary:
-      "HR operations appear well structured and capable of supporting organisational growth. Continued refinement can help maintain efficiency and keep HR aligned with business priorities.",
+      "The Health Check suggests that HR operations are broadly well structured and able to support the organisation effectively. The opportunity is more likely to be in optimisation, resilience, and maintaining quality as priorities, scale, or complexity continue to evolve.",
     freeInsights: [
-      "Processes appear relatively well established and consistent.",
-      "Operational governance is likely supporting delivery effectively.",
-      "Targeted optimisation may still unlock additional value over time.",
+      "Core foundations appear to be well established and operating with a good degree of consistency.",
+      "The strongest gains are likely to come from targeted refinement rather than major structural change.",
+      "This result points more towards optimisation and scale-readiness than foundational rebuild.",
     ],
   };
 }
@@ -279,7 +279,7 @@ function getDiscussionPrompt(label: string): string {
       return "What happens to HR operations when the business scales, restructures, or changes policy quickly?";
     default:
       return `What is currently driving friction in ${label.toLowerCase()}?`;
-    }
+  }
 }
 
 function getSuggestedFocusAreas(labels: string[]): string[] {

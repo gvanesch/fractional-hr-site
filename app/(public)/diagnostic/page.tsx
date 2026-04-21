@@ -30,8 +30,15 @@ type DiagnosticDraftState = {
   showResults: boolean;
 };
 
+type DiagnosticCompleteResponse = {
+  submissionId?: string;
+  publicToken?: string;
+  error?: string;
+};
+
 const DIAGNOSTIC_DRAFT_STORAGE_KEY = "greg-diagnostic-draft-v1";
 const HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY = "health-check-submission-id";
+const HEALTH_CHECK_PUBLIC_TOKEN_STORAGE_KEY = "health-check-public-token";
 
 const scaleOptions: { label: string; value: AnswerValue }[] = [
   { label: "Strongly disagree", value: 1 },
@@ -108,6 +115,7 @@ export default function DiagnosticPage() {
   const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<
     number | null
   >(null);
+  const [publicToken, setPublicToken] = useState("");
 
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -128,6 +136,10 @@ export default function DiagnosticPage() {
         setAcceptedNotice(Boolean(draft.acceptedNotice));
         setShowResults(Boolean(draft.showResults));
       }
+
+      const storedPublicToken =
+        window.localStorage.getItem(HEALTH_CHECK_PUBLIC_TOKEN_STORAGE_KEY) ?? "";
+      setPublicToken(storedPublicToken);
     } catch (error) {
       console.error("Failed to load diagnostic draft:", error);
     } finally {
@@ -300,7 +312,7 @@ export default function DiagnosticPage() {
     });
 
     const payload = (await response.json().catch(() => null)) as
-      | { submissionId?: string; error?: string }
+      | DiagnosticCompleteResponse
       | null;
 
     if (!response.ok) {
@@ -317,6 +329,18 @@ export default function DiagnosticPage() {
         );
       } catch (error) {
         console.error("Failed to persist health check submission id:", error);
+      }
+    }
+
+    if (payload?.publicToken) {
+      try {
+        window.localStorage.setItem(
+          HEALTH_CHECK_PUBLIC_TOKEN_STORAGE_KEY,
+          payload.publicToken,
+        );
+        setPublicToken(payload.publicToken);
+      } catch (error) {
+        console.error("Failed to persist health check public token:", error);
       }
     }
 
@@ -386,10 +410,12 @@ export default function DiagnosticPage() {
     setCompletionEmailStatus("idle");
     setSubmitError("");
     setPendingScrollQuestionId(null);
+    setPublicToken("");
 
     try {
       window.localStorage.removeItem(DIAGNOSTIC_DRAFT_STORAGE_KEY);
       window.localStorage.removeItem(HEALTH_CHECK_SUBMISSION_ID_STORAGE_KEY);
+      window.localStorage.removeItem(HEALTH_CHECK_PUBLIC_TOKEN_STORAGE_KEY);
       clearDiagnosticState();
     } catch (error) {
       console.error("Failed to clear diagnostic storage:", error);
@@ -397,6 +423,10 @@ export default function DiagnosticPage() {
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const interpretationHref = publicToken
+    ? `/contact/diagnostic-interpretation?t=${encodeURIComponent(publicToken)}`
+    : "/contact/diagnostic-interpretation";
 
   return (
     <>
@@ -480,7 +510,7 @@ export default function DiagnosticPage() {
               </div>
 
               <div className="mt-8 grid gap-5 md:grid-cols-2">
-                <div className="flex h-full flex-col">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Company size <span className="text-red-500">*</span>
                   </label>
@@ -501,7 +531,7 @@ export default function DiagnosticPage() {
                   </select>
                 </div>
 
-                <div className="flex h-full flex-col">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Industry <span className="text-red-500">*</span>
                   </label>
@@ -522,7 +552,7 @@ export default function DiagnosticPage() {
                   </select>
                 </div>
 
-                <div className="flex h-full flex-col">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Your role <span className="text-red-500">*</span>
                   </label>
@@ -543,7 +573,7 @@ export default function DiagnosticPage() {
                   </select>
                 </div>
 
-                <div className="flex h-full flex-col">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Country / region
                   </label>
@@ -559,7 +589,7 @@ export default function DiagnosticPage() {
                   />
                 </div>
 
-                <div className="md:col-span-2 flex h-full flex-col">
+                <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Email address
                   </label>
@@ -689,128 +719,157 @@ export default function DiagnosticPage() {
               </div>
             </div>
 
-            {showResults && score !== null && band ? (
-              <div ref={resultsRef} className="mt-16 rounded-lg bg-white p-8 shadow">
-                <h2 className="mb-2 text-2xl font-semibold text-slate-950">
-                  Your HR Operations Health Check Score: {score} / 100
-                </h2>
+            {showResults && score !== null && band && (
+              <div
+                ref={resultsRef}
+                className="mt-16 rounded-[1.5rem] bg-white p-8 shadow-sm"
+              >
+                <div className="brand-stack-sm">
+                  <p className="brand-section-kicker">Your result</p>
 
-                <p className="mb-1 text-lg font-medium text-[#1E6FD9]">
-                  {band.label}
-                </p>
+                  <h2 className="brand-heading-md text-slate-950">
+                    HR Operations Health Check Score: {score} / 100
+                  </h2>
 
-                <p className="mb-6 text-slate-700">{band.summary}</p>
-
-                <h3 className="mb-4 text-lg font-semibold text-slate-950">
-                  Operational profile
-                </h3>
-
-                <div className="mb-10 space-y-3">
-                  {dimensions.map((dimension) => {
-                    const percent = (dimension.score / 5) * 100;
-
-                    return (
-                      <div key={dimension.label}>
-                        <div className="mb-1 flex justify-between text-sm text-slate-700">
-                          <span>{dimension.label}</span>
-                          <span>{dimension.score} / 5</span>
-                        </div>
-
-                        <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                          <div
-                            className="h-full bg-[#1E6FD9]"
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <p className="brand-heading-sm text-[#1E6FD9]">
+                    {band.label}
+                  </p>
                 </div>
 
-                {lowestDimensions.length > 0 ? (
-                  <div className="mb-10">
-                    <h3 className="mb-3 text-lg font-semibold text-slate-950">
-                      Areas most likely to benefit from attention
+                <div className="mt-8 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-6">
+                  <div className="brand-stack-sm">
+                    <h3 className="brand-heading-sm text-slate-950">
+                      Structured interpretation
                     </h3>
 
-                    <p className="mb-4 text-sm text-slate-600">
-                      These dimensions may be the most likely areas where greater
-                      clarity, consistency, or operational focus would add value
-                      at the moment.
+                    <p className="brand-body">{band.summary}</p>
+
+                    <p className="brand-body">
+                      This is an initial interpretation based on one set of
+                      responses. It is most useful as a starting point for
+                      discussion rather than a full organisational diagnostic.
                     </p>
+                  </div>
+                </div>
+
+                <div className="mt-8">
+                  <div className="brand-stack-sm">
+                    <h3 className="brand-heading-sm text-slate-950">
+                      What this may indicate
+                    </h3>
 
                     <div className="space-y-2">
-                      {lowestDimensions.map((dimension) => (
+                      {band.freeInsights.map((insight) => (
                         <div
-                          key={dimension.label}
-                          className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                          key={insight}
+                          className="rounded-lg bg-slate-50 px-4 py-3"
                         >
-                          <span>{dimension.label}</span>
-                          <span className="font-medium">{dimension.score} / 5</span>
+                          <p className="brand-body-sm">{insight}</p>
                         </div>
                       ))}
                     </div>
                   </div>
-                ) : null}
-
-                <div className="mt-8 rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
-                  {saveStatus === "saved" && completionEmailStatus === "sent" ? (
-                    <p>
-                      Your result has been saved locally in this browser and your
-                      health check completion has been recorded.
-                    </p>
-                  ) : null}
-                  {saveStatus === "saved" && completionEmailStatus === "idle" ? (
-                    <p>
-                      Your result has been saved locally in this browser so you can
-                      continue to the interpretation and enquiry flow.
-                    </p>
-                  ) : null}
-                  {saveStatus === "saved" && completionEmailStatus === "error" ? (
-                    <p>
-                      Your result has been saved locally in this browser, but the
-                      completion notification could not be sent.
-                    </p>
-                  ) : null}
-                  {saveStatus === "error" ? (
-                    <p>
-                      Your result has been calculated, but local saving failed in
-                      this browser.
-                    </p>
-                  ) : null}
                 </div>
 
-                <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-[#F4F6FA] p-6">
-                  <h4 className="mb-2 text-lg font-semibold text-slate-950">
-                    Want a more detailed interpretation of what this pattern may mean?
-                  </h4>
+                <div className="mt-10">
+                  <div className="brand-stack-sm">
+                    <h3 className="brand-heading-sm text-slate-950">
+                      Operational profile
+                    </h3>
 
-                  <p className="mb-4 text-sm leading-7 text-slate-700">
-                    This Health Check gives a structured first read. If you want a
-                    more developed interpretation of what the result is likely to
-                    mean in practice, continue to the detailed interpretation page.
-                    If you need a deeper, cross-role view, the HR Operations
-                    Diagnostic Assessment is the next step.
-                  </p>
+                    <div className="space-y-3">
+                      {dimensions.map((dimension) => {
+                        const percent = (dimension.score / 5) * 100;
 
-                  <div className="flex flex-wrap gap-4">
-                    <Link
-                      href="/contact/diagnostic-interpretation"
-                      className="inline-block rounded-lg bg-[#1E6FD9] px-6 py-3 text-white"
-                    >
-                      View detailed interpretation
-                    </Link>
+                        return (
+                          <div key={dimension.label}>
+                            <div className="mb-1 flex justify-between text-sm text-slate-700">
+                              <span>{dimension.label}</span>
+                              <span>{dimension.score} / 5</span>
+                            </div>
 
-                    <Link
-                      href="/diagnostic-assessment"
-                      className="inline-block rounded-lg border border-slate-300 px-6 py-3 text-slate-800"
-                    >
-                      View Diagnostic Assessment
-                    </Link>
+                            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full bg-[#1E6FD9]"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
+
+                {lowestDimensions.length > 0 && (
+                  <div className="mt-10">
+                    <div className="brand-stack-sm">
+                      <h3 className="brand-heading-sm text-slate-950">
+                        Where attention may be most useful
+                      </h3>
+
+                      <p className="brand-body-sm">
+                        These areas may represent the greatest opportunity to
+                        strengthen how HR operates in practice.
+                      </p>
+
+                      <div className="space-y-2">
+                        {lowestDimensions.map((dimension) => (
+                          <div
+                            key={dimension.label}
+                            className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-slate-700"
+                          >
+                            <span className="text-sm">{dimension.label}</span>
+                            <span className="text-sm font-medium">
+                              {dimension.score} / 5
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-10 rounded-[1.25rem] bg-[#F4F6FA] p-6">
+                  <div className="brand-stack-sm">
+                    <h3 className="brand-heading-sm text-slate-950">
+                      Want a more developed interpretation of what this may mean?
+                    </h3>
+
+                    <p className="brand-body-sm">
+                      The Health Check provides a structured first view. A more
+                      detailed interpretation helps translate this pattern into
+                      clearer operational implications and next-step options.
+                    </p>
+
+                    <div className="pt-2">
+                      <Link
+                        href={interpretationHref}
+                        className="brand-button-primary"
+                      >
+                        View detailed interpretation
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 rounded-lg bg-slate-50 p-5">
+                  <p className="brand-body-sm">
+                    {saveStatus === "saved" && completionEmailStatus === "sent"
+                      ? "Your result has been saved locally in this browser and your health check completion has been recorded."
+                      : saveStatus === "saved" &&
+                        completionEmailStatus === "idle"
+                        ? "Your result has been saved locally in this browser so you can continue to the interpretation flow."
+                        : saveStatus === "saved" &&
+                          completionEmailStatus === "error"
+                          ? "Your result has been saved locally in this browser, but the completion notification could not be sent."
+                          : saveStatus === "error"
+                            ? "Your result has been calculated, but local saving failed in this browser."
+                            : ""}
+                  </p>
+                </div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </section>
