@@ -604,8 +604,9 @@ export default function DiagnosticPage() {
                     className="h-14 w-full rounded-lg border border-slate-300 bg-white px-4 text-base leading-none text-slate-900"
                   />
                   <p className="mt-2 text-sm text-slate-500">
-                    Optional. Add your email if you would like a copy of your
-                    result. You will not be added to a mailing list.
+                    <p className="mt-2 text-sm text-slate-500">
+                      Optional. You will see your result immediately on completion. Add your email if you would like a copy sent to you and a secure link to revisit it later. You will not be added to a mailing list.
+                    </p>
                   </p>
                 </div>
               </div>

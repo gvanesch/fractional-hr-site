@@ -600,6 +600,50 @@ export async function POST(request: Request) {
       answers: body.answers,
     });
 
+    if (body.email) {
+      try {
+        const clientEmailResponse = await fetch(
+          `${new URL(request.url).origin}/api/public-diagnostic-email`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: completion.publicToken,
+              email: body.email,
+            }),
+          },
+        );
+
+        if (!clientEmailResponse.ok) {
+          const clientEmailPayload = (await clientEmailResponse
+            .json()
+            .catch(() => null)) as
+            | { error?: string; ok?: boolean }
+            | null;
+
+          console.error(
+            "Client result email send failed:",
+            clientEmailPayload?.error ||
+            `Request failed with status ${clientEmailResponse.status}`,
+          );
+        }
+      } catch (error) {
+        console.error("Client result email send failed:", error);
+      }
+    }
+
+    return jsonResponse({
+      ok: true,
+      submissionId: completion.submissionId,
+      publicToken: completion.publicToken,
+      completedAt: completion.completedAt,
+      score,
+      band: band.label,
+      resendId: resendResponse.id ?? null,
+    });
+
     return jsonResponse({
       ok: true,
       submissionId: completion.submissionId,

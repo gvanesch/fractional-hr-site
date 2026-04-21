@@ -482,7 +482,11 @@ export default function DiagnosticInterpretationPage() {
                   </div>
 
                   <p className="brand-body-sm text-slate-500">
-                    This is only used to send your result. You will not be contacted unless you request us to via the contact page. You will not be added to any mailing list and your information will not be sold.
+                    <p className="mt-2 text-sm text-slate-500">
+                      Optional. You will see your result immediately on completion. Add your
+                      email if you would like a copy sent to you with a secure link to revisit
+                      it later. You will not be added to a mailing list.
+                    </p>
                   </p>
 
                   {emailMessage ? (
