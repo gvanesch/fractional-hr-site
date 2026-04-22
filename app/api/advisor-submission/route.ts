@@ -1,9 +1,9 @@
 // ⚠️ LEGACY ROUTE - DO NOT USE FOR NEW DEVELOPMENT
 // This endpoint was previously used by advisor pages via server-side fetch.
 // The application now uses direct Supabase reads in server components instead.
-// 
+//
 // This route is retained temporarily for backward compatibility (e.g. email links or manual access).
-// 
+//
 // If no external dependencies are confirmed, this route should be removed in a future cleanup.
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -200,13 +200,21 @@ function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
   const executiveReadout = asString(objectValue.executiveReadout);
   const recommendedCallAngle = asString(objectValue.recommendedCallAngle);
   const callOpening = asString(objectValue.callOpening);
+  const patternDiagnosis = asString(objectValue.patternDiagnosis);
+  const likelyOperatingModel = asString(objectValue.likelyOperatingModel);
+  const nextBestOffer = asString(objectValue.nextBestOffer);
+  const callObjective = asString(objectValue.callObjective);
 
   if (
     !headline ||
     !overallAssessment ||
     !executiveReadout ||
     !recommendedCallAngle ||
-    !callOpening
+    !callOpening ||
+    !patternDiagnosis ||
+    !likelyOperatingModel ||
+    !nextBestOffer ||
+    !callObjective
   ) {
     return null;
   }
@@ -227,6 +235,13 @@ function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
     callOpening,
     conversationFlow: asStringArray(objectValue.conversationFlow),
     conversionPositioning: asStringArray(objectValue.conversionPositioning),
+    patternDiagnosis,
+    likelyOperatingModel,
+    rootCauseHypotheses: asStringArray(objectValue.rootCauseHypotheses),
+    whatToValidateInCall: asStringArray(objectValue.whatToValidateInCall),
+    qualificationSignals: asStringArray(objectValue.qualificationSignals),
+    nextBestOffer,
+    callObjective,
   };
 }
 
@@ -411,36 +426,36 @@ export async function GET(request: Request): Promise<Response> {
       },
       diagnostic: result
         ? {
-            score: result.score,
-            band: {
-              label: result.band.label,
-              summary: result.band.summary,
-            },
-            lowestDimensions: result.lowestDimensions.map((dimension) => ({
-              label: dimension.label,
-              score: dimension.score,
-            })),
-          }
+          score: result.score,
+          band: {
+            label: result.band.label,
+            summary: result.band.summary,
+          },
+          lowestDimensions: result.lowestDimensions.map((dimension) => ({
+            label: dimension.label,
+            score: dimension.score,
+          })),
+        }
         : null,
       derived: result
         ? {
-            narrative: buildNarrative(result.score, submission),
-            impact: buildImpact(result.score),
-            priorities: buildPriorities(result.score),
-            callOpener: buildCallOpener(result.score, submission),
-            lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
-              label: dimension.label,
-              score: dimension.score,
-              insight: getInsight(dimension.label),
-            })),
-          }
+          narrative: buildNarrative(result.score, submission),
+          impact: buildImpact(result.score),
+          priorities: buildPriorities(result.score),
+          callOpener: buildCallOpener(result.score, submission),
+          lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
+            label: dimension.label,
+            score: dimension.score,
+            insight: getInsight(dimension.label),
+          })),
+        }
         : {
-            narrative: null,
-            impact: null,
-            priorities: [],
-            callOpener: null,
-            lowestDimensionInsights: [],
-          },
+          narrative: null,
+          impact: null,
+          priorities: [],
+          callOpener: null,
+          lowestDimensionInsights: [],
+        },
       advisorBrief,
     };
 

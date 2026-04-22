@@ -208,6 +208,7 @@ function buildEmailHtml(params: {
   countryRegion?: string;
   email?: string;
   answers: Record<number, AnswerValue | undefined>;
+  advisorUrl?: string;
 }) {
   const {
     score,
@@ -219,6 +220,7 @@ function buildEmailHtml(params: {
     countryRegion,
     email,
     answers,
+    advisorUrl,
   } = params;
 
   const result = {
@@ -342,10 +344,24 @@ function buildEmailHtml(params: {
           </tbody>
         </table>
 
-        <div style="margin-top: 24px; padding: 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
-          <p style="margin: 0 0 12px; color: #334155; line-height: 1.8;">
-            If helpful, this can be explored in a short follow-up conversation to understand what may be driving the pattern in practice and whether a deeper diagnostic would be useful.
+                <div style="margin-top: 24px; padding: 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
+                    <p style="margin: 0 0 12px; color: #334155; line-height: 1.8;">
+            Use the advisor dashboard to review the full brief, prepare the call angle, and decide the most appropriate next step.
           </p>
+
+          ${advisorUrl
+      ? `
+          <p style="margin: 0;">
+            <a
+              href="${escapeHtml(advisorUrl)}"
+              style="display: inline-block; background: #1E6FD9; color: #FFFFFF; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 600;"
+            >
+              Open advisor dashboard
+            </a>
+          </p>
+          `
+      : ""
+    }
         </div>
       </div>
     </div>
@@ -497,6 +513,7 @@ async function sendDiagnosticEmail(params: {
   countryRegion?: string;
   email?: string;
   answers: Record<number, AnswerValue | undefined>;
+  advisorUrl?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.CONTACT_FROM_EMAIL;
@@ -535,6 +552,7 @@ async function sendDiagnosticEmail(params: {
         countryRegion: params.countryRegion,
         email: params.email,
         answers: params.answers,
+        advisorUrl: params.advisorUrl,
       }),
     }),
   });
@@ -588,6 +606,10 @@ export async function POST(request: Request) {
       email: body.email,
     });
 
+    const advisorUrl = `${new URL(request.url).origin}/advisor/${encodeURIComponent(
+      completion.submissionId,
+    )}`;
+
     const resendResponse = await sendDiagnosticEmail({
       score,
       bandLabel: band.label,
@@ -598,6 +620,7 @@ export async function POST(request: Request) {
       countryRegion: body.countryRegion,
       email: body.email,
       answers: body.answers,
+      advisorUrl,
     });
 
     if (body.email) {

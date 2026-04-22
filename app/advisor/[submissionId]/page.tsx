@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import ProspectCrmPanel from "@/app/components/advisor/ProspectCrmPanel";
 import {
+  buildAdvisorBrief,
   calculateDiagnosticResult,
   type DiagnosticAnswers,
   type AdvisorBrief,
@@ -31,12 +32,13 @@ type JsonObject = {
 
 type SubmissionRow = {
   submission_id: string;
-  contact_name: string;
-  contact_email: string;
+  contact_name: string | null;
+  contact_email: string | null;
   contact_company: string | null;
   contact_topic: string | null;
-  contact_message: string;
+  contact_message: string | null;
   contact_source: string | null;
+  email: string | null;
   company_size: string | null;
   industry: string | null;
   role: string | null;
@@ -55,13 +57,13 @@ type ProspectRecord = {
   company: string | null;
   relationship: "weak" | "medium" | "strong";
   status:
-    | "not_contacted"
-    | "contacted"
-    | "replied"
-    | "call_booked"
-    | "opportunity"
-    | "won"
-    | "lost";
+  | "not_contacted"
+  | "contacted"
+  | "replied"
+  | "call_booked"
+  | "opportunity"
+  | "won"
+  | "lost";
   last_contact_date: string | null;
   next_action_date: string | null;
   source: "network" | "referral" | "website" | "other";
@@ -86,11 +88,11 @@ type ProspectActivityRecord = {
 type DerivedResult = {
   submission: {
     submissionId: string;
-    contactName: string;
-    contactEmail: string;
+    contactName: string | null;
+    contactEmail: string | null;
     contactCompany: string | null;
     contactTopic: string | null;
-    contactMessage: string;
+    contactMessage: string | null;
     contactSource: string | null;
     companySize: string | null;
     industry: string | null;
@@ -308,13 +310,21 @@ function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
   const executiveReadout = asString(objectValue.executiveReadout);
   const recommendedCallAngle = asString(objectValue.recommendedCallAngle);
   const callOpening = asString(objectValue.callOpening);
+  const patternDiagnosis = asString(objectValue.patternDiagnosis);
+  const likelyOperatingModel = asString(objectValue.likelyOperatingModel);
+  const nextBestOffer = asString(objectValue.nextBestOffer);
+  const callObjective = asString(objectValue.callObjective);
 
   if (
     !headline ||
     !overallAssessment ||
     !executiveReadout ||
     !recommendedCallAngle ||
-    !callOpening
+    !callOpening ||
+    !patternDiagnosis ||
+    !likelyOperatingModel ||
+    !nextBestOffer ||
+    !callObjective
   ) {
     return null;
   }
@@ -335,6 +345,13 @@ function asAdvisorBrief(value: JsonValue): AdvisorBrief | null {
     callOpening,
     conversationFlow: asStringArray(objectValue.conversationFlow),
     conversionPositioning: asStringArray(objectValue.conversionPositioning),
+    patternDiagnosis,
+    likelyOperatingModel,
+    rootCauseHypotheses: asStringArray(objectValue.rootCauseHypotheses),
+    whatToValidateInCall: asStringArray(objectValue.whatToValidateInCall),
+    qualificationSignals: asStringArray(objectValue.qualificationSignals),
+    nextBestOffer,
+    callObjective,
   };
 }
 
@@ -467,10 +484,11 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 async function requireAdvisorSession(submissionId: string) {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (error || !user) {
     redirect(`/advisor/login?next=/advisor/${submissionId}`);
   }
 
@@ -479,13 +497,13 @@ async function requireAdvisorSession(submissionId: string) {
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 
-  const userEmail = session.user.email?.toLowerCase() ?? "";
+  const userEmail = user.email?.toLowerCase() ?? "";
 
   if (!userEmail || !allowedEmails.includes(userEmail)) {
     redirect("/advisor/login?error=forbidden");
   }
 
-  return session;
+  return user;
 }
 
 async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
@@ -502,6 +520,7 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
         contact_topic,
         contact_message,
         contact_source,
+        email,
         company_size,
         industry,
         role,
@@ -608,13 +627,15 @@ async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
     ? calculateDiagnosticResult(diagnosticAnswers)
     : null;
 
-  const advisorBrief = asAdvisorBrief(submission.advisor_brief);
+  const storedAdvisorBrief = asAdvisorBrief(submission.advisor_brief);
+  const advisorBrief =
+    storedAdvisorBrief || (result ? buildAdvisorBrief(result) : null);
 
   return {
     submission: {
       submissionId: submission.submission_id,
       contactName: submission.contact_name,
-      contactEmail: submission.contact_email,
+      contactEmail: submission.contact_email || submission.email,
       contactCompany: submission.contact_company,
       contactTopic: submission.contact_topic,
       contactMessage: submission.contact_message,
@@ -627,36 +648,36 @@ async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
     },
     diagnostic: result
       ? {
-          score: result.score,
-          band: {
-            label: result.band.label,
-            summary: result.band.summary,
-          },
-          lowestDimensions: result.lowestDimensions.map((dimension) => ({
-            label: dimension.label,
-            score: dimension.score,
-          })),
-        }
+        score: result.score,
+        band: {
+          label: result.band.label,
+          summary: result.band.summary,
+        },
+        lowestDimensions: result.lowestDimensions.map((dimension) => ({
+          label: dimension.label,
+          score: dimension.score,
+        })),
+      }
       : null,
     derived: result
       ? {
-          narrative: buildNarrative(result.score, submission),
-          impact: buildImpact(result.score),
-          priorities: buildPriorities(result.score),
-          callOpener: buildCallOpener(result.score, submission),
-          lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
-            label: dimension.label,
-            score: dimension.score,
-            insight: getInsight(dimension.label),
-          })),
-        }
+        narrative: buildNarrative(result.score, submission),
+        impact: buildImpact(result.score),
+        priorities: buildPriorities(result.score),
+        callOpener: buildCallOpener(result.score, submission),
+        lowestDimensionInsights: result.lowestDimensions.map((dimension) => ({
+          label: dimension.label,
+          score: dimension.score,
+          insight: getInsight(dimension.label),
+        })),
+      }
       : {
-          narrative: null,
-          impact: null,
-          priorities: [],
-          callOpener: null,
-          lowestDimensionInsights: [],
-        },
+        narrative: null,
+        impact: null,
+        priorities: [],
+        callOpener: null,
+        lowestDimensionInsights: [],
+      },
     advisorBrief,
   };
 }
@@ -766,6 +787,9 @@ export default async function AdvisorSubmissionPage({
   const suggestedFocusAreas = advisorBrief?.suggestedFocusAreas ?? [];
   const conversationFlow = advisorBrief?.conversationFlow ?? [];
   const conversionPositioning = advisorBrief?.conversionPositioning ?? [];
+  const rootCauseHypotheses = advisorBrief?.rootCauseHypotheses ?? [];
+  const whatToValidateInCall = advisorBrief?.whatToValidateInCall ?? [];
+  const qualificationSignals = advisorBrief?.qualificationSignals ?? [];
 
   return (
     <main className="brand-light-section min-h-screen">
@@ -776,7 +800,10 @@ export default async function AdvisorSubmissionPage({
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <h1 className="brand-heading-lg text-white">
-                {submission.contactCompany || submission.contactName || "Health Check"}
+                {submission.contactCompany ||
+                  submission.contactName ||
+                  submission.contactEmail ||
+                  "Health Check"}
               </h1>
 
               {prospect ? (
@@ -858,175 +885,179 @@ export default async function AdvisorSubmissionPage({
 
             <ProspectCrmPanel prospect={prospect} />
 
-            {advisorBrief ? (
+            {(advisorBrief || result) ? (
               <section className="brand-surface-card p-6 sm:p-8">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-6">
                   <div>
-                    <p className="brand-section-kicker">Advisor call prep</p>
+                    <p className="brand-section-kicker">Call cheat sheet</p>
                     <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                      Conversation framing and positioning
+                      Operator read for a 10 to 15 minute introduction call
                     </h2>
+                    <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                      Use this to control the conversation, validate whether the
+                      signal reflects a real structural issue, and decide what
+                      the right next step should be.
+                    </p>
                   </div>
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {advisorBrief.headline ? (
+                  {advisorBrief ? (
+                    <>
                       <SignalCard title="Headline">
                         {advisorBrief.headline}
                       </SignalCard>
-                    ) : null}
 
-                    {advisorBrief.executiveReadout ? (
                       <SignalCard title="Executive readout">
                         {advisorBrief.executiveReadout}
                       </SignalCard>
-                    ) : null}
 
-                    {advisorBrief.recommendedCallAngle ? (
-                      <SignalCard title="Recommended call angle">
-                        {advisorBrief.recommendedCallAngle}
-                      </SignalCard>
-                    ) : null}
-
-                    {advisorBrief.callOpening ? (
-                      <SignalCard title="Suggested call opening">
-                        {advisorBrief.callOpening}
-                      </SignalCard>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {conversationFlow.length > 0 ? (
-                      <SignalCard title="Conversation flow">
-                        {renderList(conversationFlow)}
-                      </SignalCard>
-                    ) : null}
-
-                    {conversionPositioning.length > 0 ? (
-                      <SignalCard title="Positioning into next step">
-                        {renderList(conversionPositioning)}
-                      </SignalCard>
-                    ) : null}
-
-                    {discussionPrompts.length > 0 ? (
-                      <SignalCard title="First questions to explore">
-                        {renderList(discussionPrompts.slice(0, 3))}
-                      </SignalCard>
-                    ) : null}
-
-                    {advisorBrief.overallAssessment ? (
                       <SignalCard title="Overall assessment">
                         {advisorBrief.overallAssessment}
                       </SignalCard>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
-            ) : null}
 
-            {result ? (
-              <section className="brand-surface-card p-6 sm:p-8">
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <p className="brand-section-kicker">Diagnostic interpretation</p>
-                    <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                      Operating signals and priorities
-                    </h2>
-                  </div>
-
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {data.derived.narrative ? (
-                      <SignalCard title="Narrative">
-                        {data.derived.narrative}
+                      <SignalCard title="Recommended call angle">
+                        {advisorBrief.recommendedCallAngle}
                       </SignalCard>
-                    ) : null}
 
-                    {data.derived.impact ? (
-                      <SignalCard title="Business impact">
-                        {data.derived.impact}
+                      <SignalCard title="Pattern diagnosis">
+                        {advisorBrief.patternDiagnosis}
                       </SignalCard>
-                    ) : null}
 
-                    {data.derived.priorities.length > 0 ? (
-                      <SignalCard title="Priority actions">
-                        {renderList(data.derived.priorities)}
+                      <SignalCard title="Likely operating model">
+                        {advisorBrief.likelyOperatingModel}
                       </SignalCard>
-                    ) : null}
 
-                    {advisorBrief?.suggestedFocusAreas?.length ? (
-                      <SignalCard title="Suggested focus areas">
-                        {renderList(suggestedFocusAreas)}
+                      {rootCauseHypotheses.length > 0 ? (
+                        <SignalCard title="Root cause hypotheses">
+                          {renderList(rootCauseHypotheses)}
+                        </SignalCard>
+                      ) : null}
+
+                      {whatToValidateInCall.length > 0 ? (
+                        <SignalCard title="What to validate in call">
+                          {renderList(whatToValidateInCall)}
+                        </SignalCard>
+                      ) : null}
+
+                      <SignalCard title="Call objective">
+                        {advisorBrief.callObjective}
                       </SignalCard>
-                    ) : null}
-                  </div>
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {data.derived.lowestDimensionInsights.length > 0 ? (
-                      <div className="rounded-xl border border-slate-200 bg-white p-5">
-                        <p className="text-sm font-semibold text-slate-900">
-                          Lowest scoring areas
-                        </p>
-                        <div className="mt-4 space-y-3">
-                          {data.derived.lowestDimensionInsights.map((dimension) => (
-                            <div
-                              key={dimension.label}
-                              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4"
-                            >
-                              <p className="text-sm font-semibold text-slate-900">
-                                {dimension.label} - {dimension.score}/5
-                              </p>
-                              <p className="mt-2 text-sm leading-6 text-slate-700">
-                                {dimension.insight}
-                              </p>
-                            </div>
-                          ))}
+                      <SignalCard title="Opening line">
+                        {advisorBrief.callOpening}
+                      </SignalCard>
+
+                      {conversationFlow.length > 0 ? (
+                        <SignalCard title="Conversation flow">
+                          {renderList(conversationFlow)}
+                        </SignalCard>
+                      ) : null}
+
+                      {discussionPrompts.length > 0 ? (
+                        <SignalCard title="Probe questions">
+                          {renderList(discussionPrompts.slice(0, 5))}
+                        </SignalCard>
+                      ) : null}
+
+                      {keyThemes.length > 0 ? (
+                        <SignalCard title="Key themes">
+                          {renderList(keyThemes)}
+                        </SignalCard>
+                      ) : null}
+
+                      {likelyFrictionPoints.length > 0 ? (
+                        <SignalCard title="Likely operational friction">
+                          {renderList(likelyFrictionPoints)}
+                        </SignalCard>
+                      ) : null}
+
+                      {businessImplications.length > 0 ? (
+                        <SignalCard title="Business implications">
+                          {renderList(businessImplications)}
+                        </SignalCard>
+                      ) : null}
+
+                      {likelyOperationalRisks.length > 0 ? (
+                        <SignalCard title="Likely operational risks">
+                          {renderList(likelyOperationalRisks)}
+                        </SignalCard>
+                      ) : null}
+
+                      {whatTypicallyHappensNext.length > 0 ? (
+                        <SignalCard title="What typically happens next">
+                          {renderList(whatTypicallyHappensNext)}
+                        </SignalCard>
+                      ) : null}
+
+                      {first30DayPriorities.length > 0 ? (
+                        <SignalCard title="First 30-day priorities">
+                          {renderList(first30DayPriorities)}
+                        </SignalCard>
+                      ) : null}
+
+                      {qualificationSignals.length > 0 ? (
+                        <SignalCard title="Qualification signals">
+                          {renderList(qualificationSignals)}
+                        </SignalCard>
+                      ) : null}
+
+                      <SignalCard title="Next best offer">
+                        {advisorBrief.nextBestOffer}
+                      </SignalCard>
+
+                      {conversionPositioning.length > 0 ? (
+                        <SignalCard title="Positioning into next step">
+                          {renderList(conversionPositioning)}
+                        </SignalCard>
+                      ) : null}
+
+                      {suggestedFocusAreas.length > 0 ? (
+                        <SignalCard title="Likely focus areas if the signal holds">
+                          {renderList(suggestedFocusAreas)}
+                        </SignalCard>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {result ? (
+                    <div className="space-y-4">
+                      {data.derived.lowestDimensionInsights.length > 0 ? (
+                        <div className="rounded-xl border border-slate-200 bg-white p-5">
+                          <p className="text-sm font-semibold text-slate-900">
+                            Supporting diagnostic signals
+                          </p>
+                          <div className="mt-4 space-y-3">
+                            {data.derived.lowestDimensionInsights.map((dimension) => (
+                              <div
+                                key={dimension.label}
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4"
+                              >
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {dimension.label} - {dimension.score}/5
+                                </p>
+                                <p className="mt-2 text-sm leading-6 text-slate-700">
+                                  {dimension.insight}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {data.derived.callOpener ? (
-                      <SignalCard title="Derived call opener">
-                        {data.derived.callOpener}
-                      </SignalCard>
-                    ) : null}
-                  </div>
+                      {!advisorBrief && suggestedFocusAreas.length > 0 ? (
+                        <SignalCard title="Likely focus areas if the signal holds">
+                          {renderList(suggestedFocusAreas)}
+                        </SignalCard>
+                      ) : null}
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {keyThemes.length > 0 ? (
-                      <SignalCard title="Key themes">
-                        {renderList(keyThemes)}
-                      </SignalCard>
-                    ) : null}
-
-                    {likelyFrictionPoints.length > 0 ? (
-                      <SignalCard title="Likely operational friction">
-                        {renderList(likelyFrictionPoints)}
-                      </SignalCard>
-                    ) : null}
-
-                    {businessImplications.length > 0 ? (
-                      <SignalCard title="Business implications">
-                        {renderList(businessImplications)}
-                      </SignalCard>
-                    ) : null}
-
-                    {likelyOperationalRisks.length > 0 ? (
-                      <SignalCard title="Likely operational risks">
-                        {renderList(likelyOperationalRisks)}
-                      </SignalCard>
-                    ) : null}
-
-                    {whatTypicallyHappensNext.length > 0 ? (
-                      <SignalCard title="What typically happens next">
-                        {renderList(whatTypicallyHappensNext)}
-                      </SignalCard>
-                    ) : null}
-
-                    {first30DayPriorities.length > 0 ? (
-                      <SignalCard title="First 30-day priorities">
-                        {renderList(first30DayPriorities)}
-                      </SignalCard>
-                    ) : null}
-                  </div>
+                      {!advisorBrief &&
+                        !suggestedFocusAreas.length &&
+                        data.derived.priorities.length > 0 ? (
+                        <SignalCard title="Likely focus areas if the signal holds">
+                          {renderList(data.derived.priorities)}
+                        </SignalCard>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </section>
             ) : null}
@@ -1043,8 +1074,16 @@ export default async function AdvisorSubmissionPage({
                 <div className="grid gap-4 lg:grid-cols-3">
                   <InfoCard
                     label="Contact"
-                    value={submission.contactName}
-                    secondary={submission.contactEmail}
+                    value={
+                      submission.contactName ||
+                      submission.contactEmail ||
+                      "Not provided"
+                    }
+                    secondary={
+                      submission.contactName
+                        ? submission.contactEmail || undefined
+                        : undefined
+                    }
                   />
                   <InfoCard
                     label="Organisation"
@@ -1076,7 +1115,13 @@ export default async function AdvisorSubmissionPage({
                   />
                 </div>
 
-                <NotesCard title="Message" content={submission.contactMessage} />
+                <NotesCard
+                  title="Message"
+                  content={
+                    submission.contactMessage ||
+                    "No contact message was submitted with this Health Check."
+                  }
+                />
               </div>
             </section>
 

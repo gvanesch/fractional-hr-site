@@ -41,7 +41,6 @@ export type AdvisorBrief = {
   discussionPrompts: string[];
   suggestedFocusAreas: string[];
 
-  // Existing richer advisory layers
   executiveReadout: string;
   likelyFrictionPoints: string[];
   businessImplications: string[];
@@ -49,10 +48,17 @@ export type AdvisorBrief = {
   first30DayPriorities: string[];
   recommendedCallAngle: string;
 
-  // New call-support layers
   callOpening: string;
   conversationFlow: string[];
   conversionPositioning: string[];
+
+  patternDiagnosis: string;
+  likelyOperatingModel: string;
+  rootCauseHypotheses: string[];
+  whatToValidateInCall: string[];
+  qualificationSignals: string[];
+  nextBestOffer: string;
+  callObjective: string;
 };
 
 export const questions: Question[] = [
@@ -442,6 +448,66 @@ function buildExecutiveReadout(
   return `This lead appears broadly operationally mature, but the weakest areas (${weakestSummary}) may still be limiting efficiency, resilience, or scale readiness. The call should likely focus less on foundational repair and more on optimisation, cross-functional friction, and reducing hidden drag.`;
 }
 
+function buildOperatingModelHypothesis(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): {
+  patternDiagnosis: string;
+  likelyOperatingModel: string;
+  rootCauseHypotheses: string[];
+} {
+  if (result.band.label === "Emerging Foundations") {
+    return {
+      patternDiagnosis:
+        "The operating model is not yet holding through structure. Work is moving, but it relies heavily on individual interpretation, informal ownership, and manual coordination rather than a clearly defined path.",
+      likelyOperatingModel: "Ad hoc, people-dependent HR model",
+      rootCauseHypotheses: [
+        "Core processes are not yet defined tightly enough to remove reliance on individual judgement",
+        "Ownership is implicit rather than explicit at key decision and handoff points",
+        "The service model has evolved reactively rather than through deliberate design",
+      ],
+    };
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return {
+      patternDiagnosis:
+        "The operating model exists in parts, but it is not landing consistently in execution. Work is still relying on interpretation, informal ownership, and uneven access rather than a repeatable, controlled path.",
+      likelyOperatingModel:
+        "Partially structured, manager-dependent HR model",
+      rootCauseHypotheses: [
+        "Ownership exists in theory but is not explicit enough where work actually moves",
+        "Process knowledge is held in individuals rather than embedded in the workflow",
+        "Access into HR is not designed as a single front door, creating fragmented demand",
+      ],
+    };
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return {
+      patternDiagnosis:
+        "The operating model is broadly in place, but it is carrying avoidable friction in how work flows, transfers, and is experienced. The structure exists, but it is not yet as clean or efficient as it could be.",
+      likelyOperatingModel: "Structured but friction-heavy HR model",
+      rootCauseHypotheses: [
+        "Handoffs and ownership boundaries are not tight enough to prevent rework or delay",
+        "Service access and routing are adding unnecessary complexity to otherwise defined processes",
+        "Systems or workflows are not fully aligned to how work actually happens in practice",
+      ],
+    };
+  }
+
+  return {
+    patternDiagnosis:
+      "The operating model is broadly mature, but there are still areas where hidden inefficiency, cross-functional friction, or suboptimal design are limiting scale efficiency.",
+    likelyOperatingModel: "Mature but optimisation-constrained HR model",
+    rootCauseHypotheses: [
+      "Some workflows are carrying legacy design choices that no longer match current scale or complexity",
+      "Cross-functional handoffs are not fully optimised, creating hidden coordination cost",
+      "Opportunities for simplification or automation have not yet been fully realised",
+    ],
+  };
+}
+
 function buildOverallAssessment(result: DiagnosticResult): string {
   if (result.band.label === "Emerging Foundations") {
     return "The organisation is likely operating with some important HR foundations still evolving. There may be meaningful dependence on individual knowledge, informal process handling, or manual coordination.";
@@ -479,7 +545,10 @@ function buildRecommendedCallAngle(
   return `Position the conversation around optimisation and scale-readiness. Use ${joined} to test where a mature HR operation still has hidden inefficiency, fragile handoffs, or opportunities for smarter service design.`;
 }
 
-function buildCallOpening(result: DiagnosticResult, weakestLabels: string[]): string {
+function buildCallOpening(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string {
   const weakestSummary = weakestLabels.join(", ");
 
   if (result.band.label === "Emerging Foundations") {
@@ -579,6 +648,115 @@ function buildConversionPositioning(
   ];
 }
 
+function buildWhatToValidateInCall(
+  weakestLabels: string[],
+): string[] {
+  return weakestLabels.map((label) => {
+    switch (label) {
+      case "Process clarity":
+        return "Whether managers are relying on verbal guidance or precedent rather than one clear documented path.";
+      case "Consistency":
+        return "Whether similar situations are producing materially different outcomes across teams or managers.";
+      case "Service access":
+        return "Whether requests are coming through multiple informal channels instead of one controlled route.";
+      case "Ownership":
+        return "Whether approvals, escalations, or exceptions regularly pause because accountability is not explicit.";
+      case "Onboarding":
+        return "Whether onboarding quality changes meaningfully depending on manager discipline or local process.";
+      case "Technology alignment":
+        return "Whether spreadsheets, side processes, or manual reminders are compensating for weak system support.";
+      case "Knowledge and self-service":
+        return "Whether HR is acting as a translation layer for routine questions that should be self-served.";
+      case "Operational capacity":
+        return "Whether the team is trapped in reactive case handling with little room for operational improvement.";
+      case "Data and handoffs":
+        return "Whether work is being corrected, re-entered, or chased when it moves between teams or systems.";
+      case "Change resilience":
+        return "Whether new ways of working are launched but not embedded consistently enough to hold.";
+      default:
+        return `Whether ${label.toLowerCase()} is creating visible day-to-day operating drag.`;
+    }
+  });
+}
+
+function buildQualificationSignals(
+  result: DiagnosticResult,
+  weakestLabels: string[],
+): string[] {
+  const signals: string[] = [];
+
+  if (result.band.label === "Emerging Foundations") {
+    signals.push(
+      "Strong fit if they describe HR as reactive, manager-dependent, or inconsistent.",
+      "Strong fit if growth is exposing weaknesses they previously managed informally.",
+    );
+  }
+
+  if (result.band.label === "Developing Structure") {
+    signals.push(
+      "Strong fit if they say process exists on paper but does not land consistently in practice.",
+      "Strong fit if leadership senses friction but cannot yet isolate the structural cause.",
+    );
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    signals.push(
+      "Strong fit if they already have a functioning model but want clearer prioritisation on where to tighten it.",
+      "Strong fit if friction is concentrated in handoffs, service design, or execution discipline rather than full redesign need.",
+    );
+  }
+
+  if (result.band.label === "Operationally Mature") {
+    signals.push(
+      "Strong fit if they are optimisation-minded and can point to specific drag, inefficiency, or scale-readiness concerns.",
+    );
+  }
+
+  if (
+    weakestLabels.includes("Process clarity") ||
+    weakestLabels.includes("Ownership") ||
+    weakestLabels.includes("Service access")
+  ) {
+    signals.push(
+      "Qualification improves if they describe confusion around who owns work, how it moves, or where requests should enter HR.",
+    );
+  }
+
+  return Array.from(new Set(signals));
+}
+
+function buildNextBestOffer(result: DiagnosticResult): string {
+  if (result.band.label === "Emerging Foundations") {
+    return "Position the HR Operations Diagnostic Assessment as the best next step to validate whether the visible friction is structural and to clarify the first priorities before execution support.";
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return "Position the HR Operations Diagnostic Assessment as the best next step to separate partial structure from true operational consistency and to sharpen prioritisation.";
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return "Position the HR Operations Diagnostic Assessment as the best next step if they want stronger evidence on where targeted improvement will have the greatest operational return.";
+  }
+
+  return "Position the conversation around whether a targeted diagnostic review is justified to confirm meaningful optimisation opportunity before any broader work.";
+}
+
+function buildCallObjective(result: DiagnosticResult): string {
+  if (result.band.label === "Emerging Foundations") {
+    return "Confirm that the visible strain is structural, make it legible to the buyer, and create appetite for a deeper diagnostic rather than rushing into tactical fixes.";
+  }
+
+  if (result.band.label === "Developing Structure") {
+    return "Help the buyer see the gap between having some structure and having a model that runs consistently enough to scale, then move them toward the deeper diagnostic.";
+  }
+
+  if (result.band.label === "Structured but Improving") {
+    return "Clarify where targeted friction is absorbing disproportionate effort and create a case for a more structured diagnostic to sequence the right improvements.";
+  }
+
+  return "Test whether there is enough meaningful operating drag to justify deeper review and move the conversation toward focused optimisation rather than broad redesign.";
+}
+
 function dedupe(items: string[]): string[] {
   return Array.from(new Set(items));
 }
@@ -605,7 +783,10 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
   const first30DayPriorities = dedupe(
     weakestLabels.map(getFirst30DayPriority),
   );
-  const recommendedCallAngle = buildRecommendedCallAngle(result, weakestLabels);
+  const recommendedCallAngle = buildRecommendedCallAngle(
+    result,
+    weakestLabels,
+  );
 
   const callOpening = buildCallOpening(result, weakestLabels);
   const conversationFlow = buildConversationFlow(result, weakestLabels);
@@ -613,6 +794,17 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
     result,
     weakestLabels,
   );
+
+  const {
+    patternDiagnosis,
+    likelyOperatingModel,
+    rootCauseHypotheses,
+  } = buildOperatingModelHypothesis(result, weakestLabels);
+
+  const whatToValidateInCall = buildWhatToValidateInCall(weakestLabels);
+  const qualificationSignals = buildQualificationSignals(result, weakestLabels);
+  const nextBestOffer = buildNextBestOffer(result);
+  const callObjective = buildCallObjective(result);
 
   return {
     headline,
@@ -630,6 +822,13 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
     callOpening,
     conversationFlow,
     conversionPositioning,
+    patternDiagnosis,
+    likelyOperatingModel,
+    rootCauseHypotheses,
+    whatToValidateInCall,
+    qualificationSignals,
+    nextBestOffer,
+    callObjective,
   };
 }
 
