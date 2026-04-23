@@ -1,5 +1,6 @@
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import FloatingCtaPrompt from "@/app/components/FloatingCtaPrompt";
 
 export default function PublicLayout({
   children,
@@ -10,6 +11,7 @@ export default function PublicLayout({
     <>
       <Header />
       <main>{children}</main>
+      <FloatingCtaPrompt />
       <Footer />
     </>
   );
