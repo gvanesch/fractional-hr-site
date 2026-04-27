@@ -1,421 +1,328 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "HR Operations Diagnostic Assessment",
+  description:
+    "A structured, multi-perspective diagnostic of how HR operates across leadership, managers, and HR.",
+};
+
+const contactHref =
+  "/contact?topic=HR%20Operations%20Diagnostic%20Assessment";
+
+const recognitionItems = [
+  {
+    number: "01",
+    title: "The Health Check gives a signal, but not enough evidence",
+    text: "You can see that something is not running as cleanly as it should, but not where the issue sits or how widely it is experienced across the organisation.",
+  },
+  {
+    number: "02",
+    title: "HR, managers, and leadership see different parts of the picture",
+    text: "Each group experiences processes, ownership, and support differently. Without bringing those views together, the full pattern remains unclear.",
+  },
+  {
+    number: "03",
+    title: "The issue needs to be separated from the noise",
+    text: "Variation across teams, systems, and ways of working makes it difficult to tell whether the problem is isolated or part of a broader operating pattern.",
+  },
+];
 
 const participantGroups = [
   {
     title: "HR",
-    text: "Input from HR helps build a structured view of how processes, ownership, service access, and operating discipline are intended to work, and how consistently they are being carried through in practice.",
+    text: "Shows how processes, ownership, and service delivery work day to day, including where things run smoothly and where workarounds are carrying too much.",
   },
   {
     title: "Managers",
-    text: "Manager input helps show how people processes are experienced day to day, where guidance is clear, where support is easy to access, and where delivery can be made more consistent.",
+    text: "Shows how HR processes are experienced in practice, where guidance is clear, where support is easy to access, and where delivery becomes harder to manage.",
   },
   {
     title: "Leadership",
-    text: "Leadership input adds a broader view of whether HR operations are supporting organisational execution effectively, where alignment is strong, and where greater clarity or consistency would support scale.",
+    text: "Shows whether HR operations are supporting execution effectively, where alignment is strong, and where greater clarity or consistency would strengthen performance.",
   },
 ];
 
-const revealPoints = [
-  "Where delivery is working well across roles",
-  "Where ownership would benefit from greater clarity",
-  "Where systems and manual activity are not yet working as cleanly together as they could",
-  "Where guidance and self-service can be strengthened",
-  "Where operational capacity may be shaping service experience",
-  "Where perspectives differ materially by role or level",
+const outputAreas = [
+  {
+    title: "Cross-role comparison",
+    text: "You can see how HR, managers, and leadership experience the same processes, and where those experiences begin to diverge.",
+  },
+  {
+    title: "Clear priorities",
+    text: "The assessment highlights where attention is most likely to improve consistency, service delivery, and day-to-day execution.",
+  },
+  {
+    title: "Decision-ready output",
+    text: "You receive a structured report with scored insight, narrative interpretation, and clear guidance on where to focus next.",
+  },
 ];
 
-const deliverables = [
-  "Cross-role scoring across core operational dimensions",
-  "A clear view of the areas that would benefit most from attention",
-  "Narrative insight across observation, implication, and next step",
-  "A client-ready diagnostic report",
-  "Practical priorities for where to focus first",
-  "A structured basis for deciding whether execution support is needed",
-];
+function RecognitionItem({
+  number,
+  title,
+  text,
+}: {
+  number: string;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="grid grid-cols-[4.25rem_1fr] gap-5 border-t border-slate-200 py-10 lg:grid-cols-[5.5rem_minmax(0,1fr)] lg:gap-8 lg:py-12">
+      <div className="pt-1">
+        <p className="text-[3rem] font-semibold leading-none tracking-[-0.04em] text-slate-300 lg:text-[4.5rem]">
+          {number}
+        </p>
+      </div>
 
-const flowSteps = [
-  {
-    title: "1. HR Health Check",
-    text: "A quick initial signal to indicate whether a deeper review would be valuable.",
-    href: "/diagnostic",
-    cta: "View the Health Check",
-    isCurrent: false,
-  },
-  {
-    title: "2. HR Operations Diagnostic Assessment",
-    text: "A deeper, structured diagnostic across leadership, managers, and HR.",
-    href: "/diagnostic-assessment",
-    cta: "You are here",
-    isCurrent: true,
-  },
-  {
-    title: "3. HR Foundations Sprint",
-    text: "A focused engagement to turn structured insight into practical improvements, where appropriate.",
-    href: "/services/hr-foundations-sprint",
-    cta: "View the Sprint",
-    isCurrent: false,
-  },
-];
+      <div className="max-w-2xl">
+        <h3 className="text-[1.35rem] font-semibold leading-[1.2] text-slate-950 lg:text-[1.55rem]">
+          {title}
+        </h3>
+
+        <p className="mt-3 text-base leading-8 text-slate-600">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function OutcomeStatement({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="border-t border-white/12 pt-6 lg:pt-8">
+      <h3 className="text-[1.25rem] font-semibold leading-[1.2] text-white lg:text-[1.45rem]">
+        {title}
+      </h3>
+
+      <p className="mt-3 max-w-md text-[0.98rem] leading-7 text-white/70">
+        {text}
+      </p>
+    </div>
+  );
+}
 
 export default function DiagnosticAssessmentPage() {
   return (
     <>
+      {/* HERO */}
       <section className="brand-hero">
-        <div className="brand-hero-content brand-container brand-section">
-          <div className="grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
-            <div className="brand-stack-md">
-              <div className="inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-[#8AAAC8]">
-                HR Operations Diagnostic Assessment
-              </div>
+        <div className="brand-container brand-hero-content brand-section">
+          <div className="brand-section-intro brand-stack-md">
+            <div className="brand-stack-sm">
+              <p className="brand-kicker">HR Operations Diagnostic Assessment</p>
 
-              <div className="brand-stack-sm">
-                <h1 className="brand-heading-xl max-w-4xl">
-                  HR Operations Diagnostic Assessment
-                </h1>
-
-                <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  A structured, multi-perspective diagnostic of how HR operates
-                  across your organisation.
-                </p>
-
-                <p className="brand-body-on-dark max-w-3xl text-lg leading-8 text-[#C7D8EA]">
-                  This goes beyond the Health Check and brings together
-                  structured input from leadership, managers, and HR to build a
-                  clearer view of how operations are experienced, where
-                  alignment is strong, where consistency varies, and where focus
-                  is likely to have the greatest value.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Link
-                  href="/contact"
-                  className="brand-button-primary px-6 py-3 text-base font-medium"
-                >
-                  Discuss the Diagnostic Assessment
-                </Link>
-                <a
-                  href="https://calendly.com/greg-vanesch/30min"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
-                >
-                  Book a Diagnostic Conversation
-                </a>
-              </div>
+              <h1 className="brand-heading-xl">
+                A structured diagnostic of how HR operates across the organisation.
+              </h1>
             </div>
 
-            <div className="brand-card-dark p-8 lg:p-9">
-              <div className="brand-stack-md">
-                <p className="brand-kicker">What it is designed to do</p>
+            <p className="brand-subheading brand-body-on-dark max-w-3xl">
+              The Health Check gives an initial signal. The Diagnostic Assessment builds a clearer view of how HR is operating across the organisation.
+            </p>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                  <h2 className="text-2xl font-semibold text-white">
-                    A deeper layer of operational clarity
-                  </h2>
-                  <p className="mt-4 text-base leading-7 text-slate-200">
-                    The assessment is designed to show how HR is experienced
-                    across the organisation, where delivery is already working
-                    well, and where greater clarity, consistency, or operational
-                    discipline would strengthen performance over time.
-                  </p>
-                </div>
+            <p className="max-w-3xl text-base leading-8 text-[#C7D8EA]">
+              It brings together structured input from HR, managers, and leadership to show where delivery is consistent, where it starts to vary, and where greater clarity or control would make the biggest difference.
+            </p>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
-                    This is not a general survey
-                  </p>
-                  <p className="mt-3 text-base leading-7 text-slate-200">
-                    It is a structured diagnostic designed to compare how HR
-                    operations are understood and experienced across leadership,
-                    managers, and HR.
-                  </p>
-                </div>
+            <div className="brand-actions">
+              <Link
+                href="/diagnostic"
+                className="brand-button-primary px-6 py-3 text-base font-medium"
+              >
+                Take the Health Check
+              </Link>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
-                    Best suited to
-                  </p>
-                  <p className="mt-3 text-base leading-7 text-slate-200">
-                    Organisations that want a more complete view than a quick
-                    signal can provide, and need stronger evidence to support
-                    priorities, sequencing, and next-step decisions.
-                  </p>
-                </div>
-              </div>
+              <Link
+                href={contactHref}
+                className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+              >
+                Start a conversation
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-white">
+      {/* SECTION A */}
+      <section className="brand-light-section">
         <div className="brand-container brand-section">
-          <div className="max-w-3xl brand-stack-sm">
-            <p className="brand-section-kicker">How this differs from the Health Check</p>
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">When this becomes useful</p>
+
             <h2 className="brand-heading-lg text-slate-950">
-              The Health Check gives you a signal. The Diagnostic Assessment
-              gives you a structured view.
+              You reach this point when the question is no longer whether there is a signal, but what it means.
             </h2>
-            <p className="brand-subheading text-slate-700">
-              The Health Check is designed as a quick entry point. The
-              Diagnostic Assessment goes further by combining multiple
-              perspectives to build a more grounded and decision-useful picture
-              of how HR operations are working across the organisation.
+
+            <p className="brand-body-lg">
+              The Diagnostic Assessment is used when a quick read is no longer enough. It helps you understand what is driving the pattern, how widely it is experienced, and where it is most important to focus.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            <div className="brand-surface-card p-8">
-              <div className="brand-stack-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  HR Health Check
-                </p>
-                <h3 className="brand-heading-md text-slate-950">
-                  A fast initial signal
-                </h3>
-                <p className="brand-body">
-                  A short 10-question assessment designed to indicate whether a
-                  wider operational review may be valuable and to open an
-                  informed conversation.
-                </p>
-              </div>
+          <div className="brand-section-body-xl">
+            <div className="border-b border-slate-200">
+              {recognitionItems.map((item) => (
+                <RecognitionItem
+                  key={item.number}
+                  number={item.number}
+                  title={item.title}
+                  text={item.text}
+                />
+              ))}
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="brand-surface-card p-8">
-              <div className="brand-stack-sm">
+      {/* SECTION B */}
+      <section className="brand-dark-section">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-kicker">How the assessment works</p>
+
+            <h2 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.04] tracking-[-0.035em] text-white lg:text-[3.45rem]">
+              A structured comparison across the roles that experience HR operations differently.
+            </h2>
+
+            <p className="max-w-3xl text-[1.05rem] leading-8 text-white/90">
+              The assessment is built around how HR operates day to day. It compares how processes, ownership, and service delivery are experienced across roles, rather than relying on a single view.
+            </p>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
+              {participantGroups.map((group) => (
+                <OutcomeStatement
+                  key={group.title}
+                  title={group.title}
+                  text={group.text}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION C */}
+      <section className="bg-white">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">What the output gives you</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              A clearer view of where to focus, and why.
+            </h2>
+
+            <p className="brand-body-lg">
+              The value is not just in a score. It is in understanding where delivery is working well, where it becomes inconsistent, and where clearer ownership or stronger process discipline would improve how HR operates.
+            </p>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="brand-rule-columns">
+              {outputAreas.map((item) => (
+                <div key={item.title} className="brand-rule-col">
+                  <h3 className="brand-heading-sm text-slate-950">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-4 brand-body">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* INVESTMENT */}
+      <section className="bg-[#F4F6FA]">
+        <div className="brand-container brand-section-tight">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">Investment</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              A defined diagnostic with a clear commercial shape.
+            </h2>
+
+            <p className="brand-body-lg">
+              This is a structured diagnostic step with a clear output. It provides enough depth to move from observation to decision, with a grounded view of what is working, what is not, and what to do next.
+            </p>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="brand-case-split">
+              <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Diagnostic Assessment
                 </p>
-                <h3 className="brand-heading-md text-slate-950">
-                  A deeper, cross-role diagnostic
-                </h3>
-                <p className="brand-body">
-                  A more structured piece of work that compares input across HR,
-                  managers, and leadership to clarify priorities, support
-                  decision-making, and identify where focused execution support
-                  may be useful.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container brand-section">
-          <div className="max-w-3xl brand-stack-sm">
-            <p className="brand-section-kicker">Who participates</p>
-            <h2 className="brand-heading-lg text-slate-950">
-              A rounded view depends on multiple perspectives.
-            </h2>
-            <p className="brand-subheading text-slate-700">
-              The assessment is designed to compare how HR operations are
-              experienced and interpreted across the organisation, rather than
-              relying on a single viewpoint.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {participantGroups.map((group) => (
-              <div key={group.title} className="brand-surface-card p-8">
-                <div className="brand-stack-sm">
-                  <h3 className="brand-heading-md text-slate-950">
-                    {group.title}
-                  </h3>
-                  <p className="brand-body">{group.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-[#F4F6FA]">
-        <div className="brand-container brand-section">
-          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-            <div className="brand-stack-sm">
-              <p className="brand-section-kicker">What it reveals</p>
-              <h2 className="brand-heading-lg text-slate-950">
-                A clearer view of where operations are working well and where
-                they would benefit from attention.
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                The value is not just in a score. It is in understanding where
-                experience differs across roles, where processes are interpreted
-                differently, and where greater consistency or clarity would have
-                the greatest effect.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {revealPoints.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-5 text-base leading-7 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container brand-section">
-          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-            <div className="brand-stack-sm">
-              <p className="brand-section-kicker">What clients receive</p>
-              <h2 className="brand-heading-lg text-slate-950">
-                Structured output, not generic commentary.
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                The assessment is designed to produce something practical. It
-                should help clarify priorities, support better conversations,
-                and create a more grounded basis for next-step decisions.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {deliverables.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5 text-base leading-7 text-slate-700"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="brand-container brand-section">
-          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-            <div className="brand-stack-sm">
-              <p className="brand-section-kicker">Value and decision support</p>
-              <h2 className="brand-heading-lg text-slate-950">
-                A structured piece of work with a clear output.
-              </h2>
-              <p className="brand-subheading text-slate-700">
-                The Diagnostic Assessment is designed as a serious diagnostic,
-                not a light-touch add-on. It creates a more complete view of how
-                HR operates and produces structured insight that can be used to
-                clarify priorities, support internal conversations, and decide
-                what should happen next.
-              </p>
-            </div>
-
-            <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-8">
-              <div className="brand-stack-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  HR Operations Diagnostic Assessment
-                </p>
-                <p className="text-3xl font-semibold tracking-tight text-slate-950">
+                <p className="mt-3 text-[2.5rem] font-semibold leading-none tracking-[-0.035em] text-slate-950">
                   £3,000 + VAT
                 </p>
-                <p className="text-base leading-7 text-slate-700">
-                  Fully credited against the HR Foundations Sprint if you
-                  proceed.
+
+                <p className="mt-5 brand-body">
+                  Fully credited against the HR Foundations Sprint if you proceed.
                 </p>
-                <p className="text-base leading-7 text-slate-700">
-                  This includes structured cross-role input, scored insight,
-                  narrative output, prioritised observations, and a client-ready
-                  diagnostic report.
-                </p>
+              </div>
+
+              <div>
+                <h3 className="brand-heading-sm text-slate-950">
+                  What this includes
+                </h3>
+
+                <div className="mt-5 brand-stack-sm">
+                  <p className="brand-body">
+                    Structured input across HR, managers, and leadership, covering how processes, ownership, and service delivery work in practice.
+                  </p>
+
+                  <p className="brand-body">
+                    Scored insight with narrative interpretation, highlighting where delivery is consistent and where it begins to break down.
+                  </p>
+
+                  <p className="brand-body">
+                    A client-ready report that supports clear decisions on priorities, sequencing, and next steps.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-[#F4F6FA]">
-        <div className="brand-container brand-section">
-          <div className="max-w-3xl brand-stack-sm">
-            <p className="brand-section-kicker">How it fits the broader model</p>
-            <h2 className="brand-heading-lg text-slate-950">
-              A structured path from signal to action.
-            </h2>
-            <p className="brand-subheading text-slate-700">
-              The Diagnostic Assessment sits between the initial Health Check
-              and a more focused execution engagement. It provides the deeper
-              clarity that helps determine what matters most and whether a
-              targeted sprint would add value.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {flowSteps.map((step) => (
-              <div
-                key={step.title}
-                className="brand-surface-card flex h-full flex-col p-8"
-              >
-                <div className="flex-1 brand-stack-sm">
-                  <h3 className="brand-heading-md text-slate-950">
-                    {step.title}
-                  </h3>
-                  <p className="brand-body">{step.text}</p>
-                </div>
-
-                <div className="pt-6">
-                  {step.isCurrent ? (
-                    <span className="inline-flex rounded-xl border border-slate-300 px-5 py-3 text-base font-medium text-slate-500">
-                      {step.cta}
-                    </span>
-                  ) : (
-                    <Link
-                      href={step.href}
-                      className="brand-button-dark px-5 py-3 text-base font-medium"
-                    >
-                      {step.cta}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="brand-dark-section">
-        <div className="brand-container brand-section">
+      {/* CTA */}
+      <section className="brand-dark-section-plain">
+        <div className="brand-container brand-section-tight">
           <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
+
                 <h2 className="brand-heading-lg">
-                  Need a more structured view of how HR operates across the
-                  organisation?
+                  Get a clearer view of how your HR model is running.
                 </h2>
+
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  The Diagnostic Assessment is designed for organisations that
-                  need more than a quick signal. It creates a more complete,
-                  multi-perspective view of current operations and helps clarify
-                  where focus is likely to create the greatest value.
+                  Start with the Health Check if you need an initial view, or move straight to a conversation if you are already looking for a more structured diagnostic.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Link
-                  href="/contact"
-                  className="brand-button-primary px-6 py-3 text-base font-medium"
-                >
-                  Discuss the Diagnostic Assessment
-                </Link>
-                <a
-                  href="https://calendly.com/greg-vanesch/30min"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
-                >
-                  Book a Diagnostic Conversation
-                </a>
+              <div className="brand-actions">
                 <Link
                   href="/diagnostic"
-                  className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                  className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Start with the Health Check
+                  Take the Health Check
+                </Link>
+
+                <Link
+                  href={contactHref}
+                  className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
+                >
+                  Start a conversation
                 </Link>
               </div>
             </div>

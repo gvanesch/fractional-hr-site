@@ -156,21 +156,20 @@ export default function GrowingCompaniesPage() {
               <p className="brand-kicker">Growing Companies & Mid-Market</p>
 
               <h1 className="brand-heading-xl">
-                HR foundations that support growth without unnecessary complexity.
+                When growth exposes the gaps in how HR actually runs.
               </h1>
             </div>
 
             <p className="brand-subheading brand-body-on-dark max-w-3xl">
-              Growing organisations often reach the point where informal
-              processes start to break down. Managers create their own
-              workarounds, onboarding varies, and HR becomes more
-              reactive than operational.
+              Early on, HR works because people make it work. As the organisation grows,
+              that stops holding. Managers create their own ways of doing things,
+              onboarding varies, and the same issues surface repeatedly.
             </p>
 
             <p className="max-w-3xl text-base leading-8 text-[#C7D8EA]">
-              What’s needed at that point is not more activity, but more
-              structure. Clearer ownership, stronger onboarding, and
-              processes that support the business as it grows.
+              The problem is not effort. It is that the model no longer produces consistent
+              outcomes. What’s needed at that point is clearer ownership, stronger
+              onboarding, and processes that actually hold under pressure.
             </p>
 
             <div className="brand-actions">
@@ -204,8 +203,9 @@ export default function GrowingCompaniesPage() {
 
             <p className="brand-body-lg">
               Growing organisations rarely set out to build inconsistent HR
-              operations. The model evolves around speed, pressure, and what
-              works at the time. Over time, that creates friction.
+              operations. The model evolves around speed and what works at the time.
+              Over time, that creates friction that slows hiring, increases manager
+              load, and makes delivery less predictable.
             </p>
           </div>
 
