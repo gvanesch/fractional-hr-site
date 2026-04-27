@@ -11,6 +11,22 @@ const HIDDEN_ROUTES = new Set([
     "/contact/diagnostic-interpretation",
 ]);
 
+function getScrollThreshold(pathname: string | null): number {
+    if (pathname === "/") {
+        return 2400;
+    }
+
+    if (pathname === "/services") {
+        return 1400;
+    }
+
+    if (pathname?.startsWith("/services/")) {
+        return 1200;
+    }
+
+    return 1000;
+}
+
 export default function FloatingCtaPrompt() {
     const pathname = usePathname();
     const [hasScrolledEnough, setHasScrolledEnough] = useState(false);
@@ -25,6 +41,11 @@ export default function FloatingCtaPrompt() {
         return HIDDEN_ROUTES.has(pathname);
     }, [pathname]);
 
+    const scrollThreshold = useMemo(
+        () => getScrollThreshold(pathname),
+        [pathname],
+    );
+
     useEffect(() => {
         setDismissed(false);
         setHasScrolledEnough(false);
@@ -38,7 +59,17 @@ export default function FloatingCtaPrompt() {
         }
 
         function handleScroll() {
-            setHasScrolledEnough(window.scrollY > 1000);
+            const scrollPosition = window.scrollY;
+            const viewportHeight = window.innerHeight;
+            const fullHeight = document.body.scrollHeight;
+
+            const scrollProgress = (scrollPosition + viewportHeight) / fullHeight;
+
+            if (pathname === "/") {
+                setHasScrolledEnough(scrollPosition > scrollThreshold);
+            } else {
+                setHasScrolledEnough(scrollProgress > 0.45);
+            }
         }
 
         handleScroll();
@@ -47,7 +78,7 @@ export default function FloatingCtaPrompt() {
         return () => {
             window.removeEventListener("scroll", handleScroll);
         };
-    }, [shouldHideForRoute]);
+    }, [shouldHideForRoute, scrollThreshold]);
 
     useEffect(() => {
         if (shouldHideForRoute) {
