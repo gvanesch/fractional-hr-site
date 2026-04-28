@@ -1,3 +1,4 @@
+import { logSystemEvent } from "@/lib/system-events";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
@@ -29,10 +30,7 @@ function escapeHtml(value: string): string {
 }
 
 function isValidEmail(email: string): boolean {
-    if (email.length > MAX_EMAIL_LENGTH) {
-        return false;
-    }
-
+    if (email.length > MAX_EMAIL_LENGTH) return false;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
@@ -60,9 +58,7 @@ function asDiagnosticAnswers(value: unknown): DiagnosticAnswers | null {
     for (const [key, rawValue] of Object.entries(value)) {
         const questionId = Number(key);
 
-        if (!Number.isInteger(questionId)) {
-            return null;
-        }
+        if (!Number.isInteger(questionId)) return null;
 
         if (
             rawValue === 1 ||
@@ -122,6 +118,7 @@ function buildClientEmailHtml(params: {
     return `
     <div style="font-family: Arial, Helvetica, sans-serif; background: #F8FAFC; padding: 32px;">
       <div style="max-width: 760px; margin: 0 auto; background: #FFFFFF; border-radius: 16px; padding: 32px; border: 1px solid #E2E8F0;">
+        
         <p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #1E6FD9;">
           Van Esch
         </p>
@@ -142,26 +139,49 @@ function buildClientEmailHtml(params: {
           </p>
         </div>
 
+        <h2 style="margin: 0 0 12px; font-size: 20px; color: #0A1628;">
+          What this suggests
+        </h2>
+
         <p style="margin: 0 0 24px; color: #334155; line-height: 1.8;">
           ${escapeHtml(overallAssessment)}
         </p>
+
+        <h2 style="margin: 0 0 12px; font-size: 20px; color: #0A1628;">
+          Where to focus first
+        </h2>
 
         <ul style="margin: 0 0 24px; padding-left: 20px;">
           ${focusAreasHtml}
         </ul>
 
-        <ul style="margin: 0 0 24px; padding-left: 20px;">
+        <h2 style="margin: 0 0 12px; font-size: 20px; color: #0A1628;">
+          What often becomes more visible over time
+        </h2>
+
+        <ul style="margin: 0 0 32px; padding-left: 20px;">
           ${nextNarrativesHtml}
         </ul>
 
-        <p style="margin: 0;">
+        <div style="margin: 0 0 16px;">
           <a
             href="${escapeHtml(interpretationUrl)}"
             style="display: inline-block; background: #1E6FD9; color: #FFFFFF; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 600;"
           >
             View your detailed interpretation
           </a>
-        </p>
+        </div>
+
+        <p style="margin: 0; color: #64748B; font-size: 14px; line-height: 1.6;">
+  This result is based on a short diagnostic and highlights patterns that are often worth exploring in more depth. 
+  <br /><br />
+  If you want a clearer view of how these themes are showing up across your organisation, you can explore the full diagnostic here:
+  <br />
+  <a href="https://vanesch.uk/diagnostic" style="color: #1E6FD9; text-decoration: none; font-weight: 500;">
+    Explore the Diagnostic Assessment
+  </a>
+</p>
+
       </div>
     </div>
   `;
@@ -174,7 +194,8 @@ export async function POST(request: Request) {
             email?: string;
         };
 
-        const token = typeof rawBody.token === "string" ? rawBody.token.trim() : "";
+        const token =
+            typeof rawBody.token === "string" ? rawBody.token.trim() : "";
 
         if (!token) {
             return jsonResponse({ ok: false, error: "Token is required." }, 400);
@@ -186,7 +207,7 @@ export async function POST(request: Request) {
 
         const { data, error } = await supabase
             .from("diagnostic_submissions")
-            .select("answers")
+            .select("submission_id, answers")
             .eq("public_token", token)
             .single();
 
@@ -194,10 +215,18 @@ export async function POST(request: Request) {
             return jsonResponse({ ok: false, error: "Result not found." }, 404);
         }
 
+        const submissionId =
+            typeof data.submission_id === "string"
+                ? data.submission_id
+                : undefined;
+
         const answers = asDiagnosticAnswers(data.answers);
 
         if (!answers) {
-            return jsonResponse({ ok: false, error: "Invalid diagnostic data." }, 500);
+            return jsonResponse(
+                { ok: false, error: "Invalid diagnostic data." },
+                500
+            );
         }
 
         const result = calculateDiagnosticResult(answers);
@@ -217,7 +246,7 @@ export async function POST(request: Request) {
 
         const requestUrl = new URL(request.url);
         const interpretationUrl = `${requestUrl.origin}/contact/diagnostic-interpretation?t=${encodeURIComponent(
-            token,
+            token
         )}`;
 
         const response = await fetch("https://api.resend.com/emails", {
@@ -244,27 +273,46 @@ export async function POST(request: Request) {
         });
 
         if (!response.ok) {
-            console.error("PUBLIC_HEALTH_CHECK_EMAIL_FAILED", {
-                token,
-                status: response.status,
+            await logSystemEvent({
+                eventType: "health_check_client_email",
+                status: "error",
+                submissionId,
+                publicToken: token,
+                source: "public-diagnostic-email",
+                metadata: { status: response.status },
             });
 
             return jsonResponse(
                 { ok: false, error: "Unable to send email." },
-                500,
+                500
             );
         }
 
-        console.log("PUBLIC_HEALTH_CHECK_EMAIL_SENT", {
-            token,
-            score: result.score,
-            band: result.band.label,
+        await logSystemEvent({
+            eventType: "health_check_client_email",
+            submissionId,
+            publicToken: token,
+            source: "public-diagnostic-email",
+            metadata: {
+                score: result.score,
+                band: result.band.label,
+            },
         });
 
         return jsonResponse({ ok: true });
     } catch (error) {
-        console.error("PUBLIC_HEALTH_CHECK_EMAIL_FAILED", {
-            error: error instanceof Error ? error.message : "Unknown error",
+        await logSystemEvent({
+            eventType: "health_check_client_email",
+            status: "error",
+            source: "public-diagnostic-email",
+            metadata: {
+                error: error instanceof Error ? error.message : "Unknown error",
+            },
         });
+
+        return jsonResponse(
+            { ok: false, error: "Unable to send result email." },
+            500
+        );
     }
 }

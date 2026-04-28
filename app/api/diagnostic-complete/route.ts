@@ -675,6 +675,18 @@ export async function POST(request: Request) {
       advisorUrl,
     });
 
+    await logSystemEvent({
+      eventType: "health_check_internal_email",
+      submissionId: completion.submissionId,
+      publicToken: completion.publicToken,
+      source: "health-check",
+      metadata: {
+        score,
+        band: band.label,
+        resendId: resendResponse.id ?? null,
+      },
+    });
+
     console.log("HEALTH_CHECK_INTERNAL_EMAIL_SENT", {
       submissionId: completion.submissionId,
       score,
@@ -705,6 +717,20 @@ export async function POST(request: Request) {
             | { error?: string; ok?: boolean }
             | null;
 
+          await logSystemEvent({
+            eventType: "health_check_client_email",
+            status: "error",
+            submissionId: completion.submissionId,
+            publicToken: completion.publicToken,
+            source: "health-check",
+            metadata: {
+              status: clientEmailResponse.status,
+              error:
+                clientEmailPayload?.error ||
+                `Request failed with status ${clientEmailResponse.status}`,
+            },
+          });
+
           console.error("HEALTH_CHECK_CLIENT_EMAIL_FAILED", {
             submissionId: completion.submissionId,
             status: clientEmailResponse.status,
@@ -713,11 +739,29 @@ export async function POST(request: Request) {
               `Request failed with status ${clientEmailResponse.status}`,
           });
         } else {
+          await logSystemEvent({
+            eventType: "health_check_client_email",
+            submissionId: completion.submissionId,
+            publicToken: completion.publicToken,
+            source: "health-check",
+          });
+
           console.log("HEALTH_CHECK_CLIENT_EMAIL_SENT", {
             submissionId: completion.submissionId,
           });
         }
       } catch (error) {
+        await logSystemEvent({
+          eventType: "health_check_client_email",
+          status: "error",
+          submissionId: completion.submissionId,
+          publicToken: completion.publicToken,
+          source: "health-check",
+          metadata: {
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
+        });
+
         console.error("HEALTH_CHECK_CLIENT_EMAIL_FAILED", {
           submissionId: completion.submissionId,
           error: error instanceof Error ? error.message : "Unknown error",
@@ -735,6 +779,15 @@ export async function POST(request: Request) {
       resendId: resendResponse.id ?? null,
     });
   } catch (error) {
+    await logSystemEvent({
+      eventType: "health_check_failure",
+      status: "error",
+      source: "health-check",
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+
     console.error("Diagnostic complete API error:", error);
 
     const isValidationError =
