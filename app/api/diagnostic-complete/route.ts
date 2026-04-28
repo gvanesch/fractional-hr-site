@@ -6,7 +6,9 @@ import {
   getDimensionScores,
   questions,
   scoreToBand,
+  type AdvisorBrief,
   type AnswerValue,
+  type DiagnosticResult,
 } from "../../../lib/diagnostic";
 
 type DiagnosticCompleteRequestBody = {
@@ -189,8 +191,11 @@ function buildContextHtml(params: {
     ${presentRows
       .map(
         (row, index) => `
-          <p style="margin: 0 0 ${index === presentRows.length - 1 ? "24px" : "8px"}; color: #334155;">
-            <strong>${escapeHtml(row.label)}:</strong> ${escapeHtml(row.value as string)}
+          <p style="margin: 0 0 ${index === presentRows.length - 1 ? "24px" : "8px"
+          }; color: #334155;">
+            <strong>${escapeHtml(row.label)}:</strong> ${escapeHtml(
+            row.value as string,
+          )}
           </p>
         `,
       )
@@ -223,7 +228,7 @@ function buildEmailHtml(params: {
     advisorUrl,
   } = params;
 
-  const result = {
+  const result: DiagnosticResult = {
     rawScore: calculateRawScore(answers),
     score,
     band: scoreToBand(score),
@@ -344,8 +349,8 @@ function buildEmailHtml(params: {
           </tbody>
         </table>
 
-                <div style="margin-top: 24px; padding: 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
-                    <p style="margin: 0 0 12px; color: #334155; line-height: 1.8;">
+        <div style="margin-top: 24px; padding: 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
+          <p style="margin: 0 0 12px; color: #334155; line-height: 1.8;">
             Use the advisor dashboard to review the full brief, prepare the call angle, and decide the most appropriate next step.
           </p>
 
@@ -417,6 +422,7 @@ function createPublicToken(): string {
 
 async function createCompletionSubmission(params: {
   answers: Record<number, AnswerValue | undefined>;
+  advisorBrief: AdvisorBrief;
   rawScore: number;
   score: number;
   bandLabel: string;
@@ -428,6 +434,7 @@ async function createCompletionSubmission(params: {
 }) {
   const {
     answers,
+    advisorBrief,
     rawScore,
     score,
     bandLabel,
@@ -468,6 +475,7 @@ async function createCompletionSubmission(params: {
     answers,
     score,
     band: bandLabel,
+    advisor_brief: advisorBrief,
     ...buildDimensionScoreColumns(dimensionScores),
   };
 
@@ -593,9 +601,23 @@ export async function POST(request: Request) {
     const rawScore = calculateRawScore(body.answers);
     const score = calculatePercentageScore(rawScore);
     const band = scoreToBand(score);
+    const dimensions = getDimensionScores(body.answers).sort(
+      (a, b) => a.score - b.score,
+    );
+
+    const result: DiagnosticResult = {
+      rawScore,
+      score,
+      band,
+      dimensions,
+      lowestDimensions: dimensions.slice(0, 3),
+    };
+
+    const advisorBrief = buildAdvisorBrief(result);
 
     const completion = await createCompletionSubmission({
       answers: body.answers,
+      advisorBrief,
       rawScore,
       score,
       bandLabel: band.label,
@@ -656,16 +678,6 @@ export async function POST(request: Request) {
         console.error("Client result email send failed:", error);
       }
     }
-
-    return jsonResponse({
-      ok: true,
-      submissionId: completion.submissionId,
-      publicToken: completion.publicToken,
-      completedAt: completion.completedAt,
-      score,
-      band: band.label,
-      resendId: resendResponse.id ?? null,
-    });
 
     return jsonResponse({
       ok: true,

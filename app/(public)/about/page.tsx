@@ -2,27 +2,27 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "About | Van Esch Advisory Ltd",
+  title: "About",
   description:
-    "Van Esch Advisory Ltd provides practical HR operations, service delivery, and transformation advisory for growing and complex organisations.",
+    "Van Esch Advisory provides practical HR operations, service delivery, and transformation advisory grounded in real operating experience.",
 };
 
 const experienceThemes = [
   {
-    title: "Global HR Operations & Shared Services",
-    text: "Experience leading and restructuring People Operations and shared services in complex international environments. This includes accountability across employee lifecycle operations, service delivery, and operational execution.",
+    title: "Global HR operations and shared services",
+    text: "Experience leading and improving People Operations and shared services in complex international environments. This includes employee lifecycle operations, service delivery, and day-to-day execution.",
   },
   {
-    title: "HR Transformation, Process & Governance",
-    text: "Hands-on work across HR operating models, process design, SOPs, controls, governance structures, ISO27001, SOC2, and statutory reporting. The focus is on creating clarity, consistency, and operational discipline that holds up as organisations scale.",
+    title: "HR transformation, process, and governance",
+    text: "Work across operating models, process design, controls, and governance. The focus is on creating clarity and consistency that holds under pressure.",
   },
   {
-    title: "HR Technology & Workflow Automation",
-    text: "Practical experience improving HR systems and reducing manual work through better workflow design. This includes ServiceNow, HR systems integration, process redesign, and making systems genuinely useful in day-to-day operations.",
+    title: "HR technology and workflow design",
+    text: "Improving HR systems and reducing manual work through better workflow design. This includes ServiceNow HR Service Delivery, system integration, and process redesign.",
   },
   {
-    title: "M&A, Integration & Organisational Change",
-    text: "Operational delivery through acquisitions, integration planning, TUPE-related change, and harmonisation of benefits and employment conditions. This includes aligning processes, policies, and structures across multiple entities and regions.",
+    title: "M&A and organisational integration",
+    text: "Operational delivery through acquisitions and integration. This includes due diligence, TUPE-related change, and aligning processes across entities and regions.",
   },
 ];
 
@@ -37,120 +37,128 @@ const credibility = [
 const organisationFit = [
   {
     title: "Growing organisations",
-    text: "Businesses that have reached the point where HR can no longer run informally. They now need stronger foundations, clearer ownership, and more consistent execution.",
+    text: "Where HR can no longer run informally and needs clearer ownership, structure, and consistency.",
   },
   {
-    title: "Complex organisations",
-    text: "Businesses dealing with international operations, shared services, multiple systems, or regulatory requirements. These environments need more deliberate operating structure.",
+    title: "Complex environments",
+    text: "Where shared services, systems, or global operations require more deliberate structure and control.",
   },
   {
     title: "Change moments",
-    text: "Organisations navigating growth, transformation, restructuring, or systems change. HR operations need to keep pace with how the business is evolving.",
+    text: "Where growth, transformation, or systems change requires HR operations to adapt quickly and cleanly.",
   },
 ];
 
+function ExperienceRow({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="border-t border-slate-200 py-8 lg:py-10">
+      <h3 className="text-[1.25rem] font-semibold leading-[1.25] text-slate-950 lg:text-[1.4rem]">
+        {title}
+      </h3>
+      <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+        {text}
+      </p>
+    </div>
+  );
+}
+
 export default function AboutPage() {
   return (
-    <main>
+    <>
+      {/* HERO */}
       <section className="brand-hero">
-        <div className="brand-hero-content brand-container brand-section">
-          <div className="max-w-5xl brand-stack-md">
+        <div className="brand-container brand-hero-content brand-section">
+          <div className="brand-section-intro brand-stack-md">
             <div className="brand-stack-sm">
-              <p className="brand-kicker">About Van Esch Advisory Ltd</p>
+              <p className="brand-kicker">About</p>
 
-              <h1 className="brand-heading-lg">
-                HR operations, designed to work, not just exist.
+              <h1 className="brand-heading-xl">
+                HR operations designed to work in practice.
               </h1>
-
-              <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                Practical HR Operations, Service Delivery, and Transformation
-                Advisory grounded in real operating experience.
-              </p>
-
-              <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                The focus is on making HR function more cleanly in practice,
-                through clearer processes, stronger ownership, and operating
-                models that hold up as organisations grow.
-              </p>
-
-              <p className="brand-body-on-dark max-w-3xl">
-                Most HR challenges are not isolated issues. They are symptoms of
-                how the function is structured and how work flows through the
-                organisation.
-              </p>
             </div>
 
-            <div className="flex flex-wrap gap-4 pt-2">
+            <p className="brand-subheading brand-body-on-dark max-w-3xl">
+              Van Esch Advisory focuses on making HR function more cleanly,
+              through clearer processes, stronger ownership, and operating
+              models that hold up as organisations grow.
+            </p>
+
+            <p className="max-w-3xl text-base leading-8 text-[#C7D8EA]">
+              Most HR challenges are not isolated issues. They are symptoms of
+              how work flows through the organisation.
+            </p>
+
+            <div className="brand-actions">
               <Link
-                href="/contact"
+                href="/diagnostic"
                 className="brand-button-primary px-6 py-3 text-base font-medium"
               >
-                Contact
+                Take the Health Check
               </Link>
 
               <Link
-                href="/diagnostic"
+                href="/contact"
                 className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
               >
-                Take the Health Check
+                Start a conversation
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="bg-white">
+      {/* WHAT THIS FIRM DOES */}
+      <section className="brand-light-section">
         <div className="brand-container brand-section">
-          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="brand-stack-sm">
-              <p className="brand-section-kicker">
-                What this firm is built to do
-              </p>
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">
+              What this firm is built to do
+            </p>
 
-              <h2 className="brand-heading-lg text-slate-950">
-                Turning HR complexity into clearer operating structure.
-              </h2>
+            <h2 className="brand-heading-lg text-slate-950">
+              Turning HR complexity into clearer operating structure.
+            </h2>
 
-              <p className="brand-subheading text-slate-700">
-                Many organisations do not need more HR theory. They need help
-                making the function work more cleanly in practice. This usually
-                shows up as inconsistent processes, unclear ownership, service
-                friction, and systems that do not fully support how the business
-                operates.
-              </p>
+            <p className="brand-body-lg">
+              Many organisations do not need more theory. They need help making
+              HR work more cleanly in practice.
+            </p>
+          </div>
 
-              <p className="brand-body">
-                Van Esch Advisory was built on a simple idea. HR improves when
-                its operations are designed deliberately, not allowed to evolve
-                by default.
-              </p>
-
-              <p className="brand-body">
-                The focus here is on solving those problems properly. That means
-                simplifying where needed, creating structure where it is
-                missing, and making sure the operating model holds up as the
-                organisation grows.
-              </p>
-            </div>
-
-            <div className="brand-surface-soft p-8">
-              <div className="brand-stack-sm">
-                <p className="brand-section-kicker">Core perspective</p>
-
-                <h3 className="brand-heading-md text-slate-950">
-                  Stronger HR usually starts with stronger operations.
+          <div className="brand-section-body-xl">
+            <div className="brand-rule-columns">
+              <div className="brand-rule-col">
+                <h3 className="brand-heading-sm text-slate-950">
+                  Clarify ownership
                 </h3>
-
-                <p className="brand-body">
-                  When HR becomes reactive, the issue is rarely effort alone. It
-                  is usually a lack of structure around how work flows through
-                  the organisation.
+                <p className="mt-4 brand-body">
+                  So HR work does not sit loosely across teams and decisions are
+                  made more consistently.
                 </p>
+              </div>
 
-                <p className="brand-body">
-                  Improving HR therefore starts with operating design. Once that
-                  is in place, consistency improves and pressure on the team
-                  reduces.
+              <div className="brand-rule-col">
+                <h3 className="brand-heading-sm text-slate-950">
+                  Strengthen processes
+                </h3>
+                <p className="mt-4 brand-body">
+                  So the basics hold under pressure rather than changing by team
+                  or urgency.
+                </p>
+              </div>
+
+              <div className="brand-rule-col">
+                <h3 className="brand-heading-sm text-slate-950">
+                  Improve service delivery
+                </h3>
+                <p className="mt-4 brand-body">
+                  So HR becomes more predictable, usable, and easier to operate.
                 </p>
               </div>
             </div>
@@ -158,188 +166,151 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white">
+      {/* EXPERIENCE */}
+      <section className="bg-white">
         <div className="brand-container brand-section">
-          <div className="max-w-3xl brand-stack-sm">
+          <div className="brand-section-intro-tight brand-stack-sm">
             <p className="brand-section-kicker">Relevant experience</p>
 
             <h2 className="brand-heading-lg text-slate-950">
               Experience that translates into practical advisory value.
             </h2>
 
-            <p className="brand-subheading text-slate-700">
-              The value of experience is not the title. It is the ability to
-              recognise patterns quickly and understand what will work in a real
-              operating environment.
+            <p className="brand-body-lg">
+              The value of experience is not the title. It is recognising
+              patterns quickly and understanding what will work in practice.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {experienceThemes.map((theme) => (
-              <div key={theme.title} className="brand-surface-card p-8">
-                <div className="brand-stack-sm">
-                  <h3 className="brand-heading-md text-slate-950">
-                    {theme.title}
-                  </h3>
-                  <p className="brand-body">{theme.text}</p>
-                </div>
-              </div>
+          <div className="brand-section-body-xl border-b border-slate-200">
+            {experienceThemes.map((item) => (
+              <ExperienceRow
+                key={item.title}
+                title={item.title}
+                text={item.text}
+              />
             ))}
           </div>
         </div>
       </section>
 
+      {/* FOUNDER */}
       <section className="bg-[#F4F6FA]">
         <div className="brand-container brand-section">
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
             <div className="brand-stack-sm">
-              <p className="brand-section-kicker">About the Founder</p>
+              <p className="brand-section-kicker">Founder</p>
 
               <h2 className="brand-heading-lg text-slate-950">
-                Built on operating experience, not advisory theory.
+                Built on operating experience.
               </h2>
 
-              <p className="brand-subheading text-slate-700">
+              <p className="brand-body">
                 Van Esch Advisory is led by Greg van Esch, an HR Operations and
-                Transformation leader with over 17 years of experience operating
-                inside complex organisations.
+                Transformation leader with over 17 years of experience.
               </p>
 
               <p className="brand-body">
-                His background is not in advisory alone, but in building,
-                running, and improving HR operations in practice. This includes
-                leading global People Operations and shared services
-                environments, delivering HR transformation programmes, and
-                designing operating models that hold up under real organisational
-                pressure.
+                His background is in building and running HR operations inside
+                complex organisations. This includes global People Operations,
+                shared services, HR transformation, and operational integration.
               </p>
 
               <p className="brand-body">
-                Much of this work has involved simplifying complexity, whether
-                through process redesign, service delivery improvement, or
-                better use of HR technology such as ServiceNow HR Service
-                Delivery and connected HR systems.
-              </p>
-
-              <p className="brand-body">
-                This experience shapes the approach taken at Van Esch Advisory.
-                The focus is not on theory or generic best practice, but on
+                The focus is not on theory or generic frameworks. It is on
                 creating operational clarity that works in the context of the
                 business.
               </p>
-
-              <div className="rounded-[1.5rem] border border-slate-200 bg-white px-6 py-5">
-                <p className="text-base font-semibold text-slate-950">
-                  The perspective throughout this work is simple:
-                </p>
-                <p className="mt-2 text-base leading-7 text-slate-700">
-                  HR improves when its operations are designed deliberately, not
-                  allowed to evolve by default.
-                </p>
-              </div>
-
-              
             </div>
 
-            <div className="brand-surface-card p-8">
-              <div className="brand-stack-sm">
-                <p className="brand-section-kicker">What clients should expect</p>
+            <div className="brand-stack-sm">
+              <p className="brand-section-kicker">
+                What clients should expect
+              </p>
 
-                <h3 className="brand-heading-md text-slate-950">
-                  Clear thinking, honest diagnosis, and usable outputs.
-                </h3>
+              <h3 className="brand-heading-md text-slate-950">
+                Clear thinking and usable outputs.
+              </h3>
 
-                <p className="brand-body">
-                  The work is intended to help organisations make better
-                  decisions and reduce operational friction. It does not rely on
-                  generic recommendations or abstract frameworks.
-                </p>
-
-                <p className="brand-body">
-                  The focus is on creating solutions that fit the reality of the
-                  business and can be implemented without unnecessary
-                  complexity.
-                </p>
-
-                <div className="mt-6 space-y-3 text-base text-slate-700">
-                  {credibility.map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-lg bg-slate-50 px-4 py-3"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
+              <div className="mt-6 space-y-3">
+                {credibility.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-lg bg-white px-4 py-3 text-base text-slate-700"
+                  >
+                    {item}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
+      {/* BEST FIT */}
       <section className="bg-white">
         <div className="brand-container brand-section">
-          <div className="max-w-3xl brand-stack-sm">
+          <div className="brand-section-intro-tight brand-stack-sm">
             <p className="brand-section-kicker">Best fit</p>
 
             <h2 className="brand-heading-lg text-slate-950">
-              The organisations this work is best suited to.
+              Where this work tends to add the most value.
             </h2>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {organisationFit.map((item) => (
-              <div key={item.title} className="brand-surface-card p-8">
-                <div className="brand-stack-sm">
-                  <h3 className="brand-heading-md text-slate-950">
+          <div className="brand-section-body-xl">
+            <div className="brand-rule-columns">
+              {organisationFit.map((item) => (
+                <div key={item.title} className="brand-rule-col">
+                  <h3 className="brand-heading-sm text-slate-950">
                     {item.title}
                   </h3>
-                  <p className="brand-body">{item.text}</p>
+
+                  <p className="mt-4 brand-body">{item.text}</p>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="brand-dark-section">
-        <div className="brand-container brand-section">
+      {/* CTA */}
+      <section className="brand-dark-section-plain">
+        <div className="brand-container brand-section-tight">
           <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
             <div className="brand-stack-md">
               <div className="brand-stack-sm">
                 <p className="brand-kicker">Next step</p>
 
                 <h2 className="brand-heading-lg">
-                  If HR operations need to become clearer, more consistent, or
-                  more scalable, the next step is straightforward.
+                  Get a clearer view of how your HR model is running.
                 </h2>
 
                 <p className="brand-subheading brand-body-on-dark max-w-3xl">
-                  You can take the HR Health Check for an immediate
-                  self-assessment, or start with a short conversation about your
-                  current challenges.
+                  Use the Health Check for an initial read, or start a
+                  conversation if the situation is already clear.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
+              <div className="brand-actions">
                 <Link
-                  href="/contact"
+                  href="/diagnostic"
                   className="brand-button-primary px-6 py-3 text-base font-medium"
                 >
-                  Contact
+                  Take the Health Check
                 </Link>
 
                 <Link
-                  href="/diagnostic"
+                  href="/contact"
                   className="brand-button-secondary-dark px-6 py-3 text-base font-medium"
                 >
-                  Take the Health Check
+                  Start a conversation
                 </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
-    </main>
+    </>
   );
 }

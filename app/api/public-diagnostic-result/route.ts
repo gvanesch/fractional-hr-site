@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
-    buildAdvisorBrief,
+    buildPublicDiagnosticInterpretation,
     calculateDiagnosticResult,
     type DiagnosticAnswers,
 } from "@/lib/diagnostic";
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         }
 
         const result = calculateDiagnosticResult(answers);
-        const brief = buildAdvisorBrief(result);
+        const interpretation = buildPublicDiagnosticInterpretation(result);
 
         return jsonResponse({
             ok: true,
@@ -84,11 +84,7 @@ export async function GET(request: Request) {
                 role: data.role ?? null,
                 emailPresent: Boolean(data.email),
             },
-            interpretation: {
-                overallAssessment: brief.overallAssessment,
-                focusAreas: brief.suggestedFocusAreas,
-                whatTypicallyHappensNext: brief.whatTypicallyHappensNext,
-            },
+            interpretation,
         });
     } catch (error) {
         console.error("public-diagnostic-result error", error);

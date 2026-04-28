@@ -831,7 +831,25 @@ export function buildAdvisorBrief(result: DiagnosticResult): AdvisorBrief {
     callObjective,
   };
 }
+export type PublicDiagnosticInterpretation = {
+  overallAssessment: string;
+  focusAreas: string[];
+  whatTypicallyHappensNext: string[];
+};
 
+export function buildPublicDiagnosticInterpretation(
+  result: DiagnosticResult,
+): PublicDiagnosticInterpretation {
+  const weakestLabels = result.lowestDimensions.map((dimension) => dimension.label);
+
+  return {
+    overallAssessment: buildOverallAssessment(result),
+    focusAreas: getSuggestedFocusAreas(weakestLabels),
+    whatTypicallyHappensNext: dedupe(
+      weakestLabels.map(getTypicalNextNarrative),
+    ),
+  };
+}
 export function buildDiagnosticState(
   answers: DiagnosticAnswers,
 ): SavedDiagnosticState {
