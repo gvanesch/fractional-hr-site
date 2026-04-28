@@ -244,19 +244,27 @@ export async function POST(request: Request) {
         });
 
         if (!response.ok) {
+            console.error("PUBLIC_HEALTH_CHECK_EMAIL_FAILED", {
+                token,
+                status: response.status,
+            });
+
             return jsonResponse(
                 { ok: false, error: "Unable to send email." },
                 500,
             );
         }
 
+        console.log("PUBLIC_HEALTH_CHECK_EMAIL_SENT", {
+            token,
+            score: result.score,
+            band: result.band.label,
+        });
+
         return jsonResponse({ ok: true });
     } catch (error) {
-        console.error("Public diagnostic email API error:", error);
-
-        return jsonResponse(
-            { ok: false, error: "Unable to send result email." },
-            500,
-        );
+        console.error("PUBLIC_HEALTH_CHECK_EMAIL_FAILED", {
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
 }

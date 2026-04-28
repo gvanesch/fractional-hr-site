@@ -524,10 +524,10 @@ function buildEmailHtml(params: {
         </p>
         <p style="margin: 0; color: #334155; line-height: 1.7;">
           ${escapeHtml(
-            advisorBrief.executiveReadout ||
-              advisorBrief.overallAssessment ||
-              "The diagnostic suggests there are identifiable HR operational themes worth exploring in more depth.",
-          )}
+      advisorBrief.executiveReadout ||
+      advisorBrief.overallAssessment ||
+      "The diagnostic suggests there are identifiable HR operational themes worth exploring in more depth.",
+    )}
         </p>
       </div>
 
@@ -552,18 +552,17 @@ function buildEmailHtml(params: {
 
       <p style="margin: 0 0 8px; color: #334155;">
         <strong>Headline:</strong> ${escapeHtml(
-          advisorBrief.headline || "Not available",
-        )}
+      advisorBrief.headline || "Not available",
+    )}
       </p>
       <p style="margin: 0 0 20px; color: #334155; line-height: 1.7;">
         ${escapeHtml(
-          advisorBrief.overallAssessment || "No overall assessment available.",
-        )}
+      advisorBrief.overallAssessment || "No overall assessment available.",
+    )}
       </p>
 
-      ${
-        advisorBrief.recommendedCallAngle
-          ? `
+      ${advisorBrief.recommendedCallAngle
+        ? `
             <div style="margin: 0 0 24px; padding: 18px 20px; border-radius: 14px; background: #F8FAFC; border: 1px solid #E2E8F0;">
               <p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #64748B;">
                 Recommended call angle
@@ -573,12 +572,11 @@ function buildEmailHtml(params: {
               </p>
             </div>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.callOpening
-          ? `
+      ${advisorBrief.callOpening
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Suggested call opening
             </h4>
@@ -586,12 +584,11 @@ function buildEmailHtml(params: {
               ${escapeHtml(advisorBrief.callOpening)}
             </p>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.conversationFlow?.length
-          ? `
+      ${advisorBrief.conversationFlow?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Conversation flow
             </h4>
@@ -599,12 +596,11 @@ function buildEmailHtml(params: {
               ${conversationFlowHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.conversionPositioning?.length
-          ? `
+      ${advisorBrief.conversionPositioning?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Positioning into next step
             </h4>
@@ -612,12 +608,11 @@ function buildEmailHtml(params: {
               ${conversionPositioningHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.keyThemes?.length
-          ? `
+      ${advisorBrief.keyThemes?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Key themes
             </h4>
@@ -625,12 +620,11 @@ function buildEmailHtml(params: {
               ${keyThemesHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.likelyFrictionPoints?.length
-          ? `
+      ${advisorBrief.likelyFrictionPoints?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Likely operational friction
             </h4>
@@ -638,12 +632,11 @@ function buildEmailHtml(params: {
               ${frictionPointsHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.businessImplications?.length
-          ? `
+      ${advisorBrief.businessImplications?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Business implications
             </h4>
@@ -651,12 +644,11 @@ function buildEmailHtml(params: {
               ${businessImplicationsHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.likelyOperationalRisks?.length
-          ? `
+      ${advisorBrief.likelyOperationalRisks?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Likely operational risks
             </h4>
@@ -664,12 +656,11 @@ function buildEmailHtml(params: {
               ${risksHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.whatTypicallyHappensNext?.length
-          ? `
+      ${advisorBrief.whatTypicallyHappensNext?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               What typically happens next
             </h4>
@@ -677,12 +668,11 @@ function buildEmailHtml(params: {
               ${whatNextHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.first30DayPriorities?.length
-          ? `
+      ${advisorBrief.first30DayPriorities?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               First 30-day priorities
             </h4>
@@ -690,12 +680,11 @@ function buildEmailHtml(params: {
               ${first30DayHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.discussionPrompts?.length
-          ? `
+      ${advisorBrief.discussionPrompts?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Suggested discussion prompts
             </h4>
@@ -703,12 +692,11 @@ function buildEmailHtml(params: {
               ${promptsHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
-      ${
-        advisorBrief.suggestedFocusAreas?.length
-          ? `
+      ${advisorBrief.suggestedFocusAreas?.length
+        ? `
             <h4 style="margin: 20px 0 10px; font-size: 16px; color: #0A1628;">
               Suggested focus areas
             </h4>
@@ -716,7 +704,7 @@ function buildEmailHtml(params: {
               ${focusAreasHtml}
             </ul>
           `
-          : ""
+        : ""
       }
 
       <div style="margin: 28px 0 0;">
@@ -867,16 +855,16 @@ export async function POST(request: Request) {
 
     const submissionId = body.submissionId
       ? await updateExistingLeadSubmission({
-          submissionId: body.submissionId,
-          body,
-          result,
-          advisorBrief,
-        })
+        submissionId: body.submissionId,
+        body,
+        result,
+        advisorBrief,
+      })
       : await createLeadSubmission({
-          body,
-          result,
-          advisorBrief,
-        });
+        body,
+        result,
+        advisorBrief,
+      });
 
     await upsertProspect({
       submissionId,
@@ -893,6 +881,13 @@ export async function POST(request: Request) {
       advisorBrief,
     });
 
+    console.log("CONTACT_ENQUIRY_EMAIL_SENT", {
+      submissionId,
+      source: body.source || "website",
+      hasDiagnostic: Boolean(result),
+      resendId: resendResponse.id ?? null,
+    });
+
     return jsonResponse({
       ok: true,
       submissionId,
@@ -902,7 +897,9 @@ export async function POST(request: Request) {
         "Thanks, your enquiry has been sent. We will come back to you shortly.",
     });
   } catch (error) {
-    console.error("Contact API error:", error);
+    console.error("CONTACT_ENQUIRY_FAILED", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
 
     const isValidationError =
       error instanceof Error &&

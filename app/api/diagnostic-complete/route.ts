@@ -645,6 +645,13 @@ export async function POST(request: Request) {
       advisorUrl,
     });
 
+    console.log("HEALTH_CHECK_INTERNAL_EMAIL_SENT", {
+      submissionId: completion.submissionId,
+      score,
+      band: band.label,
+      resendId: resendResponse.id ?? null,
+    });
+
     if (body.email) {
       try {
         const clientEmailResponse = await fetch(
@@ -668,14 +675,23 @@ export async function POST(request: Request) {
             | { error?: string; ok?: boolean }
             | null;
 
-          console.error(
-            "Client result email send failed:",
-            clientEmailPayload?.error ||
-            `Request failed with status ${clientEmailResponse.status}`,
-          );
+          console.error("HEALTH_CHECK_CLIENT_EMAIL_FAILED", {
+            submissionId: completion.submissionId,
+            status: clientEmailResponse.status,
+            error:
+              clientEmailPayload?.error ||
+              `Request failed with status ${clientEmailResponse.status}`,
+          });
+        } else {
+          console.log("HEALTH_CHECK_CLIENT_EMAIL_SENT", {
+            submissionId: completion.submissionId,
+          });
         }
       } catch (error) {
-        console.error("Client result email send failed:", error);
+        console.error("HEALTH_CHECK_CLIENT_EMAIL_FAILED", {
+          submissionId: completion.submissionId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
     }
 
