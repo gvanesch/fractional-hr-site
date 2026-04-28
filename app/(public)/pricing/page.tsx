@@ -2,449 +2,334 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Pricing | Greg van Esch",
+  title: "Pricing",
   description:
-    "Clear starting points for improving HR operations, including the HR Operations Diagnostic Assessment, the HR Foundations Sprint, and follow-on advisory support.",
+    "Clear pricing aligned to how HR operations work typically progresses, from initial signal to structured diagnostic and focused improvement.",
 };
-
-const sprintIncludes = [
-  "HR Operations Diagnostic Assessment",
-  "Leadership and HR stakeholder discussions",
-  "Focused analysis of priority process areas and operational friction",
-  "Targeted process mapping and optimisation in the areas that matter most",
-  "Prioritisation and practical design decisions",
-  "Development of a sequenced improvement roadmap",
-];
-
-const sprintDeliverables = [
-  "Scored diagnostic output across key dimensions",
-  "Priority process analysis and mapping",
-  "Operational friction analysis",
-  "Prioritised improvement areas",
-  "HR Foundations roadmap",
-  "Executive recommendations presentation",
-];
-
-const diagnosticAssessmentIncludes = [
-  "Multi-perspective input across HR, managers, and leadership",
-  "Scored output across core operational dimensions",
-  "Identification of alignment gaps and weakest areas",
-  "Narrative insight across observation, implication, and next step",
-  "A structured report to clarify what should be prioritised first",
-];
-
-const followOnWork = [
-  "HR service delivery design",
-  "Onboarding, offboarding and lifecycle process redesign",
-  "HR knowledge management structures",
-  "HR technology optimisation",
-];
-
-const advisoryAreas = [
-  "Operational governance",
-  "HR technology optimisation",
-  "Service delivery improvement",
-  "Leadership guidance",
-];
 
 export default function PricingPage() {
   return (
     <>
+      {/* HERO */}
       <section className="brand-hero">
-        <div className="brand-hero-content mx-auto max-w-7xl px-6 py-20 lg:py-24">
-          <div className="max-w-4xl">
-            <p className="brand-kicker">Pricing</p>
-            <h1 className="brand-heading-xl mt-3">
-              Clear starting points for improving HR operations.
-            </h1>
-            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              The model is designed as a structured path: begin with the HR
-              Operations Health Check, move into the HR Operations Diagnostic
-              Assessment when deeper clarity is needed, and use the HR
-              Foundations Sprint to act on that insight.
+        <div className="brand-container brand-hero-content brand-section">
+          <div className="brand-section-intro brand-stack-md">
+            <div className="brand-stack-sm">
+              <p className="brand-kicker">Pricing</p>
+
+              <h1 className="brand-heading-xl">
+                Clear pricing aligned to how the work actually progresses.
+              </h1>
+            </div>
+
+            <p className="brand-subheading brand-body-on-dark max-w-3xl">
+              Most organisations start with a signal or a diagnostic. Then move
+              into focused improvement once the priorities are clear.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/diagnostic-assessment"
-                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-              >
-                View Diagnostic Assessment
-              </Link>
-              <Link
-                href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium text-white transition hover:bg-white/10"
-              >
-                View the HR Foundations Sprint
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="brand-light-section">
-        <div className="mx-auto max-w-7xl px-6 py-20">
-          <div className="space-y-8">
-            <div className="brand-surface rounded-[2rem] p-8 lg:p-10">
-              <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">
-                    HR Operations Diagnostic Assessment
-                  </p>
-                  <h2 className="brand-heading-lg text-slate-950">
-                    Structured diagnostic insight before focused action
-                  </h2>
-                  <p className="brand-subheading text-slate-700">
-                    A structured, multi-perspective diagnostic of how HR
-                    actually operates across your organisation.
-                  </p>
-
-                  <div className="grid gap-4 pt-2 sm:grid-cols-2">
-                    <div className="brand-surface-soft rounded-2xl p-5">
-                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Investment
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                        £3,000 + VAT
-                      </p>
-                    </div>
-
-                    <div className="brand-surface-soft rounded-2xl p-5">
-                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Position in the journey
-                      </p>
-                      <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
-                        Step 2
-                      </p>
-                      <p className="mt-2 text-base leading-7 text-slate-700">
-                        Follows the Health Check and can lead into the Sprint.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">What clients receive</p>
-                  <div className="grid gap-3 pt-2">
-                    {diagnosticAssessmentIncludes.map((item) => (
-                      <div
-                        key={item}
-                        className="rounded-lg bg-slate-50 px-4 py-3 text-base text-slate-700"
-                      >
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-10">
-                <div className="brand-body brand-body-lg space-y-4 text-slate-700">
-                  <p>
-                    This is designed for organisations that need more than a
-                    quick signal, but are not yet ready to move straight into
-                    implementation support.
-                  </p>
-                  <p>
-                    It provides structured insight into where operational
-                    friction is building, where experience differs by role, and
-                    where the greatest operational value is likely to come from
-                    focused follow-up.
-                  </p>
-                  <p>
-                    The assessment is fully credited against the HR Foundations
-                    Sprint if that becomes the right next step.
-                  </p>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-4">
-                  <Link
-                    href="/diagnostic-assessment"
-                    className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    View Diagnostic Assessment
-                  </Link>
-                  <Link
-                    href="/contact"
-                    className="brand-button-dark rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    Discuss the Assessment
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div className="brand-surface rounded-[2rem] p-8 lg:p-10">
-              <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">HR Foundations Sprint</p>
-                  <h2 className="brand-heading-lg text-slate-950">
-                    Focused execution support for organisations improving HR
-                    operations
-                  </h2>
-                  <p className="brand-subheading text-slate-700">
-                    A focused four-week engagement to turn structured diagnostic
-                    insight into clear priorities, practical design decisions,
-                    and a sequenced roadmap.
-                  </p>
-
-                  <div className="grid gap-4 pt-2 sm:grid-cols-2">
-                    <div className="brand-surface-soft rounded-2xl p-5">
-                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Standard investment
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                        £11,500 + VAT
-                      </p>
-                      <p className="mt-2 text-base leading-7 text-slate-700">
-                        For organisations up to 120 employees.
-                      </p>
-                    </div>
-
-                    <div className="brand-surface-soft rounded-2xl p-5">
-                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Duration
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                        4 weeks
-                      </p>
-                      <p className="mt-2 text-base leading-7 text-slate-700">
-                        Larger or more complex organisations are quoted
-                        separately.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Included value
-                    </p>
-                    <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
-                      Includes HR Operations Diagnostic Assessment, typically
-                      valued at £3,000
-                    </p>
-                    <p className="mt-3 text-base leading-7 text-slate-700">
-                      Total engagement value: £14,500. The Diagnostic
-                      Assessment is included within the Sprint and credited in
-                      full when the Sprint is the chosen next step.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-8">
-                  <div>
-                    <p className="brand-section-kicker">
-                      What the Sprint includes
-                    </p>
-                    <div className="mt-6 grid gap-3">
-                      {sprintIncludes.map((item) => (
-                        <div
-                          key={item}
-                          className="rounded-lg bg-slate-50 px-4 py-3 text-base text-slate-700"
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="brand-section-kicker">Deliverables</p>
-                    <div className="mt-6 grid gap-3 md:grid-cols-2">
-                      {sprintDeliverables.map((item) => (
-                        <div
-                          key={item}
-                          className="rounded-lg bg-slate-50 px-4 py-3 text-base text-slate-700"
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-10">
-                <div className="brand-body brand-body-lg space-y-4 text-slate-700">
-                  <p>
-                    The Sprint is designed for organisations where HR processes
-                    have evolved organically and are starting to feel
-                    inconsistent, reactive, or harder to scale.
-                  </p>
-                  <p>
-                    It is not open-ended discovery. It is a structured,
-                    diagnostic-informed engagement that uses the HR Operations
-                    Diagnostic Assessment to focus effort on the areas creating
-                    the most operational drag.
-                  </p>
-                  <p>
-                    That often includes unclear ownership, inconsistent manager
-                    practice, fragmented service delivery, weak handoffs, manual
-                    workarounds, or process gaps that are making day-to-day
-                    execution harder than it should be.
-                  </p>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-4">
-                  <Link
-                    href="/services/hr-foundations-sprint"
-                    className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    View the HR Foundations Sprint
-                  </Link>
-                  <Link
-                    href="/diagnostic-assessment"
-                    className="brand-button-dark rounded-xl px-6 py-3 text-base font-medium"
-                  >
-                    View Diagnostic Assessment
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div className="brand-surface-soft rounded-[1.75rem] p-8">
-              <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
-                <div className="brand-stack-sm">
-                  <p className="brand-section-kicker">
-                    Start with the lighter first step
-                  </p>
-                  <h3 className="brand-heading-md text-slate-950">
-                    HR Operations Health Check
-                  </h3>
-                </div>
-
-                <div className="brand-body space-y-4">
-                  <p>
-                    If you are still trying to identify whether the issue is
-                    isolated friction or a wider operational pattern, the
-                    Health Check is the simplest place to start.
-                  </p>
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
-                      A quick self-assessment across 10 questions
-                    </div>
-                    <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
-                      An immediate score and result band
-                    </div>
-                    <div className="rounded-lg bg-white px-4 py-3 text-base text-slate-700">
-                      A practical first read on where operational strain may be
-                      building
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <Link
-                      href="/diagnostic"
-                      className="brand-button-primary inline-flex rounded-xl px-5 py-3 text-base font-medium"
-                    >
-                      Take the Health Check
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-2">
-              <div className="brand-surface-soft h-full rounded-[1.75rem] p-8">
-                <p className="brand-section-kicker">
-                  What happens after the Sprint?
-                </p>
-                <h3 className="brand-heading-md mt-3 text-slate-950">
-                  Follow-on implementation support
-                </h3>
-                <div className="brand-body mt-4 space-y-4">
-                  <p>
-                    Following the Sprint, organisations typically either
-                    implement improvements internally or continue with targeted
-                    support to implement specific operational improvements.
-                  </p>
-                  <p>Common areas of follow-on work include:</p>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {followOnWork.map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-lg bg-white px-4 py-3 text-base text-slate-700"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-
-                <p className="brand-body mt-5">
-                  These engagements are scoped individually depending on the
-                  organisation and the areas being addressed.
-                </p>
-              </div>
-
-              <div className="brand-surface-soft h-full rounded-[1.75rem] p-8">
-                <p className="brand-section-kicker">Ongoing advisory support</p>
-                <h3 className="brand-heading-md mt-3 text-slate-950">
-                  Ongoing support while HR operations improve
-                </h3>
-                <div className="brand-body mt-4 space-y-4">
-                  <p>
-                    Some organisations also choose to retain ongoing advisory
-                    support while improving their HR operational infrastructure.
-                  </p>
-                  <p>This can include:</p>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {advisoryAreas.map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-lg bg-white px-4 py-3 text-base text-slate-700"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-
-                <p className="brand-body mt-5">
-                  Advisory engagements are typically structured on a monthly
-                  basis and scoped based on the organisation&apos;s needs.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="brand-dark-section py-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="brand-card-dark max-w-4xl rounded-[2rem] p-10 shadow-2xl shadow-black/20">
-            <p className="brand-kicker">Start with the right level of clarity</p>
-            <h2 className="brand-heading-lg mt-3">
-              There are three sensible ways to begin.
-            </h2>
-            <p className="brand-subheading brand-body-on-dark mt-4 max-w-3xl">
-              You can start with the HR Operations Health Check, move into the
-              HR Operations Diagnostic Assessment for deeper clarity, or discuss
-              whether the HR Foundations Sprint is the right next step for your
-              organisation.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/diagnostic"
-                className="brand-button-primary rounded-xl px-6 py-3 text-base font-medium"
-              >
+            <div className="brand-actions">
+              <Link href="/diagnostic" className="brand-button-primary">
                 Take the Health Check
               </Link>
+
+              <Link href="/contact" className="brand-button-secondary-dark">
+                Start a conversation
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PATHWAY */}
+      <section className="brand-light-section">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">How the work is structured</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              A clear path from signal to action.
+            </h2>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="border-b border-slate-200">
+              {[
+                {
+                  number: "01",
+                  title: "Initial signal",
+                  text: "A quick read of where operational strain may be building.",
+                },
+                {
+                  number: "02",
+                  title: "Structured diagnostic",
+                  text: "A cross-role view of how HR operates in practice.",
+                },
+                {
+                  number: "03",
+                  title: "Focused improvement",
+                  text: "Targeted work on the areas that will make the biggest difference.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.number}
+                  className="grid grid-cols-[4.25rem_1fr] gap-5 border-t border-slate-200 py-10 lg:grid-cols-[5.5rem_minmax(0,1fr)] lg:gap-8 lg:py-12"
+                >
+                  <div className="pt-1">
+                    <p className="text-[3rem] font-semibold leading-none tracking-[-0.04em] text-slate-300 lg:text-[4.5rem]">
+                      {item.number}
+                    </p>
+                  </div>
+
+                  <div className="max-w-2xl">
+                    <h3 className="text-[1.35rem] font-semibold leading-[1.2] text-slate-950 lg:text-[1.55rem]">
+                      {item.title}
+                    </h3>
+
+                    <p className="mt-3 text-base leading-8 text-slate-600">
+                      {item.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HEALTH CHECK */}
+      <section className="bg-white">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">Initial signal</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              HR Operations Health Check
+            </h2>
+
+            <p className="brand-body-lg max-w-3xl">
+              A structured self-assessment of how HR operations are working
+              across your organisation. It takes around three minutes and
+              produces an immediate view of where operational strain may be
+              building.
+            </p>
+
+            <p className="brand-body max-w-3xl">
+              This is the simplest place to start if you want to understand
+              whether the issue looks isolated or part of a broader operating
+              pattern.
+            </p>
+          </div>
+
+          <div className="mt-8">
+            <Link href="/diagnostic" className="brand-button-primary">
+              Take the Health Check
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* DIAGNOSTIC */}
+      <section className="brand-dark-section">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-kicker">Structured diagnostic</p>
+
+            <h2 className="brand-heading-lg max-w-3xl">
+              HR Operations Diagnostic Assessment
+            </h2>
+
+            <p className="brand-body-on-dark max-w-3xl">
+              Used when a quick signal is not enough and a clearer cross-role
+              view is needed before acting.
+            </p>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="brand-case-split">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/60">
+                  Investment
+                </p>
+
+                <p className="mt-3 text-[2.75rem] font-semibold tracking-[-0.035em] text-white">
+                  £3,000 + VAT
+                </p>
+
+                <p className="mt-5 text-base leading-8 text-white/70">
+                  Fully credited against the HR Foundations Sprint if you
+                  proceed.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-[1.2rem] font-semibold text-white">
+                  What this gives you
+                </h3>
+
+                <div className="mt-5 space-y-3 text-white/70">
+                  <p>
+                    Structured input gathered across HR, managers, and
+                    leadership.
+                  </p>
+                  <p>
+                    A scored view of where delivery is consistent and where it
+                    is not.
+                  </p>
+                  <p>
+                    Clear identification of the highest-impact areas to address
+                    first.
+                  </p>
+                  <p>
+                    A report the leadership team can use to make decisions and
+                    allocate focus.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10">
+            <div className="brand-actions">
               <Link
                 href="/diagnostic-assessment"
-                className="brand-button-secondary-dark rounded-xl px-6 py-3 text-base font-medium"
+                className="brand-button-primary"
               >
                 View Diagnostic Assessment
               </Link>
+
+              <Link href="/contact" className="brand-button-secondary-dark">
+                Start a conversation
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SPRINT */}
+      <section className="bg-[#F4F6FA]">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">Focused improvement</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              HR Foundations Sprint
+            </h2>
+
+            <p className="brand-body-lg max-w-3xl">
+              A defined engagement, typically run over four weeks, that turns
+              diagnostic insight into practical improvement.
+            </p>
+
+            <p className="brand-body max-w-3xl">
+              The work focuses directly on the areas identified through the
+              diagnostic. The output is practical change that can be implemented
+              and sustained, not a set of recommendations to act on later.
+            </p>
+          </div>
+
+          <div className="brand-section-body-xl">
+            <div className="brand-case-split">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Standard investment
+                </p>
+
+                <p className="mt-3 text-[2.75rem] font-semibold tracking-[-0.035em] text-slate-950">
+                  £11,500 + VAT
+                </p>
+
+                <p className="mt-5 text-base leading-8 text-slate-600">
+                  Includes the Diagnostic Assessment, typically valued at
+                  £3,000.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-[1.2rem] font-semibold text-slate-950">
+                  What this focuses on
+                </h3>
+
+                <div className="mt-5 space-y-3 text-slate-600">
+                  <p>Clarifying ownership and decision points.</p>
+                  <p>Strengthening process consistency across teams.</p>
+                  <p>Reducing manual workarounds and operational friction.</p>
+                  <p>Creating a sequenced roadmap for improvement.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10">
+            <div className="brand-actions">
               <Link
                 href="/services/hr-foundations-sprint"
-                className="rounded-xl border border-white/20 px-6 py-3 text-base font-medium transition hover:bg-white/10"
+                className="brand-button-primary"
               >
                 View the HR Foundations Sprint
               </Link>
+
+              <Link href="/contact" className="brand-button-dark">
+                Start a conversation
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOLLOW-ON */}
+      <section className="bg-white">
+        <div className="brand-container brand-section">
+          <div className="brand-section-intro-tight brand-stack-sm">
+            <p className="brand-section-kicker">Follow-on support</p>
+
+            <h2 className="brand-heading-lg text-slate-950">
+              Further work is scoped around what the diagnostic reveals.
+            </h2>
+
+            <p className="brand-body-lg max-w-3xl">
+              Some organisations implement the improvements internally. Others
+              continue with targeted support across service delivery,
+              onboarding, process redesign, HR technology, governance, or
+              operational execution.
+            </p>
+
+            <p className="brand-body max-w-3xl">
+              Follow-on advisory and implementation support is scoped
+              individually based on the organisation, the priorities identified,
+              and the level of support required.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="brand-dark-section-plain">
+        <div className="brand-container brand-section-tight">
+          <div className="brand-card-dark max-w-4xl p-10 shadow-2xl shadow-black/20">
+            <div className="brand-stack-md">
+              <div className="brand-stack-sm">
+                <p className="brand-kicker">Next step</p>
+
+                <h2 className="brand-heading-lg max-w-3xl">
+                  Start with the Health Check, or move straight into a
+                  conversation if the need is already clear.
+                </h2>
+
+                <p className="brand-subheading brand-body-on-dark max-w-3xl">
+                  The right starting point depends on how much clarity you
+                  already have.
+                </p>
+              </div>
+
+              <div className="brand-actions">
+                <Link href="/diagnostic" className="brand-button-primary">
+                  Take the Health Check
+                </Link>
+
+                <Link href="/contact" className="brand-button-secondary-dark">
+                  Start a conversation
+                </Link>
+              </div>
             </div>
           </div>
         </div>
