@@ -492,16 +492,34 @@ async function createCompletionSubmission(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
+      submissionId,
+      status: response.status,
+      error: errorText,
+    });
+
     throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
   const data = await response.json();
 
   if (!Array.isArray(data) || !data[0]?.submission_id) {
+    console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
+      submissionId,
+      error: "Supabase insert succeeded but no submission_id was returned.",
+    });
+
     throw new Error(
       "Supabase insert succeeded but no submission_id was returned.",
     );
   }
+
+  console.log("HEALTH_CHECK_DB_INSERT_SUCCESS", {
+    submissionId: data[0].submission_id,
+    hasPublicToken: Boolean(data[0].public_token || publicToken),
+    completedAt,
+  });
 
   return {
     submissionId: data[0].submission_id as string,

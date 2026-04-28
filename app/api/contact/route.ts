@@ -294,16 +294,32 @@ async function createLeadSubmission(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    console.error("CONTACT_DB_INSERT_FAILED", {
+      status: response.status,
+      error: errorText,
+    });
+
     throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
   const data = await response.json();
 
   if (!Array.isArray(data) || !data[0]?.submission_id) {
+    console.error("CONTACT_DB_INSERT_FAILED", {
+      error: "Supabase insert succeeded but no submission_id returned.",
+    });
+
     throw new Error("Supabase insert succeeded but no submission_id returned.");
   }
 
-  return data[0].submission_id as string;
+  const submissionId = data[0].submission_id as string;
+
+  console.log("CONTACT_DB_INSERT_SUCCESS", {
+    submissionId,
+  });
+
+  return submissionId;
 }
 
 async function updateExistingLeadSubmission(params: {
@@ -361,14 +377,30 @@ async function updateExistingLeadSubmission(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    console.error("CONTACT_DB_UPDATE_FAILED", {
+      submissionId,
+      status: response.status,
+      error: errorText,
+    });
+
     throw new Error(`Supabase update failed: ${errorText}`);
   }
 
   const data = await response.json();
 
   if (!Array.isArray(data) || !data[0]?.submission_id) {
+    console.error("CONTACT_DB_UPDATE_FAILED", {
+      submissionId,
+      error: "Supabase update succeeded but no submission_id returned.",
+    });
+
     throw new Error("Supabase update succeeded but no submission_id returned.");
   }
+
+  console.log("CONTACT_DB_UPDATE_SUCCESS", {
+    submissionId: data[0].submission_id,
+  });
 
   return data[0].submission_id as string;
 }
@@ -416,8 +448,19 @@ async function upsertProspect(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    console.error("CONTACT_CRM_UPSERT_FAILED", {
+      submissionId,
+      status: response.status,
+      error: errorText,
+    });
+
     throw new Error(`Prospect upsert failed: ${errorText}`);
   }
+
+  console.log("CONTACT_CRM_UPSERT_SUCCESS", {
+    submissionId,
+  });
 }
 
 function buildListHtml(items: string[]): string {
