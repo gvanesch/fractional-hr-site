@@ -9,32 +9,25 @@ export async function GET() {
 
         const { error } = await supabase
             .from("client_projects")
-            .select("id")
+            .select("project_id")
             .limit(1);
 
         if (error) {
             throw error;
         }
 
-        return new Response(
-            JSON.stringify({
-                status: "ok",
-                supabase: "connected",
-            }),
+        return Response.json({
+            status: "ok",
+            supabase: "connected",
+        });
+    } catch (error) {
+        return Response.json(
             {
-                headers: { "Content-Type": "application/json" },
-            },
-        );
-    } catch (err) {
-        return new Response(
-            JSON.stringify({
                 status: "error",
-                message: (err as Error).message,
-            }),
-            {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
+                message:
+                    error instanceof Error ? error.message : "Unknown health check error",
             },
+            { status: 500 },
         );
     }
 }
