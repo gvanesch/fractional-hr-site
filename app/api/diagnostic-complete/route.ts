@@ -1,3 +1,4 @@
+import { logSystemEvent } from "../../../lib/system-events";
 import { NextResponse } from "next/server";
 import {
   buildAdvisorBrief,
@@ -514,6 +515,17 @@ async function createCompletionSubmission(params: {
       "Supabase insert succeeded but no submission_id was returned.",
     );
   }
+
+  await logSystemEvent({
+    eventType: "health_check_db_insert",
+    submissionId: data[0].submission_id,
+    publicToken: data[0].public_token || publicToken,
+    source: "health-check",
+    metadata: {
+      hasPublicToken: Boolean(data[0].public_token || publicToken),
+      completedAt,
+    },
+  });
 
   console.log("HEALTH_CHECK_DB_INSERT_SUCCESS", {
     submissionId: data[0].submission_id,
