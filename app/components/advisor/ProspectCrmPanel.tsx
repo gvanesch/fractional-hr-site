@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type ProspectRecord = {
@@ -9,13 +10,13 @@ type ProspectRecord = {
   company: string | null;
   relationship: "weak" | "medium" | "strong";
   status:
-    | "not_contacted"
-    | "contacted"
-    | "replied"
-    | "call_booked"
-    | "opportunity"
-    | "won"
-    | "lost";
+  | "not_contacted"
+  | "contacted"
+  | "replied"
+  | "call_booked"
+  | "opportunity"
+  | "won"
+  | "lost";
   last_contact_date: string | null;
   next_action_date: string | null;
   source: "network" | "referral" | "website" | "other";
@@ -24,8 +25,16 @@ type ProspectRecord = {
   updated_at: string;
 };
 
+type SummaryData = {
+  score?: number;
+  band?: string;
+  narrative?: string;
+  callAngle?: string;
+};
+
 type ProspectCrmPanelProps = {
   prospect: ProspectRecord | null;
+  summary?: SummaryData;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -40,19 +49,6 @@ function formatSubmittedAt(value: string | null): string {
     }).format(new Date(value));
   } catch {
     return value;
-  }
-}
-
-function formatSource(value: ProspectRecord["source"]): string {
-  switch (value) {
-    case "network":
-      return "Network";
-    case "referral":
-      return "Referral";
-    case "website":
-      return "Website";
-    case "other":
-      return "Other";
   }
 }
 
@@ -120,7 +116,10 @@ function relationshipBadgeClasses(
 
 export default function ProspectCrmPanel({
   prospect,
+  summary,
 }: ProspectCrmPanelProps) {
+  const router = useRouter();
+
   const [source, setSource] = useState<ProspectRecord["source"] | "">(
     prospect?.source ?? "",
   );
@@ -140,7 +139,9 @@ export default function ProspectCrmPanel({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [updatedAtLabel, setUpdatedAtLabel] = useState(
-    prospect?.updated_at ? formatSubmittedAt(prospect.updated_at) : "Not available",
+    prospect?.updated_at
+      ? formatSubmittedAt(prospect.updated_at)
+      : "Not available",
   );
 
   async function handleSave() {
@@ -183,6 +184,8 @@ export default function ProspectCrmPanel({
           timeStyle: "short",
         }).format(new Date()),
       );
+
+      router.refresh();
     } catch (error) {
       setSaveState("error");
       setErrorMessage(
@@ -193,12 +196,50 @@ export default function ProspectCrmPanel({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+      {summary ? (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Health Check snapshot
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-800">
+            {summary.score !== undefined ? (
+              <span>
+                <strong>Score:</strong> {summary.score} / 100
+              </span>
+            ) : null}
+
+            {summary.band ? (
+              <span>
+                <strong>Profile:</strong> {summary.band}
+              </span>
+            ) : null}
+          </div>
+
+          {summary.narrative ? (
+            <p className="mt-3 text-sm leading-7 text-slate-700">
+              {summary.narrative}
+            </p>
+          ) : null}
+
+          {summary.callAngle ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Suggested call angle
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-800">
+                {summary.callAngle}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-[#0A1628]">Prospect CRM</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Light commercial workflow record linked to this Health Check
-            submission.
+            Manage commercial progression alongside the diagnostic signal.
           </p>
         </div>
 

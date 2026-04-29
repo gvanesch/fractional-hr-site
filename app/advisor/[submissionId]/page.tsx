@@ -883,7 +883,18 @@ export default async function AdvisorSubmissionPage({
               </div>
             </section>
 
-            <ProspectCrmPanel prospect={prospect} />
+            <ProspectCrmPanel
+              prospect={prospect}
+              summary={
+                result
+                  ? {
+                    score: result.score,
+                    band: result.band.label,
+                    narrative: data.derived.narrative ?? undefined,
+                  }
+                  : undefined
+              }
+            />
 
             {(advisorBrief || result) ? (
               <section className="brand-surface-card p-6 sm:p-8">
