@@ -41,6 +41,19 @@ type AdvisorProspect = {
     | "assessment_candidate"
     | "in_conversation"
     | "converted";
+    deal_stage:
+    | "new"
+    | "contacted"
+    | "replied"
+    | "meeting_booked"
+    | "in_conversation"
+    | "diagnostic_assessment_candidate"
+    | "proposal_discussed"
+    | "converted"
+    | "lost"
+    | "nurture";
+    lead_temperature: "cold" | "warm" | "hot";
+    next_step: string | null;
     last_contact_date: string | null;
     next_action_date: string | null;
     linked_submission_id: string | null;
@@ -117,6 +130,9 @@ async function getProspects(
         source,
         segment,
         diagnostic_status,
+        deal_stage,
+        lead_temperature,
+        next_step,
         last_contact_date,
         next_action_date,
         linked_submission_id,
@@ -231,6 +247,44 @@ function formatDiagnosticStatus(
     }
 }
 
+function formatDealStage(value: AdvisorProspect["deal_stage"]): string {
+    switch (value) {
+        case "new":
+            return "New";
+        case "contacted":
+            return "Contacted";
+        case "replied":
+            return "Replied";
+        case "meeting_booked":
+            return "Meeting booked";
+        case "in_conversation":
+            return "In conversation";
+        case "diagnostic_assessment_candidate":
+            return "Diagnostic Assessment candidate";
+        case "proposal_discussed":
+            return "Proposal discussed";
+        case "converted":
+            return "Converted";
+        case "lost":
+            return "Lost";
+        case "nurture":
+            return "Nurture";
+    }
+}
+
+function formatLeadTemperature(
+    value: AdvisorProspect["lead_temperature"],
+): string {
+    switch (value) {
+        case "cold":
+            return "Cold";
+        case "warm":
+            return "Warm";
+        case "hot":
+            return "Hot";
+    }
+}
+
 function formatNextActionFilter(value: NextActionFilter): string {
     switch (value) {
         case "due":
@@ -263,6 +317,102 @@ function statusBadgeClasses(
     }
 }
 
+function temperatureRank(value: AdvisorProspect["lead_temperature"]): number {
+    switch (value) {
+        case "hot":
+            return 0;
+        case "warm":
+            return 1;
+        case "cold":
+            return 2;
+    }
+}
+
+function isActiveDeal(prospect: AdvisorProspect): boolean {
+    return prospect.deal_stage !== "converted" && prospect.deal_stage !== "lost";
+}
+
+function sortActionProspects(a: AdvisorProspect, b: AdvisorProspect): number {
+    const aDate = a.next_action_date ?? "9999-12-31";
+    const bDate = b.next_action_date ?? "9999-12-31";
+
+    if (aDate !== bDate) {
+        return aDate.localeCompare(bDate);
+    }
+
+    return temperatureRank(a.lead_temperature) - temperatureRank(b.lead_temperature);
+}
+
+function ActionFocusColumn({
+    title,
+    description,
+    prospects,
+}: {
+    title: string;
+    description: string;
+    prospects: AdvisorProspect[];
+}) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {description}
+                </p>
+            </div>
+
+            {prospects.length > 0 ? (
+                <div className="mt-5 space-y-3">
+                    {prospects.slice(0, 5).map((prospect) => (
+                        <Link
+                            key={prospect.prospect_id}
+                            href={`/advisor/prospects/${prospect.prospect_id}`}
+                            className="block rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-[#1E6FD9] hover:bg-blue-50"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {prospect.company ||
+                                            prospect.name ||
+                                            "Unnamed prospect"}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-600">
+                                        {prospect.next_step || "No next step set"}
+                                    </p>
+                                </div>
+
+                                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
+                                    {formatLeadTemperature(prospect.lead_temperature)}
+                                </span>
+                            </div>
+
+                            <p className="mt-3 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+                                {formatDate(prospect.next_action_date)} ·{" "}
+                                {formatDealStage(prospect.deal_stage)}
+                            </p>
+                        </Link>
+                    ))}
+                </div>
+            ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                    <p className="text-sm leading-6 text-slate-600">
+                        No prospects in this action group.
+                    </p>
+                </div>
+            )}
+
+            {prospects.length > 5 ? (
+                <p className="mt-3 text-xs text-slate-500">
+                    Showing 5 of {prospects.length}. Use the filter below to review the
+                    full list.
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
 export default async function AdvisorProspectsPage({
     searchParams,
 }: AdvisorProspectsPageProps) {
@@ -273,7 +423,37 @@ export default async function AdvisorProspectsPage({
     const nextActionFilter = normaliseNextActionFilter(
         resolvedSearchParams.nextAction,
     );
-    const prospects = await getProspects(searchQuery, nextActionFilter);
+
+    const [allProspects, prospects] = await Promise.all([
+        getProspects("", "all"),
+        getProspects(searchQuery, nextActionFilter),
+    ]);
+
+    const today = getLondonDateString(new Date());
+    const nextSevenDays = addDaysToDateString(today, 7);
+
+    const activeProspects = allProspects.filter(isActiveDeal);
+
+    const overdueProspects = activeProspects
+        .filter(
+            (prospect) =>
+                prospect.next_action_date !== null &&
+                prospect.next_action_date < today,
+        )
+        .sort(sortActionProspects);
+
+    const dueTodayProspects = activeProspects
+        .filter((prospect) => prospect.next_action_date === today)
+        .sort(sortActionProspects);
+
+    const upcomingProspects = activeProspects
+        .filter(
+            (prospect) =>
+                prospect.next_action_date !== null &&
+                prospect.next_action_date > today &&
+                prospect.next_action_date <= nextSevenDays,
+        )
+        .sort(sortActionProspects);
 
     const clearParams = new URLSearchParams();
 
@@ -331,9 +511,9 @@ export default async function AdvisorProspectsPage({
 
                 <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Visible prospects</p>
+                        <p className="text-sm font-medium text-slate-500">Total prospects</p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {prospects.length}
+                            {allProspects.length}
                         </p>
                     </div>
 
@@ -343,7 +523,7 @@ export default async function AdvisorProspectsPage({
                         </p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">
                             {
-                                prospects.filter((prospect) =>
+                                allProspects.filter((prospect) =>
                                     Boolean(prospect.linked_submission_id),
                                 ).length
                             }
@@ -352,27 +532,51 @@ export default async function AdvisorProspectsPage({
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-sm font-medium text-slate-500">
-                            In conversation
+                            Due today / overdue
                         </p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {
-                                prospects.filter(
-                                    (prospect) =>
-                                        prospect.diagnostic_status === "in_conversation",
-                                ).length
-                            }
+                            {overdueProspects.length + dueTodayProspects.length}
                         </p>
                     </div>
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Converted</p>
+                        <p className="text-sm font-medium text-slate-500">Next 7 days</p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {
-                                prospects.filter(
-                                    (prospect) => prospect.diagnostic_status === "converted",
-                                ).length
-                            }
+                            {upcomingProspects.length}
                         </p>
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Action focus
+                        </p>
+                        <h2 className="mt-3 text-xl font-semibold text-slate-900">
+                            What needs attention
+                        </h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                            Active prospects with dated follow-up actions. Lost and
+                            converted prospects are excluded from this action view.
+                        </p>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                        <ActionFocusColumn
+                            title="Overdue"
+                            description="Follow-ups that should already have happened."
+                            prospects={overdueProspects}
+                        />
+                        <ActionFocusColumn
+                            title="Due today"
+                            description="Actions scheduled for today."
+                            prospects={dueTodayProspects}
+                        />
+                        <ActionFocusColumn
+                            title="Next 7 days"
+                            description="Upcoming follow-ups to keep warm."
+                            prospects={upcomingProspects}
+                        />
                     </div>
                 </section>
 
