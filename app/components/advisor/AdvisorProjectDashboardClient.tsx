@@ -10,6 +10,7 @@ import {
   type SetStateAction,
 } from "react";
 import AddParticipantForm from "@/app/components/advisor/AddParticipantForm";
+import ProjectSignalPanel from "@/app/components/advisor/ProjectSignalPanel";
 import type {
   SegmentationFieldKey,
   SegmentationSchema,
@@ -1403,6 +1404,13 @@ export default function AdvisorProjectDashboardClient({
               </div>
             </section>
 
+            <ProjectSignalPanel
+              completion={completion}
+              scoredCompletion={scoredCompletion}
+              factPack={factPack}
+              participants={participants}
+            />
+
             <section className="brand-surface-card p-6 sm:p-8">
               <div className="flex flex-col gap-3">
                 <div>
@@ -1808,7 +1816,8 @@ export default function AdvisorProjectDashboardClient({
                                       )
                                     }
                                     disabled={
-                                      !permissions.canEditSegmentation || !levelField
+                                      !permissions.canEditSegmentation ||
+                                      !levelField
                                     }
                                     className={getLockedFieldClassName(
                                       !permissions.canEditSegmentation ||
@@ -1957,30 +1966,78 @@ export default function AdvisorProjectDashboardClient({
             </section>
 
             <section className="brand-surface-card p-6 sm:p-8">
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-6">
                 <div>
                   <p className="brand-section-kicker">Reporting context</p>
                   <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    Fact pack, functional signals, and diagnostic pattern signals
+                    Pre-report checks
                   </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                    A compact operational check before opening the full report. This
+                    dashboard should confirm coverage and readiness only. Diagnosis,
+                    narrative, interpretation, and ROI material remain in the reporting
+                    engine.
+                  </p>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-4">
-                  <FactPackCard factPack={factPack} />
+                <div className="grid gap-4 lg:grid-cols-4">
+                  <MetricCard
+                    label="Scored groups"
+                    value={`${scoredCompletion.completed} / ${scoredCompletion.totalInvited}`}
+                  />
+                  <MetricCard
+                    label="Outstanding scored"
+                    value={String(scoredCompletion.outstanding)}
+                  />
+                  <MetricCard
+                    label="Fact pack"
+                    value={getFactPackStatusLabel(factPack.factPackStatus)}
+                  />
+                  <MetricCard
+                    label="Functional signals"
+                    value={`${functionalSignals.filter(
+                      (signal) => signal.signalStatus === "completed",
+                    ).length} / ${functionalSignals.length}`}
+                  />
+                </div>
 
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <FactPackCard factPack={factPack} />
                   <FunctionalSignalsCard functionalSignals={functionalSignals} />
 
-                  <SignalSectionCard
-                    title="Biggest gaps"
-                    description="Highest cross-group variation"
-                    dimensions={biggestGaps}
-                  />
+                  <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-5">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Report handoff
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">
+                      Use this workspace to confirm whether the evidence base is
+                      complete enough to review. Do not use this area to interpret
+                      scores or draw conclusions.
+                    </p>
 
-                  <SignalSectionCard
-                    title="Strongest alignment"
-                    description="Lowest cross-group variation"
-                    dimensions={strongestAlignment}
-                  />
+                    <div className="mt-5 space-y-3">
+                      <ActionCard
+                        title="Resolve outstanding scored responses"
+                        description={
+                          scoredCompletion.outstanding > 0
+                            ? "Follow up with remaining scored participants before treating the report as complete."
+                            : "Scored participant collection is complete."
+                        }
+                      />
+                      <ActionCard
+                        title="Check contextual inputs"
+                        description={
+                          factPack.factPackStatus === "completed"
+                            ? "The Client Fact Pack is available for the reporting engine."
+                            : "Confirm whether the Client Fact Pack is required before final report review."
+                        }
+                      />
+                      <ActionCard
+                        title="Open the report"
+                        description="Use the report view for diagnosis, narrative, interpretation, and next-step advisory framing."
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
