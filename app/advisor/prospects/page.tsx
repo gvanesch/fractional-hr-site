@@ -14,8 +14,12 @@ export const metadata = {
     },
 };
 
+type NextActionFilter = "all" | "due" | "seven_days" | "none";
+
 type SearchParams = Promise<{
     linkSubmissionId?: string;
+    q?: string;
+    nextAction?: string;
 }>;
 
 type AdvisorProspectsPageProps = {
@@ -63,10 +67,46 @@ async function requireAdvisorSession() {
     return user;
 }
 
-async function getProspects(): Promise<AdvisorProspect[]> {
+function getLondonDateString(date: Date): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/London",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (!year || !month || !day) {
+        return date.toISOString().slice(0, 10);
+    }
+
+    return `${year}-${month}-${day}`;
+}
+
+function addDaysToDateString(dateString: string, days: number): string {
+    const date = new Date(`${dateString}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+}
+
+function normaliseNextActionFilter(value: string | undefined): NextActionFilter {
+    if (value === "due" || value === "seven_days" || value === "none") {
+        return value;
+    }
+
+    return "all";
+}
+
+async function getProspects(
+    searchQuery: string,
+    nextActionFilter: NextActionFilter,
+): Promise<AdvisorProspect[]> {
     const supabase = createSupabaseAdminClient();
 
-    const { data, error } = await supabase
+    let query = supabase
         .from("advisor_prospects")
         .select(
             `
@@ -86,6 +126,31 @@ async function getProspects(): Promise<AdvisorProspect[]> {
         )
         .order("updated_at", { ascending: false })
         .limit(250);
+
+    if (searchQuery) {
+        const safeSearchQuery = searchQuery.replace(/[%_,]/g, "");
+        query = query.or(
+            `name.ilike.%${safeSearchQuery}%,company.ilike.%${safeSearchQuery}%,role.ilike.%${safeSearchQuery}%,source.ilike.%${safeSearchQuery}%,segment.ilike.%${safeSearchQuery}%,diagnostic_status.ilike.%${safeSearchQuery}%`,
+        );
+    }
+
+    const today = getLondonDateString(new Date());
+
+    if (nextActionFilter === "due") {
+        query = query.lte("next_action_date", today);
+    }
+
+    if (nextActionFilter === "seven_days") {
+        query = query
+            .gte("next_action_date", today)
+            .lte("next_action_date", addDaysToDateString(today, 7));
+    }
+
+    if (nextActionFilter === "none") {
+        query = query.is("next_action_date", null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         throw new Error(`Unable to load prospects: ${error.message}`);
@@ -166,6 +231,19 @@ function formatDiagnosticStatus(
     }
 }
 
+function formatNextActionFilter(value: NextActionFilter): string {
+    switch (value) {
+        case "due":
+            return "due today or overdue";
+        case "seven_days":
+            return "due in the next 7 days";
+        case "none":
+            return "with no next action set";
+        case "all":
+            return "all next actions";
+    }
+}
+
 function statusBadgeClasses(
     value: AdvisorProspect["diagnostic_status"],
 ): string {
@@ -189,9 +267,25 @@ export default async function AdvisorProspectsPage({
     searchParams,
 }: AdvisorProspectsPageProps) {
     const advisorUser = await requireAdvisorSession();
-    const prospects = await getProspects();
     const resolvedSearchParams = await searchParams;
     const linkSubmissionId = resolvedSearchParams.linkSubmissionId?.trim() || "";
+    const searchQuery = resolvedSearchParams.q?.trim() || "";
+    const nextActionFilter = normaliseNextActionFilter(
+        resolvedSearchParams.nextAction,
+    );
+    const prospects = await getProspects(searchQuery, nextActionFilter);
+
+    const clearParams = new URLSearchParams();
+
+    if (linkSubmissionId) {
+        clearParams.set("linkSubmissionId", linkSubmissionId);
+    }
+
+    const clearPath = clearParams.toString()
+        ? `/advisor/prospects?${clearParams.toString()}`
+        : "/advisor/prospects";
+
+    const hasActiveFilters = Boolean(searchQuery) || nextActionFilter !== "all";
 
     return (
         <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
@@ -237,7 +331,7 @@ export default async function AdvisorProspectsPage({
 
                 <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Total prospects</p>
+                        <p className="text-sm font-medium text-slate-500">Visible prospects</p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">
                             {prospects.length}
                         </p>
@@ -282,15 +376,88 @@ export default async function AdvisorProspectsPage({
                     </div>
                 </section>
 
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <form
+                        action="/advisor/prospects"
+                        className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto]"
+                    >
+                        {linkSubmissionId ? (
+                            <input
+                                type="hidden"
+                                name="linkSubmissionId"
+                                value={linkSubmissionId}
+                            />
+                        ) : null}
+
+                        <label className="sr-only" htmlFor="prospect-search">
+                            Search prospects
+                        </label>
+                        <input
+                            id="prospect-search"
+                            name="q"
+                            type="search"
+                            defaultValue={searchQuery}
+                            placeholder="Search by company, contact, role, source, segment, or status"
+                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1E6FD9] focus:ring-4 focus:ring-blue-100"
+                        />
+
+                        <label className="sr-only" htmlFor="next-action-filter">
+                            Filter by next action
+                        </label>
+                        <select
+                            id="next-action-filter"
+                            name="nextAction"
+                            defaultValue={nextActionFilter}
+                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-4 focus:ring-blue-100"
+                        >
+                            <option value="all">All next actions</option>
+                            <option value="due">Due today / overdue</option>
+                            <option value="seven_days">Next 7 days</option>
+                            <option value="none">No next action</option>
+                        </select>
+
+                        <button
+                            type="submit"
+                            className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-700"
+                        >
+                            Apply
+                        </button>
+
+                        {hasActiveFilters ? (
+                            <Link
+                                href={clearPath}
+                                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                                Clear
+                            </Link>
+                        ) : null}
+                    </form>
+
+                    {hasActiveFilters ? (
+                        <p className="mt-3 text-sm text-slate-600">
+                            Showing {prospects.length} result
+                            {prospects.length === 1 ? "" : "s"}
+                            {searchQuery ? (
+                                <>
+                                    {" "}
+                                    for <strong>{searchQuery}</strong>
+                                </>
+                            ) : null}{" "}
+                            across <strong>{formatNextActionFilter(nextActionFilter)}</strong>.
+                        </p>
+                    ) : null}
+                </section>
+
                 <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {prospects.length === 0 ? (
                         <div className="p-8">
                             <h2 className="text-lg font-semibold text-slate-900">
-                                No prospects yet
+                                {hasActiveFilters ? "No matching prospects" : "No prospects yet"}
                             </h2>
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                                Add prospects from LinkedIn, referrals, SaaS contacts, or other
-                                outbound sources. Health Check data can be linked later.
+                                {hasActiveFilters
+                                    ? "Try a different search term or next action filter."
+                                    : "Add prospects from LinkedIn, referrals, SaaS contacts, or other outbound sources. Health Check data can be linked later."}
                             </p>
                         </div>
                     ) : (

@@ -1,0 +1,25 @@
+name: Advisor Daily Action Digest
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  send-advisor-action-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger advisor action digest endpoint
+        env:
+          ADVISOR_ACTION_DIGEST_URL: ${{ secrets.ADVISOR_ACTION_DIGEST_URL }}
+          DAILY_SUMMARY_ENDPOINT_SECRET: ${{ secrets.DAILY_SUMMARY_ENDPOINT_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$ADVISOR_ACTION_DIGEST_URL" \
+            --header "Authorization: Bearer $DAILY_SUMMARY_ENDPOINT_SECRET"
