@@ -365,7 +365,7 @@ function ActionFocusColumn({
 
             {prospects.length > 0 ? (
                 <div className="mt-5 space-y-3">
-                    {prospects.slice(0, 5).map((prospect) => (
+                    {prospects.map((prospect) => (
                         <Link
                             key={prospect.prospect_id}
                             href={`/advisor/prospects/${prospect.prospect_id}`}
@@ -403,12 +403,6 @@ function ActionFocusColumn({
                 </div>
             )}
 
-            {prospects.length > 5 ? (
-                <p className="mt-3 text-xs text-slate-500">
-                    Showing 5 of {prospects.length}. Use the filter below to review the
-                    full list.
-                </p>
-            ) : null}
         </div>
     );
 }
