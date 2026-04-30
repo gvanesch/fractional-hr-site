@@ -87,6 +87,34 @@ type FactPackRow = {
   response_json: Record<string, unknown> | null;
 };
 
+type FunctionalSignalRow = {
+  signal_request_id: string;
+  module_type: string;
+  module_label: string | null;
+  recipient_name: string;
+  recipient_email: string;
+  signal_status: string;
+  invited_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  submitted_at: string | null;
+  updated_at: string;
+};
+
+type FunctionalSignalSummary = {
+  signalRequestId: string;
+  moduleType: string;
+  moduleLabel: string | null;
+  recipientName: string;
+  recipientEmail: string;
+  signalStatus: string;
+  invitedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  submittedAt: string | null;
+  updatedAt: string;
+};
+
 type ParticipantSummary = {
   participantId: string;
   questionnaireType: ProjectQuestionnaireType;
@@ -213,6 +241,7 @@ export type ProjectSummaryResponse = {
     analysisReady: boolean;
   };
   factPack: FactPackSummary;
+  functionalSignals: FunctionalSignalSummary[];
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
@@ -785,8 +814,8 @@ function buildFactPackSummary(
 
   const hasSavedResponse = Boolean(
     factPack?.response_json &&
-      typeof factPack.response_json === "object" &&
-      Object.keys(factPack.response_json).length > 0,
+    typeof factPack.response_json === "object" &&
+    Object.keys(factPack.response_json).length > 0,
   );
 
   let factPackStatus: FactPackSummary["factPackStatus"] = "not_started";
@@ -1154,18 +1183,16 @@ function buildOverallQualitativeSummary(params: {
   if (themeLabels.length >= 3) {
     return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
       ", ",
-    )}. The most consistent qualitative signals relate to ${themeLabels[0]}, ${themeLabels[1]}, and ${themeLabels[2]}. ${
-      systemicStory ??
-      "Together, that pattern suggests the issues are showing up in day-to-day operation rather than only in scored perception."
-    }`;
+    )}. The most consistent qualitative signals relate to ${themeLabels[0]}, ${themeLabels[1]}, and ${themeLabels[2]}. ${systemicStory ??
+    "Together, that pattern suggests the issues are showing up in day-to-day operation rather than only in scored perception."
+      }`;
   }
 
   if (themeLabels.length >= 1) {
     return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
       ", ",
-    )}. The clearest recurring signal relates to ${themeLabels[0]}, which adds useful context behind the score pattern.${
-      systemicStory ? ` ${systemicStory}` : ""
-    }`;
+    )}. The clearest recurring signal relates to ${themeLabels[0]}, which adds useful context behind the score pattern.${systemicStory ? ` ${systemicStory}` : ""
+      }`;
   }
 
   return `A total of ${totalCommentCount} written comments were provided across ${groupLabels.join(
@@ -1212,11 +1239,11 @@ function buildQualitativeSummary(params: {
       advisoryRead:
         insight !== undefined
           ? buildDimensionAdvisoryRead({
-              insight,
-              dimensionLabel: dimension.dimensionLabel,
-              commentCount: comments.length,
-              themes,
-            })
+            insight,
+            dimensionLabel: dimension.dimensionLabel,
+            commentCount: comments.length,
+            themes,
+          })
           : null,
       illustrativeSignals: getIllustrativeSignals(comments),
       confidence: getQualitativeConfidence({
@@ -1277,6 +1304,7 @@ export async function getProjectSummaryData(
     { data: project, error: projectError },
     { data: participants, error: participantsError },
     { data: factPackRows, error: factPackError },
+    { data: functionalSignalRows, error: functionalSignalsError },
     { data: scoreRows, error: scoresError },
     { data: commentRows, error: commentsError },
   ] = await Promise.all([
@@ -1284,7 +1312,7 @@ export async function getProjectSummaryData(
       .from("client_projects")
       .select(
         "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, segmentation_schema, created_at, updated_at",
-    )
+      )
       .eq("project_id", projectId)
       .single<ProjectRow>(),
     supabase
@@ -1296,11 +1324,17 @@ export async function getProjectSummaryData(
       .returns<ParticipantRow[]>(),
     supabase
       .from("client_fact_packs")
-      .select(
-        "participant_id, status, submitted_at, updated_at, response_json",
-      )
+      .select("participant_id, status, submitted_at, updated_at, response_json")
       .eq("project_id", projectId)
       .returns<FactPackRow[]>(),
+    supabase
+      .from("client_functional_signal_requests")
+      .select(
+        "signal_request_id, module_type, module_label, recipient_name, recipient_email, signal_status, invited_at, started_at, completed_at, submitted_at, updated_at",
+      )
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true })
+      .returns<FunctionalSignalRow[]>(),
     supabase
       .from("client_dimension_scores")
       .select(
@@ -1330,6 +1364,10 @@ export async function getProjectSummaryData(
     throw new Error("Unable to load client fact pack summary.");
   }
 
+  if (functionalSignalsError) {
+    throw new Error("Unable to load functional signal requests.");
+  }
+
   if (scoresError) {
     throw new Error("Unable to load project dimension scores.");
   }
@@ -1340,9 +1378,11 @@ export async function getProjectSummaryData(
 
   const participantRows = participants ?? [];
   const activeParticipants = getActiveParticipants(participantRows);
+
   const activeParticipantIds = new Set(
     activeParticipants.map((participant) => participant.participant_id),
   );
+
   const activeScoredParticipantIds = new Set(
     activeParticipants
       .filter((participant) =>
@@ -1354,10 +1394,27 @@ export async function getProjectSummaryData(
   );
 
   const participantSummaries = participantRows.map(buildParticipantSummary);
+
   const factPackSummary = buildFactPackSummary(
     participantRows,
     factPackRows ?? [],
   );
+
+  const functionalSignalSummaries: FunctionalSignalSummary[] = (
+    functionalSignalRows ?? []
+  ).map((row) => ({
+    signalRequestId: row.signal_request_id,
+    moduleType: row.module_type,
+    moduleLabel: row.module_label,
+    recipientName: row.recipient_name,
+    recipientEmail: row.recipient_email,
+    signalStatus: row.signal_status,
+    invitedAt: row.invited_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    submittedAt: row.submitted_at,
+    updatedAt: row.updated_at,
+  }));
 
   const dimensionScoreRows = (scoreRows ?? []).filter(
     (row) =>
@@ -1383,11 +1440,15 @@ export async function getProjectSummaryData(
   );
 
   const dimensions = buildDimensionSummaries(dimensionScoreRows);
+
   const dimensionInsights = buildDimensionInsights(dimensions);
+
   const dimensionAnalyses = buildDimensionAnalyses({
     insights: dimensionInsights,
   });
+
   const dimensionNarratives = buildDimensionNarratives(dimensionAnalyses);
+
   const insightSummary = buildInsightSummary(dimensionInsights);
 
   const qualitativeSummary = buildQualitativeSummary({
@@ -1409,20 +1470,20 @@ export async function getProjectSummaryData(
   return {
     success: true,
     project: {
-        projectId: project.project_id,
-        companyName: project.company_name,
-        primaryContactName: project.primary_contact_name,
-        primaryContactEmail: project.primary_contact_email,
-        billingContactName: project.billing_contact_name,
-        billingContactEmail: project.billing_contact_email,
-        companyWebsite: project.company_website,
-        purchaseOrderNumber: project.purchase_order_number,
-        msaStatus: project.msa_status,
-        dpaStatus: project.dpa_status,
-        projectStatus: project.project_status,
-        notes: project.notes,
-        segmentationSchema: project.segmentation_schema,
-     },
+      projectId: project.project_id,
+      companyName: project.company_name,
+      primaryContactName: project.primary_contact_name,
+      primaryContactEmail: project.primary_contact_email,
+      billingContactName: project.billing_contact_name,
+      billingContactEmail: project.billing_contact_email,
+      companyWebsite: project.company_website,
+      purchaseOrderNumber: project.purchase_order_number,
+      msaStatus: project.msa_status,
+      dpaStatus: project.dpa_status,
+      projectStatus: project.project_status,
+      notes: project.notes,
+      segmentationSchema: project.segmentation_schema,
+    },
     completion: {
       ...completion,
       participants: participantSummaries,
@@ -1434,6 +1495,7 @@ export async function getProjectSummaryData(
         scoredCompletion.outstanding === 0,
     },
     factPack: factPackSummary,
+    functionalSignals: functionalSignalSummaries,
     dimensions,
     strongestAlignment,
     biggestGaps,

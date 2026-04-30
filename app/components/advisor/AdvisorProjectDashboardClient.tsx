@@ -89,6 +89,20 @@ type FactPackSummary = {
   submittedAt: string | null;
 };
 
+type FunctionalSignalSummary = {
+  signalRequestId: string;
+  moduleType: string;
+  moduleLabel: string | null;
+  recipientName: string;
+  recipientEmail: string;
+  signalStatus: string;
+  invitedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  submittedAt: string | null;
+  updatedAt: string;
+};
+
 type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -113,6 +127,7 @@ type ProjectSummaryResponse = {
     analysisReady: boolean;
   };
   factPack: FactPackSummary;
+  functionalSignals: FunctionalSignalSummary[];
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
@@ -131,80 +146,80 @@ type ProjectStatusResponse = {
 
 type ProjectUpdateResponse =
   | {
-      success: true;
-    }
+    success: true;
+  }
   | {
-      success: false;
-      error: string;
-    };
+    success: false;
+    error: string;
+  };
 
 type ParticipantUpdateResponse =
   | {
-      success: true;
-      participant: {
-        participantId: string;
-        projectId: string;
-        questionnaireType: QuestionnaireType;
-        roleLabel: string;
-        name: string;
-        email: string;
-        segmentationValues: SegmentationValues | null;
-        participantStatus: string;
-        completedAt: string | null;
-      };
-    }
-  | {
-      success: false;
-      error: string;
+    success: true;
+    participant: {
+      participantId: string;
+      projectId: string;
+      questionnaireType: QuestionnaireType;
+      roleLabel: string;
+      name: string;
+      email: string;
+      segmentationValues: SegmentationValues | null;
+      participantStatus: string;
+      completedAt: string | null;
     };
+  }
+  | {
+    success: false;
+    error: string;
+  };
 
 type WithdrawParticipantResponse =
   | {
-      success: true;
-      participant: {
-        participantId: string;
-        projectId: string;
-        participantStatus: string;
-        completedAt: string | null;
-      };
-    }
-  | {
-      success: false;
-      error: string;
+    success: true;
+    participant: {
+      participantId: string;
+      projectId: string;
+      participantStatus: string;
+      completedAt: string | null;
     };
+  }
+  | {
+    success: false;
+    error: string;
+  };
 
 type ReinstateParticipantResponse =
   | {
-      success: true;
-      participant: {
-        participantId: string;
-        projectId: string;
-        participantStatus: string;
-        completedAt: string | null;
-      };
-    }
-  | {
-      success: false;
-      error: string;
+    success: true;
+    participant: {
+      participantId: string;
+      projectId: string;
+      participantStatus: string;
+      completedAt: string | null;
     };
+  }
+  | {
+    success: false;
+    error: string;
+  };
 
 type ExtendInviteResponse =
   | {
-      success: true;
-      participant: {
-        participant_id: string;
-        email: string;
-        questionnaire_type: QuestionnaireType;
-        participant_status: string;
-        invite_expires_at: string | null;
-        invite_revoked_at: string | null;
-      };
-      extendedByDays: number;
-    }
-  | {
-      success: false;
-      error: string;
+    success: true;
+    participant: {
+      participant_id: string;
+      email: string;
+      questionnaire_type: QuestionnaireType;
+      participant_status: string;
+      invite_expires_at: string | null;
+      invite_revoked_at: string | null;
     };
+    extendedByDays: number;
+  }
+  | {
+    success: false;
+    error: string;
+  };
 
 type AdvisorProjectDashboardClientProps = {
   projectId: string;
@@ -282,32 +297,32 @@ const WITHDRAW_REASON_OPTIONS: Array<{
   value: WithdrawReason;
   label: string;
 }> = [
-  { value: "wrong_details", label: "Wrong details entered" },
-  { value: "duplicate_participant", label: "Duplicate participant" },
-  { value: "added_in_error", label: "Added in error" },
-  { value: "contact_left_organisation", label: "Contact left organisation" },
-  {
-    value: "company_withdrew_participant",
-    label: "Company withdrew participant",
-  },
-  { value: "declined_to_participate", label: "Declined to participate" },
-  { value: "no_longer_in_scope", label: "No longer in scope" },
-  { value: "other", label: "Other" },
-];
+    { value: "wrong_details", label: "Wrong details entered" },
+    { value: "duplicate_participant", label: "Duplicate participant" },
+    { value: "added_in_error", label: "Added in error" },
+    { value: "contact_left_organisation", label: "Contact left organisation" },
+    {
+      value: "company_withdrew_participant",
+      label: "Company withdrew participant",
+    },
+    { value: "declined_to_participate", label: "Declined to participate" },
+    { value: "no_longer_in_scope", label: "No longer in scope" },
+    { value: "other", label: "Other" },
+  ];
 
 const REINSTATE_REASON_OPTIONS: Array<{
   value: ReinstateReason;
   label: string;
 }> = [
-  { value: "withdrawn_in_error", label: "Withdrawn in error" },
-  { value: "duplicate_resolved", label: "Duplicate resolved" },
-  {
-    value: "client_requested_reinstatement",
-    label: "Client requested reinstatement",
-  },
-  { value: "participant_now_in_scope", label: "Participant now in scope" },
-  { value: "other", label: "Other" },
-];
+    { value: "withdrawn_in_error", label: "Withdrawn in error" },
+    { value: "duplicate_resolved", label: "Duplicate resolved" },
+    {
+      value: "client_requested_reinstatement",
+      label: "Client requested reinstatement",
+    },
+    { value: "participant_now_in_scope", label: "Participant now in scope" },
+    { value: "other", label: "Other" },
+  ];
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -355,6 +370,23 @@ function formatQuestionnaireType(value: QuestionnaireType): string {
       return "Client Fact Pack";
     default:
       return value;
+  }
+}
+
+function formatFunctionalSignalModuleType(value: string): string {
+  switch (value) {
+    case "it":
+      return "IT / Systems";
+    case "payroll":
+      return "Payroll";
+    case "finance":
+      return "Finance";
+    case "other":
+      return "Other";
+    default:
+      return value
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 }
 
@@ -438,6 +470,21 @@ function getFactPackTone(status: FactPackSummary["factPackStatus"]): string {
   }
 }
 
+function getFunctionalSignalTone(status: string): string {
+  switch (status) {
+    case "completed":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "started":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "invited":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "archived":
+      return "border-slate-200 bg-slate-100 text-slate-600";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
 function getFactPackStatusLabel(status: FactPackSummary["factPackStatus"]): string {
   switch (status) {
     case "completed":
@@ -450,6 +497,21 @@ function getFactPackStatusLabel(status: FactPackSummary["factPackStatus"]): stri
       return "Not invited";
     default:
       return status;
+  }
+}
+
+function getFunctionalSignalStatusLabel(status: string): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "started":
+      return "Started";
+    case "invited":
+      return "Invited";
+    case "archived":
+      return "Archived";
+    default:
+      return formatStatusValue(status);
   }
 }
 
@@ -1002,13 +1064,13 @@ export default function AdvisorProjectDashboardClient({
           participantEditForm.questionnaireType === "client_fact_pack"
             ? null
             : {
-                function:
-                  participantEditForm.segmentationValues.function.trim() || null,
-                location:
-                  participantEditForm.segmentationValues.location.trim() || null,
-                level:
-                  participantEditForm.segmentationValues.level.trim() || null,
-              },
+              function:
+                participantEditForm.segmentationValues.function.trim() || null,
+              location:
+                participantEditForm.segmentationValues.location.trim() || null,
+              level:
+                participantEditForm.segmentationValues.level.trim() || null,
+            },
       };
 
       const response = await fetch("/api/advisor-update-participant", {
@@ -1163,6 +1225,7 @@ export default function AdvisorProjectDashboardClient({
   const completion = data.completion;
   const scoredCompletion = data.scoredCompletion;
   const factPack = data.factPack;
+  const functionalSignals = data.functionalSignals;
   const respondentGroups = data.completion.respondentGroups;
   const participants = data.completion.participants;
   const biggestGaps = data.biggestGaps;
@@ -1390,8 +1453,8 @@ export default function AdvisorProjectDashboardClient({
                               group.totalInvited === 0
                                 ? "0%"
                                 : `${Math.round(
-                                    (group.completed / group.totalInvited) * 100,
-                                  )}%`,
+                                  (group.completed / group.totalInvited) * 100,
+                                )}%`,
                           }}
                         />
                       </div>
@@ -1417,7 +1480,10 @@ export default function AdvisorProjectDashboardClient({
                                 Role: {participant.roleLabel}
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
-                                Status: {getDisplayParticipantStatus(participant.participantStatus)}
+                                Status:{" "}
+                                {getDisplayParticipantStatus(
+                                  participant.participantStatus,
+                                )}
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
                                 Started: {formatDateTime(participant.startedAt)}
@@ -1451,7 +1517,10 @@ export default function AdvisorProjectDashboardClient({
               </div>
 
               <div className="mt-6">
-                <AddParticipantForm projectId={projectId} />
+                <AddParticipantForm
+                  projectId={projectId}
+                  segmentationSchema={segmentationSchema}
+                />
               </div>
 
               {inviteActionMessage ? (
@@ -1542,7 +1611,9 @@ export default function AdvisorProjectDashboardClient({
                                 participant.participantStatus,
                               )}`}
                             >
-                              {getDisplayParticipantStatus(participant.participantStatus)}
+                              {getDisplayParticipantStatus(
+                                participant.participantStatus,
+                              )}
                             </span>
                           </div>
 
@@ -1555,9 +1626,9 @@ export default function AdvisorProjectDashboardClient({
                                   setParticipantEditForm((current) =>
                                     current
                                       ? {
-                                          ...current,
-                                          name: event.target.value,
-                                        }
+                                        ...current,
+                                        name: event.target.value,
+                                      }
                                       : current,
                                   )
                                 }
@@ -1576,9 +1647,9 @@ export default function AdvisorProjectDashboardClient({
                                   setParticipantEditForm((current) =>
                                     current
                                       ? {
-                                          ...current,
-                                          email: event.target.value,
-                                        }
+                                        ...current,
+                                        email: event.target.value,
+                                      }
                                       : current,
                                   )
                                 }
@@ -1597,9 +1668,9 @@ export default function AdvisorProjectDashboardClient({
                                   setParticipantEditForm((current) =>
                                     current
                                       ? {
-                                          ...current,
-                                          roleLabel: event.target.value,
-                                        }
+                                        ...current,
+                                        roleLabel: event.target.value,
+                                      }
                                       : current,
                                   )
                                 }
@@ -1617,10 +1688,10 @@ export default function AdvisorProjectDashboardClient({
                                   setParticipantEditForm((current) =>
                                     current
                                       ? {
-                                          ...current,
-                                          questionnaireType:
-                                            event.target.value as QuestionnaireType,
-                                        }
+                                        ...current,
+                                        questionnaireType:
+                                          event.target.value as QuestionnaireType,
+                                      }
                                       : current,
                                   )
                                 }
@@ -1638,7 +1709,7 @@ export default function AdvisorProjectDashboardClient({
                             </EditableField>
 
                             {participantEditForm.questionnaireType !==
-                            "client_fact_pack" ? (
+                              "client_fact_pack" ? (
                               <>
                                 <EditableField label="Function">
                                   <select
@@ -1649,12 +1720,12 @@ export default function AdvisorProjectDashboardClient({
                                       setParticipantEditForm((current) =>
                                         current
                                           ? {
-                                              ...current,
-                                              segmentationValues: {
-                                                ...current.segmentationValues,
-                                                function: event.target.value,
-                                              },
-                                            }
+                                            ...current,
+                                            segmentationValues: {
+                                              ...current.segmentationValues,
+                                              function: event.target.value,
+                                            },
+                                          }
                                           : current,
                                       )
                                     }
@@ -1664,7 +1735,7 @@ export default function AdvisorProjectDashboardClient({
                                     }
                                     className={getLockedFieldClassName(
                                       !permissions.canEditSegmentation ||
-                                        !functionField,
+                                      !functionField,
                                     )}
                                   >
                                     <option value="">Select function</option>
@@ -1688,12 +1759,12 @@ export default function AdvisorProjectDashboardClient({
                                       setParticipantEditForm((current) =>
                                         current
                                           ? {
-                                              ...current,
-                                              segmentationValues: {
-                                                ...current.segmentationValues,
-                                                location: event.target.value,
-                                              },
-                                            }
+                                            ...current,
+                                            segmentationValues: {
+                                              ...current.segmentationValues,
+                                              location: event.target.value,
+                                            },
+                                          }
                                           : current,
                                       )
                                     }
@@ -1703,7 +1774,7 @@ export default function AdvisorProjectDashboardClient({
                                     }
                                     className={getLockedFieldClassName(
                                       !permissions.canEditSegmentation ||
-                                        !locationField,
+                                      !locationField,
                                     )}
                                   >
                                     <option value="">Select location</option>
@@ -1727,12 +1798,12 @@ export default function AdvisorProjectDashboardClient({
                                       setParticipantEditForm((current) =>
                                         current
                                           ? {
-                                              ...current,
-                                              segmentationValues: {
-                                                ...current.segmentationValues,
-                                                level: event.target.value,
-                                              },
-                                            }
+                                            ...current,
+                                            segmentationValues: {
+                                              ...current.segmentationValues,
+                                              level: event.target.value,
+                                            },
+                                          }
                                           : current,
                                       )
                                     }
@@ -1741,7 +1812,7 @@ export default function AdvisorProjectDashboardClient({
                                     }
                                     className={getLockedFieldClassName(
                                       !permissions.canEditSegmentation ||
-                                        !levelField,
+                                      !levelField,
                                     )}
                                   >
                                     <option value="">Select level</option>
@@ -1839,7 +1910,9 @@ export default function AdvisorProjectDashboardClient({
                         withdrawForm={withdrawForm}
                         reinstateForm={reinstateForm}
                         onEdit={() => beginParticipantEdit(participant)}
-                        onArchive={() => beginParticipantWithdraw(participant.participantId)}
+                        onArchive={() =>
+                          beginParticipantWithdraw(participant.participantId)
+                        }
                         onCancelArchive={() =>
                           cancelParticipantWithdraw(participant.participantId)
                         }
@@ -1888,12 +1961,14 @@ export default function AdvisorProjectDashboardClient({
                 <div>
                   <p className="brand-section-kicker">Reporting context</p>
                   <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    Fact pack and diagnostic pattern signals
+                    Fact pack, functional signals, and diagnostic pattern signals
                   </h2>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-3">
+                <div className="grid gap-4 xl:grid-cols-4">
                   <FactPackCard factPack={factPack} />
+
+                  <FunctionalSignalsCard functionalSignals={functionalSignals} />
 
                   <SignalSectionCard
                     title="Biggest gaps"
@@ -1942,13 +2017,7 @@ export default function AdvisorProjectDashboardClient({
   );
 }
 
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
@@ -1985,11 +2054,7 @@ function InfoCard({
   );
 }
 
-function NotesCard({
-  notes,
-}: {
-  notes: string | null;
-}) {
+function NotesCard({ notes }: { notes: string | null }) {
   return (
     <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] px-4 py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
@@ -2563,13 +2628,7 @@ function ParticipantCard({
   );
 }
 
-function AttributeCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function AttributeCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -2580,13 +2639,7 @@ function AttributeCard({
   );
 }
 
-function MetaChip({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MetaChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -2631,11 +2684,7 @@ function FieldGroup({
   );
 }
 
-function FactPackCard({
-  factPack,
-}: {
-  factPack: FactPackSummary;
-}) {
+function FactPackCard({ factPack }: { factPack: FactPackSummary }) {
   return (
     <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-5">
       <div className="flex items-center justify-between gap-3">
@@ -2684,6 +2733,84 @@ function FactPackCard({
           The Client Fact Pack is tracked as a project deliverable and input to
           final reporting. It is not included in scored comparison, insight
           generation, narrative engines, or qualitative pattern analysis.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FunctionalSignalsCard({
+  functionalSignals,
+}: {
+  functionalSignals: FunctionalSignalSummary[];
+}) {
+  const completedCount = functionalSignals.filter(
+    (signal) => signal.signalStatus === "completed",
+  ).length;
+
+  return (
+    <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Functional signals
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Non-scored cross-functional input
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+          {completedCount} / {functionalSignals.length}
+        </span>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {functionalSignals.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+            No functional signal modules have been added yet. These will sit
+            outside the scored diagnostic model.
+          </div>
+        ) : (
+          functionalSignals.map((signal) => (
+            <div
+              key={signal.signalRequestId}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {signal.moduleLabel ||
+                      formatFunctionalSignalModuleType(signal.moduleType)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {signal.recipientName}
+                  </p>
+                  <p className="mt-1 break-words text-xs text-slate-500">
+                    {signal.recipientEmail}
+                  </p>
+                </div>
+
+                <span
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${getFunctionalSignalTone(
+                    signal.signalStatus,
+                  )}`}
+                >
+                  {getFunctionalSignalStatusLabel(signal.signalStatus)}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                <p>Invited: {formatDateTime(signal.invitedAt)}</p>
+                <p>Completed: {formatDateTime(signal.completedAt)}</p>
+              </div>
+            </div>
+          ))
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+          Functional signals are contextual only. They do not affect scored
+          completion, dimension scores, cross-group gaps, or qualitative analysis.
         </div>
       </div>
     </div>
