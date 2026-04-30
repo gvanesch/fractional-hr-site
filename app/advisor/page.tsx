@@ -8,7 +8,6 @@ export const metadata = {
   },
 };
 
-
 export default async function AdvisorHomePage() {
   const advisorUser = await requireAdvisorUser();
 
@@ -28,8 +27,9 @@ export default async function AdvisorHomePage() {
             </h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Manage diagnostic projects, track participant completion, and
-              move from diagnostic insight to structured advisory engagement.
+              Manage diagnostic projects, track participant completion, review
+              health check activity, and move from diagnostic insight to
+              structured advisory engagement.
             </p>
           </div>
         </div>
@@ -58,6 +58,18 @@ export default async function AdvisorHomePage() {
             </h2>
             <p className="mt-2 text-sm text-slate-600">
               Monitor completion and access project dashboards.
+            </p>
+          </a>
+
+          <a
+            href="/advisor/health-checks"
+            className="brand-surface-card p-6 transition hover:shadow-md"
+          >
+            <h2 className="text-lg font-semibold text-slate-900">
+              Health checks
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Browse recent HR Health Check completions and linked enquiries.
             </p>
           </a>
         </div>
