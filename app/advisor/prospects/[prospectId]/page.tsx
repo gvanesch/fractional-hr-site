@@ -6,6 +6,7 @@ import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import ProspectDealControlPanel from "@/app/components/advisor/ProspectDealControlPanel";
 import UnlinkHealthCheckButton from "@/app/components/advisor/UnlinkHealthCheckButton";
 import AddProspectNote from "@/app/components/advisor/AddProspectNote";
+import ProspectContactOrganisationPanel from "@/app/components/advisor/ProspectContactOrganisationPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -35,18 +36,14 @@ type AdvisorProspect = {
     name: string | null;
     company: string | null;
     role: string | null;
-
-    // NEW CONTACT + ORG FIELDS
     contact_email: string | null;
     contact_phone: string | null;
     company_website: string | null;
     billing_contact_name: string | null;
     billing_contact_email: string | null;
     linkedin_url: string | null;
-
     source: "linkedin" | "referral" | "website" | "saas" | "other";
     segment: "smb" | "mid" | "enterprise" | null;
-
     diagnostic_status:
     | "not_invited"
     | "invited"
@@ -55,7 +52,6 @@ type AdvisorProspect = {
     | "assessment_candidate"
     | "in_conversation"
     | "converted";
-
     deal_stage:
     | "new"
     | "contacted"
@@ -67,20 +63,15 @@ type AdvisorProspect = {
     | "converted"
     | "lost"
     | "nurture";
-
     relationship_strength: "unknown" | "weak" | "medium" | "strong";
     lead_temperature: "cold" | "warm" | "hot";
-
     last_contact_date: string | null;
     next_action_date: string | null;
     next_step: string | null;
     lost_reason: string | null;
-
     observed_signals: string[] | null;
     notes: string | null;
-
     linked_submission_id: string | null;
-
     created_at: string;
     updated_at: string;
 };
@@ -323,6 +314,28 @@ function formatActivityDescription(activity: ProspectActivity): string {
         return `${actor} unlinked a Health Check from this prospect.`;
     }
 
+    if (activity.field_name) {
+        const field = activity.field_name.replaceAll("_", " ");
+
+        if (activity.old_value && activity.new_value) {
+            return `${actor} updated ${field} from "${activity.old_value}" to "${activity.new_value}".`;
+        }
+
+        if (activity.new_value) {
+            return `${actor} set ${field} to "${activity.new_value}".`;
+        }
+
+        if (activity.old_value) {
+            return `${actor} cleared ${field} (previously "${activity.old_value}").`;
+        }
+
+        return `${actor} updated ${field}.`;
+    }
+
+    if (activity.activity_type === "note_added") {
+        return `${actor} added a note.`;
+    }
+
     return `${actor} recorded ${activity.activity_type.replaceAll("_", " ")}.`;
 }
 
@@ -471,7 +484,9 @@ function SummaryItem({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {label}
             </p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+            <p className="mt-2 break-words text-sm font-semibold text-slate-900">
+                {value}
+            </p>
         </div>
     );
 }
@@ -538,7 +553,21 @@ export default async function ProspectDetailPage({
                         </span>
                     </div>
 
-                    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                            Next action
+                        </p>
+                        <h2 className="mt-2 text-lg font-semibold text-slate-900">
+                            {prospect.next_step || "No next step set"}
+                        </h2>
+                        <p className="mt-3 text-sm leading-6 text-slate-700">
+                            Action date:{" "}
+                            <strong>{formatDate(prospect.next_action_date)}</strong>
+                            {nextActionOverdue ? " · Overdue" : ""}
+                        </p>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <SummaryItem
                             label="Deal stage"
                             value={formatDealStage(prospect.deal_stage)}
@@ -546,14 +575,6 @@ export default async function ProspectDetailPage({
                         <SummaryItem
                             label="Lead temperature"
                             value={formatLeadTemperature(prospect.lead_temperature)}
-                        />
-                        <SummaryItem
-                            label="Next step"
-                            value={prospect.next_step || "Not set"}
-                        />
-                        <SummaryItem
-                            label="Next action date"
-                            value={formatDate(prospect.next_action_date)}
                         />
                         <SummaryItem
                             label="Last interaction"
@@ -608,15 +629,6 @@ export default async function ProspectDetailPage({
 
                 <ProspectDealControlPanel
                     prospectId={prospect.prospect_id}
-                    name={prospect.name}
-                    company={prospect.company}
-                    role={prospect.role}
-                    contactEmail={prospect.contact_email}
-                    contactPhone={prospect.contact_phone}
-                    companyWebsite={prospect.company_website}
-                    billingContactName={prospect.billing_contact_name}
-                    billingContactEmail={prospect.billing_contact_email}
-                    linkedinUrl={prospect.linkedin_url}
                     source={prospect.source}
                     segment={prospect.segment}
                     relationshipStrength={prospect.relationship_strength}
@@ -624,11 +636,52 @@ export default async function ProspectDetailPage({
                     leadTemperature={prospect.lead_temperature}
                     lastContactDate={prospect.last_contact_date}
                     nextActionDate={prospect.next_action_date}
-                    nextStep={prospect.next_step}
                     lostReason={prospect.lost_reason}
-                    notes={prospect.notes}
-                    observedSignals={prospect.observed_signals}
                 />
+
+                <AddProspectNote prospectId={prospect.prospect_id} />
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Historic notes
+                        </p>
+                        <h2 className="mt-3 text-xl font-semibold text-slate-900">
+                            Conversation notes
+                        </h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                            Append-only notes recorded against this prospect. These are kept
+                            separate from system activity so the conversation history is easy
+                            to read.
+                        </p>
+                    </div>
+
+                    {notesActivity.length > 0 ? (
+                        <div className="mt-6 space-y-4">
+                            {notesActivity.map((item) => (
+                                <article
+                                    key={item.activity_id}
+                                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
+                                >
+                                    <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800">
+                                        {item.note}
+                                    </p>
+                                    <p className="mt-3 text-xs uppercase tracking-[0.12em] text-slate-500">
+                                        {formatNoteType(item.note_type)} ·{" "}
+                                        {formatDateTime(item.created_at)}
+                                        {item.changed_by ? ` · ${item.changed_by}` : ""}
+                                    </p>
+                                </article>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                            <p className="text-sm leading-7 text-slate-700">
+                                No historic notes have been added yet.
+                            </p>
+                        </div>
+                    )}
+                </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -724,49 +777,18 @@ export default async function ProspectDetailPage({
                     )}
                 </section>
 
-                <AddProspectNote prospectId={prospect.prospect_id} />
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Historic notes
-                        </p>
-                        <h2 className="mt-3 text-xl font-semibold text-slate-900">
-                            Conversation notes
-                        </h2>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                            Append-only notes recorded against this prospect. These are kept
-                            separate from system activity so the conversation history is easy
-                            to read.
-                        </p>
-                    </div>
-
-                    {notesActivity.length > 0 ? (
-                        <div className="mt-6 space-y-4">
-                            {notesActivity.map((item) => (
-                                <article
-                                    key={item.activity_id}
-                                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
-                                >
-                                    <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800">
-                                        {item.note}
-                                    </p>
-                                    <p className="mt-3 text-xs uppercase tracking-[0.12em] text-slate-500">
-                                        {formatNoteType(item.note_type)} ·{" "}
-                                        {formatDateTime(item.created_at)}
-                                        {item.changed_by ? ` · ${item.changed_by}` : ""}
-                                    </p>
-                                </article>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                            <p className="text-sm leading-7 text-slate-700">
-                                No historic notes have been added yet.
-                            </p>
-                        </div>
-                    )}
-                </section>
+                <ProspectContactOrganisationPanel
+                    prospectId={prospect.prospect_id}
+                    name={prospect.name}
+                    company={prospect.company}
+                    role={prospect.role}
+                    contactEmail={prospect.contact_email}
+                    contactPhone={prospect.contact_phone}
+                    companyWebsite={prospect.company_website}
+                    billingContactName={prospect.billing_contact_name}
+                    billingContactEmail={prospect.billing_contact_email}
+                    linkedinUrl={prospect.linkedin_url}
+                />
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     <div>
@@ -793,12 +815,10 @@ export default async function ProspectDetailPage({
                                         {formatActivityDescription(item)}
                                     </p>
 
-                                    {item.old_value || item.new_value ? (
-                                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                                            {item.old_value ? `From: ${item.old_value}` : ""}
-                                            {item.old_value && item.new_value ? " · " : ""}
-                                            {item.new_value ? `To: ${item.new_value}` : ""}
-                                        </p>
+                                    {item.note?.trim() ? (
+                                        <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
+                                            {item.note}
+                                        </pre>
                                     ) : null}
 
                                     <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">
