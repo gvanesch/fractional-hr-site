@@ -4,17 +4,18 @@ export const metadata = {
     follow: false,
   },
 };
-
+import Link from "next/link";
+import UnlinkHealthCheckButton from "@/app/components/advisor/UnlinkHealthCheckButton";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import ProspectCrmPanel from "@/app/components/advisor/ProspectCrmPanel";
 import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
-  type DiagnosticAnswers,
   type AdvisorBrief,
+  type DiagnosticAnswers,
 } from "../../../lib/diagnostic";
+
 
 export const dynamic = "force-dynamic";
 
@@ -50,32 +51,48 @@ type SubmissionRow = {
   contact_submitted_at: string | null;
 };
 
-type ProspectRecord = {
+type AdvisorProspectRecord = {
   prospect_id: string;
-  submission_id: string;
   name: string | null;
   company: string | null;
-  relationship: "weak" | "medium" | "strong";
-  status:
-  | "not_contacted"
+  role: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  company_website: string | null;
+  source: "linkedin" | "referral" | "website" | "saas" | "other";
+  segment: "smb" | "mid" | "enterprise" | null;
+  relationship_strength: "cold" | "warm" | "strong" | null;
+  deal_stage:
+  | "identified"
   | "contacted"
-  | "replied"
-  | "call_booked"
-  | "opportunity"
-  | "won"
+  | "in_conversation"
+  | "proposal"
+  | "converted"
   | "lost";
+  lead_temperature: "cold" | "warm" | "hot" | null;
+  diagnostic_status:
+  | "not_invited"
+  | "invited"
+  | "started"
+  | "completed"
+  | "assessment_candidate"
+  | "in_conversation"
+  | "converted";
   last_contact_date: string | null;
   next_action_date: string | null;
-  source: "network" | "referral" | "website" | "other";
+  next_step: string | null;
+  lost_reason: string | null;
   notes: string | null;
+  observed_signals: string | null;
+  linked_submission_id: string | null;
   created_at: string;
   updated_at: string;
 };
 
-type ProspectActivityRecord = {
+type AdvisorProspectActivityRecord = {
   activity_id: string;
   prospect_id: string;
-  submission_id: string;
+  linked_submission_id: string | null;
   activity_type: string;
   field_name: string | null;
   old_value: string | null;
@@ -139,7 +156,7 @@ function formatSubmittedAt(value: string | null): string {
 }
 
 function formatDateValue(value: string | null): string {
-  if (!value) return "Empty";
+  if (!value) return "Not set";
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     try {
@@ -168,52 +185,122 @@ function renderList(items: string[]) {
   );
 }
 
-function formatProspectStatusValue(value: string | null): string {
-  switch (value) {
-    case "not_contacted":
-      return "Not Contacted";
-    case "contacted":
-      return "Contacted";
-    case "replied":
-      return "Replied";
-    case "call_booked":
-      return "Call Booked";
-    case "opportunity":
-      return "Opportunity";
-    case "won":
-      return "Won";
-    case "lost":
-      return "Lost";
-    default:
-      return value || "Empty";
-  }
-}
-
-function formatRelationshipValue(value: string | null): string {
-  switch (value) {
-    case "weak":
-      return "Weak";
-    case "medium":
-      return "Medium";
-    case "strong":
-      return "Strong";
-    default:
-      return value || "Empty";
-  }
-}
-
 function formatSourceValue(value: string | null): string {
   switch (value) {
-    case "network":
-      return "Network";
+    case "linkedin":
+      return "LinkedIn";
     case "referral":
       return "Referral";
     case "website":
       return "Website";
+    case "saas":
+      return "SaaS";
+    case "network":
+      return "Network";
     case "other":
       return "Other";
     default:
-      return value || "Empty";
+      return value || "Not set";
+  }
+}
+
+function formatSegmentValue(value: string | null): string {
+  switch (value) {
+    case "smb":
+      return "SMB";
+    case "mid":
+      return "Mid-market";
+    case "enterprise":
+      return "Enterprise";
+    default:
+      return value || "Not set";
+  }
+}
+
+function formatRelationshipStrength(value: string | null): string {
+  switch (value) {
+    case "cold":
+      return "Cold";
+    case "warm":
+      return "Warm";
+    case "strong":
+      return "Strong";
+    default:
+      return value || "Not set";
+  }
+}
+
+function formatDealStage(value: string | null): string {
+  switch (value) {
+    case "identified":
+      return "Identified";
+    case "contacted":
+      return "Contacted";
+    case "in_conversation":
+      return "In conversation";
+    case "proposal":
+      return "Proposal";
+    case "converted":
+      return "Converted";
+    case "lost":
+      return "Lost";
+    default:
+      return value || "Not set";
+  }
+}
+
+function formatLeadTemperature(value: string | null): string {
+  switch (value) {
+    case "cold":
+      return "Cold";
+    case "warm":
+      return "Warm";
+    case "hot":
+      return "Hot";
+    default:
+      return value || "Not set";
+  }
+}
+
+function formatDiagnosticStatus(value: string | null): string {
+  switch (value) {
+    case "not_invited":
+      return "Not invited";
+    case "invited":
+      return "Invited";
+    case "started":
+      return "Started";
+    case "completed":
+      return "Health Check completed";
+    case "assessment_candidate":
+      return "Assessment candidate";
+    case "in_conversation":
+      return "In conversation";
+    case "converted":
+      return "Converted";
+    default:
+      return value || "Not set";
+  }
+}
+
+function statusBadgeClasses(value: string | null): string {
+  switch (value) {
+    case "converted":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "completed":
+    case "assessment_candidate":
+      return "border-violet-200 bg-violet-50 text-violet-700";
+    case "in_conversation":
+    case "proposal":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "invited":
+    case "started":
+    case "contacted":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    case "lost":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
   }
 }
 
@@ -221,61 +308,50 @@ function formatFieldLabel(value: string | null): string {
   switch (value) {
     case "source":
       return "source";
-    case "status":
-      return "status";
-    case "relationship":
-      return "relationship";
+    case "segment":
+      return "segment";
+    case "deal_stage":
+      return "deal stage";
+    case "lead_temperature":
+      return "lead temperature";
+    case "diagnostic_status":
+      return "diagnostic status";
     case "last_contact_date":
       return "last contact date";
     case "next_action_date":
       return "next action date";
+    case "next_step":
+      return "next step";
     case "notes":
       return "notes";
+    case "linked_submission_id":
+      return "linked Health Check";
     default:
       return value || "field";
   }
 }
 
-function formatActivityDescription(activity: ProspectActivityRecord): string {
-  const actor = activity.changed_by || "Unknown advisor";
+function formatActivityDescription(
+  activity: AdvisorProspectActivityRecord,
+): string {
+  const actor = activity.changed_by || "Advisor";
 
-  if (activity.activity_type === "source_changed") {
-    return `${actor} changed source from ${formatSourceValue(
-      activity.old_value,
-    )} to ${formatSourceValue(activity.new_value)}.`;
+  switch (activity.activity_type) {
+    case "health_check_linked":
+      return `${actor} linked a Health Check to this prospect.`;
+    case "health_check_unlinked":
+      return `${actor} unlinked a Health Check from this prospect.`;
+    case "note_added":
+      return `${actor} added a prospect note.`;
+    case "prospect_created":
+      return `${actor} created this prospect.`;
+    default:
+      if (activity.field_name) {
+        return `${actor} updated ${formatFieldLabel(activity.field_name)}.`;
+      }
+
+      return `${actor} updated this prospect.`;
   }
-
-  if (activity.activity_type === "status_changed") {
-    return `${actor} changed status from ${formatProspectStatusValue(
-      activity.old_value,
-    )} to ${formatProspectStatusValue(activity.new_value)}.`;
-  }
-
-  if (activity.activity_type === "relationship_changed") {
-    return `${actor} changed relationship from ${formatRelationshipValue(
-      activity.old_value,
-    )} to ${formatRelationshipValue(activity.new_value)}.`;
-  }
-
-  if (activity.activity_type === "last_contact_date_changed") {
-    return `${actor} changed last contact date from ${formatDateValue(
-      activity.old_value,
-    )} to ${formatDateValue(activity.new_value)}.`;
-  }
-
-  if (activity.activity_type === "next_action_date_changed") {
-    return `${actor} changed next action date from ${formatDateValue(
-      activity.old_value,
-    )} to ${formatDateValue(activity.new_value)}.`;
-  }
-
-  if (activity.activity_type === "notes_changed") {
-    return `${actor} updated internal prospect notes.`;
-  }
-
-  return `${actor} changed ${formatFieldLabel(
-    activity.field_name,
-  )} from ${activity.old_value || "Empty"} to ${activity.new_value || "Empty"}.`;
 }
 
 function asObject(value: JsonValue): JsonObject | null {
@@ -483,6 +559,7 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 
 async function requireAdvisorSession(submissionId: string) {
   const supabase = await createSupabaseServerClient();
+
   const {
     data: { user },
     error,
@@ -546,42 +623,52 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
   return data as SubmissionRow;
 }
 
-async function getHealthCheckProspect(
+async function getLinkedAdvisorProspect(
   submissionId: string,
-): Promise<ProspectRecord | null> {
+): Promise<AdvisorProspectRecord | null> {
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
-    .from("health_check_prospects")
+    .from("advisor_prospects")
     .select(
       `
         prospect_id,
-        submission_id,
         name,
         company,
-        relationship,
-        status,
+        role,
+        contact_email,
+        contact_phone,
+        company_website,
+        source,
+        segment,
+        relationship_strength,
+        deal_stage,
+        lead_temperature,
+        diagnostic_status,
         last_contact_date,
         next_action_date,
-        source,
+        next_step,
+        lost_reason,
         notes,
+        observed_signals,
+        linked_submission_id,
         created_at,
         updated_at
       `,
     )
-    .eq("submission_id", submissionId)
+    .eq("linked_submission_id", submissionId)
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Unable to load prospect record: ${error.message}`);
+    throw new Error(`Unable to load linked CRM prospect: ${error.message}`);
   }
 
-  return (data as ProspectRecord | null) ?? null;
+  return (data as AdvisorProspectRecord | null) ?? null;
 }
 
-async function getProspectActivity(
+async function getAdvisorProspectActivity(
   prospectId: string | null,
-): Promise<ProspectActivityRecord[]> {
+): Promise<AdvisorProspectActivityRecord[]> {
   if (!prospectId) {
     return [];
   }
@@ -589,12 +676,12 @@ async function getProspectActivity(
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
-    .from("health_check_prospect_activity")
+    .from("advisor_prospect_activity")
     .select(
       `
         activity_id,
         prospect_id,
-        submission_id,
+        linked_submission_id,
         activity_type,
         field_name,
         old_value,
@@ -612,7 +699,7 @@ async function getProspectActivity(
     throw new Error(`Unable to load prospect activity: ${error.message}`);
   }
 
-  return (data ?? []) as ProspectActivityRecord[];
+  return (data ?? []) as AdvisorProspectActivityRecord[];
 }
 
 async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
@@ -694,7 +781,9 @@ function MetricCard({
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 break-words text-lg font-semibold text-slate-900">
+        {value}
+      </p>
     </div>
   );
 }
@@ -759,6 +848,130 @@ function SignalCard({
   );
 }
 
+function LinkedProspectCard({
+  prospect,
+  submissionId,
+}: {
+  prospect: AdvisorProspectRecord | null;
+  submissionId: string;
+}) {
+  if (!prospect) {
+    return (
+      <section className="brand-surface-card p-6 sm:p-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="brand-section-kicker">Prospect CRM</p>
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              No CRM prospect linked
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              This Health Check can be linked to an existing Prospect CRM record.
+              Linking keeps the Health Check evidence and pipeline workflow in one
+              place without converting it into a full diagnostic project.
+            </p>
+          </div>
+
+          <Link
+            href={`/advisor/prospects?linkSubmissionId=${encodeURIComponent(
+              submissionId,
+            )}`}
+            className="brand-button-primary text-center"
+          >
+            Link to prospect
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="brand-surface-card p-6 sm:p-8">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="brand-section-kicker">Prospect CRM</p>
+            <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+              Linked CRM prospect
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              This Health Check is linked to the Prospect CRM record below. Use
+              the CRM record for pipeline notes, next action, and opportunity
+              movement.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link
+              href={`/advisor/prospects/${prospect.prospect_id}`}
+              className="brand-button-primary text-center"
+            >
+              Open prospect
+            </Link>
+
+            <UnlinkHealthCheckButton prospectId={prospect.prospect_id} />
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <MetricCard
+            label="Prospect"
+            value={prospect.company || prospect.name || "Unnamed prospect"}
+          />
+          <MetricCard
+            label="Deal stage"
+            value={formatDealStage(prospect.deal_stage)}
+          />
+          <MetricCard
+            label="Diagnostic status"
+            value={formatDiagnosticStatus(prospect.diagnostic_status)}
+          />
+          <MetricCard
+            label="Next action"
+            value={formatDateValue(prospect.next_action_date)}
+          />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <InfoCard
+            label="Contact"
+            value={prospect.name || "No named contact"}
+            secondary={prospect.contact_email || undefined}
+          />
+          <InfoCard
+            label="Source"
+            value={formatSourceValue(prospect.source)}
+            secondary={`Segment: ${formatSegmentValue(prospect.segment)}`}
+          />
+          <InfoCard
+            label="Relationship"
+            value={formatRelationshipStrength(prospect.relationship_strength)}
+            secondary={`Temperature: ${formatLeadTemperature(
+              prospect.lead_temperature,
+            )}`}
+          />
+        </div>
+
+        {prospect.next_step || prospect.notes || prospect.observed_signals ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <NotesCard
+              title="Next step"
+              content={prospect.next_step || "No next step recorded."}
+            />
+            <NotesCard
+              title="Observed signals"
+              content={prospect.observed_signals || "No observed signals recorded."}
+            />
+            <NotesCard
+              title="CRM notes"
+              content={prospect.notes || "No CRM notes recorded."}
+            />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export default async function AdvisorSubmissionPage({
   params,
 }: AdvisorPageProps) {
@@ -768,10 +981,10 @@ export default async function AdvisorSubmissionPage({
 
   const [data, prospect] = await Promise.all([
     getSubmissionView(submissionId),
-    getHealthCheckProspect(submissionId),
+    getLinkedAdvisorProspect(submissionId),
   ]);
 
-  const activity = await getProspectActivity(prospect?.prospect_id ?? null);
+  const activity = await getAdvisorProspectActivity(prospect?.prospect_id ?? null);
 
   const submission = data.submission;
   const result = data.diagnostic;
@@ -808,17 +1021,26 @@ export default async function AdvisorSubmissionPage({
 
               {prospect ? (
                 <>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {formatSourceValue(prospect.source)}
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(
+                      prospect.deal_stage,
+                    )}`}
+                  >
+                    {formatDealStage(prospect.deal_stage)}
                   </span>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {formatRelationshipValue(prospect.relationship)}
-                  </span>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {formatProspectStatusValue(prospect.status)}
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(
+                      prospect.diagnostic_status,
+                    )}`}
+                  >
+                    {formatDiagnosticStatus(prospect.diagnostic_status)}
                   </span>
                 </>
-              ) : null}
+              ) : (
+                <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                  Not linked to CRM
+                </span>
+              )}
             </div>
 
             <p className="brand-subheading brand-body-on-dark mt-5 max-w-3xl">
@@ -883,18 +1105,7 @@ export default async function AdvisorSubmissionPage({
               </div>
             </section>
 
-            <ProspectCrmPanel
-              prospect={prospect}
-              summary={
-                result
-                  ? {
-                    score: result.score,
-                    band: result.band.label,
-                    narrative: data.derived.narrative ?? undefined,
-                  }
-                  : undefined
-              }
-            />
+            <LinkedProspectCard prospect={prospect} submissionId={submissionId} />
 
             {(advisorBrief || result) ? (
               <section className="brand-surface-card p-6 sm:p-8">
@@ -1037,19 +1248,21 @@ export default async function AdvisorSubmissionPage({
                             Supporting diagnostic signals
                           </p>
                           <div className="mt-4 space-y-3">
-                            {data.derived.lowestDimensionInsights.map((dimension) => (
-                              <div
-                                key={dimension.label}
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4"
-                              >
-                                <p className="text-sm font-semibold text-slate-900">
-                                  {dimension.label} - {dimension.score}/5
-                                </p>
-                                <p className="mt-2 text-sm leading-6 text-slate-700">
-                                  {dimension.insight}
-                                </p>
-                              </div>
-                            ))}
+                            {data.derived.lowestDimensionInsights.map(
+                              (dimension) => (
+                                <div
+                                  key={dimension.label}
+                                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4"
+                                >
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {dimension.label} - {dimension.score}/5
+                                  </p>
+                                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                                    {dimension.insight}
+                                  </p>
+                                </div>
+                              ),
+                            )}
                           </div>
                         </div>
                       ) : null}
@@ -1141,11 +1354,11 @@ export default async function AdvisorSubmissionPage({
                 <div className="mb-6">
                   <p className="brand-section-kicker">Activity history</p>
                   <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    Prospect activity timeline
+                    CRM activity timeline
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm text-slate-600">
-                    Read-only history of meaningful CRM changes made against this
-                    Health Check prospect record.
+                    Read-only history of meaningful CRM changes made against the
+                    linked Prospect CRM record.
                   </p>
                 </div>
 
@@ -1175,7 +1388,7 @@ export default async function AdvisorSubmissionPage({
                 ) : (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
                     <p className="text-sm leading-7 text-slate-700">
-                      No prospect activity has been recorded yet.
+                      No CRM activity has been recorded yet.
                     </p>
                   </div>
                 )}

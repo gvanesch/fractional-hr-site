@@ -60,6 +60,13 @@ export default function AdvisorNav() {
           >
             Health Checks
           </a>
+
+          <a
+            href="/advisor/prospects"
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
+            Prospect CRM
+          </a>
         </div>
 
         <button

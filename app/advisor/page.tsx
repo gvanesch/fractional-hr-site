@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 
@@ -7,6 +8,31 @@ export const metadata = {
     follow: false,
   },
 };
+
+const ADVISOR_CARDS = [
+  {
+    title: "Create project",
+    description: "Set up a new diagnostic project and invite participants.",
+    href: "/advisor/create-project",
+  },
+  {
+    title: "View projects",
+    description: "Monitor completion, manage participants, and access reports.",
+    href: "/advisor/projects",
+  },
+  {
+    title: "Health checks",
+    description:
+      "Review inbound health check submissions and early advisory signals.",
+    href: "/advisor/submissions",
+  },
+  {
+    title: "Prospect CRM",
+    description:
+      "Manage prospects, track outreach, and keep advisory pipeline activity in one place.",
+    href: "/advisor/prospects",
+  },
+];
 
 export default async function AdvisorHomePage() {
   const advisorUser = await requireAdvisorUser();
@@ -27,51 +53,30 @@ export default async function AdvisorHomePage() {
             </h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              Manage diagnostic projects, track participant completion, review
-              health check activity, and move from diagnostic insight to
-              structured advisory engagement.
+              Manage diagnostic projects, review health check signals, track
+              prospects, and move from structured insight to advisory action.
             </p>
+
           </div>
         </div>
       </section>
 
       <div className="brand-container py-10">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <a
-            href="/advisor/create-project"
-            className="brand-surface-card p-6 transition hover:shadow-md"
-          >
-            <h2 className="text-lg font-semibold text-slate-900">
-              Create project
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Set up a new diagnostic and invite participants.
-            </p>
-          </a>
-
-          <a
-            href="/advisor/projects"
-            className="brand-surface-card p-6 transition hover:shadow-md"
-          >
-            <h2 className="text-lg font-semibold text-slate-900">
-              View projects
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Monitor completion and access project dashboards.
-            </p>
-          </a>
-
-          <a
-            href="/advisor/health-checks"
-            className="brand-surface-card p-6 transition hover:shadow-md"
-          >
-            <h2 className="text-lg font-semibold text-slate-900">
-              Health checks
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Browse recent HR Health Check completions and linked enquiries.
-            </p>
-          </a>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {ADVISOR_CARDS.map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="brand-surface-card p-6 transition hover:shadow-md"
+            >
+              <h2 className="text-lg font-semibold text-slate-900">
+                {card.title}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {card.description}
+              </p>
+            </Link>
+          ))}
         </div>
       </div>
     </main>
