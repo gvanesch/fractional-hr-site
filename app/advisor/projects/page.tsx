@@ -29,6 +29,12 @@ type PageProps = {
   }>;
 };
 
+const fieldClassName =
+  "mt-2 h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 text-sm leading-none text-slate-900 outline-none transition focus:border-slate-500";
+
+const actionButtonClassName =
+  "inline-flex h-12 items-center justify-center whitespace-nowrap rounded-full px-5 text-center text-sm font-semibold";
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
@@ -169,7 +175,7 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
         ) : (
           <div className="space-y-6">
             <section className="brand-surface-card p-6">
-              <form className="grid gap-4 lg:grid-cols-[1fr_180px_180px_auto]">
+              <form className="grid items-end gap-4 lg:grid-cols-[1fr_180px_180px_auto]">
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
                     Search projects
@@ -179,7 +185,7 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
                     type="search"
                     defaultValue={query}
                     placeholder="Search company, project, or project ID"
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    className={fieldClassName}
                   />
                 </label>
 
@@ -190,7 +196,7 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
                   <select
                     name="status"
                     defaultValue={status}
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    className={fieldClassName}
                   >
                     <option value="all">All</option>
                     <option value="active">Open</option>
@@ -206,19 +212,25 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
                   <select
                     name="sort"
                     defaultValue={sort}
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    className={fieldClassName}
                   >
                     <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
                   </select>
                 </label>
 
-                <div className="flex items-end gap-3">
-                  <button type="submit" className="brand-button-primary">
+                <div className="flex flex-wrap items-end gap-3">
+                  <button
+                    type="submit"
+                    className={`${actionButtonClassName} brand-button-primary`}
+                  >
                     Apply
                   </button>
 
-                  <Link href="/advisor/projects" className="brand-button-dark">
+                  <Link
+                    href="/advisor/projects"
+                    className={`${actionButtonClassName} brand-button-dark`}
+                  >
                     Reset
                   </Link>
                 </div>
@@ -248,13 +260,13 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
                 </p>
               </section>
             ) : (
-              <div className="space-y-4">
+              <div className="grid gap-4">
                 {filteredProjects.map((project) => (
                   <section
                     key={project.project_id}
-                    className="brand-surface-card p-6 transition-shadow hover:shadow-md"
+                    className="brand-surface-card min-h-[168px] p-6 transition-shadow hover:shadow-md"
                   >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex h-full flex-col gap-5 lg:flex-row lg:items-stretch lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <h2 className="text-xl font-semibold text-slate-900">
@@ -280,17 +292,17 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
                         </div>
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[320px] lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="grid content-center gap-3 sm:grid-cols-2 lg:min-w-[320px] lg:grid-cols-1 xl:grid-cols-2">
                         <Link
                           href={`/advisor/project/${project.project_id}`}
-                          className="brand-button-primary text-center"
+                          className={`${actionButtonClassName} brand-button-primary`}
                         >
                           Open workspace
                         </Link>
 
                         <Link
                           href={`/advisor/report/${project.project_id}`}
-                          className="brand-button-dark text-center"
+                          className={`${actionButtonClassName} brand-button-dark`}
                         >
                           View report
                         </Link>
@@ -309,7 +321,7 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
 
 function WorkspaceStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/10 p-5 text-white">
+    <div className="h-full rounded-2xl border border-white/15 bg-white/10 p-5 text-white">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
         {label}
       </p>
