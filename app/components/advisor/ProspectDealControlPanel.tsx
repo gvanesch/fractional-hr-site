@@ -32,7 +32,7 @@ type ProspectDealControlPanelProps = {
 };
 
 const inputClass =
-    "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15";
+    "h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15";
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
     return (
@@ -63,12 +63,14 @@ export default function ProspectDealControlPanel({
     const [currentLeadTemperature, setCurrentLeadTemperature] =
         useState(leadTemperature);
     const [currentLastContactDate, setCurrentLastContactDate] = useState(
-        lastContactDate ?? "",
+        lastContactDate ?? ""
     );
     const [currentNextActionDate, setCurrentNextActionDate] = useState(
-        nextActionDate ?? "",
+        nextActionDate ?? ""
     );
-    const [currentLostReason, setCurrentLostReason] = useState(lostReason ?? "");
+    const [currentLostReason, setCurrentLostReason] = useState(
+        lostReason ?? ""
+    );
 
     const [saveState, setSaveState] = useState<
         "idle" | "saving" | "saved" | "error"
@@ -112,17 +114,14 @@ export default function ProspectDealControlPanel({
         } catch (err) {
             setSaveState("error");
             setError(
-                err instanceof Error ? err.message : "Unable to update prospect.",
+                err instanceof Error ? err.message : "Unable to update prospect."
             );
         }
     }
 
     return (
-        <section
-            id="deal-control-panel"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-        >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         CRM workspace
@@ -131,8 +130,8 @@ export default function ProspectDealControlPanel({
                         Manage deal movement
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Keep the live commercial position current. Use the interaction
-                        note below to record conversations and update the next step.
+                        Keep the live commercial position current. Update stage,
+                        temperature, and timing as conversations progress.
                     </p>
                 </div>
 
@@ -140,24 +139,28 @@ export default function ProspectDealControlPanel({
                     type="button"
                     onClick={handleSave}
                     disabled={saveState === "saving"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-[#1E6FD9] px-4 text-sm font-medium text-white transition hover:bg-[#1859ad] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-12 items-center justify-center rounded-xl bg-[#1E6FD9] px-5 text-sm font-medium text-white shadow-sm transition hover:bg-[#1859ad] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {saveState === "saving" ? "Saving..." : "Save CRM update"}
+                    {saveState === "saving" ? "Saving..." : "Save update"}
                 </button>
             </div>
 
-            <div className="mt-6 space-y-6">
+            <div className="mt-8 space-y-8">
+                {/* Deal state */}
                 <div>
-                    <h3 className="text-sm font-semibold text-slate-900">Deal state</h3>
-                    <div className="mt-3 grid gap-4 md:grid-cols-3">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                        Deal state
+                    </h3>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <label className="block">
                             <FieldLabel>Deal stage</FieldLabel>
                             <select
                                 value={currentDealStage}
-                                onChange={(event) =>
-                                    setCurrentDealStage(event.target.value as DealStage)
+                                onChange={(e) =>
+                                    setCurrentDealStage(e.target.value as DealStage)
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2 appearance-none`}
                             >
                                 <option value="new">New</option>
                                 <option value="contacted">Contacted</option>
@@ -167,7 +170,9 @@ export default function ProspectDealControlPanel({
                                 <option value="diagnostic_assessment_candidate">
                                     Diagnostic Assessment candidate
                                 </option>
-                                <option value="proposal_discussed">Proposal discussed</option>
+                                <option value="proposal_discussed">
+                                    Proposal discussed
+                                </option>
                                 <option value="converted">Converted</option>
                                 <option value="lost">Lost</option>
                                 <option value="nurture">Nurture</option>
@@ -178,12 +183,12 @@ export default function ProspectDealControlPanel({
                             <FieldLabel>Lead temperature</FieldLabel>
                             <select
                                 value={currentLeadTemperature}
-                                onChange={(event) =>
+                                onChange={(e) =>
                                     setCurrentLeadTemperature(
-                                        event.target.value as LeadTemperature,
+                                        e.target.value as LeadTemperature
                                     )
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2 appearance-none`}
                             >
                                 <option value="cold">Cold</option>
                                 <option value="warm">Warm</option>
@@ -195,12 +200,12 @@ export default function ProspectDealControlPanel({
                             <FieldLabel>Relationship</FieldLabel>
                             <select
                                 value={currentRelationshipStrength}
-                                onChange={(event) =>
+                                onChange={(e) =>
                                     setCurrentRelationshipStrength(
-                                        event.target.value as RelationshipStrength,
+                                        e.target.value as RelationshipStrength
                                     )
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2 appearance-none`}
                             >
                                 <option value="unknown">Unknown</option>
                                 <option value="weak">Weak</option>
@@ -211,20 +216,22 @@ export default function ProspectDealControlPanel({
                     </div>
                 </div>
 
+                {/* Movement */}
                 <div>
                     <h3 className="text-sm font-semibold text-slate-900">
                         Commercial movement
                     </h3>
-                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <FieldLabel>Last contact</FieldLabel>
                             <input
                                 type="date"
                                 value={currentLastContactDate}
-                                onChange={(event) =>
-                                    setCurrentLastContactDate(event.target.value)
+                                onChange={(e) =>
+                                    setCurrentLastContactDate(e.target.value)
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2`}
                             />
                         </label>
 
@@ -233,10 +240,10 @@ export default function ProspectDealControlPanel({
                             <input
                                 type="date"
                                 value={currentNextActionDate}
-                                onChange={(event) =>
-                                    setCurrentNextActionDate(event.target.value)
+                                onChange={(e) =>
+                                    setCurrentNextActionDate(e.target.value)
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2`}
                             />
                         </label>
                     </div>
@@ -246,29 +253,31 @@ export default function ProspectDealControlPanel({
                             <FieldLabel>Lost reason</FieldLabel>
                             <input
                                 value={currentLostReason}
-                                onChange={(event) =>
-                                    setCurrentLostReason(event.target.value)
+                                onChange={(e) =>
+                                    setCurrentLostReason(e.target.value)
                                 }
                                 placeholder="Why was this lost?"
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2`}
                             />
                         </label>
                     ) : null}
                 </div>
 
+                {/* Qualification */}
                 <div>
                     <h3 className="text-sm font-semibold text-slate-900">
                         Qualification
                     </h3>
-                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <label className="block">
                             <FieldLabel>Source</FieldLabel>
                             <select
                                 value={currentSource}
-                                onChange={(event) =>
-                                    setCurrentSource(event.target.value as ProspectSource)
+                                onChange={(e) =>
+                                    setCurrentSource(e.target.value as ProspectSource)
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2 appearance-none`}
                             >
                                 <option value="linkedin">LinkedIn</option>
                                 <option value="referral">Referral</option>
@@ -282,17 +291,17 @@ export default function ProspectDealControlPanel({
                             <FieldLabel>Segment</FieldLabel>
                             <select
                                 value={currentSegment ?? ""}
-                                onChange={(event) =>
+                                onChange={(e) =>
                                     setCurrentSegment(
-                                        event.target.value
-                                            ? (event.target.value as Exclude<
+                                        e.target.value
+                                            ? (e.target.value as Exclude<
                                                 ProspectSegment,
                                                 null
                                             >)
-                                            : null,
+                                            : null
                                     )
                                 }
-                                className={`mt-2 ${inputClass}`}
+                                className={`${inputClass} mt-2 appearance-none`}
                             >
                                 <option value="">Not set</option>
                                 <option value="smb">SMB</option>
@@ -304,10 +313,10 @@ export default function ProspectDealControlPanel({
                 </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm text-slate-600">
                     {saveState === "idle" &&
-                        "Update this panel when the commercial position changes. Use interaction notes for conversation history and next-step detail."}
+                        "Update this panel when the commercial position changes."}
                     {saveState === "saving" && "Saving changes..."}
                     {saveState === "saved" && "CRM updated successfully."}
                     {saveState === "error" && error}
