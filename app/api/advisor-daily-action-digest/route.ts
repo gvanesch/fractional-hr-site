@@ -35,11 +35,23 @@ type ProjectDigestRow = {
     dashboardUrl: string | null;
 };
 
+type ContactFormDiagnosticRow = {
+    submission_id: string;
+    contact_name: string | null;
+    contact_email: string | null;
+    contact_company: string | null;
+    contact_topic: string | null;
+    score: number | null;
+    band: string | null;
+    contact_submitted_at: string | null;
+};
+
 type DigestData = {
     overdueProspects: AdvisorProspectRow[];
     dueTodayProspects: AdvisorProspectRow[];
     nextSevenDaysProspects: AdvisorProspectRow[];
     noNextActionProspects: AdvisorProspectRow[];
+    contactFormDiagnostics: ContactFormDiagnosticRow[];
     activeProjects: ProjectDigestRow[];
 };
 
@@ -256,6 +268,76 @@ function buildProspectSection(
   `;
 }
 
+function buildContactFormDiagnosticSection(
+    diagnostics: ContactFormDiagnosticRow[],
+    appBaseUrl: string | null,
+) {
+    if (diagnostics.length === 0) {
+        return "";
+    }
+
+    const rows = diagnostics
+        .map((item) => {
+            const healthCheckUrl = buildHealthCheckUrl(
+                appBaseUrl,
+                item.submission_id,
+            );
+
+            const link = healthCheckUrl
+                ? `<a href="${escapeHtml(healthCheckUrl)}" style="color: #1E6FD9; text-decoration: none;">Open Health Check</a>`
+                : "";
+
+            return `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628;">
+            <strong>${escapeHtml(item.contact_company || item.contact_name || "Unknown contact")}</strong>
+            <br />
+            <span style="color: #64748B;">
+              ${escapeHtml(item.contact_name || "No name")} · ${escapeHtml(item.contact_email || "No email")}
+            </span>
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #E2E8F0; color: #334155;">
+            ${item.score ?? "-"} / 100
+            <br />
+            <span style="color: #64748B;">${escapeHtml(item.band || "Unknown")}</span>
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #E2E8F0; color: #334155;">
+            ${escapeHtml(item.contact_topic || "General enquiry")}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #E2E8F0; color: #334155;">
+            ${link}
+          </td>
+        </tr>
+      `;
+        })
+        .join("");
+
+    return `
+    <section style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; margin: 0 0 16px 0;">
+      <h3 style="margin: 0 0 12px 0; color: #0A1628; font-size: 18px; line-height: 1.3;">
+        Contact-form diagnostics requiring review
+      </h3>
+      <p style="margin: 0 0 14px 0; color: #64748B; line-height: 1.6;">
+        These are Health Check records where a contact form was submitted. Anonymous and passive Health Checks are excluded.
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
+        <thead>
+          <tr style="background: #F8FAFC;">
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Contact</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Score</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Topic</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
 function buildProjectSection(projects: ProjectDigestRow[]) {
     if (projects.length === 0) {
         return "";
@@ -295,10 +377,10 @@ function buildProjectSection(projects: ProjectDigestRow[]) {
       <table style="width: 100%; border-collapse: collapse; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
         <thead>
           <tr style="background: #F8FAFC;">
-            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Project</th>
-            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: center;">Outstanding</th>
-            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: center;">Invites expiring in 7 days</th>
-            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #0A1628; text-align: left;">Link</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: left;">Project</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center;">Outstanding</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center;">Invites expiring</th>
+            <th style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: left;">Link</th>
           </tr>
         </thead>
         <tbody>
@@ -315,6 +397,7 @@ function buildEmailHtml(data: DigestData, appBaseUrl: string | null) {
         data.dueTodayProspects.length +
         data.nextSevenDaysProspects.length +
         data.noNextActionProspects.length +
+        data.contactFormDiagnostics.length +
         data.activeProjects.length;
 
     const emptyState =
@@ -322,7 +405,7 @@ function buildEmailHtml(data: DigestData, appBaseUrl: string | null) {
             ? `
         <section style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; margin: 0 0 16px 0;">
           <h3 style="margin: 0 0 8px 0; color: #0A1628; font-size: 18px;">No immediate actions</h3>
-          <p style="margin: 0; color: #334155;">There are no overdue prospect actions, due actions, near-term prospect actions, missing next actions, or active project follow-ups requiring attention today.</p>
+          <p style="margin: 0; color: #334155;">There are no overdue prospect actions, due actions, near-term prospect actions, contact-form diagnostics, missing next actions, or active project follow-ups requiring attention today.</p>
         </section>
       `
             : "";
@@ -334,7 +417,7 @@ function buildEmailHtml(data: DigestData, appBaseUrl: string | null) {
           Daily Advisor Action Digest
         </h2>
         <p style="margin: 0 0 24px 0; color: #64748B;">
-          The prospects and projects most likely to need attention today.
+          Pipeline actions, contact-form diagnostics, and active project follow-ups needing attention.
         </p>
 
         ${emptyState}
@@ -342,6 +425,7 @@ function buildEmailHtml(data: DigestData, appBaseUrl: string | null) {
         ${buildProspectSection("Prospect actions due today", data.dueTodayProspects, appBaseUrl)}
         ${buildProspectSection("Prospect actions due in the next 7 days", data.nextSevenDaysProspects, appBaseUrl)}
         ${buildProspectSection("Prospects with no next action set", data.noNextActionProspects, appBaseUrl)}
+        ${buildContactFormDiagnosticSection(data.contactFormDiagnostics, appBaseUrl)}
         ${buildProjectSection(data.activeProjects)}
       </div>
     </div>
@@ -384,22 +468,26 @@ async function loadProspectsForDigest(
     }
 
     const prospects = data ?? [];
+    const activeProspects = prospects.filter(
+        (prospect) =>
+            prospect.deal_stage !== "converted" && prospect.deal_stage !== "lost",
+    );
 
     return {
-        overdueProspects: prospects.filter(
+        overdueProspects: activeProspects.filter(
             (prospect) =>
                 prospect.next_action_date !== null && prospect.next_action_date < today,
         ),
-        dueTodayProspects: prospects.filter(
+        dueTodayProspects: activeProspects.filter(
             (prospect) => prospect.next_action_date === today,
         ),
-        nextSevenDaysProspects: prospects.filter(
+        nextSevenDaysProspects: activeProspects.filter(
             (prospect) =>
                 prospect.next_action_date !== null &&
                 prospect.next_action_date > today &&
                 prospect.next_action_date <= nextSevenDays,
         ),
-        noNextActionProspects: prospects
+        noNextActionProspects: activeProspects
             .filter((prospect) => prospect.next_action_date === null)
             .slice(0, 25),
     };
@@ -472,6 +560,78 @@ async function loadProjectsForDigest(
         .filter((project) => project.outstanding > 0 || project.inviteExpiryCount > 0);
 }
 
+async function loadContactFormDiagnostics(): Promise<ContactFormDiagnosticRow[]> {
+    const supabase = getSupabaseAdminClient();
+
+    const { data, error } = await supabase
+        .from("diagnostic_submissions")
+        .select(
+            `
+        submission_id,
+        contact_name,
+        contact_email,
+        contact_company,
+        contact_topic,
+        score,
+        band,
+        contact_submitted_at
+      `,
+        )
+        .not("contact_submitted_at", "is", null)
+        .not("contact_email", "is", null)
+        .not("contact_name", "is", null)
+        .order("contact_submitted_at", { ascending: false })
+        .limit(200)
+        .returns<ContactFormDiagnosticRow[]>();
+
+    if (error) {
+        throw new Error(`Failed to load contact-form diagnostics: ${error.message}`);
+    }
+
+    const submissions = data ?? [];
+
+    if (submissions.length === 0) {
+        return [];
+    }
+
+    const submissionIds = submissions.map((submission) => submission.submission_id);
+
+    const { data: linkedProspects, error: prospectError } = await supabase
+        .from("advisor_prospects")
+        .select(
+            `
+        linked_submission_id,
+        deal_stage
+      `,
+        )
+        .in("linked_submission_id", submissionIds);
+
+    if (prospectError) {
+        throw new Error(`Failed to load linked prospects: ${prospectError.message}`);
+    }
+
+    const prospectMap = new Map(
+        (linkedProspects ?? []).map((prospect) => [
+            prospect.linked_submission_id,
+            prospect,
+        ]),
+    );
+
+    return submissions.filter((submission) => {
+        const linkedProspect = prospectMap.get(submission.submission_id);
+
+        if (!linkedProspect) {
+            return true;
+        }
+
+        const stage = linkedProspect.deal_stage;
+
+        return !["in_conversation", "proposal_discussed", "converted", "lost"].includes(
+            stage,
+        );
+    });
+}
+
 export async function POST(request: Request) {
     try {
         const { cronSecret, dailySummaryRecipient, appBaseUrl } =
@@ -503,6 +663,7 @@ export async function POST(request: Request) {
         const nextSevenDays = addDaysToDateString(today, 7);
 
         const prospectDigest = await loadProspectsForDigest(today, nextSevenDays);
+        const contactFormDiagnostics = await loadContactFormDiagnostics();
         const activeProjects = await loadProjectsForDigest(
             appBaseUrl,
             today,
@@ -511,6 +672,7 @@ export async function POST(request: Request) {
 
         const data: DigestData = {
             ...prospectDigest,
+            contactFormDiagnostics,
             activeProjects,
         };
 
@@ -538,6 +700,7 @@ export async function POST(request: Request) {
                 dueTodayProspects: data.dueTodayProspects.length,
                 nextSevenDaysProspects: data.nextSevenDaysProspects.length,
                 noNextActionProspects: data.noNextActionProspects.length,
+                contactFormDiagnostics: data.contactFormDiagnostics.length,
                 activeProjects: data.activeProjects.length,
             }),
         );
@@ -549,6 +712,7 @@ export async function POST(request: Request) {
             dueTodayProspects: data.dueTodayProspects.length,
             nextSevenDaysProspects: data.nextSevenDaysProspects.length,
             noNextActionProspects: data.noNextActionProspects.length,
+            contactFormDiagnostics: data.contactFormDiagnostics.length,
             activeProjects: data.activeProjects.length,
         });
     } catch (error) {
