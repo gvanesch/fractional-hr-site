@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   ClientDiagnosticReport,
   ReportAnalyticsDimension,
@@ -13,7 +14,24 @@ type AdvisorReportClientProps = {
 export default function AdvisorReportClient({
   report,
 }: AdvisorReportClientProps) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
+
   const llmEvidencePack = buildLlmEvidencePack(report);
+
+  async function handleCopyEvidencePack() {
+    try {
+      await navigator.clipboard.writeText(llmEvidencePack);
+      setCopyState("copied");
+
+      window.setTimeout(() => {
+        setCopyState("idle");
+      }, 3000);
+    } catch {
+      setCopyState("error");
+    }
+  }
 
   return (
     <main className="brand-light-section min-h-screen">
@@ -41,12 +59,37 @@ export default function AdvisorReportClient({
 
       <div className="brand-container space-y-10 py-10">
         <ReportSection title="LLM evidence pack">
-          <p className="text-sm leading-7 text-slate-600">
-            Copy this structured source pack into an LLM to generate an
-            executive summary, board narrative, PowerPoint storyline, ROI logic,
-            recommendations, and next-step plan. It preserves the scoring
-            guardrails and separates evidence from client-facing language.
-          </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <p className="max-w-3xl text-sm leading-7 text-slate-600">
+              Copy this structured source pack into an LLM to generate an
+              executive summary, board narrative, PowerPoint storyline, ROI
+              logic, recommendations, and next-step plan. It preserves the
+              scoring guardrails and separates evidence from client-facing
+              language.
+            </p>
+
+            <div className="flex flex-col items-start gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCopyEvidencePack()}
+                className="inline-flex items-center justify-center rounded-xl bg-[#1E6FD9] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#1859ad]"
+              >
+                Copy LLM evidence pack
+              </button>
+
+              {copyState === "copied" ? (
+                <p className="text-sm font-medium text-emerald-700">
+                  Copied to clipboard.
+                </p>
+              ) : null}
+
+              {copyState === "error" ? (
+                <p className="text-sm font-medium text-rose-700">
+                  Copy failed. Select the text manually.
+                </p>
+              ) : null}
+            </div>
+          </div>
 
           <textarea
             readOnly
