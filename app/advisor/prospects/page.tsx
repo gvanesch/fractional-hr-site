@@ -61,6 +61,18 @@ type AdvisorProspect = {
     updated_at: string;
 };
 
+const fieldClassName =
+    "h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 text-sm leading-none text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1E6FD9] focus:ring-4 focus:ring-blue-100";
+
+const primaryButtonClassName =
+    "inline-flex h-12 items-center justify-center rounded-xl bg-[#1E6FD9] px-4 text-sm font-medium text-white transition hover:bg-[#1859ad]";
+
+const darkButtonClassName =
+    "inline-flex h-12 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-700";
+
+const secondaryButtonClassName =
+    "inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50";
+
 async function requireAdvisorSession() {
     const supabase = await createSupabaseServerClient();
 
@@ -123,22 +135,22 @@ async function getProspects(
         .from("advisor_prospects")
         .select(
             `
-        prospect_id,
-        name,
-        company,
-        role,
-        source,
-        segment,
-        diagnostic_status,
-        deal_stage,
-        lead_temperature,
-        next_step,
-        last_contact_date,
-        next_action_date,
-        linked_submission_id,
-        created_at,
-        updated_at
-      `,
+                prospect_id,
+                name,
+                company,
+                role,
+                source,
+                segment,
+                diagnostic_status,
+                deal_stage,
+                lead_temperature,
+                next_step,
+                last_contact_date,
+                next_action_date,
+                linked_submission_id,
+                created_at,
+                updated_at
+            `,
         )
         .order("updated_at", { ascending: false })
         .limit(250);
@@ -176,7 +188,9 @@ async function getProspects(
 }
 
 function formatDate(value: string | null): string {
-    if (!value) return "Not set";
+    if (!value) {
+        return "Not set";
+    }
 
     try {
         return new Intl.DateTimeFormat("en-GB", {
@@ -343,6 +357,21 @@ function sortActionProspects(a: AdvisorProspect, b: AdvisorProspect): number {
     return temperatureRank(a.lead_temperature) - temperatureRank(b.lead_temperature);
 }
 
+function MetricCard({
+    label,
+    value,
+}: {
+    label: string;
+    value: number;
+}) {
+    return (
+        <div className="flex h-full min-h-[126px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">{label}</p>
+            <p className="mt-4 text-2xl font-semibold text-slate-900">{value}</p>
+        </div>
+    );
+}
+
 function ActionFocusColumn({
     title,
     description,
@@ -353,7 +382,7 @@ function ActionFocusColumn({
     prospects: AdvisorProspect[];
 }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     {title}
@@ -364,7 +393,7 @@ function ActionFocusColumn({
             </div>
 
             {prospects.length > 0 ? (
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 flex-1 space-y-2">
                     {prospects.map((prospect) => (
                         <Link
                             key={prospect.prospect_id}
@@ -372,8 +401,8 @@ function ActionFocusColumn({
                             className="block rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-[#1E6FD9] hover:bg-blue-50"
                         >
                             <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-slate-900">
                                         {prospect.company ||
                                             prospect.name ||
                                             "Unnamed prospect"}
@@ -396,13 +425,12 @@ function ActionFocusColumn({
                     ))}
                 </div>
             ) : (
-                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                <div className="mt-5 flex flex-1 items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                     <p className="text-sm leading-6 text-slate-600">
                         No prospects in this action group.
                     </p>
                 </div>
             )}
-
         </div>
     );
 }
@@ -477,13 +505,13 @@ export default async function AdvisorProspectsPage({
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-                            Signed in as <strong>{advisorUser.email}</strong>
+                        <div className="flex h-12 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-600 shadow-sm">
+                            Signed in as <strong className="ml-1">{advisorUser.email}</strong>
                         </div>
 
                         <Link
                             href="/advisor/prospects/new"
-                            className="inline-flex items-center justify-center rounded-xl bg-[#1E6FD9] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#1859ad]"
+                            className={primaryButtonClassName}
                         >
                             Add Prospect
                         </Link>
@@ -503,42 +531,21 @@ export default async function AdvisorProspectsPage({
                     </section>
                 ) : null}
 
-                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Total prospects</p>
-                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {allProspects.length}
-                        </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">
-                            Health Check linked
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {
-                                allProspects.filter((prospect) =>
-                                    Boolean(prospect.linked_submission_id),
-                                ).length
-                            }
-                        </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">
-                            Due today / overdue
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {overdueProspects.length + dueTodayProspects.length}
-                        </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Next 7 days</p>
-                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                            {upcomingProspects.length}
-                        </p>
-                    </div>
+                <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <MetricCard label="Total prospects" value={allProspects.length} />
+                    <MetricCard
+                        label="Health Check linked"
+                        value={
+                            allProspects.filter((prospect) =>
+                                Boolean(prospect.linked_submission_id),
+                            ).length
+                        }
+                    />
+                    <MetricCard
+                        label="Due today / overdue"
+                        value={overdueProspects.length + dueTodayProspects.length}
+                    />
+                    <MetricCard label="Next 7 days" value={upcomingProspects.length} />
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -550,12 +557,12 @@ export default async function AdvisorProspectsPage({
                             What needs attention
                         </h2>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                            Active prospects with dated follow-up actions. Lost and
-                            converted prospects are excluded from this action view.
+                            Active prospects with dated follow-up actions. Lost and converted
+                            prospects are excluded from this action view.
                         </p>
                     </div>
 
-                    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                    <div className="mt-6 grid items-stretch gap-4 lg:grid-cols-3">
                         <ActionFocusColumn
                             title="Overdue"
                             description="Follow-ups that should already have happened."
@@ -596,7 +603,7 @@ export default async function AdvisorProspectsPage({
                             type="search"
                             defaultValue={searchQuery}
                             placeholder="Search by company, contact, role, source, segment, or status"
-                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1E6FD9] focus:ring-4 focus:ring-blue-100"
+                            className={fieldClassName}
                         />
 
                         <label className="sr-only" htmlFor="next-action-filter">
@@ -606,7 +613,7 @@ export default async function AdvisorProspectsPage({
                             id="next-action-filter"
                             name="nextAction"
                             defaultValue={nextActionFilter}
-                            className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-4 focus:ring-blue-100"
+                            className={fieldClassName}
                         >
                             <option value="all">All next actions</option>
                             <option value="due">Due today / overdue</option>
@@ -614,18 +621,12 @@ export default async function AdvisorProspectsPage({
                             <option value="none">No next action</option>
                         </select>
 
-                        <button
-                            type="submit"
-                            className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white transition hover:bg-slate-700"
-                        >
+                        <button type="submit" className={darkButtonClassName}>
                             Apply
                         </button>
 
                         {hasActiveFilters ? (
-                            <Link
-                                href={clearPath}
-                                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                            >
+                            <Link href={clearPath} className={secondaryButtonClassName}>
                                 Clear
                             </Link>
                         ) : null}
