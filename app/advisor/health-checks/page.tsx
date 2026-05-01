@@ -12,6 +12,9 @@ export const metadata = {
   },
 };
 
+const DEFAULT_SORT = "completed_desc";
+const PAGE_SIZE = 50;
+
 type SearchParams = Promise<{
   q?: string;
   completedFrom?: string;
@@ -25,6 +28,7 @@ type SearchParams = Promise<{
   source?: string;
   status?: string;
   sort?: string;
+  page?: string;
 }>;
 
 type AdvisorHealthChecksPageProps = {
@@ -76,7 +80,11 @@ type FilterOptions = {
   sources: string[];
 };
 
-const DEFAULT_SORT = "completed_desc";
+const fieldClassName =
+  "h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 text-sm leading-none text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15";
+
+const buttonClassName =
+  "inline-flex h-12 items-center justify-center rounded-xl px-4 text-sm font-medium transition";
 
 function normaliseFilter(value: string | undefined): string {
   return value?.trim() ?? "";
@@ -97,6 +105,36 @@ function getFilters(searchParams: Awaited<SearchParams>): HealthCheckFilters {
     status: normaliseFilter(searchParams.status),
     sort: normaliseFilter(searchParams.sort) || DEFAULT_SORT,
   };
+}
+
+function getPage(value: string | undefined): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+
+  return Math.floor(parsed);
+}
+
+function buildQueryString(
+  filters: HealthCheckFilters,
+  page: number,
+): string {
+  const search = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value && !(key === "sort" && value === DEFAULT_SORT)) {
+      search.set(key, value);
+    }
+  });
+
+  if (page > 1) {
+    search.set("page", String(page));
+  }
+
+  const queryString = search.toString();
+  return queryString ? `?${queryString}` : "";
 }
 
 function formatTimestamp(value: string | null): string {
@@ -145,11 +183,11 @@ function getDateRange(from: string, to: string): {
 
 function buildSort(sort: string): {
   column:
-    | "completed_at"
-    | "contact_submitted_at"
-    | "score"
-    | "contact_name"
-    | "email";
+  | "completed_at"
+  | "contact_submitted_at"
+  | "score"
+  | "contact_name"
+  | "email";
   ascending: boolean;
 } {
   switch (sort) {
@@ -260,6 +298,7 @@ async function getFilterOptions(): Promise<FilterOptions> {
 
 async function getHealthChecks(
   filters: HealthCheckFilters,
+  page: number,
 ): Promise<HealthCheckRow[]> {
   const supabase = createSupabaseAdminClient();
   const sort = buildSort(filters.sort);
@@ -268,6 +307,8 @@ async function getHealthChecks(
     filters.completedTo,
   );
   const enquiryRange = getDateRange(filters.enquiryFrom, filters.enquiryTo);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
   let query = supabase
     .from("diagnostic_submissions")
@@ -354,7 +395,7 @@ async function getHealthChecks(
 
   const { data, error } = await query
     .order(sort.column, { ascending: sort.ascending, nullsFirst: false })
-    .limit(250);
+    .range(from, to);
 
   if (error) {
     throw new Error(`Unable to load health check submissions: ${error.message}`);
@@ -371,9 +412,9 @@ function getSummaryStats(rows: HealthCheckRow[]) {
   const averageScore =
     withScore.length > 0
       ? Math.round(
-          withScore.reduce((total, row) => total + (row.score ?? 0), 0) /
-            withScore.length,
-        )
+        withScore.reduce((total, row) => total + (row.score ?? 0), 0) /
+        withScore.length,
+      )
       : null;
 
   return {
@@ -429,17 +470,17 @@ function cellValue(value: string | null): string {
 function hasActiveFilters(filters: HealthCheckFilters): boolean {
   return Boolean(
     filters.q ||
-      filters.completedFrom ||
-      filters.completedTo ||
-      filters.enquiryFrom ||
-      filters.enquiryTo ||
-      filters.industry ||
-      filters.role ||
-      filters.companySize ||
-      filters.band ||
-      filters.source ||
-      filters.status ||
-      (filters.sort && filters.sort !== DEFAULT_SORT),
+    filters.completedFrom ||
+    filters.completedTo ||
+    filters.enquiryFrom ||
+    filters.enquiryTo ||
+    filters.industry ||
+    filters.role ||
+    filters.companySize ||
+    filters.band ||
+    filters.source ||
+    filters.status ||
+    (filters.sort && filters.sort !== DEFAULT_SORT),
   );
 }
 
@@ -455,6 +496,23 @@ function getPrimaryName(row: HealthCheckRow): string {
   return row.contact_name || "No enquiry yet";
 }
 
+function FilterLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="mb-2 block text-sm font-medium text-slate-700"
+    >
+      {children}
+    </label>
+  );
+}
+
 export default async function AdvisorHealthChecksPage({
   searchParams,
 }: AdvisorHealthChecksPageProps) {
@@ -462,13 +520,16 @@ export default async function AdvisorHealthChecksPage({
 
   const resolvedSearchParams = await searchParams;
   const filters = getFilters(resolvedSearchParams);
+  const page = getPage(resolvedSearchParams.page);
 
   const [healthChecks, filterOptions] = await Promise.all([
-    getHealthChecks(filters),
+    getHealthChecks(filters, page),
     getFilterOptions(),
   ]);
 
   const stats = getSummaryStats(healthChecks);
+  const hasPreviousPage = page > 1;
+  const hasNextPage = healthChecks.length === PAGE_SIZE;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
@@ -490,36 +551,38 @@ export default async function AdvisorHealthChecksPage({
         </div>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-500">Completions</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.total}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-500">With enquiry</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.withEnquiry}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-500">Completion only</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.completionOnly}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-500">Average score</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.averageScore ?? "N/A"}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">With advisor brief</p>
+          <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              With advisor brief
+            </p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {stats.withAdvisorBrief}
             </p>
@@ -530,100 +593,72 @@ export default async function AdvisorHealthChecksPage({
           <form className="space-y-5" method="get">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_180px_180px]">
               <div>
-                <label
-                  htmlFor="q"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Search
-                </label>
+                <FilterLabel htmlFor="q">Search</FilterLabel>
                 <input
                   id="q"
                   name="q"
                   type="text"
                   defaultValue={filters.q}
                   placeholder="Name, email, or organisation"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="completedFrom"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
+                <FilterLabel htmlFor="completedFrom">
                   Completed from
-                </label>
+                </FilterLabel>
                 <input
                   id="completedFrom"
                   name="completedFrom"
                   type="date"
                   defaultValue={formatDateForInput(filters.completedFrom)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="completedTo"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Completed to
-                </label>
+                <FilterLabel htmlFor="completedTo">Completed to</FilterLabel>
                 <input
                   id="completedTo"
                   name="completedTo"
                   type="date"
                   defaultValue={formatDateForInput(filters.completedTo)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 />
               </div>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[180px_180px_minmax(0,1fr)]">
               <div>
-                <label
-                  htmlFor="enquiryFrom"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Enquiry from
-                </label>
+                <FilterLabel htmlFor="enquiryFrom">Enquiry from</FilterLabel>
                 <input
                   id="enquiryFrom"
                   name="enquiryFrom"
                   type="date"
                   defaultValue={formatDateForInput(filters.enquiryFrom)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="enquiryTo"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Enquiry to
-                </label>
+                <FilterLabel htmlFor="enquiryTo">Enquiry to</FilterLabel>
                 <input
                   id="enquiryTo"
                   name="enquiryTo"
                   type="date"
                   defaultValue={formatDateForInput(filters.enquiryTo)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Lifecycle status
-                </label>
+                <FilterLabel htmlFor="status">Lifecycle status</FilterLabel>
                 <select
                   id="status"
                   name="status"
                   defaultValue={filters.status}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All records</option>
                   <option value="completion_only">Completion only</option>
@@ -634,17 +669,12 @@ export default async function AdvisorHealthChecksPage({
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <div>
-                <label
-                  htmlFor="industry"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Industry
-                </label>
+                <FilterLabel htmlFor="industry">Industry</FilterLabel>
                 <select
                   id="industry"
                   name="industry"
                   defaultValue={filters.industry}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All industries</option>
                   {filterOptions.industries.map((option) => (
@@ -656,17 +686,12 @@ export default async function AdvisorHealthChecksPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="role"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Role
-                </label>
+                <FilterLabel htmlFor="role">Role</FilterLabel>
                 <select
                   id="role"
                   name="role"
                   defaultValue={filters.role}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All roles</option>
                   {filterOptions.roles.map((option) => (
@@ -678,17 +703,12 @@ export default async function AdvisorHealthChecksPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="companySize"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Company size
-                </label>
+                <FilterLabel htmlFor="companySize">Company size</FilterLabel>
                 <select
                   id="companySize"
                   name="companySize"
                   defaultValue={filters.companySize}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All company sizes</option>
                   {filterOptions.companySizes.map((option) => (
@@ -700,17 +720,12 @@ export default async function AdvisorHealthChecksPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="band"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Band
-                </label>
+                <FilterLabel htmlFor="band">Band</FilterLabel>
                 <select
                   id="band"
                   name="band"
                   defaultValue={filters.band}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All bands</option>
                   {filterOptions.bands.map((option) => (
@@ -722,17 +737,12 @@ export default async function AdvisorHealthChecksPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="source"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Source
-                </label>
+                <FilterLabel htmlFor="source">Source</FilterLabel>
                 <select
                   id="source"
                   name="source"
                   defaultValue={filters.source}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                  className={fieldClassName}
                 >
                   <option value="">All sources</option>
                   {filterOptions.sources.map((option) => (
@@ -748,22 +758,17 @@ export default async function AdvisorHealthChecksPage({
               <div className="text-sm text-slate-500">
                 {hasActiveFilters(filters)
                   ? "Filters applied to Health Check records."
-                  : "Showing all recent Health Check completions and linked enquiries."}
+                  : "Showing recent Health Check completions and linked enquiries."}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="w-full sm:w-[220px]">
-                  <label
-                    htmlFor="sort"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    Sort by
-                  </label>
+                  <FilterLabel htmlFor="sort">Sort by</FilterLabel>
                   <select
                     id="sort"
                     name="sort"
                     defaultValue={filters.sort}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1E6FD9] focus:ring-2 focus:ring-[#1E6FD9]/15"
+                    className={fieldClassName}
                   >
                     <option value="completed_desc">Latest completion</option>
                     <option value="completed_asc">Oldest completion</option>
@@ -780,13 +785,13 @@ export default async function AdvisorHealthChecksPage({
                 <div className="flex flex-wrap gap-3">
                   <a
                     href="/advisor/health-checks"
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    className={`${buttonClassName} border border-slate-300 text-slate-700 hover:bg-slate-50`}
                   >
                     Reset
                   </a>
                   <button
                     type="submit"
-                    className="inline-flex items-center justify-center rounded-xl bg-[#1E6FD9] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#1859ad]"
+                    className={`${buttonClassName} bg-[#1E6FD9] text-white hover:bg-[#1859ad]`}
                   >
                     Apply filters
                   </button>
@@ -809,6 +814,11 @@ export default async function AdvisorHealthChecksPage({
             </div>
           ) : (
             <>
+              <div className="border-b border-slate-200 px-4 py-4 text-sm text-slate-500">
+                Showing page {page}. Use filters or search to narrow the
+                repository.
+              </div>
+
               <div className="hidden lg:block">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
@@ -854,7 +864,9 @@ export default async function AdvisorHealthChecksPage({
                           <div className="font-medium text-slate-900">
                             {getPrimaryName(submission)}
                           </div>
-                          <div className="mt-1">{getPrimaryEmail(submission)}</div>
+                          <div className="mt-1">
+                            {getPrimaryEmail(submission)}
+                          </div>
                           <div className="mt-1 text-xs text-slate-500">
                             {cellValue(submission.role)} ·{" "}
                             {cellValue(submission.country_region)}
@@ -1097,6 +1109,36 @@ export default async function AdvisorHealthChecksPage({
                     </div>
                   </article>
                 ))}
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-500">Page {page}</div>
+
+                <div className="flex flex-wrap gap-3">
+                  {hasPreviousPage ? (
+                    <Link
+                      href={`/advisor/health-checks${buildQueryString(
+                        filters,
+                        page - 1,
+                      )}`}
+                      className={`${buttonClassName} border border-slate-300 text-slate-700 hover:bg-slate-50`}
+                    >
+                      Previous
+                    </Link>
+                  ) : null}
+
+                  {hasNextPage ? (
+                    <Link
+                      href={`/advisor/health-checks${buildQueryString(
+                        filters,
+                        page + 1,
+                      )}`}
+                      className={`${buttonClassName} bg-[#1E6FD9] text-white hover:bg-[#1859ad]`}
+                    >
+                      Next
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </>
           )}
