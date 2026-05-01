@@ -89,19 +89,6 @@ type AdvisorProspectRecord = {
   updated_at: string;
 };
 
-type AdvisorProspectActivityRecord = {
-  activity_id: string;
-  prospect_id: string;
-  linked_submission_id: string | null;
-  activity_type: string;
-  field_name: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  note: string | null;
-  changed_by: string | null;
-  created_at: string;
-};
-
 type DerivedResult = {
   submission: {
     submissionId: string;
@@ -301,56 +288,6 @@ function statusBadgeClasses(value: string | null): string {
       return "border-rose-200 bg-rose-50 text-rose-700";
     default:
       return "border-slate-200 bg-slate-50 text-slate-700";
-  }
-}
-
-function formatFieldLabel(value: string | null): string {
-  switch (value) {
-    case "source":
-      return "source";
-    case "segment":
-      return "segment";
-    case "deal_stage":
-      return "deal stage";
-    case "lead_temperature":
-      return "lead temperature";
-    case "diagnostic_status":
-      return "diagnostic status";
-    case "last_contact_date":
-      return "last contact date";
-    case "next_action_date":
-      return "next action date";
-    case "next_step":
-      return "next step";
-    case "notes":
-      return "notes";
-    case "linked_submission_id":
-      return "linked Health Check";
-    default:
-      return value || "field";
-  }
-}
-
-function formatActivityDescription(
-  activity: AdvisorProspectActivityRecord,
-): string {
-  const actor = activity.changed_by || "Advisor";
-
-  switch (activity.activity_type) {
-    case "health_check_linked":
-      return `${actor} linked a Health Check to this prospect.`;
-    case "health_check_unlinked":
-      return `${actor} unlinked a Health Check from this prospect.`;
-    case "note_added":
-      return `${actor} added a prospect note.`;
-    case "prospect_created":
-      return `${actor} created this prospect.`;
-    default:
-      if (activity.field_name) {
-        return `${actor} updated ${formatFieldLabel(activity.field_name)}.`;
-      }
-
-      return `${actor} updated this prospect.`;
   }
 }
 
@@ -666,42 +603,6 @@ async function getLinkedAdvisorProspect(
   return (data as AdvisorProspectRecord | null) ?? null;
 }
 
-async function getAdvisorProspectActivity(
-  prospectId: string | null,
-): Promise<AdvisorProspectActivityRecord[]> {
-  if (!prospectId) {
-    return [];
-  }
-
-  const supabase = createSupabaseAdminClient();
-
-  const { data, error } = await supabase
-    .from("advisor_prospect_activity")
-    .select(
-      `
-        activity_id,
-        prospect_id,
-        linked_submission_id,
-        activity_type,
-        field_name,
-        old_value,
-        new_value,
-        note,
-        changed_by,
-        created_at
-      `,
-    )
-    .eq("prospect_id", prospectId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    throw new Error(`Unable to load prospect activity: ${error.message}`);
-  }
-
-  return (data ?? []) as AdvisorProspectActivityRecord[];
-}
-
 async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
   const submission = await getSubmission(submissionId);
 
@@ -984,8 +885,6 @@ export default async function AdvisorSubmissionPage({
     getLinkedAdvisorProspect(submissionId),
   ]);
 
-  const activity = await getAdvisorProspectActivity(prospect?.prospect_id ?? null);
-
   const submission = data.submission;
   const result = data.diagnostic;
   const advisorBrief = data.advisorBrief;
@@ -1045,7 +944,7 @@ export default async function AdvisorSubmissionPage({
 
             <p className="brand-subheading brand-body-on-dark mt-5 max-w-3xl">
               Health Check submission view for contact context, advisory call
-              preparation, commercial workflow, and activity history.
+              preparation, and linked CRM context.
             </p>
           </div>
         </div>
@@ -1349,51 +1248,6 @@ export default async function AdvisorSubmissionPage({
               </div>
             </section>
 
-            {prospect ? (
-              <section className="brand-surface-card p-6 sm:p-8">
-                <div className="mb-6">
-                  <p className="brand-section-kicker">Activity history</p>
-                  <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
-                    CRM activity timeline
-                  </h2>
-                  <p className="mt-3 max-w-3xl text-sm text-slate-600">
-                    Read-only history of meaningful CRM changes made against the
-                    linked Prospect CRM record.
-                  </p>
-                </div>
-
-                {activity.length > 0 ? (
-                  <div className="space-y-4">
-                    {activity.map((item) => (
-                      <div
-                        key={item.activity_id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 p-5"
-                      >
-                        <p className="text-sm font-medium text-slate-900">
-                          {formatActivityDescription(item)}
-                        </p>
-
-                        <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-500">
-                          {formatSubmittedAt(item.created_at)}
-                        </p>
-
-                        {item.note?.trim() ? (
-                          <p className="mt-3 text-sm leading-7 text-slate-700">
-                            {item.note}
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                    <p className="text-sm leading-7 text-slate-700">
-                      No CRM activity has been recorded yet.
-                    </p>
-                  </div>
-                )}
-              </section>
-            ) : null}
           </div>
         </div>
       </section>
