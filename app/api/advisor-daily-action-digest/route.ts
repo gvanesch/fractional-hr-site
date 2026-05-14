@@ -98,8 +98,8 @@ function getRequiredConfig() {
 }
 
 function isAuthorized(request: Request, cronSecret: string) {
-    const authorizationHeader = request.headers.get("authorization");
-    return authorizationHeader === `Bearer ${cronSecret}`;
+    const cronHeader = request.headers.get("x-cron-secret");
+    return cronHeader === cronSecret;
 }
 
 function escapeHtml(value: string): string {
