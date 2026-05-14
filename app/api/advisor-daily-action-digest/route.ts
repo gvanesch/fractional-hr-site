@@ -638,10 +638,38 @@ export async function POST(request: Request) {
             getRequiredConfig();
 
         if (!isAuthorized(request, cronSecret)) {
+            const authorizationHeader = request.headers.get("authorization") ?? "";
+            const suppliedToken = authorizationHeader.startsWith("Bearer ")
+                ? authorizationHeader.slice("Bearer ".length)
+                : authorizationHeader;
+
+            const encoder = new TextEncoder();
+
+            const hashValue = async (value: string) => {
+                const digest = await crypto.subtle.digest(
+                    "SHA-256",
+                    encoder.encode(value),
+                );
+
+                return Array.from(new Uint8Array(digest))
+                    .slice(0, 6)
+                    .map((byte) => byte.toString(16).padStart(2, "0"))
+                    .join("");
+            };
+
             return NextResponse.json(
                 {
                     success: false,
                     error: "Forbidden.",
+                    diagnostic: {
+                        hasAuthorizationHeader: authorizationHeader.length > 0,
+                        authorizationHeaderLength: authorizationHeader.length,
+                        suppliedTokenLength: suppliedToken.length,
+                        cronSecretExists: cronSecret.length > 0,
+                        cronSecretLength: cronSecret.length,
+                        suppliedTokenHash: await hashValue(suppliedToken),
+                        cronSecretHash: await hashValue(cronSecret),
+                    },
                 },
                 { status: 403 },
             );
