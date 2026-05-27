@@ -638,19 +638,10 @@ export async function POST(request: Request) {
             getRequiredConfig();
 
         if (!isAuthorized(request, cronSecret)) {
-            const cronHeader = request.headers.get("x-cron-secret") ?? "";
-
             return NextResponse.json(
                 {
                     success: false,
                     error: "Forbidden.",
-                    diagnostic: {
-                        hasCronHeader: cronHeader.length > 0,
-                        cronHeaderLength: cronHeader.length,
-                        cronSecretExists: cronSecret.length > 0,
-                        cronSecretLength: cronSecret.length,
-                        headerMatchesSecret: cronHeader === cronSecret,
-                    },
                 },
                 { status: 403 },
             );
