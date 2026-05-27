@@ -31,4 +31,4 @@ jobs:
           curl --fail-with-body --show-error --location --write-out "\nHTTP_STATUS:%{http_code}\n" \
             --request POST \
             --url "${ADVISOR_ACTION_DIGEST_URL}" \
-            --header "x-cron-secret: ${DAILY_SUMMARY_ENDPOINT_SECRET}"
+            --header "Authorization: Bearer ${DAILY_SUMMARY_ENDPOINT_SECRET}"
