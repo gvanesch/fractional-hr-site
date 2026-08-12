@@ -363,11 +363,7 @@ export default function ClientDiagnosticQuestionnaire({
         console.error("Unable to clear questionnaire draft.", error);
       }
 
-      setSubmitState("success");
-      setSubmitMessage(
-        result.message ||
-          "Thank you. Your responses have been submitted successfully.",
-      );
+      window.location.replace("/client-diagnostic/submitted");
     } catch (error) {
       setSubmitState("error");
       setSubmitMessage(

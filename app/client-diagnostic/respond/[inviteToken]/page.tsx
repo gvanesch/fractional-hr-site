@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  getVerifiedSessionCookieName,
+  validateParticipantVerifiedSession,
+} from "@/lib/security/client-participant-otp";
 import {
   questionnaireTypes,
   type QuestionnaireType,
@@ -258,6 +263,30 @@ export default async function ClientDiagnosticRespondPage({
     })
   ) {
     return <LinkNoLongerActivePage />;
+  }
+
+  const cookieStore = await cookies();
+  const verifiedSessionToken = cookieStore.get(
+    getVerifiedSessionCookieName(),
+  )?.value;
+
+  if (!verifiedSessionToken) {
+    redirect(
+      `/client-diagnostic/respond/${encodeURIComponent(inviteToken)}/verify`,
+    );
+  }
+
+  const verifiedSession = await validateParticipantVerifiedSession({
+    participantId: resolvedParticipant.participant_id,
+    projectId: resolvedParticipant.project_id,
+    inviteToken,
+    sessionToken: verifiedSessionToken,
+  });
+
+  if (!verifiedSession.valid) {
+    redirect(
+      `/client-diagnostic/respond/${encodeURIComponent(inviteToken)}/verify`,
+    );
   }
 
   const targetUrl =

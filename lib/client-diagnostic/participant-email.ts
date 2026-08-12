@@ -939,3 +939,181 @@ export async function sendParticipantEventEmail(
     };
   }
 }
+export type ParticipantOtpEmailParams = {
+  resend: Resend;
+  fromEmail: string;
+  replyToEmail: string;
+  participantName?: string | null;
+  participantEmail: string;
+  otpCode: string;
+  expiresInMinutes?: number;
+};
+
+export async function sendParticipantOtpEmail(
+  params: ParticipantOtpEmailParams,
+): Promise<ParticipantEventEmailResult> {
+  const {
+    resend,
+    fromEmail,
+    replyToEmail,
+    participantName,
+    participantEmail,
+    otpCode,
+    expiresInMinutes = 10,
+  } = params;
+
+  const name = participantName?.trim() || "there";
+
+  const leadHtml = `
+    <p style="margin:0;">Hi ${escapeHtml(name)},</p>
+    <p style="margin:16px 0 0 0;">
+      Use the verification code below to continue to your secure
+      Van Esch Advisory diagnostic.
+    </p>
+  `;
+
+  const bodyHtml = `
+    <div
+      style="
+        margin:24px 0;
+        padding:22px;
+        border:1px solid #dbe3ef;
+        border-radius:16px;
+        background:#f8fafc;
+        text-align:center;
+      "
+    >
+      <div
+        style="
+          font-size:13px;
+          line-height:1.5;
+          color:#64748b;
+          text-transform:uppercase;
+          letter-spacing:0.12em;
+          font-weight:600;
+        "
+      >
+        Verification code
+      </div>
+
+      <div
+        style="
+          margin-top:10px;
+          font-size:34px;
+          line-height:1.2;
+          color:#0f172a;
+          font-weight:700;
+          letter-spacing:0.18em;
+        "
+      >
+        ${escapeHtml(otpCode)}
+      </div>
+    </div>
+
+    <p style="margin:0;">
+      This code expires in ${expiresInMinutes} minutes and can only be used once.
+    </p>
+
+    <p style="margin:16px 0 0 0;">
+      If you did not request this code, you can ignore this email.
+    </p>
+
+    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;">
+      Van Esch Advisory will never ask you to send or disclose this
+      verification code by email or telephone.
+    </p>
+  `;
+
+  const html = buildEmailShell({
+    previewLabel: "Your diagnostic verification code",
+    heading: "Verify your email",
+    leadHtml,
+    bodyHtml,
+    footerHtml:
+      "This message relates to secure access to a diagnostic engagement managed by Van Esch Advisory Ltd.<br/><br/>Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory<br/>www.vanesch.uk",
+  });
+
+  const text = [
+    `Hi ${name},`,
+    "",
+    "Use the verification code below to continue to your secure Van Esch Advisory diagnostic.",
+    "",
+    `Verification code: ${otpCode}`,
+    "",
+    `This code expires in ${expiresInMinutes} minutes and can only be used once.`,
+    "",
+    "If you did not request this code, you can ignore this email.",
+    "",
+    "Van Esch Advisory will never ask you to send or disclose this verification code by email or telephone.",
+    "",
+    "Van Esch Advisory",
+    "www.vanesch.uk",
+  ].join("\n");
+
+  try {
+    const resendResponse = await resend.emails.send({
+      from: `Van Esch Advisory <${fromEmail}>`,
+      to: participantEmail,
+      replyTo: replyToEmail,
+      subject: "Your Van Esch Advisory verification code",
+      html,
+      text,
+    });
+
+    const resendError =
+      resendResponse && "error" in resendResponse
+        ? resendResponse.error
+        : null;
+
+    const resendData =
+      resendResponse && "data" in resendResponse
+        ? resendResponse.data
+        : null;
+
+    if (resendError) {
+      console.error("Resend returned an OTP email error", {
+        eventType: "participant_email_otp",
+        resendError,
+      });
+
+      return {
+        email: participantEmail,
+        success: false,
+        resendId: null,
+        error:
+          typeof resendError.message === "string"
+            ? resendError.message
+            : "Resend returned an error.",
+      };
+    }
+
+    console.info("Participant OTP email accepted by Resend", {
+      eventType: "participant_email_otp",
+      resendId: resendData?.id ?? null,
+    });
+
+    return {
+      email: participantEmail,
+      success: true,
+      resendId: resendData?.id ?? null,
+      error: null,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown participant OTP email error.";
+
+    console.error("Participant OTP email threw an exception", {
+      eventType: "participant_email_otp",
+      error: message,
+    });
+
+    return {
+      email: participantEmail,
+      success: false,
+      resendId: null,
+      error: message,
+    };
+  }
+}

@@ -5,8 +5,13 @@ export const metadata = {
   },
 };
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  getVerifiedSessionCookieName,
+  validateParticipantVerifiedSession,
+} from "@/lib/security/client-participant-otp";
 import ClientDiagnosticQuestionnaire from "@/app/components/client-diagnostic/ClientDiagnosticQuestionnaire";
 import {
   questionnaireTypes,
@@ -239,6 +244,30 @@ export default async function ClientDiagnosticQuestionnairePage({
 
   if (participant.participant_status === "archived") {
     notFound();
+  }
+
+  const cookieStore = await cookies();
+  const verifiedSessionToken = cookieStore.get(
+    getVerifiedSessionCookieName(),
+  )?.value;
+
+  if (!verifiedSessionToken) {
+    redirect(
+      `/client-diagnostic/respond/${encodeURIComponent(inviteToken)}`,
+    );
+  }
+
+  const verifiedSession = await validateParticipantVerifiedSession({
+    participantId,
+    projectId,
+    inviteToken,
+    sessionToken: verifiedSessionToken,
+  });
+
+  if (!verifiedSession.valid) {
+    redirect(
+      `/client-diagnostic/respond/${encodeURIComponent(inviteToken)}`,
+    );
   }
 
   if (

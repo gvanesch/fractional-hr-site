@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import {
+  getVerifiedSessionCookieName,
+  validateParticipantVerifiedSession,
+} from "@/lib/security/client-participant-otp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   getQuestionsForQuestionnaireType,
@@ -386,6 +391,65 @@ function mapRpcErrorToResponse(errorMessage: string) {
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = await request.json();
+
+    const accessCandidate =
+      body && typeof body === "object"
+        ? (body as Partial<ClientDiagnosticSubmitRequestBody>)
+        : null;
+
+    const projectId = accessCandidate?.projectId;
+    const participantId = accessCandidate?.participantId;
+    const inviteToken = accessCandidate?.inviteToken;
+
+    if (
+      typeof projectId !== "string" ||
+      typeof participantId !== "string" ||
+      typeof inviteToken !== "string" ||
+      !isUuid(projectId) ||
+      !isUuid(participantId) ||
+      !isUuid(inviteToken)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid submission identifiers.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const cookieStore = await cookies();
+    const verifiedSessionToken = cookieStore.get(
+      getVerifiedSessionCookieName(),
+    )?.value;
+
+    if (!verifiedSessionToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const verifiedSession = await validateParticipantVerifiedSession({
+      participantId,
+      projectId,
+      inviteToken,
+      sessionToken: verifiedSessionToken,
+    });
+
+    if (!verifiedSession.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
+        { status: 403 },
+      );
+    }
+
     const validation = validateRequestBody(body);
 
     if (!validation.isValid) {
@@ -398,8 +462,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const { projectId, participantId, inviteToken, questionnaireType, responses } =
-      validation.data;
+    const { questionnaireType, responses } = validation.data;
 
     const responseRows = buildResponseRows(responses);
     const dimensionScoreRows = buildDimensionScoreRows(responses);

@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import {
+  getVerifiedSessionCookieName,
+  validateParticipantVerifiedSession,
+} from "@/lib/security/client-participant-otp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type FactPackSubmitRequest = {
@@ -131,6 +136,38 @@ export async function POST(request: Request): Promise<Response> {
 
     const { projectId, participantId, inviteToken, responseJson, mode } =
       validation.data;
+
+    const cookieStore = await cookies();
+    const verifiedSessionToken = cookieStore.get(
+      getVerifiedSessionCookieName(),
+    )?.value;
+
+    if (!verifiedSessionToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const verifiedSession = await validateParticipantVerifiedSession({
+      participantId,
+      projectId,
+      inviteToken,
+      sessionToken: verifiedSessionToken,
+    });
+
+    if (!verifiedSession.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
+        { status: 403 },
+      );
+    }
 
     const supabase = createSupabaseAdminClient();
 

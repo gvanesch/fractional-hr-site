@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import {
+  getVerifiedSessionCookieName,
+  validateParticipantVerifiedSession,
+} from "@/lib/security/client-participant-otp";
 import { createClient } from "@supabase/supabase-js";
 
 
@@ -67,6 +72,38 @@ export async function GET(request: Request) {
     if (participant.invite_token !== inviteToken) {
       return NextResponse.json(
         { success: false, error: "Invalid access." },
+        { status: 403 },
+      );
+    }
+
+    const cookieStore = await cookies();
+    const verifiedSessionToken = cookieStore.get(
+      getVerifiedSessionCookieName(),
+    )?.value;
+
+    if (!verifiedSessionToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const verifiedSession = await validateParticipantVerifiedSession({
+      participantId,
+      projectId,
+      inviteToken,
+      sessionToken: verifiedSessionToken,
+    });
+
+    if (!verifiedSession.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verified participant access is required.",
+        },
         { status: 403 },
       );
     }

@@ -12,6 +12,7 @@ const ICO_REGISTRATION_NUMBER = "ZC202153";
 export default function PrivacyPage() {
   return (
     <main>
+      {/* HERO */}
       <section className="brand-hero">
         <div className="brand-hero-content brand-container brand-section">
           <div className="max-w-4xl">
@@ -23,7 +24,8 @@ export default function PrivacyPage() {
               This Privacy Policy explains how personal information is
               collected, used, stored, shared, and protected when you visit
               https://vanesch.uk, contact Van Esch Advisory Ltd, use the HR
-              Operations Health Check, or engage with our services.
+              Operations Health Check, participate in an invited client
+              diagnostic or Client Fact Pack, or engage with our services.
             </p>
           </div>
         </div>
@@ -32,7 +34,7 @@ export default function PrivacyPage() {
       <section className="brand-light-section">
         <div className="brand-container brand-section">
           <div className="space-y-12">
-            {/* CONTROLLER */}
+            {/* DATA CONTROLLER AND PROCESSOR ROLES */}
             <section>
               <p className="brand-section-kicker">Who we are</p>
 
@@ -48,8 +50,8 @@ export default function PrivacyPage() {
                 </p>
 
                 <p>
-                  Van Esch Advisory Ltd is the data controller for Personal Data
-                  collected through this website, the HR Operations Health
+                  Van Esch Advisory Ltd is the data controller for Personal
+                  Data collected through this website, the HR Operations Health
                   Check, contact and enquiry forms, and other services where the
                   company determines the purposes and means of processing.
                 </p>
@@ -112,7 +114,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* DATA */}
+            {/* INFORMATION COLLECTED */}
             <section>
               <p className="brand-section-kicker">Information collected</p>
 
@@ -142,7 +144,12 @@ export default function PrivacyPage() {
                   </li>
 
                   <li>
-                    Your responses to Health Check or diagnostic questions
+                    Your responses to Health Check or client diagnostic
+                    questions
+                  </li>
+
+                  <li>
+                    Information provided through an invited Client Fact Pack
                   </li>
 
                   <li>
@@ -161,8 +168,9 @@ export default function PrivacyPage() {
                   </li>
 
                   <li>
-                    Basic technical and usage information required for website
-                    operation, security, fraud prevention, and performance
+                    Basic technical, verification, session, and usage
+                    information required for website operation, security,
+                    fraud prevention, access control, and performance
                   </li>
 
                   <li>
@@ -181,7 +189,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* COLLECTION */}
+            {/* SOURCES OF PERSONAL DATA */}
             <section>
               <p className="brand-section-kicker">
                 How information is collected
@@ -198,7 +206,13 @@ export default function PrivacyPage() {
                   <li>Visit or use the website</li>
                   <li>Submit a contact or enquiry form</li>
                   <li>Communicate with us about potential services</li>
-                  <li>Complete the HR Operations Health Check</li>
+                  <li>Complete the public HR Operations Health Check</li>
+
+                  <li>
+                    Participate in a client diagnostic or Client Fact Pack
+                    after being invited as part of a client engagement
+                  </li>
+
                   <li>Book a meeting or consultation</li>
                   <li>Enter into or receive services under a contract</li>
                   <li>Make a payment for services</li>
@@ -209,12 +223,15 @@ export default function PrivacyPage() {
                   We may also receive relevant Personal Data from consulting
                   clients, professional advisers, service providers, publicly
                   available business sources, or other parties where there is a
-                  lawful basis for doing so.
+                  lawful basis for doing so. For example, a consulting client
+                  may provide a participant&apos;s name and business email
+                  address so that they can be invited to participate in a
+                  client diagnostic.
                 </p>
               </div>
             </section>
 
-            {/* PURPOSE */}
+            {/* PURPOSES OF PROCESSING */}
             <section>
               <p className="brand-section-kicker">Why information is used</p>
 
@@ -227,12 +244,24 @@ export default function PrivacyPage() {
 
                 <ul className="list-disc space-y-2 pl-6">
                   <li>Respond to contact requests and business enquiries</li>
+
                   <li>
                     Assess whether our services may be relevant to your
                     organisation
                   </li>
+
                   <li>
-                    Provide and improve the HR Operations Health Check
+                    Provide and improve the public HR Operations Health Check
+                  </li>
+
+                  <li>
+                    Administer client diagnostic and Client Fact Pack
+                    participation as part of advisory engagements
+                  </li>
+
+                  <li>
+                    Verify invited participants and maintain secure access to
+                    client diagnostic services
                   </li>
 
                   <li>
@@ -291,7 +320,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* LAWFUL BASIS */}
+            {/* LAWFUL BASES */}
             <section>
               <p className="brand-section-kicker">Lawful bases</p>
 
@@ -317,11 +346,12 @@ export default function PrivacyPage() {
 
                   <li>
                     <strong>Legitimate interests</strong> in operating,
-                    maintaining, securing, and improving the website; responding
-                    to genuine business enquiries; providing and improving the
-                    Health Check; maintaining appropriate business records;
+                    maintaining, securing, and improving the website;
+                    responding to genuine business enquiries; providing and
+                    improving the Health Check; administering secure client
+                    services; maintaining appropriate business records;
                     managing professional relationships; and protecting the
-                    company, its systems, and its users
+                    company, its systems, clients, and users
                   </li>
 
                   <li>
@@ -345,45 +375,54 @@ export default function PrivacyPage() {
                   lawfulness of processing carried out before consent was
                   withdrawn.
                 </p>
+
+                <p>
+                  Where Van Esch Advisory Ltd acts only as a processor on
+                  behalf of a consulting client, the client is responsible as
+                  controller for determining the relevant lawful basis for that
+                  processing. Van Esch Advisory Ltd processes the relevant
+                  Personal Data in accordance with the client&apos;s documented
+                  instructions and applicable contractual arrangements.
+                </p>
               </div>
             </section>
 
-            {/* HEALTH CHECK */}
+            {/* PUBLIC HR OPERATIONS HEALTH CHECK */}
             <section>
               <p className="brand-section-kicker">
                 HR Operations Health Check
               </p>
 
               <h2 className="brand-heading-md mt-3 text-slate-950">
-                How diagnostic information is handled
+                How public Health Check information is handled
               </h2>
 
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  The HR Operations Health Check is designed as a practical
-                  self-assessment tool. Information submitted through the tool
-                  is used to generate your result, provide an indicative view of
-                  HR operational maturity, and support understanding of common
-                  operational patterns over time.
+                  The HR Operations Health Check is a publicly accessible
+                  practical self-assessment tool. Information submitted through
+                  the tool is used to generate your result, provide an
+                  indicative view of HR operational maturity, and support
+                  understanding of common operational patterns over time.
                 </p>
 
                 <p>
-                  Health Check and diagnostic information may include your
-                  responses, organisation context, results, scores, bands,
-                  summaries, recommendations, and other outputs derived from the
+                  Health Check information may include your responses,
+                  organisation context, results, scores, bands, summaries,
+                  recommendations, and other outputs derived from the
                   information submitted.
                 </p>
 
                 <p>
-                  Where benchmark or trend information is created from
-                  diagnostic submissions, it is intended to be used in
-                  aggregated, anonymised, or de-identified form so that
-                  individual people or organisations are not identified.
+                  Where benchmark or trend information is created from Health
+                  Check submissions, it is intended to be used in aggregated,
+                  anonymised, or de-identified form so that individual people
+                  or organisations are not identified.
                 </p>
 
                 <p>
                   If you provide contact details or submit an enquiry, your
-                  diagnostic responses, scores, and related contextual
+                  Health Check responses, scores, and related contextual
                   information may be linked to your enquiry and associated with
                   your contact details.
                 </p>
@@ -396,15 +435,74 @@ export default function PrivacyPage() {
                 </p>
 
                 <p>
-                  Diagnostic information linked to an enquiry may be used for
+                  Health Check information linked to an enquiry may be used for
                   handling that enquiry, supporting follow-up discussions,
-                  evaluating potential services, and providing advisory services
-                  where relevant.
+                  evaluating potential services, and providing advisory
+                  services where relevant.
                 </p>
               </div>
             </section>
 
-            {/* AI */}
+            {/* CLIENT-ONLY DIAGNOSTICS */}
+            <section>
+              <p className="brand-section-kicker">
+                Client diagnostic services
+              </p>
+
+              <h2 className="brand-heading-md mt-3 text-slate-950">
+                Invited diagnostic participants
+              </h2>
+
+              <div className="brand-body mt-4 space-y-4">
+                <p>
+                  Van Esch Advisory Ltd may provide client organisations with
+                  access to comprehensive diagnostic services and Client Fact
+                  Packs as part of an advisory engagement. These services are
+                  not publicly accessible and participation is provided by
+                  invitation.
+                </p>
+
+                <p>
+                  Depending on the engagement, diagnostic information may
+                  include participant responses, organisational context,
+                  ratings, comments, fact-pack information, scores, themes,
+                  summaries, and outputs derived from submitted information.
+                </p>
+
+                <p>
+                  Where you are invited to participate, we may use your
+                  registered email address to send a one-time verification
+                  code. Verification and session information is processed to
+                  confirm authorised access, prevent misuse, and protect client
+                  diagnostic information from unauthorised access.
+                </p>
+
+                <p>
+                  Email verification codes are temporary and are not stored in
+                  readable form after they are issued. Successful verification
+                  may create a temporary secure session linked to the relevant
+                  diagnostic invitation so that verification does not need to
+                  be repeated on every page or request.
+                </p>
+
+                <p>
+                  Diagnostic information collected as part of a client
+                  engagement may be reviewed and analysed alongside other
+                  relevant project evidence to support the delivery of advisory
+                  services to the client.
+                </p>
+
+                <p>
+                  Where Van Esch Advisory Ltd processes participant information
+                  solely on behalf of a client, the client may be the data
+                  controller and Van Esch Advisory Ltd may act as its processor,
+                  subject to the applicable contractual and data-processing
+                  arrangements.
+                </p>
+              </div>
+            </section>
+
+            {/* AI-ASSISTED PROCESSING */}
             <section>
               <p className="brand-section-kicker">
                 AI-assisted processing
@@ -434,15 +532,15 @@ export default function PrivacyPage() {
 
                 <p>
                   Personal Data is only provided to AI or technology service
-                  providers where there is an appropriate purpose, lawful basis,
-                  contractual arrangement, and level of security.
+                  providers where there is an appropriate purpose, lawful
+                  basis, contractual arrangement, and level of security.
                 </p>
               </div>
             </section>
 
-            {/* LOCAL STORAGE */}
+            {/* BROWSER STORAGE AND VERIFICATION COOKIE */}
             <section>
-              <p className="brand-section-kicker">Local storage</p>
+              <p className="brand-section-kicker">Browser storage</p>
 
               <h2 className="brand-heading-md mt-3 text-slate-950">
                 Browser-based data storage
@@ -450,9 +548,9 @@ export default function PrivacyPage() {
 
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Information entered into the Health Check may be stored
-                  locally in your browser to allow you to continue or resume the
-                  assessment.
+                  Information entered into the public HR Operations Health
+                  Check may be stored locally in your browser to allow you to
+                  continue or resume the assessment.
                 </p>
 
                 <p>
@@ -467,10 +565,34 @@ export default function PrivacyPage() {
                   non-essential cookies will only be used where an appropriate
                   consent mechanism applies.
                 </p>
+
+                <p>
+                  Where an invited participant accesses a client diagnostic or
+                  Client Fact Pack, a strictly necessary first-party
+                  verification cookie may be used after successful email
+                  verification. The cookie contains a randomly generated session
+                  identifier rather than the verification code or diagnostic
+                  responses, and normally expires after 12 hours.
+                </p>
+
+                <p>
+                  The corresponding verified session may end sooner if the
+                  invitation expires or is revoked, the client project is
+                  closed, or participation is completed or withdrawn.
+                </p>
+
+                <p>
+                  Further information about cookies and browser storage is
+                  available in our{" "}
+                  <Link href="/cookies" className="brand-link font-medium">
+                    Cookie Policy
+                  </Link>
+                  .
+                </p>
               </div>
             </section>
 
-            {/* SHARING */}
+            {/* SERVICE PROVIDERS AND SHARING */}
             <section>
               <p className="brand-section-kicker">Sharing information</p>
 
@@ -493,15 +615,25 @@ export default function PrivacyPage() {
                 </p>
 
                 <ul className="list-disc space-y-2 pl-6">
-                  <li>Supabase for database, authentication, and data storage</li>
-                  <li>Resend for transactional email delivery</li>
+                  <li>
+                    Supabase for database, authentication, verification, and
+                    data storage
+                  </li>
+
+                  <li>
+                    Resend for transactional email delivery, including
+                    verification emails
+                  </li>
 
                   <li>
                     Google Workspace and Microsoft 365 for business
                     communications, productivity, and document management
                   </li>
 
-                  <li>Cloudflare for hosting, delivery, and security services</li>
+                  <li>
+                    Cloudflare for hosting, delivery, performance, and security
+                    services
+                  </li>
 
                   <li>
                     GitHub for source-code management and deployment
@@ -526,8 +658,8 @@ export default function PrivacyPage() {
                 </p>
 
                 <p>
-                  Where card payments are accepted through FreeAgent, Stripe, or
-                  another payment provider, the payment provider may process
+                  Where card payments are accepted through FreeAgent, Stripe,
+                  or another payment provider, the payment provider may process
                   payment and transaction information as a processor or as an
                   independent controller, depending on the service and legal
                   context. Van Esch Advisory Ltd does not generally receive or
@@ -552,7 +684,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* INTERNATIONAL TRANSFERS */}
+            {/* INTERNATIONAL DATA TRANSFERS */}
             <section>
               <p className="brand-section-kicker">
                 International data transfers
@@ -616,16 +748,16 @@ export default function PrivacyPage() {
               <div className="brand-body mt-4 space-y-4">
                 <p>
                   We use reasonable technical and organisational measures
-                  intended to protect Personal Data against unauthorised access,
-                  loss, misuse, alteration, or disclosure.
+                  intended to protect Personal Data against unauthorised
+                  access, loss, misuse, alteration, or disclosure.
                 </p>
 
                 <p>
                   Measures may include access controls, authentication,
-                  encryption in transit, secure hosting and database services,
-                  software maintenance, monitoring, backups, and limiting
-                  access to people and providers who require it for an
-                  authorised purpose.
+                  verification, encryption in transit, secure hosting and
+                  database services, software maintenance, monitoring, backups,
+                  and limiting access to people and providers who require it
+                  for an authorised purpose.
                 </p>
 
                 <p>
@@ -650,16 +782,25 @@ export default function PrivacyPage() {
                   necessary for the purpose for which it was collected,
                   including responding to enquiries, delivering services,
                   maintaining appropriate business records, complying with
-                  legal obligations, and establishing, exercising, or defending
-                  legal claims.
+                  legal obligations, and establishing, exercising, or
+                  defending legal claims.
                 </p>
 
                 <p>
-                  The appropriate retention period depends on factors including
-                  the nature of the information, the relationship with the
-                  individual or organisation, legal and regulatory
-                  requirements, security considerations, and whether the
-                  information is required for an existing or potential claim.
+                  Short-lived authentication and verification information is
+                  used only for the period required to provide and secure the
+                  relevant access. A verified client diagnostic browser session
+                  normally expires after 12 hours and may end earlier where the
+                  underlying invitation or participation is no longer valid.
+                </p>
+
+                <p>
+                  The appropriate retention period for other information
+                  depends on factors including the nature of the information,
+                  the relationship with the individual or organisation, legal
+                  and regulatory requirements, security considerations, and
+                  whether the information is required for an existing or
+                  potential claim.
                 </p>
 
                 <p>
@@ -669,7 +810,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* RIGHTS */}
+            {/* DATA PROTECTION RIGHTS */}
             <section>
               <p className="brand-section-kicker">Your rights</p>
 
@@ -706,8 +847,8 @@ export default function PrivacyPage() {
                 </ul>
 
                 <p>
-                  These rights are subject to legal conditions, limitations, and
-                  exemptions. They will not apply in every circumstance.
+                  These rights are subject to legal conditions, limitations,
+                  and exemptions. They will not apply in every circumstance.
                 </p>
 
                 <p>
@@ -719,8 +860,9 @@ export default function PrivacyPage() {
 
                 <p>
                   There is normally no fee for exercising your data protection
-                  rights. However, applicable law may permit a reasonable fee or
-                  refusal where a request is manifestly unfounded or excessive.
+                  rights. However, applicable law may permit a reasonable fee
+                  or refusal where a request is manifestly unfounded or
+                  excessive.
                 </p>
               </div>
             </section>
@@ -735,8 +877,8 @@ export default function PrivacyPage() {
 
               <div className="brand-body mt-4 space-y-4">
                 <p>
-                  Please contact us first if you have a concern about how we use
-                  your Personal Data, so that we have an opportunity to
+                  Please contact us first if you have a concern about how we
+                  use your Personal Data, so that we have an opportunity to
                   investigate and respond.
                 </p>
 
@@ -761,7 +903,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* CONTACT */}
+            {/* PRIVACY CONTACT */}
             <section>
               <p className="brand-section-kicker">Contact</p>
 
@@ -816,7 +958,7 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* POLICY CONTROL */}
+            {/* DOCUMENT CONTROL */}
             <section>
               <p className="brand-section-kicker">Document control</p>
 
@@ -826,18 +968,18 @@ export default function PrivacyPage() {
 
               <div className="brand-body mt-4 space-y-2">
                 <p>
-                  <strong>Last updated:</strong> 21 July 2026
+                  <strong>Last updated:</strong> 12 August 2026
                 </p>
 
                 <p>
-                  <strong>Version:</strong> 2.0
+                  <strong>Version:</strong> 2.1
                 </p>
 
                 <p>
                   We may update this Privacy Policy periodically to reflect
                   changes to our services, technology, suppliers, processing
-                  activities, or legal obligations. The updated version will be
-                  published on this page.
+                  activities, or legal obligations. The updated version will
+                  be published on this page.
                 </p>
               </div>
             </section>
