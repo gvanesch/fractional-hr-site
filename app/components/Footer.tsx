@@ -64,19 +64,12 @@ export default function Footer() {
               growing and complex organisations.
             </p>
 
-            <Link
-              href="/cyber-essentials"
-              className="inline-block"
-              aria-label="Van Esch Advisory Ltd Cyber Essentials certification"
-            >
-              <Image
-                src="/certifications/cyber-essentials.png"
-                alt="Cyber Essentials certified"
-                width={180}
-                height={85}
-                className="h-auto w-[160px] opacity-90 transition hover:opacity-100"
-              />
-            </Link>
+            <iframe
+              src="https://registry.blockmarktech.com/certificates/acbc9192-47fc-4c84-bb6a-5eca8d3b46e5/widget/?tooltip_position=bottom_right&theme=transparent&hover=t"
+              title="Van Esch Advisory Ltd Cyber Essentials certification"
+              loading="lazy"
+              style={{ border: "none", height: "132px", width: "132px" }}
+            />
           </div>
 
           <div className="space-y-5">

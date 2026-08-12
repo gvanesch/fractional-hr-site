@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -31,7 +30,7 @@ export default function CyberEssentialsPage() {
       </section>
 
       <section className="brand-light-section">
-        <div className="brand-container brand-section">
+        <div className="brand-container brand-section pb-10 md:pb-14">
           <div className="mx-auto max-w-4xl space-y-12">
             <section>
               <p className="brand-section-kicker">Certification</p>
@@ -58,27 +57,10 @@ export default function CyberEssentialsPage() {
             </section>
 
             <section className="border-y border-slate-200 py-10 sm:py-12">
-              <div className="grid gap-10 md:grid-cols-[240px_1fr] md:items-start">
-                <a
-                  href={certificateSearchUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block"
-                  aria-label="Verify Van Esch Advisory Ltd Cyber Essentials certification"
-                >
-                  <Image
-                    src="/certifications/cyber-essentials.png"
-                    alt="Cyber Essentials certified"
-                    width={240}
-                    height={113}
-                    className="h-auto w-[210px] transition hover:opacity-90"
-                  />
-                </a>
-
-                <div>
-                  <h2 className="brand-heading-md text-slate-950">
-                    Certification details
-                  </h2>
+              <div>
+                <h2 className="brand-heading-md text-slate-950">
+                  Certification details
+                </h2>
 
                   <dl className="mt-7 grid gap-x-12 gap-y-6 sm:grid-cols-2">
                     <div>
@@ -151,17 +133,24 @@ export default function CyberEssentialsPage() {
                       </span>
                     </a>
                   </div>
-                </div>
               </div>
-
             </section>
 
-            <p className="max-w-3xl text-base leading-7 text-slate-600">
-              Cyber Essentials certification provides assurance against the
-              technical controls defined by the scheme. Like any cyber security
-              certification, it does not mean that an organisation is immune
-              from cyber incidents.
-            </p>
+            <div className="grid gap-6 sm:grid-cols-[132px_1fr] sm:items-center">
+              <iframe
+                src="https://registry.blockmarktech.com/certificates/acbc9192-47fc-4c84-bb6a-5eca8d3b46e5/widget/?tooltip_position=bottom_right&theme=transparent&hover=t"
+                title="Van Esch Advisory Ltd Cyber Essentials certification"
+                loading="lazy"
+                style={{ border: "none", height: "132px", width: "132px" }}
+              />
+
+              <p className="max-w-2xl text-base leading-7 text-slate-600">
+                Cyber Essentials certification provides assurance against the
+                technical controls defined by the scheme. Like any cyber security
+                certification, it does not mean that an organisation is immune
+                from cyber incidents.
+              </p>
+            </div>
           </div>
         </div>
       </section>
