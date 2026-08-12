@@ -27,7 +27,7 @@ const experienceThemes = [
 ];
 
 const credibility = [
-  "17+ years in HR operations and service delivery",
+  "Nearly two decades in HR operations and service delivery",
   "Global experience across 30+ countries",
   "Leadership roles in complex and scaled organisations",
   "Deep experience in ServiceNow HR technology and workflow design",
@@ -207,7 +207,7 @@ export default function AboutPage() {
 
               <p className="brand-body">
                 Van Esch Advisory is led by Greg van Esch, an HR Operations and
-                Transformation leader with over 17 years of experience.
+                Transformation leader with nearly two decades of experience.
               </p>
 
               <p className="brand-body">

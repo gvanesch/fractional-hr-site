@@ -20,10 +20,18 @@ const legalLinks = [
   { href: "/terms", label: "Terms of Use" },
   { href: "/cookies", label: "Cookie Policy" },
   { href: "/modern-slavery", label: "Modern Slavery Statement" },
+];
+
+const companyLinks = [
   {
     href: "https://www.linkedin.com/in/greg-van-esch/",
     label: "LinkedIn",
     external: true,
+  },
+  {
+    href: "/cyber-essentials",
+    label: "Cyber Essentials certified",
+    external: false,
   },
 ];
 
@@ -55,6 +63,20 @@ export default function Footer() {
               HR Operations, Service Delivery, and Transformation Advisory for
               growing and complex organisations.
             </p>
+
+            <Link
+              href="/cyber-essentials"
+              className="inline-block"
+              aria-label="Van Esch Advisory Ltd Cyber Essentials certification"
+            >
+              <Image
+                src="/certifications/cyber-essentials.png"
+                alt="Cyber Essentials certified"
+                width={180}
+                height={85}
+                className="h-auto w-[160px] opacity-90 transition hover:opacity-100"
+              />
+            </Link>
           </div>
 
           <div className="space-y-5">
@@ -73,22 +95,12 @@ export default function Footer() {
             </nav>
           </div>
 
-          <div className="space-y-5">
-            <h3 className="text-base font-semibold text-slate-900">Legal</h3>
+          <div className="space-y-9">
+            <div className="space-y-5">
+              <h3 className="text-base font-semibold text-slate-900">Legal</h3>
 
-            <nav className="flex flex-col gap-3">
-              {legalLinks.map((item) =>
-                item.external ? (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-slate-500 transition hover:text-[#1E6FD9]"
-                  >
-                    {item.label}
-                  </a>
-                ) : (
+              <nav className="flex flex-col gap-3">
+                {legalLinks.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -96,9 +108,37 @@ export default function Footer() {
                   >
                     {item.label}
                   </Link>
-                ),
-              )}
-            </nav>
+                ))}
+              </nav>
+            </div>
+
+            <div className="space-y-5">
+              <h3 className="text-base font-semibold text-slate-900">Company</h3>
+
+              <nav className="flex flex-col gap-3">
+                {companyLinks.map((item) =>
+                  item.external ? (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-slate-500 transition hover:text-[#1E6FD9]"
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="text-sm text-slate-500 transition hover:text-[#1E6FD9]"
+                    >
+                      {item.label}
+                    </Link>
+                  ),
+                )}
+              </nav>
+            </div>
           </div>
         </div>
 

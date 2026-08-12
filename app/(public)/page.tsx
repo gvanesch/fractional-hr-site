@@ -146,7 +146,7 @@ export default function HomePage() {
             </h2>
 
             <p className="brand-body-lg">
-              The firm draws on over 17 years of hands-on HR operations
+              The firm draws on nearly two decades of hands-on HR operations
               leadership across both enterprise and rapidly scaling
               environments, including global shared services, HR technology
               transformation, and M&amp;A integration.
