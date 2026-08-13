@@ -538,7 +538,7 @@ function WelcomeStep({
       </section>
 
       <section className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] p-5 sm:p-6">
-        <div className="max-w-5xl">
+        <div className="w-full">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
             How to use the scale
           </p>
@@ -548,7 +548,7 @@ function WelcomeStep({
             reality, not how it is intended to work on paper.
           </p>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <ScaleCard
               value="1"
               label="Rarely true"
@@ -1056,7 +1056,7 @@ function ScaleCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--brand-border)] bg-white p-4">
+    <div className="min-w-0 rounded-2xl border border-[var(--brand-border)] bg-white p-4 xl:p-5">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--brand-accent)] text-sm font-bold text-white">
           {value}
