@@ -758,7 +758,10 @@ function ScoreQuestionCard({
           <span className="text-right">Consistently true</span>
         </div>
 
-        <div className="grid grid-cols-5 gap-2 sm:gap-3">
+        <div
+      data-diagnostic-score-controls
+      className="grid grid-cols-5 gap-2 sm:gap-3"
+    >
           {[1, 2, 3, 4, 5].map((value) => {
             const isSelected = selectedValue === value;
 
@@ -766,9 +769,50 @@ function ScoreQuestionCard({
               <button
                 key={value}
                 type="button"
-                onClick={() =>
-                  onChange(question.id, value as ScoreAnswerValue)
+                onClick={(event) => {
+              const currentControls =
+                event.currentTarget.closest<HTMLElement>(
+                  "[data-diagnostic-score-controls]",
+                );
+
+              const currentTop =
+                currentControls?.getBoundingClientRect().top ?? null;
+
+              onChange(question.id, value as ScoreAnswerValue);
+
+              if (!currentControls || currentTop === null) {
+                return;
+              }
+
+              window.requestAnimationFrame(() => {
+                const controls = Array.from(
+                  document.querySelectorAll<HTMLElement>(
+                    "[data-diagnostic-score-controls], [data-diagnostic-probe-controls]",
+                  ),
+                );
+
+                const currentIndex = controls.indexOf(currentControls);
+
+                if (currentIndex === -1) {
+                  return;
                 }
+
+                const nextControls = controls[currentIndex + 1];
+
+                if (!nextControls) {
+                  return;
+                }
+
+                const nextTop =
+                  nextControls.getBoundingClientRect().top;
+
+                window.scrollBy({
+                  top: nextTop - currentTop,
+                  left: 0,
+                  behavior: "smooth",
+                });
+              });
+            }}
                 className={`min-h-14 rounded-xl border px-3 py-4 text-base font-semibold transition ${
                   isSelected
                     ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white shadow-sm"
@@ -1046,6 +1090,7 @@ function ProbeQuestionCard({
       </p>
 
       <textarea
+        data-diagnostic-probe-controls
         value={value}
         onChange={(event) => onChange(question.id, event.target.value)}
         rows={5}
