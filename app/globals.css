@@ -371,6 +371,21 @@ body {
   padding-top: calc(var(--site-header-height) + var(--hero-content-offset));
 }
 
+/* Compact contextual hero for the participant diagnostic journey */
+.brand-diagnostic-hero-content {
+  position: relative;
+  z-index: 1;
+  padding-top: calc(var(--site-header-height) + 2rem);
+  padding-bottom: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .brand-diagnostic-hero-content {
+    padding-top: calc(var(--site-header-height) + 2.5rem);
+    padding-bottom: 3rem;
+  }
+}
+
 .brand-dark-section .brand-container.brand-section,
 .brand-dark-section-plain .brand-container.brand-section {
   padding-top: calc(4.5rem + 1rem);

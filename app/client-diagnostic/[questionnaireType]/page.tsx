@@ -282,50 +282,16 @@ export default async function ClientDiagnosticQuestionnairePage({
   }
 
   return (
-    <main className="brand-light-section min-h-screen">
-      <section className="brand-hero">
-        <div className="brand-container brand-section brand-hero-content">
-          <div className="max-w-4xl">
-            <p className="brand-kicker">Client diagnostic</p>
-
-            <h1 className="brand-heading-lg mt-5 text-white">
-              {getQuestionnaireTitle(questionnaireType)}
-            </h1>
-
-            <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
-              This diagnostic is designed to build a rounded view of how people
-              operations are working today across different roles and
-              perspectives.
-            </p>
-
-            <div className="brand-card-dark mt-8 max-w-3xl p-6 sm:p-7">
-              <div className="space-y-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8AAAC8]">
-                  Guidance
-                </p>
-
-                <p className="text-base leading-7 text-slate-200">
-                  {getQuestionnaireIntro(questionnaireType)}
-                </p>
-
-                <p className="text-base leading-7 text-slate-300">
-                  Please answer candidly and based on current experience. The
-                  most useful insight comes from reflecting how work operates in
-                  reality, including where processes feel clear, well supported,
-                  inconsistent, or difficult to navigate.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    <main>
       <ClientDiagnosticQuestionnaire
         questionnaireType={questionnaireType}
         projectId={projectId}
         participantId={participantId}
         inviteToken={inviteToken}
+        questionnaireTitle={getQuestionnaireTitle(questionnaireType)}
+        questionnaireIntro={getQuestionnaireIntro(questionnaireType)}
       />
     </main>
   );
+
 }
