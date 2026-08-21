@@ -212,7 +212,7 @@ function buildDetailsPanel(params: {
   }
 
   return `
-    <div style="margin-top:24px;padding:18px 20px;border:1px solid #dbe3ef;border-radius:16px;background:#f8fafc;">
+    <div style="margin-top:24px;padding:16px 18px;border:1px solid #dbe3ef;border-radius:8px;background:#f8fafc;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
         ${rows.map(buildDetailRow).join("")}
       </table>
@@ -240,48 +240,49 @@ function buildEmailShell(params: {
   } = params;
 
   return `
-    <div style="margin:0;padding:36px 16px;background:#F4F6FA;font-family:Inter,Arial,sans-serif;color:#0f172a;">
+    <div style="margin:0;padding:32px 16px;background:#F8FAFC;font-family:Inter,Arial,sans-serif;color:#0f172a;">
       <div style="max-width:680px;margin:0 auto;">
-        <div style="overflow:hidden;border:1px solid #d6e0eb;border-radius:24px;background:#ffffff;box-shadow:0 8px 30px rgba(15,23,42,0.06);">
-          <div style="padding:26px 30px;background:linear-gradient(135deg,#0A1628 0%,#0D1F3C 100%);">
-            <div style="font-size:11px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#8AAAC8;font-weight:700;">
-              ${escapeHtml(previewLabel)}
-            </div>
 
-            <div style="margin-top:14px;font-size:30px;line-height:1.1;color:#ffffff;font-weight:700;">
-              Van Esch
-            </div>
+        <div style="background:#0A1628;padding:22px 30px 20px 30px;border-radius:12px 12px 0 0;">
+          <img
+            src="https://www.vanesch.uk/brand/van-esch-email-logo.png"
+            width="250"
+            alt="Van Esch Advisory"
+            style="display:block;width:250px;max-width:100%;height:auto;border:0;"
+          />
+        </div>
 
-            <div style="margin-top:8px;font-size:14px;line-height:1.7;color:#d4dfeb;">
-              HR Operations &amp; Transformation Advisory
-            </div>
+        <div style="height:3px;background:#1E6FD9;font-size:0;line-height:0;">&nbsp;</div>
+
+        <div style="border:1px solid #dbe3ef;border-top:0;background:#ffffff;padding:34px 30px 32px 30px;border-radius:0 0 12px 12px;">
+
+          <div style="font-size:11px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#6f8eaa;font-weight:700;">
+            ${escapeHtml(previewLabel)}
           </div>
 
-          <div style="padding:34px 30px 32px 30px;">
-            <div style="font-size:28px;line-height:1.2;font-weight:700;color:#0f172a;letter-spacing:-0.02em;">
-              ${escapeHtml(heading)}
-            </div>
+          <div style="margin-top:12px;font-size:28px;line-height:1.2;font-weight:700;color:#0A1628;letter-spacing:-0.02em;">
+            ${escapeHtml(heading)}
+          </div>
 
-            <div style="margin-top:22px;font-size:15px;line-height:1.9;color:#334155;">
-              ${leadHtml}
-            </div>
+          <div style="margin-top:22px;font-size:15px;line-height:1.8;color:#334155;">
+            ${leadHtml}
+          </div>
 
-            ${detailPanelHtml ? detailPanelHtml : ""}
+          ${detailPanelHtml ? detailPanelHtml : ""}
 
-            <div style="margin-top:24px;font-size:15px;line-height:1.9;color:#334155;">
-              ${bodyHtml}
-            </div>
+          <div style="margin-top:24px;font-size:15px;line-height:1.8;color:#334155;">
+            ${bodyHtml}
+          </div>
 
-            ${ctaHtml ? `<div style="margin-top:30px;">${ctaHtml}</div>` : ""}
+          ${ctaHtml ? `<div style="margin-top:28px;">${ctaHtml}</div>` : ""}
 
-            <div style="margin-top:34px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;line-height:1.9;color:#64748b;">
-              ${
-                footerHtml ??
-                `Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory<br/>www.vanesch.uk`
-              }
-            </div>
+          <div style="margin-top:34px;padding-top:18px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.8;color:#64748b;">
+            ${footerHtml ??
+    `Van Esch Advisory Ltd<br/>HR Operations &amp; Transformation Advisory<br/>www.vanesch.uk`
+    }
           </div>
         </div>
+
       </div>
     </div>
   `;
@@ -296,7 +297,7 @@ function buildButton(params: {
   return `
     <a
       href="${escapeHtml(href)}"
-      style="display:inline-block;padding:14px 20px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:14px;letter-spacing:0.01em;"
+      style="display:inline-block;padding:13px 20px;background:#1E6FD9;color:#ffffff;text-decoration:none;border-radius:7px;font-weight:600;font-size:14px;letter-spacing:0.01em;"
     >
       ${escapeHtml(label)}
     </a>
@@ -332,8 +333,8 @@ function buildInviteEmail(params: {
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       You’ve been invited to contribute to the <strong>${escapeHtml(
-        audienceCopy.title,
-      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong>.
+    audienceCopy.title,
+  )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong>.
     </p>
     <p style="margin:16px 0 0 0;">
       ${escapeHtml(audienceCopy.positioning)}
@@ -343,16 +344,27 @@ function buildInviteEmail(params: {
   const detailPanelHtml = buildDetailsPanel({
     rows: [
       {
-        label: "Participation type",
+        label:
+          questionnaireType === "client_fact_pack"
+            ? "Input"
+            : "Perspective",
         value: audienceCopy.titleShort,
       },
+      ...(questionnaireType === "client_fact_pack"
+        ? []
+        : [
+          {
+            label: "Time",
+            value: "Around 8–10 minutes",
+          },
+        ]),
       ...(expiresLabel
         ? [
-            {
-              label: "Response window",
-              value: `Please respond by ${expiresLabel}`,
-            },
-          ]
+          {
+            label: "Respond by",
+            value: expiresLabel,
+          },
+        ]
         : []),
     ],
   });
@@ -361,15 +373,18 @@ function buildInviteEmail(params: {
     <p style="margin:0;">
       ${escapeHtml(audienceCopy.purpose)}
     </p>
+    ${questionnaireType === "client_fact_pack"
+      ? `<p style="margin:16px 0 0 0;">
+            This input should be completed once to establish the operating context for this engagement.
+          </p>`
+      : ""
+    }
     <p style="margin:16px 0 0 0;">
-      ${
-        questionnaireType === "client_fact_pack"
-          ? "This input should be completed once to establish the operating context for this engagement."
-          : "The diagnostic typically takes around 8 to 10 minutes to complete."
-      }
+      You can pause and return later using the same invitation link.
     </p>
-    <p style="margin:16px 0 0 0;">
-      You can return to the same link if you need to pause and continue later.
+    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;line-height:1.7;">
+      Access is invitation-only. When you open the link, a one-time verification
+      code will be sent to this email address.
     </p>
   `;
 
@@ -397,18 +412,26 @@ function buildInviteEmail(params: {
     ``,
     audienceCopy.positioning,
     ``,
-    `Participation type: ${audienceCopy.titleShort}`,
-    expiresLabel ? `Response window: Please respond by ${expiresLabel}` : "",
+    `${questionnaireType === "client_fact_pack"
+      ? "Input"
+      : "Perspective"
+    }: ${audienceCopy.titleShort}`,
+    questionnaireType === "client_fact_pack"
+      ? ""
+      : "Time: Around 8–10 minutes",
+    expiresLabel ? `Respond by: ${expiresLabel}` : "",
     ``,
     audienceCopy.purpose,
     ``,
     questionnaireType === "client_fact_pack"
       ? "This input should be completed once to establish the operating context for this engagement."
-      : "The diagnostic typically takes around 8 to 10 minutes to complete.",
+      : "",
     ``,
     `Access link: ${inviteUrl}`,
     ``,
-    `You can return to the same link if you need to pause and continue later.`,
+    `You can pause and return later using the same invitation link.`,
+    ``,
+    `Access is invitation-only. When you open the link, a one-time verification code will be sent to this email address.`,
     ``,
     `Van Esch Advisory`,
     `www.vanesch.uk`,
@@ -456,37 +479,44 @@ function buildInviteExtendedEmail(params: {
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       Your response window for the <strong>${escapeHtml(
-        audienceCopy.title,
-      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been extended.
+    audienceCopy.title,
+  )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been extended.
     </p>
     <p style="margin:16px 0 0 0;">
-      This is to ensure your perspective can still be included in the active diagnostic collection.
+      You now have additional time to complete your response.
     </p>
   `;
 
   const detailPanelHtml = buildDetailsPanel({
     rows: [
       {
-        label: "Participation type",
+        label:
+          questionnaireType === "client_fact_pack"
+            ? "Input"
+            : "Perspective",
         value: audienceCopy.titleShort,
       },
       ...(expiresLabel
         ? [
-            {
-              label: "Updated response window",
-              value: `Please respond by ${expiresLabel}`,
-            },
-          ]
+          {
+            label: "Respond by",
+            value: expiresLabel,
+          },
+        ]
         : []),
     ],
   });
 
   const bodyHtml = `
     <p style="margin:0;">
-      Your input remains an important part of building a complete and balanced view of current operations.
+      Your input remains part of the diagnostic and no previous progress has been lost.
     </p>
     <p style="margin:16px 0 0 0;">
-      You can continue using the same link below.
+      Continue using the same invitation link below.
+    </p>
+    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;line-height:1.7;">
+      When you open the link, a one-time verification code will be sent to this
+      email address.
     </p>
   `;
 
@@ -507,14 +537,19 @@ function buildInviteExtendedEmail(params: {
     ``,
     `Your response window for the ${audienceCopy.title} for ${organisationLabel} has been extended.`,
     ``,
-    `This is to ensure your perspective can still be included in the active diagnostic collection.`,
+    `You now have additional time to complete your response.`,
     ``,
-    `Participation type: ${audienceCopy.titleShort}`,
-    expiresLabel ? `Updated response window: Please respond by ${expiresLabel}` : "",
+    `${questionnaireType === "client_fact_pack"
+      ? "Input"
+      : "Perspective"
+    }: ${audienceCopy.titleShort}`,
+    expiresLabel ? `Respond by: ${expiresLabel}` : "",
     ``,
-    `Your input remains an important part of building a complete and balanced view of current operations.`,
+    `Your input remains part of the diagnostic and no previous progress has been lost.`,
     ``,
     `Access link: ${inviteUrl}`,
+    ``,
+    `When you open the link, a one-time verification code will be sent to this email address.`,
     ``,
     `Van Esch Advisory`,
     `www.vanesch.uk`,
@@ -559,8 +594,8 @@ function buildWithdrawnEmail(params: {
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       Your participation in the <strong>${escapeHtml(
-        audienceCopy.title,
-      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been withdrawn.
+    audienceCopy.title,
+  )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been withdrawn.
     </p>
     <p style="margin:16px 0 0 0;">
       You no longer need to take any action. This update has been made to keep the participant set aligned with the current scope of the engagement.
@@ -575,18 +610,20 @@ function buildWithdrawnEmail(params: {
       },
       ...(withdrawReasonLabel
         ? [
-            {
-              label: "Recorded reason",
-              value: withdrawReasonLabel,
-            },
-          ]
+          {
+            label: "Recorded reason",
+            value: withdrawReasonLabel,
+          },
+        ]
         : []),
     ],
   });
 
   const bodyHtml = `
     <p style="margin:0;">
-      If you believe this update has been made in error, please reply to this email so it can be reviewed.
+      If you believe this may have been done in error, please reply to this email
+      and we’ll be happy to review it with the internal project sponsor at your
+      organisation.
     </p>
   `;
 
@@ -608,7 +645,7 @@ function buildWithdrawnEmail(params: {
     `Participation type: ${audienceCopy.titleShort}`,
     withdrawReasonLabel ? `Recorded reason: ${withdrawReasonLabel}` : "",
     ``,
-    `If you believe this update has been made in error, please reply to this email so it can be reviewed.`,
+    `If you believe this may have been done in error, please reply to this email and we’ll be happy to review it with the internal project sponsor at your organisation.`,
     ``,
     `Van Esch Advisory`,
     `www.vanesch.uk`,
@@ -658,42 +695,47 @@ function buildReinstatedEmail(params: {
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
       Your participation in the <strong>${escapeHtml(
-        audienceCopy.title,
-      )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been restored.
+    audienceCopy.title,
+  )}</strong> for <strong>${escapeHtml(organisationLabel)}</strong> has been restored.
     </p>
     <p style="margin:16px 0 0 0;">
-      Your perspective is once again included in the active diagnostic collection for this engagement.
+      You can now continue with your response using the invitation link below.
     </p>
   `;
 
   const detailPanelHtml = buildDetailsPanel({
     rows: [
       {
-        label: "Participation type",
+        label: "Perspective",
         value: audienceCopy.titleShort,
       },
       ...(expiresLabel
         ? [
-            {
-              label: "Response window",
-              value: `Please respond by ${expiresLabel}`,
-            },
-          ]
+          {
+            label: "Respond by",
+            value: expiresLabel,
+          },
+        ]
         : []),
       ...(reinstateReasonLabel
         ? [
-            {
-              label: "Recorded reason",
-              value: reinstateReasonLabel,
-            },
-          ]
+          {
+            label: "Recorded reason",
+            value: reinstateReasonLabel,
+          },
+        ]
         : []),
     ],
   });
 
   const bodyHtml = `
     <p style="margin:0;">
-      Please use the link below to access and complete your response.
+      If you had already started the diagnostic, any previous progress remains
+      available and you can continue from where you left off.
+    </p>
+    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;line-height:1.7;">
+      When you open the link, a one-time verification code will be sent to this
+      email address.
     </p>
   `;
 
@@ -714,15 +756,17 @@ function buildReinstatedEmail(params: {
     ``,
     `Your participation in the ${audienceCopy.title} for ${organisationLabel} has been restored.`,
     ``,
-    `Your perspective is once again included in the active diagnostic collection for this engagement.`,
+    `You can now continue with your response using the invitation link below.`,
     ``,
-    `Participation type: ${audienceCopy.titleShort}`,
-    expiresLabel ? `Response window: Please respond by ${expiresLabel}` : "",
+    `Perspective: ${audienceCopy.titleShort}`,
+    expiresLabel ? `Respond by: ${expiresLabel}` : "",
     reinstateReasonLabel ? `Recorded reason: ${reinstateReasonLabel}` : "",
     ``,
-    `Please use the link below to access and complete your response.`,
+    `If you had already started the diagnostic, any previous progress remains available and you can continue from where you left off.`,
     ``,
     `Access link: ${inviteUrl}`,
+    ``,
+    `When you open the link, a one-time verification code will be sent to this email address.`,
     ``,
     `Van Esch Advisory`,
     `www.vanesch.uk`,
@@ -967,8 +1011,8 @@ export async function sendParticipantOtpEmail(
   const leadHtml = `
     <p style="margin:0;">Hi ${escapeHtml(name)},</p>
     <p style="margin:16px 0 0 0;">
-      Use the verification code below to continue to your secure
-      Van Esch Advisory diagnostic.
+      Enter the verification code below to continue to your Van Esch Advisory
+      diagnostic.
     </p>
   `;
 
@@ -976,21 +1020,21 @@ export async function sendParticipantOtpEmail(
     <div
       style="
         margin:24px 0;
-        padding:22px;
+        padding:20px 22px;
         border:1px solid #dbe3ef;
-        border-radius:16px;
+        border-radius:8px;
         background:#f8fafc;
         text-align:center;
       "
     >
       <div
         style="
-          font-size:13px;
+          font-size:11px;
           line-height:1.5;
           color:#64748b;
           text-transform:uppercase;
-          letter-spacing:0.12em;
-          font-weight:600;
+          letter-spacing:0.16em;
+          font-weight:700;
         "
       >
         Verification code
@@ -999,11 +1043,11 @@ export async function sendParticipantOtpEmail(
       <div
         style="
           margin-top:10px;
-          font-size:34px;
+          font-size:36px;
           line-height:1.2;
-          color:#0f172a;
+          color:#0A1628;
           font-weight:700;
-          letter-spacing:0.18em;
+          letter-spacing:0.2em;
         "
       >
         ${escapeHtml(otpCode)}
@@ -1015,18 +1059,20 @@ export async function sendParticipantOtpEmail(
     </p>
 
     <p style="margin:16px 0 0 0;">
-      If you did not request this code, you can ignore this email.
-    </p>
+  If you did not request this code, do not use it. Please reply to this email
+  to let us know so that we can investigate it further.
+</p>
 
-    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;">
-      Van Esch Advisory will never ask you to send or disclose this
-      verification code by email or telephone.
-    </p>
+    <p style="margin:16px 0 0 0;color:#64748b;font-size:13px;line-height:1.7;">
+  Keep this code private. No Van Esch Advisory employee or representative will
+  ask you to disclose or forward a verification code by email, telephone, or
+  any other channel.
+</p>
   `;
 
   const html = buildEmailShell({
-    previewLabel: "Your diagnostic verification code",
-    heading: "Verify your email",
+    previewLabel: "Secure diagnostic access",
+    heading: "Your verification code",
     leadHtml,
     bodyHtml,
     footerHtml:
@@ -1036,15 +1082,15 @@ export async function sendParticipantOtpEmail(
   const text = [
     `Hi ${name},`,
     "",
-    "Use the verification code below to continue to your secure Van Esch Advisory diagnostic.",
+    "Enter the verification code below to continue to your Van Esch Advisory diagnostic.",
     "",
     `Verification code: ${otpCode}`,
     "",
     `This code expires in ${expiresInMinutes} minutes and can only be used once.`,
     "",
-    "If you did not request this code, you can ignore this email.",
+    "If you did not request this code, do not use it. Please reply to this email to let us know so that we can investigate it further.",
     "",
-    "Van Esch Advisory will never ask you to send or disclose this verification code by email or telephone.",
+    "Keep this code private. No Van Esch Advisory employee or representative will ask you to disclose or forward a verification code by email, telephone, or any other channel.",
     "",
     "Van Esch Advisory",
     "www.vanesch.uk",
