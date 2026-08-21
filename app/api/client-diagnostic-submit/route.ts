@@ -10,6 +10,13 @@ import {
   type ClientDiagnosticQuestion,
   type QuestionnaireType,
 } from "@/lib/client-diagnostic/question-bank";
+import {
+  intendedAccessModels,
+  isServiceAccessRoute,
+  type IntendedAccessModel,
+  type ServiceAccessContext,
+  type ServiceAccessRoute,
+} from "@/lib/client-diagnostic/service-access-context";
 
 type ResponseKind = "score" | "probe";
 
@@ -24,6 +31,7 @@ type SubmittedPayload = {
   questionnaireType: QuestionnaireType;
   preparedAt?: string;
   responses: SubmittedResponse[];
+  serviceAccessContext?: ServiceAccessContext;
 };
 
 type ClientDiagnosticSubmitRequestBody = {
@@ -72,6 +80,7 @@ function validateRequestBody(
         inviteToken: string;
         questionnaireType: QuestionnaireType;
         responses: SubmittedResponse[];
+        serviceAccessContext?: ServiceAccessContext;
       };
     }
   | { isValid: false; message: string } {
@@ -264,6 +273,164 @@ function validateRequestBody(
     }
   }
 
+  let serviceAccessContext: ServiceAccessContext | undefined;
+
+  if (submission.serviceAccessContext !== undefined) {
+    if (candidate.questionnaireType === "leadership") {
+      return {
+        isValid: false,
+        message:
+          "Service access context is not supported for the leadership questionnaire.",
+      };
+    }
+
+    if (
+      !submission.serviceAccessContext ||
+      typeof submission.serviceAccessContext !== "object" ||
+      Array.isArray(submission.serviceAccessContext)
+    ) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext must be an object.",
+      };
+    }
+
+    const context = submission.serviceAccessContext as Partial<ServiceAccessContext>;
+
+    if (!Array.isArray(context.routesUsed)) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.routesUsed must be an array.",
+      };
+    }
+
+    if (!context.routesUsed.every(isServiceAccessRoute)) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.routesUsed contains an invalid route.",
+      };
+    }
+
+    const routesUsed = [...new Set(context.routesUsed)] as ServiceAccessRoute[];
+
+    if (
+      context.usualRoute !== undefined &&
+      !isServiceAccessRoute(context.usualRoute)
+    ) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.usualRoute is invalid.",
+      };
+    }
+
+    if (
+      context.intendedAccessModel !== undefined &&
+      (
+        typeof context.intendedAccessModel !== "string" ||
+        !intendedAccessModels.includes(
+          context.intendedAccessModel as IntendedAccessModel,
+        )
+      )
+    ) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.intendedAccessModel is invalid.",
+      };
+    }
+
+    if (
+      context.intendedPrimaryRoute !== undefined &&
+      !isServiceAccessRoute(context.intendedPrimaryRoute)
+    ) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.intendedPrimaryRoute is invalid.",
+      };
+    }
+
+    if (
+      context.usualRouteEffectiveness !== undefined &&
+      (
+        typeof context.usualRouteEffectiveness !== "number" ||
+        !Number.isInteger(context.usualRouteEffectiveness) ||
+        context.usualRouteEffectiveness < 1 ||
+        context.usualRouteEffectiveness > 5
+      )
+    ) {
+      return {
+        isValid: false,
+        message:
+          "serviceAccessContext.usualRouteEffectiveness must be an integer between 1 and 5.",
+      };
+    }
+
+    if (
+      context.specificRouteDetail !== undefined &&
+      typeof context.specificRouteDetail !== "string"
+    ) {
+      return {
+        isValid: false,
+        message: "serviceAccessContext.specificRouteDetail must be a string.",
+      };
+    }
+
+    const specificRouteDetail = context.specificRouteDetail?.trim();
+
+    if (specificRouteDetail && specificRouteDetail.length > 1200) {
+      return {
+        isValid: false,
+        message:
+          "serviceAccessContext.specificRouteDetail must not exceed 1200 characters.",
+      };
+    }
+
+    if (
+      candidate.questionnaireType === "manager" &&
+      context.usualRoute !== undefined &&
+      !routesUsed.includes(context.usualRoute)
+    ) {
+      return {
+        isValid: false,
+        message:
+          "serviceAccessContext.usualRoute must be one of the routes currently used.",
+      };
+    }
+
+    if (
+      candidate.questionnaireType === "manager" &&
+      context.usualRouteEffectiveness !== undefined &&
+      context.usualRoute === undefined
+    ) {
+      return {
+        isValid: false,
+        message:
+          "A usual HR access route must be selected before its effectiveness can be rated.",
+      };
+    }
+
+    serviceAccessContext = {
+      routesUsed,
+      usualRoute:
+        candidate.questionnaireType === "manager"
+          ? context.usualRoute
+          : undefined,
+      usualRouteEffectiveness:
+        candidate.questionnaireType === "manager"
+          ? context.usualRouteEffectiveness
+          : undefined,
+      intendedAccessModel:
+        candidate.questionnaireType === "hr"
+          ? context.intendedAccessModel
+          : undefined,
+      intendedPrimaryRoute:
+        candidate.questionnaireType === "hr" &&
+        context.intendedAccessModel === "single_default_route"
+          ? context.intendedPrimaryRoute
+          : undefined,
+      specificRouteDetail: specificRouteDetail || undefined,
+    };
+  }
+
   const requiredScoreQuestionIds = [...questionMap.values()]
     .filter((question) => question.kind === "score" && question.required)
     .map((question) => question.id);
@@ -296,6 +463,7 @@ function validateRequestBody(
       inviteToken: candidate.inviteToken,
       questionnaireType: candidate.questionnaireType,
       responses: submission.responses,
+      serviceAccessContext,
     },
   };
 }
@@ -462,7 +630,11 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const { questionnaireType, responses } = validation.data;
+    const {
+      questionnaireType,
+      responses,
+      serviceAccessContext,
+    } = validation.data;
 
     const responseRows = buildResponseRows(responses);
     const dimensionScoreRows = buildDimensionScoreRows(responses);
@@ -476,6 +648,7 @@ export async function POST(request: Request): Promise<Response> {
       p_questionnaire_type: questionnaireType,
       p_response_rows: responseRows,
       p_dimension_score_rows: dimensionScoreRows,
+      p_service_access_context: serviceAccessContext ?? null,
     });
 
     if (error) {

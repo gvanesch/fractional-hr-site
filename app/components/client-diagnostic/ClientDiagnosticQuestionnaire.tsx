@@ -10,6 +10,15 @@ import {
   type ScoreAnswerValue,
   type ScoreQuestion,
 } from "@/lib/client-diagnostic/question-bank";
+import {
+  intendedAccessModelLabels,
+  intendedAccessModels,
+  serviceAccessRouteLabels,
+  serviceAccessRoutes,
+  type IntendedAccessModel,
+  type ServiceAccessContext,
+  type ServiceAccessRoute,
+} from "@/lib/client-diagnostic/service-access-context";
 
 type ClientDiagnosticQuestionnaireProps = {
   questionnaireType: QuestionnaireType;
@@ -38,6 +47,7 @@ type PreparedSubmission = {
   questionnaireType: QuestionnaireType;
   preparedAt: string;
   responses: PreparedResponse[];
+  serviceAccessContext?: ServiceAccessContext;
 };
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
@@ -79,6 +89,8 @@ export default function ClientDiagnosticQuestionnaire({
     Record<string, ScoreAnswerValue | undefined>
   >({});
   const [probeAnswers, setProbeAnswers] = useState<Record<string, string>>({});
+  const [serviceAccessContext, setServiceAccessContext] =
+    useState<ServiceAccessContext>({ routesUsed: [] });
   const [preparedSubmission, setPreparedSubmission] =
     useState<PreparedSubmission | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -163,6 +175,18 @@ export default function ClientDiagnosticQuestionnaire({
     activeScoreQuestions.length > 0 &&
     completedActiveScoreCount === activeScoreQuestions.length;
 
+  const isManagerServiceAccessContextComplete =
+    questionnaireType !== "manager" ||
+    activeDimension?.key !== "service_access" ||
+    serviceAccessContext.routesUsed.length === 0 ||
+    Boolean(
+      serviceAccessContext.usualRoute &&
+        serviceAccessContext.usualRouteEffectiveness,
+    );
+
+  const canContinueActiveDimension =
+    isActiveDimensionComplete && isManagerServiceAccessContextComplete;
+
   useEffect(() => {
     try {
       const savedDraft = window.localStorage.getItem(draftStorageKey);
@@ -171,13 +195,18 @@ export default function ClientDiagnosticQuestionnaire({
         const parsed = JSON.parse(savedDraft) as {
           scoreAnswers?: Record<string, ScoreAnswerValue>;
           probeAnswers?: Record<string, string>;
+          serviceAccessContext?: ServiceAccessContext;
         };
 
         setScoreAnswers(parsed.scoreAnswers ?? {});
         setProbeAnswers(parsed.probeAnswers ?? {});
+        setServiceAccessContext(
+          parsed.serviceAccessContext ?? { routesUsed: [] },
+        );
       } else {
         setScoreAnswers({});
         setProbeAnswers({});
+        setServiceAccessContext({ routesUsed: [] });
       }
     } catch (error) {
       console.error("Unable to load questionnaire draft.", error);
@@ -197,12 +226,19 @@ export default function ClientDiagnosticQuestionnaire({
         JSON.stringify({
           scoreAnswers,
           probeAnswers,
+          serviceAccessContext,
         }),
       );
     } catch (error) {
       console.error("Unable to save questionnaire draft.", error);
     }
-  }, [draftStorageKey, isHydrated, probeAnswers, scoreAnswers]);
+  }, [
+    draftStorageKey,
+    isHydrated,
+    probeAnswers,
+    scoreAnswers,
+    serviceAccessContext,
+  ]);
 
   function scrollToQuestionnaireTop() {
     window.setTimeout(() => {
@@ -275,11 +311,15 @@ export default function ClientDiagnosticQuestionnaire({
       questionnaireType,
       preparedAt: new Date().toISOString(),
       responses,
+      serviceAccessContext:
+        questionnaireType === "leadership"
+          ? undefined
+          : serviceAccessContext,
     };
   }
 
   function handleContinueFromDimension() {
-    if (!isActiveDimensionComplete) {
+    if (!canContinueActiveDimension) {
       return;
     }
 
@@ -455,6 +495,8 @@ export default function ClientDiagnosticQuestionnaire({
             questions={activeQuestions}
             scoreAnswers={scoreAnswers}
             probeAnswers={probeAnswers}
+            serviceAccessContext={serviceAccessContext}
+            onServiceAccessContextChange={setServiceAccessContext}
             completedScoreCount={completedActiveScoreCount}
             totalScoreCount={activeScoreQuestions.length}
             overallCompletedCount={completedRequiredCount}
@@ -465,7 +507,7 @@ export default function ClientDiagnosticQuestionnaire({
             onPrevious={() => goToStep(currentStep - 1)}
             onContinue={handleContinueFromDimension}
             onReturnToReview={handleReturnToReview}
-            canContinue={isActiveDimensionComplete}
+            canContinue={canContinueActiveDimension}
             showReturnToReview={editingFromReview}
           />
         ) : null}
@@ -596,6 +638,8 @@ function DimensionStep({
   questions,
   scoreAnswers,
   probeAnswers,
+  serviceAccessContext,
+  onServiceAccessContextChange,
   completedScoreCount,
   totalScoreCount,
   overallCompletedCount,
@@ -613,6 +657,10 @@ function DimensionStep({
   questions: Array<ScoreQuestion | ProbeQuestion>;
   scoreAnswers: Record<string, ScoreAnswerValue | undefined>;
   probeAnswers: Record<string, string>;
+  serviceAccessContext: ServiceAccessContext;
+  onServiceAccessContextChange: (
+    value: ServiceAccessContext,
+  ) => void;
   completedScoreCount: number;
   totalScoreCount: number;
   overallCompletedCount: number;
@@ -684,6 +732,15 @@ function DimensionStep({
             />
           ),
         )}
+
+        {questions[0]?.dimension === "service_access" &&
+        questions[0]?.questionnaireType !== "leadership" ? (
+          <ServiceAccessContextCard
+            questionnaireType={questions[0].questionnaireType}
+            value={serviceAccessContext}
+            onChange={onServiceAccessContextChange}
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--brand-border)] pt-6 sm:flex-row sm:items-center sm:justify-between">
@@ -698,7 +755,12 @@ function DimensionStep({
         <div className="flex flex-col items-start gap-2 sm:items-end">
           {!canContinue ? (
             <p className="text-sm text-slate-500">
-              Answer all scored statements in this section to continue.
+              {questions[0]?.questionnaireType === "manager" &&
+              questions[0]?.dimension === "service_access" &&
+              completedScoreCount === totalScoreCount &&
+              serviceAccessContext.routesUsed.length > 0
+                ? "Complete the selected HR access details to continue."
+                : "Answer all scored statements in this section to continue."}
             </p>
           ) : null}
 
@@ -729,6 +791,235 @@ function DimensionStep({
     </div>
   );
 }
+
+function ServiceAccessContextCard({
+  questionnaireType,
+  value,
+  onChange,
+}: {
+  questionnaireType: "hr" | "manager";
+  value: ServiceAccessContext;
+  onChange: (value: ServiceAccessContext) => void;
+}) {
+  function toggleRoute(route: ServiceAccessRoute) {
+    const routesUsed = value.routesUsed.includes(route)
+      ? value.routesUsed.filter((item) => item !== route)
+      : [...value.routesUsed, route];
+
+    onChange({
+      ...value,
+      routesUsed,
+      usualRoute:
+        value.usualRoute && !routesUsed.includes(value.usualRoute)
+          ? undefined
+          : value.usualRoute,
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface-soft)] p-5 sm:p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-text-muted)]">
+        {questionnaireType === "hr"
+          ? "HR access model"
+          : "HR access in practice"}
+      </p>
+
+      <h3 className="mt-2 text-lg font-semibold text-slate-900">
+        How HR support is accessed in practice
+      </h3>
+
+      <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+        These questions help us understand how employees and managers access
+        HR in practice. They do not affect your diagnostic score.
+      </p>
+
+      <div className="mt-6">
+        <p className="text-sm font-semibold text-slate-900">
+          {questionnaireType === "hr"
+            ? "Which routes do employees and managers currently use to access HR support?"
+            : "Which routes do you currently use to access HR support?"}
+        </p>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {serviceAccessRoutes.map((route) => {
+            const checked = value.routesUsed.includes(route);
+
+            return (
+              <label
+                key={route}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleRoute(route)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span>{serviceAccessRouteLabels[route]}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {questionnaireType === "hr" ? (
+        <>
+          <div className="mt-6">
+            <label className="block text-sm font-semibold text-slate-900">
+              How are employees and managers intended to access HR support?
+            </label>
+
+            <select
+              value={value.intendedAccessModel ?? ""}
+              onChange={(event) => {
+                const intendedAccessModel =
+                  (event.target.value as IntendedAccessModel) || undefined;
+
+                onChange({
+                  ...value,
+                  intendedAccessModel,
+                  intendedPrimaryRoute:
+                    intendedAccessModel === "single_default_route"
+                      ? value.intendedPrimaryRoute
+                      : undefined,
+                });
+              }}
+              className="mt-2 w-full rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm text-slate-900"
+            >
+              <option value="">Select an access model</option>
+              {intendedAccessModels.map((model) => (
+                <option key={model} value={model}>
+                  {intendedAccessModelLabels[model]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {value.intendedAccessModel === "single_default_route" ? (
+            <div className="mt-6">
+              <label className="block text-sm font-semibold text-slate-900">
+                Which route should employees and managers normally use first?
+              </label>
+
+              <select
+                value={value.intendedPrimaryRoute ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    intendedPrimaryRoute:
+                      (event.target.value as ServiceAccessRoute) || undefined,
+                  })
+                }
+                className="mt-2 w-full rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm text-slate-900"
+              >
+                <option value="">Select a route</option>
+                {serviceAccessRoutes.map((route) => (
+                  <option key={route} value={route}>
+                    {serviceAccessRouteLabels[route]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div className="mt-6">
+            <label className="block text-sm font-semibold text-slate-900">
+              Which route do you most often try first?
+            </label>
+
+            <select
+              value={value.usualRoute ?? ""}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  usualRoute:
+                    (event.target.value as ServiceAccessRoute) || undefined,
+                })
+              }
+              className="mt-2 w-full rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm text-slate-900"
+            >
+              <option value="">Select a route</option>
+              {value.routesUsed.map((route) => (
+                <option key={route} value={route}>
+                  {serviceAccessRouteLabels[route]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-slate-900">
+              How effective is your usual route at getting you to the right HR
+              support?
+            </p>
+
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5].map((score) => (
+                <button
+                  key={score}
+                  type="button"
+                  onClick={() => {
+                    if (!value.usualRoute) {
+                      return;
+                    }
+
+                    onChange({
+                      ...value,
+                      usualRouteEffectiveness: score as 1 | 2 | 3 | 4 | 5,
+                    });
+                  }}
+                  disabled={!value.usualRoute}
+                  className={`min-h-12 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                    value.usualRouteEffectiveness === score
+                      ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white"
+                      : "border-[var(--brand-border)] bg-white text-slate-700 hover:border-[var(--brand-accent)]"
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                  aria-pressed={value.usualRouteEffectiveness === score}
+                >
+                  {score}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-2 flex justify-between text-xs text-slate-500">
+              <span>Very ineffective</span>
+              <span>Very effective</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="mt-6">
+        <label className="block text-sm font-semibold text-slate-900">
+          Specific HR access points
+        </label>
+
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          Please list any specific HR access points that are used regularly,
+          and what each is normally used for. For example, a shared mailbox,
+          specialist inbox, HR portal, internal messaging channel or named HR
+          contact.
+        </p>
+
+        <textarea
+          value={value.specificRouteDetail ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...value,
+              specificRouteDetail: event.target.value,
+            })
+          }
+          maxLength={1200}
+          rows={3}
+          className="mt-3 w-full rounded-xl border border-[var(--brand-border)] bg-white px-4 py-3 text-sm leading-6 text-slate-900"
+        />
+      </div>
+    </div>
+  );
+}
+
 
 function ScoreQuestionCard({
   question,
