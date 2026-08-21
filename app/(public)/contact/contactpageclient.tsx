@@ -190,12 +190,16 @@ export default function ContactPageClient() {
       return submissionIdParam.trim();
     }
 
-    if (storedSubmissionId && storedSubmissionId.trim()) {
+    if (
+      isHealthCheckJourney &&
+      storedSubmissionId &&
+      storedSubmissionId.trim()
+    ) {
       return storedSubmissionId.trim();
     }
 
     return "";
-  }, [submissionIdParam, storedSubmissionId]);
+  }, [submissionIdParam, storedSubmissionId, isHealthCheckJourney]);
 
   const displayScore =
     diagnosticState?.result?.score ?? (scoreParam ? Number(scoreParam) : null);
