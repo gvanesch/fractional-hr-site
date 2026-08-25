@@ -33,11 +33,6 @@ export default function AdvisorDiagnosticExplorerClient({
     leadership: true,
   });
 
-  const scoredRespondents =
-    summary.evidenceBase.respondentGroups.hr.completed +
-    summary.evidenceBase.respondentGroups.manager.completed +
-    summary.evidenceBase.respondentGroups.leadership.completed;
-
   const completedGroups = Object.values(summary.evidenceBase.respondentGroups).filter(
     (group) => group.completed > 0,
   ).length;
@@ -358,6 +353,14 @@ export default function AdvisorDiagnosticExplorerClient({
                 </div>
               ) : (
                 <>
+                  {selectedPerspectives.length < 3 ? (
+                    <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                      Respondent perspective visibility currently applies to
+                      scored analytics only. Qualitative summaries remain
+                      whole-project evidence and are not presented as though
+                      they were filtered to {selectedPerspectiveLabel}.
+                    </div>
+                  ) : null}
                   <OverallQualitativeCard summary={summary} />
                   <div className="mt-4 grid gap-4 xl:grid-cols-2">
                     {visibleQualitativeDimensions.map((dimension) => (
