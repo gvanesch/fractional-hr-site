@@ -5,12 +5,12 @@ export async function requireAdvisorUser() {
     const supabase = await createSupabaseServerClient();
 
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
     if (error) {
-      console.error("[advisor-auth] supabase.auth.getSession() returned error", {
+      console.error("[advisor-auth] supabase.auth.getUser() returned error", {
         message: error.message,
         name: error.name,
         status: (error as { status?: number }).status,
@@ -18,7 +18,7 @@ export async function requireAdvisorUser() {
       return null;
     }
 
-    if (!session?.user) {
+    if (!user) {
       return null;
     }
 
@@ -27,13 +27,13 @@ export async function requireAdvisorUser() {
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean);
 
-    const userEmail = session.user.email?.toLowerCase() ?? "";
+    const userEmail = user.email?.toLowerCase() ?? "";
 
     if (!userEmail || !allowedEmails.includes(userEmail)) {
       return null;
     }
 
-    return session.user;
+    return user;
   } catch (error) {
     console.error("[advisor-auth] requireAdvisorUser failed", {
       error,

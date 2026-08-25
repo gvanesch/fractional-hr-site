@@ -1,25 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "vanesch_cookie_notice_acknowledged";
 
-function getInitialVisibility(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) !== "true";
-  } catch {
-    // If storage is blocked or unavailable, show banner
-    return true;
-  }
-}
-
 export default function CookieBanner() {
-  const [visible, setVisible] = useState<boolean>(getInitialVisibility);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        setVisible(window.localStorage.getItem(STORAGE_KEY) !== "true");
+      } catch {
+        // If storage is blocked or unavailable, show banner
+        setVisible(true);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const handleAccept = () => {
     try {
