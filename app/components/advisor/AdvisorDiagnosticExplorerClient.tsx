@@ -1,30 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import type { ProjectSummaryResponse } from "@/lib/client-diagnostic/build-project-summary";
+import type {
+  ExplorerPerspective,
+  ExplorerSegmentSelection,
+} from "@/lib/client-diagnostic/explorer-segment-selection";
 
 type AdvisorDiagnosticExplorerClientProps = {
   summary: ProjectSummaryResponse;
+  initialViewBy: string;
+  initialSegmentValues: string[];
+  segmentSelection: ExplorerSegmentSelection | null;
 };
 
 type DimensionAnalysis = ProjectSummaryResponse["analyses"]["dimensions"][number];
 type DimensionQualitative =
   ProjectSummaryResponse["qualitative"]["dimensions"][number];
-type Segment = ProjectSummaryResponse["segmentation"]["segments"][number];
-type SegmentDimension = Segment["dimensions"][number];
-type Perspective = "hr" | "manager" | "leadership";
-
-type CombinedSegmentSelection = {
-  key: string;
-  values: string[];
-  respondentCount: number;
-  respondentGroups: Record<Perspective, number>;
-  analyticalStrength: Segment["analyticalStrength"];
-  compositionStatus: Segment["compositionStatus"];
-  confidentialityStatus: Segment["confidentialityStatus"];
-  dimensions: SegmentDimension[];
-};
+type SegmentDimension = ExplorerSegmentSelection["dimensions"][number];
+type Perspective = ExplorerPerspective;
 
 const PERSPECTIVE_LABELS: Record<Perspective, string> = {
   hr: "HR",
@@ -34,9 +30,14 @@ const PERSPECTIVE_LABELS: Record<Perspective, string> = {
 
 export default function AdvisorDiagnosticExplorerClient({
   summary,
+  initialViewBy,
+  initialSegmentValues,
+  segmentSelection,
 }: AdvisorDiagnosticExplorerClientProps) {
-  const [viewBy, setViewBy] = useState("overall");
-  const [segmentValues, setSegmentValues] = useState<string[]>([]);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [viewBy, setViewBy] = useState(initialViewBy);
+  const [segmentValues, setSegmentValues] = useState(initialSegmentValues);
   const [dimensionKey, setDimensionKey] = useState("all");
   const [perspectives, setPerspectives] = useState<Record<Perspective, boolean>>({
     hr: true,
@@ -47,31 +48,33 @@ export default function AdvisorDiagnosticExplorerClient({
   const selectedKey = summary.segmentation.availableKeys.find(
     (item) => item.key === viewBy,
   );
-
-  const selectedSegments =
-    viewBy === "overall"
-      ? []
-      : summary.segmentation.segments.filter(
-          (segment) =>
-            segment.key === viewBy && segmentValues.includes(segment.value),
-        );
-
-  const selectedSegment =
-    selectedSegments.length > 0
-      ? combineSelectedSegments(
-          selectedSegments,
-          summary.reportingPolicy.segmentReportingMinN,
-        )
-      : null;
+  const selectedSegment = segmentSelection;
 
   const selectedPerspectives = (Object.keys(perspectives) as Perspective[]).filter(
     (perspective) => perspectives[perspective],
   );
 
-  const selectedPerspectiveLabel =
-    selectedPerspectives.length === 3
-      ? "All respondent perspectives"
-      : selectedPerspectives.map((item) => PERSPECTIVE_LABELS[item]).join(" + ");
+  const selectedPerspectiveLabel = selectedPerspectives
+    .map((item) => PERSPECTIVE_LABELS[item])
+    .join(" + ");
+
+  const presentPerspectives = selectedSegment
+    ? (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+        (perspective) => selectedSegment.respondentGroups[perspective] > 0,
+      )
+    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+        (perspective) =>
+          summary.evidenceBase.respondentGroups[perspective].completed > 0,
+      );
+
+  const perspectiveContextLabel =
+    selectedPerspectives.length < 3
+      ? `${selectedPerspectiveLabel} shown`
+      : selectedSegment
+        ? `${presentPerspectives
+            .map((item) => PERSPECTIVE_LABELS[item])
+            .join(" + ")} present`
+        : "All respondent perspectives";
 
   const selectedDimension =
     dimensionKey === "all"
@@ -88,14 +91,7 @@ export default function AdvisorDiagnosticExplorerClient({
         0,
       );
 
-  const scoredPerspectiveCount = selectedSegment
-    ? (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
-        (perspective) => selectedSegment.respondentGroups[perspective] > 0,
-      ).length
-    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
-        (perspective) =>
-          summary.evidenceBase.respondentGroups[perspective].completed > 0,
-      ).length;
+  const scoredPerspectiveCount = presentPerspectives.length;
 
   const contextLabel = [
     selectedSegment
@@ -103,7 +99,7 @@ export default function AdvisorDiagnosticExplorerClient({
           .map(formatLabel)
           .join(" + ")}`
       : "Overall diagnostic",
-    selectedPerspectiveLabel,
+    perspectiveContextLabel,
     selectedDimension?.dimensionLabel ?? "All dimensions",
   ].join(" · ");
 
@@ -124,34 +120,51 @@ export default function AdvisorDiagnosticExplorerClient({
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
 
-  function handleViewByChange(nextViewBy: string) {
+  function navigateSegmentSelection(nextViewBy: string, nextValues: string[]) {
     setViewBy(nextViewBy);
+    setSegmentValues(nextValues);
 
+    const params = new URLSearchParams();
+
+    if (nextViewBy !== "overall") {
+      params.set("viewBy", nextViewBy);
+      nextValues.forEach((value) => params.append("segment", value));
+    }
+
+    const query = params.toString();
+    const href = query
+      ? `/advisor/explore/${summary.project.projectId}?${query}`
+      : `/advisor/explore/${summary.project.projectId}`;
+
+    startTransition(() => {
+      router.replace(href, { scroll: false });
+    });
+  }
+
+  function handleViewByChange(nextViewBy: string) {
     if (nextViewBy === "overall") {
-      setSegmentValues([]);
+      navigateSegmentSelection("overall", []);
       return;
     }
 
     const nextKey = summary.segmentation.availableKeys.find(
       (item) => item.key === nextViewBy,
     );
-    setSegmentValues(nextKey?.values.slice(0, 1) ?? []);
+    navigateSegmentSelection(nextViewBy, nextKey?.values.slice(0, 1) ?? []);
   }
 
   function toggleSegmentValue(value: string) {
-    setSegmentValues((current) => {
-      if (current.includes(value)) {
-        return current.length === 1
-          ? current
-          : current.filter((item) => item !== value);
-      }
+    const nextValues = segmentValues.includes(value)
+      ? segmentValues.length === 1
+        ? segmentValues
+        : segmentValues.filter((item) => item !== value)
+      : [...segmentValues, value];
 
-      return [...current, value];
-    });
+    navigateSegmentSelection(viewBy, nextValues);
   }
 
   function selectAllSegmentValues() {
-    setSegmentValues(selectedKey?.values ?? []);
+    navigateSegmentSelection(viewBy, selectedKey?.values ?? []);
   }
 
   function togglePerspective(perspective: Perspective) {
@@ -168,10 +181,9 @@ export default function AdvisorDiagnosticExplorerClient({
   }
 
   function resetFilters() {
-    setViewBy("overall");
-    setSegmentValues([]);
     setDimensionKey("all");
     setPerspectives({ hr: true, manager: true, leadership: true });
+    navigateSegmentSelection("overall", []);
   }
 
   return (
@@ -252,7 +264,8 @@ export default function AdvisorDiagnosticExplorerClient({
                     <button
                       type="button"
                       onClick={selectAllSegmentValues}
-                      className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad]"
+                      disabled={isPending}
+                      className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
                     >
                       Select all
                     </button>
@@ -268,7 +281,8 @@ export default function AdvisorDiagnosticExplorerClient({
                       label={formatLabel(value)}
                       checked={segmentValues.includes(value)}
                       disabled={
-                        segmentValues.includes(value) && segmentValues.length === 1
+                        isPending ||
+                        (segmentValues.includes(value) && segmentValues.length === 1)
                       }
                       onChange={() => toggleSegmentValue(value)}
                     />
@@ -340,9 +354,10 @@ export default function AdvisorDiagnosticExplorerClient({
                   </strong>
                 </span>
                 <InfoTooltip label="Client reporting threshold">
-                  This threshold controls client-facing reporting granularity and
-                  confidentiality. Evidence below the threshold may still inform
-                  advisor interpretation, subject to appropriate caution.
+                  This threshold controls one part of client-facing reporting
+                  granularity and confidentiality. Evidence below the threshold
+                  may still inform advisor interpretation. Meeting the threshold
+                  does not by itself make a result safe to share with a client.
                 </InfoTooltip>
               </div>
             </div>
@@ -359,6 +374,7 @@ export default function AdvisorDiagnosticExplorerClient({
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-sm">
+                  {isPending ? <StatusPill>Updating analysis...</StatusPill> : null}
                   <StatusPill>{scoredRespondentCount} scored respondents</StatusPill>
                   <StatusPill>
                     {scoredPerspectiveCount}/3 scored perspectives present
@@ -377,7 +393,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Dimension analytics"
-              description="Canonical scored evidence. Multiple selected values within one segmentation dimension are combined using respondent-weighted evidence; respondent perspective controls which group scores are visible."
+              description="Canonical scored evidence. Multiple selected values within one segmentation dimension are combined by the deterministic server analysis using respondent weighting; respondent perspective controls which group scores are visible."
             >
               {selectedSegment ? (
                 <>
@@ -404,7 +420,7 @@ export default function AdvisorDiagnosticExplorerClient({
                   ))}
                 </div>
               ) : (
-                <EmptyState message="No scored evidence is available for the selected segments." />
+                <EmptyState message="Updating or no scored evidence is available for the selected segments." />
               )}
             </ExplorerSection>
 
@@ -446,7 +462,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Segment comparison"
-              description="Multiple values can now be combined within a single project-defined segmentation dimension. Direct side-by-side comparison and cross-dimension intersections remain separate future analytical views."
+              description="Multiple values can be combined within a single project-defined segmentation dimension. Direct side-by-side comparison and cross-dimension intersections remain separate future analytical views."
             >
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
                 <p className="text-sm font-medium text-slate-900">
@@ -472,149 +488,13 @@ export default function AdvisorDiagnosticExplorerClient({
   );
 }
 
-function combineSelectedSegments(
-  segments: Segment[],
-  reportingMinN: number,
-): CombinedSegmentSelection {
-  const respondentGroups: Record<Perspective, number> = {
-    hr: 0,
-    manager: 0,
-    leadership: 0,
-  };
+function SegmentContextCard({
+  segment,
+}: {
+  segment: ExplorerSegmentSelection;
+}) {
+  const meetsCurrentThreshold = segment.confidentialityStatus === "reportable";
 
-  for (const segment of segments) {
-    respondentGroups.hr += segment.respondentGroups.hr;
-    respondentGroups.manager += segment.respondentGroups.manager;
-    respondentGroups.leadership += segment.respondentGroups.leadership;
-  }
-
-  const respondentCount =
-    respondentGroups.hr + respondentGroups.manager + respondentGroups.leadership;
-
-  const nonZeroGroups = (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
-    (perspective) => respondentGroups[perspective] > 0,
-  );
-  const largestGroup = Math.max(
-    respondentGroups.hr,
-    respondentGroups.manager,
-    respondentGroups.leadership,
-  );
-
-  const compositionStatus: Segment["compositionStatus"] =
-    nonZeroGroups.length <= 1
-      ? "single_group"
-      : respondentCount > 0 && largestGroup / respondentCount >= 0.75
-        ? "group_dominated"
-        : "mixed";
-
-  const analyticalStrength: Segment["analyticalStrength"] =
-    respondentCount < 5
-      ? "insufficient"
-      : respondentCount < 10
-        ? "directional"
-        : respondentCount < 20
-          ? "moderate"
-          : "strong";
-
-  const confidentialityStatus: Segment["confidentialityStatus"] =
-    respondentCount >= reportingMinN ? "reportable" : "suppressed";
-
-  const dimensionKeys = Array.from(
-    new Set(
-      segments.flatMap((segment) =>
-        segment.dimensions.map((dimension) => dimension.dimensionKey),
-      ),
-    ),
-  );
-
-  const dimensions = dimensionKeys.map((currentDimensionKey) => {
-    const parts = segments
-      .map((segment) =>
-        segment.dimensions.find(
-          (dimension) => dimension.dimensionKey === currentDimensionKey,
-        ),
-      )
-      .filter((dimension): dimension is SegmentDimension => Boolean(dimension));
-
-    const groups = {
-      hr: combineSegmentGroup(parts, "hr", reportingMinN),
-      manager: combineSegmentGroup(parts, "manager", reportingMinN),
-      leadership: combineSegmentGroup(parts, "leadership", reportingMinN),
-    };
-
-    const dimensionRespondentCount =
-      groups.hr.n + groups.manager.n + groups.leadership.n;
-    const weightedAverageTotal = parts.reduce((total, part) => {
-      if (typeof part.averageScore !== "number" || part.respondentCount === 0) {
-        return total;
-      }
-      return total + part.averageScore * part.respondentCount;
-    }, 0);
-    const averageScore =
-      dimensionRespondentCount > 0
-        ? roundMetric(weightedAverageTotal / dimensionRespondentCount)
-        : null;
-
-    const contributingGroups = (Object.keys(PERSPECTIVE_LABELS) as Perspective[])
-      .filter((perspective) => groups[perspective].n > 0);
-    const allContributingGroupsReportable = contributingGroups.every(
-      (perspective) => groups[perspective].n >= reportingMinN,
-    );
-
-    return {
-      dimensionKey: currentDimensionKey,
-      respondentCount: dimensionRespondentCount,
-      averageScore,
-      clientReporting: {
-        status: allContributingGroupsReportable ? "reportable" : "suppressed",
-        reason: allContributingGroupsReportable
-          ? "all_contributing_groups_reportable"
-          : "suppressed_group_contributes",
-      },
-      groups,
-      groupComparisons: [],
-    } satisfies SegmentDimension;
-  });
-
-  return {
-    key: segments[0]?.key ?? "segment",
-    values: segments.map((segment) => segment.value),
-    respondentCount,
-    respondentGroups,
-    analyticalStrength,
-    compositionStatus,
-    confidentialityStatus,
-    dimensions,
-  };
-}
-
-function combineSegmentGroup(
-  parts: SegmentDimension[],
-  perspective: Perspective,
-  reportingMinN: number,
-): SegmentDimension["groups"][Perspective] {
-  const n = parts.reduce(
-    (total, part) => total + part.groups[perspective].n,
-    0,
-  );
-  const weightedTotal = parts.reduce((total, part) => {
-    const group = part.groups[perspective];
-    return typeof group.mean === "number" && group.n > 0
-      ? total + group.mean * group.n
-      : total;
-  }, 0);
-
-  return {
-    n,
-    mean: n > 0 ? roundMetric(weightedTotal / n) : null,
-    clientReporting: {
-      status: n >= reportingMinN ? "reportable" : "suppressed",
-      reason: n >= reportingMinN ? "meets_threshold" : "below_threshold",
-    },
-  };
-}
-
-function SegmentContextCard({ segment }: { segment: CombinedSegmentSelection }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -624,18 +504,21 @@ function SegmentContextCard({ segment }: { segment: CombinedSegmentSelection }) 
         </Badge>
         <Badge>{formatLabel(segment.analyticalStrength)} analytical strength</Badge>
         <Badge>{formatLabel(segment.compositionStatus)} composition</Badge>
-        <Badge>{formatLabel(segment.confidentialityStatus)} client confidentiality</Badge>
+        <Badge>
+          {meetsCurrentThreshold
+            ? "Meets current client threshold"
+            : "Below current client threshold"}
+        </Badge>
+        <InfoTooltip label="Current client reporting status">
+          {meetsCurrentThreshold
+            ? "This selection meets the project's current minimum reporting threshold. Final client shareability remains subject to the separate client-reporting projection, including complementary suppression and anti-differencing controls."
+            : "This selection is below the project's current minimum reporting threshold. Exact results remain available here for advisor analysis but should not be treated as client-shareable."}
+        </InfoTooltip>
         {segment.values.length > 1 ? (
           <InfoTooltip label="Combined segment selection">
             Selected values within the same segmentation dimension are mutually
-            exclusive at participant level. Counts are summed and dimension and
-            respondent-group means are combined using respondent weighting.
-          </InfoTooltip>
-        ) : null}
-        {segment.confidentialityStatus === "suppressed" ? (
-          <InfoTooltip label="Client reporting suppressed">
-            Exact segment results are visible here for advisor analysis but are
-            not permitted for client reporting under the current project policy.
+            exclusive at participant level. The deterministic analysis combines
+            counts and means using respondent weighting.
           </InfoTooltip>
         ) : null}
       </div>
@@ -753,6 +636,7 @@ function SegmentDimensionCard({
   const metadata = summary.dimensions.find(
     (item) => item.dimensionKey === dimension.dimensionKey,
   );
+  const meetsCurrentThreshold = dimension.clientReporting.status === "reportable";
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -768,11 +652,15 @@ function SegmentDimensionCard({
           ) : null}
         </div>
         <div className="flex items-center gap-1.5">
-          <Badge>{formatLabel(dimension.clientReporting.status)}</Badge>
-          <InfoTooltip label="Client reporting status">
-            {dimension.clientReporting.status === "reportable"
-              ? "This segment dimension aggregate meets the current client-reporting rule."
-              : "This exact aggregate is advisor-visible but suppressed for client reporting because a contributing respondent group is below the reporting threshold."}
+          <Badge>
+            {meetsCurrentThreshold
+              ? "Meets current client threshold"
+              : "Current client rule: suppressed"}
+          </Badge>
+          <InfoTooltip label="Current client reporting status">
+            {meetsCurrentThreshold
+              ? "All non-empty respondent groups contributing to this aggregate meet the current project threshold. Final client shareability still depends on the separate client-reporting projection and its anti-differencing controls."
+              : "This exact aggregate is advisor-visible but suppressed under the current rule because at least one contributing respondent group is below the project threshold."}
           </InfoTooltip>
         </div>
       </div>
@@ -818,8 +706,8 @@ function SegmentDimensionCard({
                 infoLabel={`${PERSPECTIVE_LABELS[perspective]} client reporting`}
               >
                 This exact subgroup result is available to the advisor but is
-                suppressed for client reporting because the subgroup is below
-                the current threshold.
+                below the current client-reporting threshold. It should not be
+                treated as client-shareable.
               </PillWithInfo>
             ) : null;
           })}
