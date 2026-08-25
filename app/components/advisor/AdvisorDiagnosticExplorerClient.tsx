@@ -15,6 +15,17 @@ type Segment = ProjectSummaryResponse["segmentation"]["segments"][number];
 type SegmentDimension = Segment["dimensions"][number];
 type Perspective = "hr" | "manager" | "leadership";
 
+type CombinedSegmentSelection = {
+  key: string;
+  values: string[];
+  respondentCount: number;
+  respondentGroups: Record<Perspective, number>;
+  analyticalStrength: Segment["analyticalStrength"];
+  compositionStatus: Segment["compositionStatus"];
+  confidentialityStatus: Segment["confidentialityStatus"];
+  dimensions: SegmentDimension[];
+};
+
 const PERSPECTIVE_LABELS: Record<Perspective, string> = {
   hr: "HR",
   manager: "Managers",
@@ -25,7 +36,7 @@ export default function AdvisorDiagnosticExplorerClient({
   summary,
 }: AdvisorDiagnosticExplorerClientProps) {
   const [viewBy, setViewBy] = useState("overall");
-  const [segmentValue, setSegmentValue] = useState("");
+  const [segmentValues, setSegmentValues] = useState<string[]>([]);
   const [dimensionKey, setDimensionKey] = useState("all");
   const [perspectives, setPerspectives] = useState<Record<Perspective, boolean>>({
     hr: true,
@@ -33,20 +44,25 @@ export default function AdvisorDiagnosticExplorerClient({
     leadership: true,
   });
 
-  const completedGroups = Object.values(summary.evidenceBase.respondentGroups).filter(
-    (group) => group.completed > 0,
-  ).length;
-
   const selectedKey = summary.segmentation.availableKeys.find(
     (item) => item.key === viewBy,
   );
 
-  const selectedSegment =
+  const selectedSegments =
     viewBy === "overall"
-      ? null
-      : summary.segmentation.segments.find(
-          (segment) => segment.key === viewBy && segment.value === segmentValue,
-        ) ?? null;
+      ? []
+      : summary.segmentation.segments.filter(
+          (segment) =>
+            segment.key === viewBy && segmentValues.includes(segment.value),
+        );
+
+  const selectedSegment =
+    selectedSegments.length > 0
+      ? combineSelectedSegments(
+          selectedSegments,
+          summary.reportingPolicy.segmentReportingMinN,
+        )
+      : null;
 
   const selectedPerspectives = (Object.keys(perspectives) as Perspective[]).filter(
     (perspective) => perspectives[perspective],
@@ -60,23 +76,32 @@ export default function AdvisorDiagnosticExplorerClient({
   const selectedDimension =
     dimensionKey === "all"
       ? null
-      : summary.dimensions.find((dimension) => dimension.dimensionKey === dimensionKey) ??
-        null;
+      : summary.dimensions.find(
+          (dimension) => dimension.dimensionKey === dimensionKey,
+        ) ?? null;
 
-  const selectedRespondentCount = selectedSegment
-    ? selectedPerspectives.reduce(
-        (total, perspective) => total + selectedSegment.respondentGroups[perspective],
-        0,
-      )
-    : selectedPerspectives.reduce(
+  const scoredRespondentCount = selectedSegment
+    ? selectedSegment.respondentCount
+    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).reduce(
         (total, perspective) =>
           total + summary.evidenceBase.respondentGroups[perspective].completed,
         0,
       );
 
+  const scoredPerspectiveCount = selectedSegment
+    ? (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+        (perspective) => selectedSegment.respondentGroups[perspective] > 0,
+      ).length
+    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+        (perspective) =>
+          summary.evidenceBase.respondentGroups[perspective].completed > 0,
+      ).length;
+
   const contextLabel = [
     selectedSegment
-      ? `${formatLabel(selectedSegment.key)}: ${selectedSegment.value}`
+      ? `${formatLabel(selectedSegment.key)}: ${selectedSegment.values
+          .map(formatLabel)
+          .join(" + ")}`
       : "Overall diagnostic",
     selectedPerspectiveLabel,
     selectedDimension?.dimensionLabel ?? "All dimensions",
@@ -103,14 +128,30 @@ export default function AdvisorDiagnosticExplorerClient({
     setViewBy(nextViewBy);
 
     if (nextViewBy === "overall") {
-      setSegmentValue("");
+      setSegmentValues([]);
       return;
     }
 
     const nextKey = summary.segmentation.availableKeys.find(
       (item) => item.key === nextViewBy,
     );
-    setSegmentValue(nextKey?.values[0] ?? "");
+    setSegmentValues(nextKey?.values.slice(0, 1) ?? []);
+  }
+
+  function toggleSegmentValue(value: string) {
+    setSegmentValues((current) => {
+      if (current.includes(value)) {
+        return current.length === 1
+          ? current
+          : current.filter((item) => item !== value);
+      }
+
+      return [...current, value];
+    });
+  }
+
+  function selectAllSegmentValues() {
+    setSegmentValues(selectedKey?.values ?? []);
   }
 
   function togglePerspective(perspective: Perspective) {
@@ -128,7 +169,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
   function resetFilters() {
     setViewBy("overall");
-    setSegmentValue("");
+    setSegmentValues([]);
     setDimensionKey("all");
     setPerspectives({ hr: true, manager: true, leadership: true });
   }
@@ -205,21 +246,34 @@ export default function AdvisorDiagnosticExplorerClient({
 
             {viewBy !== "overall" && selectedKey ? (
               <div className="mt-6">
-                <label className="text-sm font-semibold text-slate-900" htmlFor="segment-value">
-                  Segment
-                </label>
-                <select
-                  id="segment-value"
-                  value={segmentValue}
-                  onChange={(event) => setSegmentValue(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800"
-                >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">Segments</p>
+                  {segmentValues.length < selectedKey.values.length ? (
+                    <button
+                      type="button"
+                      onClick={selectAllSegmentValues}
+                      className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad]"
+                    >
+                      Select all
+                    </button>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Select one or more values within this segmentation dimension.
+                </p>
+                <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
                   {selectedKey.values.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
+                    <CheckboxFilter
+                      key={value}
+                      label={formatLabel(value)}
+                      checked={segmentValues.includes(value)}
+                      disabled={
+                        segmentValues.includes(value) && segmentValues.length === 1
+                      }
+                      onChange={() => toggleSegmentValue(value)}
+                    />
                   ))}
-                </select>
+                </div>
               </div>
             ) : null}
 
@@ -245,7 +299,10 @@ export default function AdvisorDiagnosticExplorerClient({
             </div>
 
             <div className="mt-7 border-t border-slate-200 pt-6">
-              <label className="text-sm font-semibold text-slate-900" htmlFor="dimension-filter">
+              <label
+                className="text-sm font-semibold text-slate-900"
+                htmlFor="dimension-filter"
+              >
                 Dimension
               </label>
               <select
@@ -256,7 +313,10 @@ export default function AdvisorDiagnosticExplorerClient({
               >
                 <option value="all">All dimensions</option>
                 {summary.dimensions.map((dimension) => (
-                  <option key={dimension.dimensionKey} value={dimension.dimensionKey}>
+                  <option
+                    key={dimension.dimensionKey}
+                    value={dimension.dimensionKey}
+                  >
                     {dimension.dimensionLabel}
                   </option>
                 ))}
@@ -274,7 +334,10 @@ export default function AdvisorDiagnosticExplorerClient({
             <div className="mt-7 border-t border-slate-200 pt-6">
               <div className="flex items-center gap-1.5 text-xs leading-5 text-slate-500">
                 <span>
-                  Client reporting threshold: <strong className="font-semibold text-slate-700">n={summary.reportingPolicy.segmentReportingMinN}</strong>
+                  Client reporting threshold:{" "}
+                  <strong className="font-semibold text-slate-700">
+                    n={summary.reportingPolicy.segmentReportingMinN}
+                  </strong>
                 </span>
                 <InfoTooltip label="Client reporting threshold">
                   This threshold controls client-facing reporting granularity and
@@ -296,10 +359,14 @@ export default function AdvisorDiagnosticExplorerClient({
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-sm">
-                  <StatusPill>{selectedRespondentCount} scored respondents</StatusPill>
-                  <StatusPill>{completedGroups}/3 scored perspectives</StatusPill>
+                  <StatusPill>{scoredRespondentCount} scored respondents</StatusPill>
                   <StatusPill>
-                    {factPackAvailable ? "Fact Pack complete" : "Fact Pack not available"}
+                    {scoredPerspectiveCount}/3 scored perspectives present
+                  </StatusPill>
+                  <StatusPill>
+                    {factPackAvailable
+                      ? "Fact Pack complete"
+                      : "Fact Pack not available"}
                   </StatusPill>
                   <StatusPill>
                     {summary.segmentation.availableKeys.length} segmentation dimensions
@@ -310,7 +377,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Dimension analytics"
-              description="Canonical scored evidence. Segment selection changes the scored segment evidence shown; respondent perspective controls which group scores are visible."
+              description="Canonical scored evidence. Multiple selected values within one segmentation dimension are combined using respondent-weighted evidence; respondent perspective controls which group scores are visible."
             >
               {selectedSegment ? (
                 <>
@@ -337,7 +404,7 @@ export default function AdvisorDiagnosticExplorerClient({
                   ))}
                 </div>
               ) : (
-                <EmptyState message="No scored evidence is available for the selected segment." />
+                <EmptyState message="No scored evidence is available for the selected segments." />
               )}
             </ExplorerSection>
 
@@ -349,7 +416,10 @@ export default function AdvisorDiagnosticExplorerClient({
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
                   The canonical summary does not currently expose qualitative
                   evidence by segment. Whole-project comments are therefore not
-                  presented as though they were specific to {selectedSegment.value}.
+                  presented as though they were specific to the selected{" "}
+                  {formatLabel(selectedSegment.key)} values: {selectedSegment.values
+                    .map(formatLabel)
+                    .join(", ")}.
                 </div>
               ) : (
                 <>
@@ -376,7 +446,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Segment comparison"
-              description="Project-defined segmentation evidence is available for advisor analysis. Use View by to inspect individual segment evidence; direct multi-segment comparison remains the next Explorer increment."
+              description="Multiple values can now be combined within a single project-defined segmentation dimension. Direct side-by-side comparison and cross-dimension intersections remain separate future analytical views."
             >
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
                 <p className="text-sm font-medium text-slate-900">
@@ -402,14 +472,166 @@ export default function AdvisorDiagnosticExplorerClient({
   );
 }
 
-function SegmentContextCard({ segment }: { segment: Segment }) {
+function combineSelectedSegments(
+  segments: Segment[],
+  reportingMinN: number,
+): CombinedSegmentSelection {
+  const respondentGroups: Record<Perspective, number> = {
+    hr: 0,
+    manager: 0,
+    leadership: 0,
+  };
+
+  for (const segment of segments) {
+    respondentGroups.hr += segment.respondentGroups.hr;
+    respondentGroups.manager += segment.respondentGroups.manager;
+    respondentGroups.leadership += segment.respondentGroups.leadership;
+  }
+
+  const respondentCount =
+    respondentGroups.hr + respondentGroups.manager + respondentGroups.leadership;
+
+  const nonZeroGroups = (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+    (perspective) => respondentGroups[perspective] > 0,
+  );
+  const largestGroup = Math.max(
+    respondentGroups.hr,
+    respondentGroups.manager,
+    respondentGroups.leadership,
+  );
+
+  const compositionStatus: Segment["compositionStatus"] =
+    nonZeroGroups.length <= 1
+      ? "single_group"
+      : respondentCount > 0 && largestGroup / respondentCount >= 0.75
+        ? "group_dominated"
+        : "mixed";
+
+  const analyticalStrength: Segment["analyticalStrength"] =
+    respondentCount < 5
+      ? "insufficient"
+      : respondentCount < 10
+        ? "directional"
+        : respondentCount < 20
+          ? "moderate"
+          : "strong";
+
+  const confidentialityStatus: Segment["confidentialityStatus"] =
+    respondentCount >= reportingMinN ? "reportable" : "suppressed";
+
+  const dimensionKeys = Array.from(
+    new Set(
+      segments.flatMap((segment) =>
+        segment.dimensions.map((dimension) => dimension.dimensionKey),
+      ),
+    ),
+  );
+
+  const dimensions = dimensionKeys.map((currentDimensionKey) => {
+    const parts = segments
+      .map((segment) =>
+        segment.dimensions.find(
+          (dimension) => dimension.dimensionKey === currentDimensionKey,
+        ),
+      )
+      .filter((dimension): dimension is SegmentDimension => Boolean(dimension));
+
+    const groups = {
+      hr: combineSegmentGroup(parts, "hr", reportingMinN),
+      manager: combineSegmentGroup(parts, "manager", reportingMinN),
+      leadership: combineSegmentGroup(parts, "leadership", reportingMinN),
+    };
+
+    const dimensionRespondentCount =
+      groups.hr.n + groups.manager.n + groups.leadership.n;
+    const weightedAverageTotal = parts.reduce((total, part) => {
+      if (typeof part.averageScore !== "number" || part.respondentCount === 0) {
+        return total;
+      }
+      return total + part.averageScore * part.respondentCount;
+    }, 0);
+    const averageScore =
+      dimensionRespondentCount > 0
+        ? roundMetric(weightedAverageTotal / dimensionRespondentCount)
+        : null;
+
+    const contributingGroups = (Object.keys(PERSPECTIVE_LABELS) as Perspective[])
+      .filter((perspective) => groups[perspective].n > 0);
+    const allContributingGroupsReportable = contributingGroups.every(
+      (perspective) => groups[perspective].n >= reportingMinN,
+    );
+
+    return {
+      dimensionKey: currentDimensionKey,
+      respondentCount: dimensionRespondentCount,
+      averageScore,
+      clientReporting: {
+        status: allContributingGroupsReportable ? "reportable" : "suppressed",
+        reason: allContributingGroupsReportable
+          ? "all_contributing_groups_reportable"
+          : "suppressed_group_contributes",
+      },
+      groups,
+      groupComparisons: [],
+    } satisfies SegmentDimension;
+  });
+
+  return {
+    key: segments[0]?.key ?? "segment",
+    values: segments.map((segment) => segment.value),
+    respondentCount,
+    respondentGroups,
+    analyticalStrength,
+    compositionStatus,
+    confidentialityStatus,
+    dimensions,
+  };
+}
+
+function combineSegmentGroup(
+  parts: SegmentDimension[],
+  perspective: Perspective,
+  reportingMinN: number,
+): SegmentDimension["groups"][Perspective] {
+  const n = parts.reduce(
+    (total, part) => total + part.groups[perspective].n,
+    0,
+  );
+  const weightedTotal = parts.reduce((total, part) => {
+    const group = part.groups[perspective];
+    return typeof group.mean === "number" && group.n > 0
+      ? total + group.mean * group.n
+      : total;
+  }, 0);
+
+  return {
+    n,
+    mean: n > 0 ? roundMetric(weightedTotal / n) : null,
+    clientReporting: {
+      status: n >= reportingMinN ? "reportable" : "suppressed",
+      reason: n >= reportingMinN ? "meets_threshold" : "below_threshold",
+    },
+  };
+}
+
+function SegmentContextCard({ segment }: { segment: CombinedSegmentSelection }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{segment.respondentCount} respondents in segment</Badge>
+        <Badge>
+          {segment.respondentCount} respondents across {segment.values.length}{" "}
+          {segment.values.length === 1 ? "segment" : "segments"}
+        </Badge>
         <Badge>{formatLabel(segment.analyticalStrength)} analytical strength</Badge>
         <Badge>{formatLabel(segment.compositionStatus)} composition</Badge>
         <Badge>{formatLabel(segment.confidentialityStatus)} client confidentiality</Badge>
+        {segment.values.length > 1 ? (
+          <InfoTooltip label="Combined segment selection">
+            Selected values within the same segmentation dimension are mutually
+            exclusive at participant level. Counts are summed and dimension and
+            respondent-group means are combined using respondent weighting.
+          </InfoTooltip>
+        ) : null}
         {segment.confidentialityStatus === "suppressed" ? (
           <InfoTooltip label="Client reporting suppressed">
             Exact segment results are visible here for advisor analysis but are
@@ -452,7 +674,9 @@ function DimensionAnalyticsCard({
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold text-slate-900">{dimension.dimensionLabel}</h3>
+          <h3 className="font-semibold text-slate-900">
+            {dimension.dimensionLabel}
+          </h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
             {dimension.dimensionDescription}
           </p>
@@ -473,10 +697,16 @@ function DimensionAnalyticsCard({
           <Metric label="HR" value={formatMetricValue(dimension.scores.hr)} />
         ) : null}
         {perspectives.manager ? (
-          <Metric label="Manager" value={formatMetricValue(dimension.scores.manager)} />
+          <Metric
+            label="Manager"
+            value={formatMetricValue(dimension.scores.manager)}
+          />
         ) : null}
         {perspectives.leadership ? (
-          <Metric label="Leadership" value={formatMetricValue(dimension.scores.leadership)} />
+          <Metric
+            label="Leadership"
+            value={formatMetricValue(dimension.scores.leadership)}
+          />
         ) : null}
         <Metric label="Gap" value={formatMetricValue(dimension.gap)} />
         <MetricWithInfo
@@ -548,20 +778,23 @@ function SegmentDimensionCard({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric label="Segment average" value={formatMetricValue(dimension.averageScore)} />
-        {perspectives.hr ? (
+        <Metric
+          label="Segment average"
+          value={formatMetricValue(dimension.averageScore)}
+        />
+        {perspectives.hr && dimension.groups.hr.n > 0 ? (
           <Metric
             label={`HR · n=${dimension.groups.hr.n}`}
             value={formatMetricValue(dimension.groups.hr.mean)}
           />
         ) : null}
-        {perspectives.manager ? (
+        {perspectives.manager && dimension.groups.manager.n > 0 ? (
           <Metric
             label={`Manager · n=${dimension.groups.manager.n}`}
             value={formatMetricValue(dimension.groups.manager.mean)}
           />
         ) : null}
-        {perspectives.leadership ? (
+        {perspectives.leadership && dimension.groups.leadership.n > 0 ? (
           <Metric
             label={`Leadership · n=${dimension.groups.leadership.n}`}
             value={formatMetricValue(dimension.groups.leadership.mean)}
@@ -572,7 +805,10 @@ function SegmentDimensionCard({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(Object.keys(PERSPECTIVE_LABELS) as Perspective[])
-          .filter((perspective) => perspectives[perspective])
+          .filter(
+            (perspective) =>
+              perspectives[perspective] && dimension.groups[perspective].n > 0,
+          )
           .map((perspective) => {
             const reporting = dimension.groups[perspective].clientReporting;
             return reporting.status === "suppressed" ? (
@@ -612,7 +848,9 @@ function OverallQualitativeCard({ summary }: { summary: ProjectSummaryResponse }
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <StatusPill>{qualitative.totalCommentCount} comments</StatusPill>
-          <StatusPill>{qualitative.respondentGroupsWithComments.length} groups</StatusPill>
+          <StatusPill>
+            {qualitative.respondentGroupsWithComments.length} groups
+          </StatusPill>
         </div>
       </div>
 
@@ -637,20 +875,30 @@ function QualitativeDimensionCard({
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h3 className="font-semibold text-slate-900">{dimension.dimensionLabel}</h3>
+        <h3 className="font-semibold text-slate-900">
+          {dimension.dimensionLabel}
+        </h3>
         <div className="flex items-center gap-1.5">
           <Badge>{formatLabel(dimension.confidence)} confidence</Badge>
           <InfoTooltip label={`${dimension.dimensionLabel} qualitative confidence`}>
             This dimension currently has {dimension.commentCount} written
-            {dimension.commentCount === 1 ? " comment" : " comments"} across {dimension.respondentGroupsWithComments.length} respondent
-            {dimension.respondentGroupsWithComments.length === 1 ? " perspective" : " perspectives"}. The current model classifies that evidence as {dimension.confidence} qualitative confidence. Treat the comments as contextual evidence, not scored evidence.
+            {dimension.commentCount === 1 ? " comment" : " comments"} across{" "}
+            {dimension.respondentGroupsWithComments.length} respondent
+            {dimension.respondentGroupsWithComments.length === 1
+              ? " perspective"
+              : " perspectives"}
+            . The current model classifies that evidence as {dimension.confidence}{" "}
+            qualitative confidence. Treat the comments as contextual evidence,
+            not scored evidence.
           </InfoTooltip>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <SubtlePill>{dimension.commentCount} comments</SubtlePill>
-        <SubtlePill>{dimension.respondentGroupsWithComments.length} groups</SubtlePill>
+        <SubtlePill>
+          {dimension.respondentGroupsWithComments.length} groups
+        </SubtlePill>
         <SubtlePill>{dimension.keyThemes.length} themes</SubtlePill>
       </div>
 
@@ -725,7 +973,13 @@ function CheckboxFilter({
   onChange: () => void;
 }) {
   return (
-    <label className={`flex items-center gap-3 text-sm ${disabled ? "cursor-not-allowed text-slate-400" : "cursor-pointer text-slate-700"}`}>
+    <label
+      className={`flex items-center gap-3 text-sm ${
+        disabled
+          ? "cursor-not-allowed text-slate-400"
+          : "cursor-pointer text-slate-700"
+      }`}
+    >
       <input
         type="checkbox"
         checked={checked}
@@ -847,12 +1101,16 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function roundMetric(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function formatMetricValue(value: number | null): string {
   if (typeof value !== "number") {
     return "-";
   }
 
-  const rounded = Math.round(value * 100) / 100;
+  const rounded = roundMetric(value);
   const normalized = Object.is(rounded, -0) ? 0 : rounded;
 
   return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(2);
