@@ -25,6 +25,7 @@ type ParticipantRow = {
   started_at: string | null;
   completed_at: string | null;
   updated_at: string;
+  segmentation_values: Record<string, string> | null;
 };
 
 type DimensionScoreRow = {
@@ -47,6 +48,33 @@ type CommentRow = {
   updated_at: string;
 };
 
+type ScoredResponseRow = {
+  participant_id: string;
+  questionnaire_type: QuestionnaireType;
+  dimension_key: string;
+  question_key: string;
+  answer_value: number | null;
+};
+
+type FactPackRow = {
+  participant_id: string;
+  status: string;
+  submitted_at: string | null;
+  updated_at: string;
+  response_json: Record<string, unknown> | null;
+};
+
+type ServiceAccessContextRow = {
+  participant_id: string;
+  questionnaire_type: "hr" | "manager";
+  routes_used: string[];
+  usual_route: string | null;
+  usual_route_effectiveness: number | null;
+  intended_access_model: string | null;
+  intended_primary_route: string | null;
+  specific_route_detail: string | null;
+};
+
 type ProjectRow = {
   project_id: string;
   company_name: string;
@@ -57,6 +85,62 @@ type ProjectRow = {
   created_at: string;
   updated_at: string;
 };
+
+type ScoredQuestionnaireType = Extract<
+  QuestionnaireType,
+  "hr" | "manager" | "leadership"
+>;
+
+const DEFAULT_SEGMENT_REPORTING_MIN_N = 5;
+
+function recommendSegmentReportingMinN({
+  totalInvited,
+  respondentGroupInvitedCounts,
+}: {
+  totalInvited: number;
+  respondentGroupInvitedCounts: number[];
+}): {
+  recommendedMinN: number;
+  reason: string;
+} {
+  const positiveGroupCounts = respondentGroupInvitedCounts.filter(
+    (count) => count > 0,
+  );
+  const smallestGroup =
+    positiveGroupCounts.length > 0
+      ? Math.min(...positiveGroupCounts)
+      : 0;
+
+  if (totalInvited <= 8) {
+    return {
+      recommendedMinN: 2,
+      reason:
+        "Very small diagnostic population; lower reporting threshold recommended so that meaningful cohort evidence is not automatically suppressed.",
+    };
+  }
+
+  if (totalInvited <= 15 || smallestGroup <= 2) {
+    return {
+      recommendedMinN: 3,
+      reason:
+        "Small diagnostic population or intentionally small respondent cohort; reduced threshold recommended with appropriately cautious interpretation.",
+    };
+  }
+
+  if (totalInvited <= 25 || smallestGroup <= 4) {
+    return {
+      recommendedMinN: 4,
+      reason:
+        "Smaller diagnostic population; moderately reduced threshold recommended to preserve useful segment coverage while retaining confidentiality protection.",
+    };
+  }
+
+  return {
+    recommendedMinN: DEFAULT_SEGMENT_REPORTING_MIN_N,
+    reason:
+      "Standard reporting threshold recommended for this diagnostic population and respondent-group structure.",
+  };
+}
 
 type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
 
@@ -118,6 +202,32 @@ export type OverallQualitativeSummary = {
   summary: string | null;
 };
 
+type ScoredRespondentCount = {
+  invited: number;
+  completed: number;
+};
+
+type ItemGroupEvidence = {
+  mean: number | null;
+  n: number;
+};
+
+type SegmentGroupEvidence = ItemGroupEvidence & {
+  clientReporting: {
+    status: "reportable" | "suppressed";
+    reason: "meets_threshold" | "below_threshold";
+  };
+};
+
+type ItemEvidenceValue = {
+  combined: number | null;
+  groups: {
+    hr: ItemGroupEvidence;
+    manager: ItemGroupEvidence;
+    leadership: ItemGroupEvidence;
+  };
+};
+
 export type ProjectSummaryResponse = {
   success: true;
   project: {
@@ -147,6 +257,119 @@ export type ProjectSummaryResponse = {
   dimensions: DimensionSummary[];
   strongestAlignment: DimensionSummary[];
   biggestGaps: DimensionSummary[];
+  evidenceBase: {
+    respondentGroups: {
+      hr: ScoredRespondentCount;
+      manager: ScoredRespondentCount;
+      leadership: ScoredRespondentCount;
+    };
+  };
+  reportingPolicy: {
+    recommendedSegmentReportingMinN: number;
+    segmentReportingMinN: number;
+    source: "default" | "project";
+    recommendationReason: string;
+  };
+  segmentation: {
+    availableKeys: Array<{
+      key: string;
+      values: string[];
+    }>;
+    segments: Array<{
+      key: string;
+      value: string;
+      respondentCount: number;
+      respondentCountClientReporting: {
+        status: "reportable" | "suppressed";
+        reason:
+          | "segment_below_threshold"
+          | "no_single_hidden_nonzero_group"
+          | "single_hidden_nonzero_group";
+      };
+      questionnaireTypes: QuestionnaireType[];
+      respondentGroups: {
+        hr: number;
+        manager: number;
+        leadership: number;
+      };
+      respondentGroupClientReporting: {
+        hr: {
+          status: "reportable" | "suppressed";
+          reason: "meets_threshold" | "below_threshold";
+        };
+        manager: {
+          status: "reportable" | "suppressed";
+          reason: "meets_threshold" | "below_threshold";
+        };
+        leadership: {
+          status: "reportable" | "suppressed";
+          reason: "meets_threshold" | "below_threshold";
+        };
+      };
+      confidentialityStatus: "reportable" | "suppressed";
+      analyticalStrength:
+        | "insufficient"
+        | "directional"
+        | "moderate"
+        | "strong";
+      compositionStatus: "single_group" | "group_dominated" | "mixed";
+      independentSegmentInterpretation: "allowed" | "constrained";
+      leadershipEvidence: {
+        n: number;
+        presence: "none" | "limited" | "established";
+        interpretiveUse: "unavailable" | "caution" | "usable";
+      };
+      dimensions: Array<{
+        dimensionKey: string;
+        respondentCount: number;
+        averageScore: number | null;
+        clientReporting: {
+          status: "reportable" | "suppressed";
+          reason:
+            | "all_contributing_groups_reportable"
+            | "suppressed_group_contributes";
+        };
+        groups: {
+          hr: SegmentGroupEvidence;
+          manager: SegmentGroupEvidence;
+          leadership: SegmentGroupEvidence;
+        };
+        groupComparisons: Array<{
+          leftGroup: "hr" | "manager" | "leadership";
+          rightGroup: "hr" | "manager" | "leadership";
+          leftN: number;
+          rightN: number;
+          leftAverageScore: number;
+          rightAverageScore: number;
+          delta: number;
+          magnitude: "minimal" | "notable" | "material";
+          interpretiveUse: "unavailable" | "caution" | "usable";
+          clientReporting: {
+            status: "reportable" | "suppressed";
+            reason: "both_groups_reportable" | "group_below_threshold";
+          };
+        }>;
+      }>;
+    }>;
+    comparisons: Array<{
+      key: string;
+      leftValue: string;
+      rightValue: string;
+      availability: "allowed" | "constrained" | "unavailable";
+      analyticalStrength:
+        | "insufficient"
+        | "directional"
+        | "moderate"
+        | "strong";
+      dimensions: Array<{
+        dimensionKey: string;
+        leftAverageScore: number | null;
+        rightAverageScore: number | null;
+        delta: number | null;
+        magnitude: "minimal" | "notable" | "material" | null;
+      }>;
+    }>;
+  };
   insights: {
     dimensions: DimensionInsight[];
     summary: {
@@ -170,12 +393,32 @@ export type ProjectSummaryResponse = {
   analyses: {
     dimensions: DimensionAnalysis[];
   };
+  itemEvidence: {
+    dimensions: Array<{
+      dimensionKey: string;
+      items: {
+        score_1: ItemEvidenceValue;
+        score_2: ItemEvidenceValue;
+        score_3: ItemEvidenceValue;
+        score_4: ItemEvidenceValue;
+        score_5: ItemEvidenceValue;
+      };
+    }>;
+  };
   narratives: {
     dimensions: DimensionNarrative[];
   };
   qualitative: {
     overall: OverallQualitativeSummary;
     dimensions: DimensionQualitativeSummary[];
+  };
+  context: {
+    factPack: {
+      status: string | null;
+      submittedAt: string | null;
+      response: Record<string, unknown> | null;
+    };
+    serviceAccess: ServiceAccessContextRow[];
   };
 };
 
@@ -789,18 +1032,12 @@ function getIllustrativeSignals(comments: string[]): string[] {
     .map(normaliseText)
     .filter((comment) => comment.length > 0)
     .slice(0, 3)
-    .map((comment) => {
-      const cleaned = comment
+    .map((comment) =>
+      comment
         .replace(/\s+/g, " ")
         .replace(/\s([,.;:!?])/g, "$1")
-        .trim();
-
-      if (cleaned.length <= 145) {
-        return cleaned;
-      }
-
-      return `${cleaned.slice(0, 142).trimEnd()}...`;
-    });
+        .trim(),
+    );
 }
 
 function buildDimensionAdvisoryRead(params: {
@@ -1048,6 +1285,684 @@ function buildQualitativeSummary(params: {
   };
 }
 
+function buildQuestionScoresByDimension(
+  rows: ScoredResponseRow[],
+): Record<string, Record<string, number | undefined>> {
+  const grouped = new Map<
+    string,
+    Map<
+      string,
+      Map<QuestionnaireType, number[]>
+    >
+  >();
+
+  for (const row of rows) {
+    if (typeof row.answer_value !== "number") {
+      continue;
+    }
+
+    const match = row.question_key.match(/_score_([1-5])$/);
+
+    if (!match) {
+      continue;
+    }
+
+    const itemKey = `score_${match[1]}`;
+
+    let dimension = grouped.get(row.dimension_key);
+
+    if (!dimension) {
+      dimension = new Map();
+      grouped.set(row.dimension_key, dimension);
+    }
+
+    let item = dimension.get(itemKey);
+
+    if (!item) {
+      item = new Map();
+      dimension.set(itemKey, item);
+    }
+
+    const values = item.get(row.questionnaire_type) ?? [];
+    values.push(row.answer_value);
+    item.set(row.questionnaire_type, values);
+  }
+
+  const result: Record<string, Record<string, number | undefined>> = {};
+
+  for (const [dimensionKey, items] of grouped) {
+    const dimensionScores: Record<string, number | undefined> = {};
+
+    for (const [itemKey, groups] of items) {
+      const groupMeans = questionnaireTypes
+        .map((questionnaireType) => {
+          const values = groups.get(questionnaireType);
+
+          if (!values || values.length === 0) {
+            return null;
+          }
+
+          return values.reduce((sum, value) => sum + value, 0) / values.length;
+        })
+        .filter((value): value is number => value !== null);
+
+      if (groupMeans.length > 0) {
+        dimensionScores[itemKey] =
+          groupMeans.reduce((sum, value) => sum + value, 0) /
+          groupMeans.length;
+      }
+    }
+
+    result[dimensionKey] = dimensionScores;
+  }
+
+  return result;
+}
+
+function buildItemEvidenceByDimension(
+  rows: ScoredResponseRow[],
+): Record<string, Record<string, ItemEvidenceValue>> {
+  const grouped = new Map<
+    string,
+    Map<
+      string,
+      Map<
+        ScoredQuestionnaireType,
+        Map<string, number>
+      >
+    >
+  >();
+
+  for (const row of rows) {
+    if (
+      typeof row.answer_value !== "number" ||
+      !isScoredQuestionnaireType(row.questionnaire_type)
+    ) {
+      continue;
+    }
+
+    const match = row.question_key.match(/_score_([1-5])$/);
+
+    if (!match) {
+      continue;
+    }
+
+    const itemKey = `score_${match[1]}`;
+
+    let dimension = grouped.get(row.dimension_key);
+
+    if (!dimension) {
+      dimension = new Map();
+      grouped.set(row.dimension_key, dimension);
+    }
+
+    let item = dimension.get(itemKey);
+
+    if (!item) {
+      item = new Map();
+      dimension.set(itemKey, item);
+    }
+
+    let group = item.get(row.questionnaire_type);
+
+    if (!group) {
+      group = new Map();
+      item.set(row.questionnaire_type, group);
+    }
+
+    group.set(row.participant_id, row.answer_value);
+  }
+
+  const result: Record<string, Record<string, ItemEvidenceValue>> = {};
+
+  for (const [dimensionKey, items] of grouped) {
+    const dimensionEvidence: Record<string, ItemEvidenceValue> = {};
+
+    for (const [itemKey, groups] of items) {
+      const buildGroupEvidence = (
+        questionnaireType: ScoredQuestionnaireType,
+      ): ItemGroupEvidence => {
+        const participantValues = Array.from(
+          groups.get(questionnaireType)?.values() ?? [],
+        );
+
+        if (participantValues.length === 0) {
+          return {
+            mean: null,
+            n: 0,
+          };
+        }
+
+        return {
+          mean:
+            participantValues.reduce((sum, value) => sum + value, 0) /
+            participantValues.length,
+          n: participantValues.length,
+        };
+      };
+
+      const hr = buildGroupEvidence("hr");
+      const manager = buildGroupEvidence("manager");
+      const leadership = buildGroupEvidence("leadership");
+
+      const availableGroupMeans = [hr.mean, manager.mean, leadership.mean].filter(
+        (value): value is number => typeof value === "number",
+      );
+
+      dimensionEvidence[itemKey] = {
+        combined:
+          availableGroupMeans.length > 0
+            ? availableGroupMeans.reduce((sum, value) => sum + value, 0) /
+              availableGroupMeans.length
+            : null,
+        groups: {
+          hr,
+          manager,
+          leadership,
+        },
+      };
+    }
+
+    result[dimensionKey] = dimensionEvidence;
+  }
+
+  return result;
+}
+
+function weakerAnalyticalStrength(
+  left: "insufficient" | "directional" | "moderate" | "strong",
+  right: "insufficient" | "directional" | "moderate" | "strong",
+): "insufficient" | "directional" | "moderate" | "strong" {
+  const rank = {
+    insufficient: 0,
+    directional: 1,
+    moderate: 2,
+    strong: 3,
+  } as const;
+
+  return rank[left] <= rank[right] ? left : right;
+}
+
+function buildSegmentationSummary(
+  participants: ParticipantRow[],
+  dimensionScores: DimensionScoreRow[],
+  segmentReportingMinN: number,
+): ProjectSummaryResponse["segmentation"] {
+  const scoredParticipants = participants.filter(
+    (participant) =>
+      participant.participant_status === "completed" &&
+      isScoredQuestionnaireType(participant.questionnaire_type),
+  );
+
+  const availableValues = new Map<string, Set<string>>();
+
+  for (const participant of scoredParticipants) {
+    for (const [key, value] of Object.entries(
+      participant.segmentation_values ?? {},
+    )) {
+      if (!value) {
+        continue;
+      }
+
+      const values = availableValues.get(key) ?? new Set<string>();
+      values.add(value);
+      availableValues.set(key, values);
+    }
+  }
+
+  const availableKeys = Array.from(availableValues.entries())
+    .map(([key, values]) => ({
+      key,
+      values: Array.from(values).sort(),
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+
+  const segments = availableKeys.flatMap(({ key, values }) =>
+    values.map((value) => {
+      const matchingParticipants = scoredParticipants.filter(
+        (participant) => participant.segmentation_values?.[key] === value,
+      );
+
+      const participantIds = new Set(
+        matchingParticipants.map((participant) => participant.participant_id),
+      );
+
+      const questionnaireTypes = Array.from(
+        new Set(
+          matchingParticipants.map(
+            (participant) => participant.questionnaire_type,
+          ),
+        ),
+      );
+
+      const respondentGroups = {
+        hr: matchingParticipants.filter(
+          (participant) => participant.questionnaire_type === "hr",
+        ).length,
+        manager: matchingParticipants.filter(
+          (participant) => participant.questionnaire_type === "manager",
+        ).length,
+        leadership: matchingParticipants.filter(
+          (participant) => participant.questionnaire_type === "leadership",
+        ).length,
+      };
+
+      const respondentCount = matchingParticipants.length;
+
+      const confidentialityStatus: "reportable" | "suppressed" =
+        respondentCount >= segmentReportingMinN
+          ? "reportable"
+          : "suppressed";
+
+      const analyticalStrength:
+        | "insufficient"
+        | "directional"
+        | "moderate"
+        | "strong" =
+        respondentCount < 5
+          ? "insufficient"
+          : respondentCount < 10
+            ? "directional"
+            : respondentCount < 20
+              ? "moderate"
+              : "strong";
+
+      const nonZeroGroupCounts = Object.values(respondentGroups).filter(
+        (count) => count > 0,
+      );
+
+      const largestGroupCount = Math.max(...Object.values(respondentGroups), 0);
+
+      const compositionStatus:
+        | "single_group"
+        | "group_dominated"
+        | "mixed" =
+        nonZeroGroupCounts.length === 1
+          ? "single_group"
+          : respondentCount > 0 && largestGroupCount / respondentCount >= 0.75
+            ? "group_dominated"
+            : "mixed";
+
+      const independentSegmentInterpretation:
+        | "allowed"
+        | "constrained" =
+        confidentialityStatus === "reportable" && compositionStatus === "mixed"
+          ? "allowed"
+          : "constrained";
+
+      const leadershipCount = respondentGroups.leadership;
+
+      const leadershipEvidence: ProjectSummaryResponse["segmentation"]["segments"][number]["leadershipEvidence"] =
+        leadershipCount === 0
+          ? {
+              n: 0,
+              presence: "none",
+              interpretiveUse: "unavailable",
+            }
+          : leadershipCount <= 2
+            ? {
+                n: leadershipCount,
+                presence: "limited",
+                interpretiveUse: "caution",
+              }
+            : {
+                n: leadershipCount,
+                presence: "established",
+                interpretiveUse: "usable",
+              };
+
+      const dimensions = dimensionDefinitions.map((dimension) => {
+        const matchingScores = dimensionScores.filter(
+          (row) =>
+            row.dimension_key === dimension.key &&
+            row.participant_id !== null &&
+            participantIds.has(row.participant_id) &&
+            isScoredQuestionnaireType(row.questionnaire_type),
+        );
+
+        const buildGroupEvidence = (
+          questionnaireType: ScoredQuestionnaireType,
+        ): ItemGroupEvidence => {
+          const groupRows = matchingScores.filter(
+            (row) => row.questionnaire_type === questionnaireType,
+          );
+
+          const scores = groupRows
+            .map((row) => Number(row.average_score))
+            .filter((score) => Number.isFinite(score));
+
+          return {
+            mean:
+              scores.length > 0
+                ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+                : null,
+            n: new Set(
+              groupRows
+                .map((row) => row.participant_id)
+                .filter((participantId): participantId is string =>
+                  participantId !== null,
+                ),
+            ).size,
+          };
+        };
+
+        const withClientReporting = (
+          group: ItemGroupEvidence,
+        ): SegmentGroupEvidence => ({
+          ...group,
+          clientReporting:
+            group.n >= segmentReportingMinN
+              ? {
+                  status: "reportable",
+                  reason: "meets_threshold",
+                }
+              : {
+                  status: "suppressed",
+                  reason: "below_threshold",
+                },
+        });
+
+        const hr = withClientReporting(buildGroupEvidence("hr"));
+        const manager = withClientReporting(buildGroupEvidence("manager"));
+        const leadership = withClientReporting(
+          buildGroupEvidence("leadership"),
+        );
+
+        const respondentScores = matchingScores
+          .map((row) => Number(row.average_score))
+          .filter((score) => Number.isFinite(score));
+
+        const groupComparisonPairs = [
+          ["hr", "manager"],
+          ["hr", "leadership"],
+          ["manager", "leadership"],
+        ] as const;
+
+        const groupEvidence = {
+          hr,
+          manager,
+          leadership,
+        };
+
+        const groupComparisons = groupComparisonPairs.flatMap(
+          ([leftGroup, rightGroup]) => {
+            const left = groupEvidence[leftGroup];
+            const right = groupEvidence[rightGroup];
+
+            if (
+              left.n === 0 ||
+              right.n === 0 ||
+              left.mean === null ||
+              right.mean === null
+            ) {
+              return [];
+            }
+
+            const delta = left.mean - right.mean;
+            const absoluteRoundedDelta =
+              Math.round(Math.abs(delta) * 100) / 100;
+
+            const magnitude:
+              | "minimal"
+              | "notable"
+              | "material" =
+              absoluteRoundedDelta < 0.2
+                ? "minimal"
+                : absoluteRoundedDelta < 0.4
+                  ? "notable"
+                  : "material";
+
+            const includesLeadership =
+              rightGroup === "leadership";
+
+            const interpretiveUse:
+              | "unavailable"
+              | "caution"
+              | "usable" =
+              includesLeadership
+                ? leadershipEvidence.interpretiveUse
+                : "usable";
+
+            const clientReporting =
+              left.clientReporting.status === "reportable" &&
+              right.clientReporting.status === "reportable"
+                ? {
+                    status: "reportable" as const,
+                    reason: "both_groups_reportable" as const,
+                  }
+                : {
+                    status: "suppressed" as const,
+                    reason: "group_below_threshold" as const,
+                  };
+
+            return [
+              {
+                leftGroup,
+                rightGroup,
+                leftN: left.n,
+                rightN: right.n,
+                leftAverageScore: left.mean,
+                rightAverageScore: right.mean,
+                delta,
+                magnitude,
+                interpretiveUse,
+                clientReporting,
+              },
+            ];
+          },
+        );
+
+        const contributingGroups = [hr, manager, leadership].filter(
+          (group) => group.n > 0,
+        );
+
+        const clientReporting =
+          contributingGroups.every(
+            (group) => group.clientReporting.status === "reportable",
+          )
+            ? {
+                status: "reportable" as const,
+                reason: "all_contributing_groups_reportable" as const,
+              }
+            : {
+                status: "suppressed" as const,
+                reason: "suppressed_group_contributes" as const,
+              };
+
+        return {
+          dimensionKey: dimension.key,
+          respondentCount: new Set(
+            matchingScores
+              .map((row) => row.participant_id)
+              .filter((participantId): participantId is string =>
+                participantId !== null,
+              ),
+          ).size,
+          averageScore:
+            respondentScores.length > 0
+              ? respondentScores.reduce((sum, score) => sum + score, 0) /
+                respondentScores.length
+              : null,
+          clientReporting,
+          groups: {
+            hr,
+            manager,
+            leadership,
+          },
+          groupComparisons,
+        };
+      });
+
+      const respondentGroupClientReporting = {
+        hr:
+          respondentGroups.hr >= segmentReportingMinN
+            ? {
+                status: "reportable" as const,
+                reason: "meets_threshold" as const,
+              }
+            : {
+                status: "suppressed" as const,
+                reason: "below_threshold" as const,
+              },
+        manager:
+          respondentGroups.manager >= segmentReportingMinN
+            ? {
+                status: "reportable" as const,
+                reason: "meets_threshold" as const,
+              }
+            : {
+                status: "suppressed" as const,
+                reason: "below_threshold" as const,
+              },
+        leadership:
+          respondentGroups.leadership >= segmentReportingMinN
+            ? {
+                status: "reportable" as const,
+                reason: "meets_threshold" as const,
+              }
+            : {
+                status: "suppressed" as const,
+                reason: "below_threshold" as const,
+              },
+      };
+
+      const suppressedNonZeroRespondentGroups = (
+        ["hr", "manager", "leadership"] as const
+      ).filter(
+        (group) =>
+          respondentGroups[group] > 0 &&
+          respondentGroupClientReporting[group].status === "suppressed",
+      );
+
+      const respondentCountClientReporting =
+        confidentialityStatus === "suppressed"
+          ? {
+              status: "suppressed" as const,
+              reason: "segment_below_threshold" as const,
+            }
+          : suppressedNonZeroRespondentGroups.length === 1
+            ? {
+                status: "suppressed" as const,
+                reason: "single_hidden_nonzero_group" as const,
+              }
+            : {
+                status: "reportable" as const,
+                reason: "no_single_hidden_nonzero_group" as const,
+              };
+
+      return {
+        key,
+        value,
+        respondentCount,
+        respondentCountClientReporting,
+        questionnaireTypes,
+        respondentGroups,
+        respondentGroupClientReporting,
+        confidentialityStatus,
+        analyticalStrength,
+        compositionStatus,
+        independentSegmentInterpretation,
+        leadershipEvidence,
+        dimensions,
+      };
+    }),
+  );
+
+  const comparisons: ProjectSummaryResponse["segmentation"]["comparisons"] =
+    [];
+
+  for (const availableKey of availableKeys) {
+    const keySegments = segments.filter(
+      (segment) => segment.key === availableKey.key,
+    );
+
+    for (let leftIndex = 0; leftIndex < keySegments.length; leftIndex += 1) {
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < keySegments.length;
+        rightIndex += 1
+      ) {
+        const left = keySegments[leftIndex];
+        const right = keySegments[rightIndex];
+
+        const availability:
+          | "allowed"
+          | "constrained"
+          | "unavailable" =
+          left.confidentialityStatus === "suppressed" ||
+          right.confidentialityStatus === "suppressed"
+            ? "unavailable"
+            : left.independentSegmentInterpretation === "allowed" &&
+                right.independentSegmentInterpretation === "allowed"
+              ? "allowed"
+              : "constrained";
+
+        const comparisonDimensions =
+          availability === "unavailable"
+            ? []
+            : dimensionDefinitions.map((dimension) => {
+                const leftDimension = left.dimensions.find(
+                  (item) => item.dimensionKey === dimension.key,
+                );
+                const rightDimension = right.dimensions.find(
+                  (item) => item.dimensionKey === dimension.key,
+                );
+
+                const leftAverageScore = leftDimension?.averageScore ?? null;
+                const rightAverageScore = rightDimension?.averageScore ?? null;
+
+                const delta =
+                  leftAverageScore !== null && rightAverageScore !== null
+                    ? leftAverageScore - rightAverageScore
+                    : null;
+
+                const absoluteRoundedDelta =
+                  delta === null ? null : Math.round(Math.abs(delta) * 100) / 100;
+
+                const magnitude:
+                  | "minimal"
+                  | "notable"
+                  | "material"
+                  | null =
+                  absoluteRoundedDelta === null
+                    ? null
+                    : absoluteRoundedDelta < 0.2
+                      ? "minimal"
+                      : absoluteRoundedDelta < 0.4
+                        ? "notable"
+                        : "material";
+
+                return {
+                  dimensionKey: dimension.key,
+                  leftAverageScore,
+                  rightAverageScore,
+                  delta,
+                  magnitude,
+                };
+              });
+
+        comparisons.push({
+          key: availableKey.key,
+          leftValue: left.value,
+          rightValue: right.value,
+          availability,
+          analyticalStrength: weakerAnalyticalStrength(
+            left.analyticalStrength,
+            right.analyticalStrength,
+          ),
+          dimensions: comparisonDimensions,
+        });
+      }
+    }
+  }
+
+  return {
+    availableKeys,
+    segments,
+    comparisons,
+  };
+}
+
 export async function buildProjectSummary(
   projectId: string,
 ): Promise<ProjectSummaryResponse> {
@@ -1069,11 +1984,129 @@ export async function buildProjectSummary(
 
   const supabase = createSupabaseAdminClient();
 
+  async function loadPagedRows<T>(
+    loadPage: (
+      from: number,
+      to: number,
+    ) => Promise<{ data: T[] | null; error: unknown }>,
+  ): Promise<{ data: T[] | null; error: unknown }> {
+    const pageSize = 1000;
+    const rows: T[] = [];
+
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await loadPage(from, from + pageSize - 1);
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        };
+      }
+
+      const pageRows = data ?? [];
+      rows.push(...pageRows);
+
+      if (pageRows.length < pageSize) {
+        return {
+          data: rows,
+          error: null,
+        };
+      }
+    }
+  }
+
+  const participantsPromise = loadPagedRows<ParticipantRow>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_participants")
+        .select(
+          "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at, segmentation_values",
+        )
+        .eq("project_id", projectId)
+        .order("participant_id", { ascending: true })
+        .range(from, to)
+        .returns<ParticipantRow[]>();
+
+      return { data, error };
+    },
+  );
+
+  const dimensionScoresPromise = loadPagedRows<DimensionScoreRow>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_dimension_scores")
+        .select(
+          "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
+        )
+        .eq("project_id", projectId)
+        .order("score_id", { ascending: true })
+        .range(from, to)
+        .returns<DimensionScoreRow[]>();
+
+      return { data, error };
+    },
+  );
+
+  const scoredResponsesPromise = loadPagedRows<ScoredResponseRow>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_responses")
+        .select(
+          "participant_id, questionnaire_type, dimension_key, question_key, answer_value",
+        )
+        .eq("project_id", projectId)
+        .not("answer_value", "is", null)
+        .order("participant_id", { ascending: true })
+        .order("question_key", { ascending: true })
+        .range(from, to)
+        .returns<ScoredResponseRow[]>();
+
+      return { data, error };
+    },
+  );
+
+  const commentsPromise = loadPagedRows<CommentRow>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_responses")
+        .select(
+          "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
+        )
+        .eq("project_id", projectId)
+        .not("comment_text", "is", null)
+        .order("participant_id", { ascending: true })
+        .order("question_key", { ascending: true })
+        .range(from, to)
+        .returns<CommentRow[]>();
+
+      return { data, error };
+    },
+  );
+
+  const serviceAccessPromise = loadPagedRows<ServiceAccessContextRow>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_service_access_context")
+        .select(
+          "participant_id, questionnaire_type, routes_used, usual_route, usual_route_effectiveness, intended_access_model, intended_primary_route, specific_route_detail",
+        )
+        .eq("project_id", projectId)
+        .order("participant_id", { ascending: true })
+        .range(from, to)
+        .returns<ServiceAccessContextRow[]>();
+
+      return { data, error };
+    },
+  );
+
   const [
     { data: project, error: projectError },
     { data: participants, error: participantsError },
     { data: scoreRows, error: scoresError },
+    { data: scoredResponseRows, error: scoredResponsesError },
     { data: commentRows, error: commentsError },
+    { data: factPackRows, error: factPackError },
+    { data: serviceAccessRows, error: serviceAccessError },
   ] = await Promise.all([
     supabase
       .from("client_projects")
@@ -1082,28 +2115,16 @@ export async function buildProjectSummary(
       )
       .eq("project_id", projectId)
       .single<ProjectRow>(),
+    participantsPromise,
+    dimensionScoresPromise,
+    scoredResponsesPromise,
+    commentsPromise,
     supabase
-      .from("client_participants")
-      .select(
-        "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at",
-      )
+      .from("client_fact_packs")
+      .select("participant_id, status, submitted_at, updated_at, response_json")
       .eq("project_id", projectId)
-      .returns<ParticipantRow[]>(),
-    supabase
-      .from("client_dimension_scores")
-      .select(
-        "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-      )
-      .eq("project_id", projectId)
-      .returns<DimensionScoreRow[]>(),
-    supabase
-      .from("client_responses")
-      .select(
-        "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
-      )
-      .eq("project_id", projectId)
-      .not("comment_text", "is", null)
-      .returns<CommentRow[]>(),
+      .returns<FactPackRow[]>(),
+    serviceAccessPromise,
   ]);
 
   if (projectError || !project) {
@@ -1130,10 +2151,34 @@ export async function buildProjectSummary(
     );
   }
 
+  if (scoredResponsesError) {
+    throw new BuildProjectSummaryError(
+      "COMMENTS_LOAD_FAILED",
+      "Unable to load scored diagnostic responses.",
+      500,
+    );
+  }
+
   if (commentsError) {
     throw new BuildProjectSummaryError(
       "COMMENTS_LOAD_FAILED",
       "Unable to load project comments.",
+      500,
+    );
+  }
+
+  if (factPackError) {
+    throw new BuildProjectSummaryError(
+      "COMMENTS_LOAD_FAILED",
+      "Unable to load client fact pack.",
+      500,
+    );
+  }
+
+  if (serviceAccessError) {
+    throw new BuildProjectSummaryError(
+      "COMMENTS_LOAD_FAILED",
+      "Unable to load service access context.",
       500,
     );
   }
@@ -1146,6 +2191,15 @@ export async function buildProjectSummary(
     isScoredQuestionnaireType(row.questionnaire_type),
   );
 
+  const factPackRow =
+    (factPackRows ?? []).find(
+      (row) => row.status === "completed" || row.submitted_at !== null,
+    ) ??
+    (factPackRows ?? [])[0] ??
+    null;
+
+  const serviceAccessContext = serviceAccessRows ?? [];
+
   const completed = participantRows.filter(
     (participant) => participant.participant_status === "completed",
   ).length;
@@ -1155,9 +2209,36 @@ export async function buildProjectSummary(
 
   const respondentGroups = buildRespondentGroups(participantRows);
   const dimensions = buildDimensionSummaries(dimensionScoreRows);
+  const reportingRecommendation = recommendSegmentReportingMinN({
+    totalInvited,
+    respondentGroupInvitedCounts: respondentGroups.map(
+      (group) => group.totalInvited,
+    ),
+  });
+
+  const reportingPolicy: ProjectSummaryResponse["reportingPolicy"] = {
+    recommendedSegmentReportingMinN:
+      reportingRecommendation.recommendedMinN,
+    segmentReportingMinN: reportingRecommendation.recommendedMinN,
+    source: "default",
+    recommendationReason: reportingRecommendation.reason,
+  };
+
+  const segmentation = buildSegmentationSummary(
+    participantRows,
+    dimensionScoreRows,
+    reportingPolicy.segmentReportingMinN,
+  );
   const dimensionInsights = buildDimensionInsights(dimensions);
+  const questionScoresByDimension = buildQuestionScoresByDimension(
+    scoredResponseRows ?? [],
+  );
+  const itemEvidenceByDimension = buildItemEvidenceByDimension(
+    scoredResponseRows ?? [],
+  );
   const dimensionAnalyses = buildDimensionAnalyses({
     insights: dimensionInsights,
+    questionScoresByDimension,
   });
   const dimensionNarratives = buildDimensionNarratives(dimensionAnalyses);
   const insightSummary = buildInsightSummary(dimensionInsights);
@@ -1207,6 +2288,39 @@ export async function buildProjectSummary(
     dimensions,
     strongestAlignment,
     biggestGaps,
+    evidenceBase: {
+      respondentGroups: {
+        hr: (() => {
+          const group = respondentGroups.find(
+            (item) => item.questionnaireType === "hr",
+          );
+          return {
+            invited: group?.totalInvited ?? 0,
+            completed: group?.completed ?? 0,
+          };
+        })(),
+        manager: (() => {
+          const group = respondentGroups.find(
+            (item) => item.questionnaireType === "manager",
+          );
+          return {
+            invited: group?.totalInvited ?? 0,
+            completed: group?.completed ?? 0,
+          };
+        })(),
+        leadership: (() => {
+          const group = respondentGroups.find(
+            (item) => item.questionnaireType === "leadership",
+          );
+          return {
+            invited: group?.totalInvited ?? 0,
+            completed: group?.completed ?? 0,
+          };
+        })(),
+      },
+    },
+    reportingPolicy,
+    segmentation,
     insights: {
       dimensions: dimensionInsights,
       summary: insightSummary,
@@ -1214,9 +2328,42 @@ export async function buildProjectSummary(
     analyses: {
       dimensions: dimensionAnalyses,
     },
+    itemEvidence: {
+      dimensions: dimensionDefinitions.map((dimension) => {
+        const evidence = itemEvidenceByDimension[dimension.key] ?? {};
+
+        const emptyItemEvidence = (): ItemEvidenceValue => ({
+          combined: null,
+          groups: {
+            hr: { mean: null, n: 0 },
+            manager: { mean: null, n: 0 },
+            leadership: { mean: null, n: 0 },
+          },
+        });
+
+        return {
+          dimensionKey: dimension.key,
+          items: {
+            score_1: evidence.score_1 ?? emptyItemEvidence(),
+            score_2: evidence.score_2 ?? emptyItemEvidence(),
+            score_3: evidence.score_3 ?? emptyItemEvidence(),
+            score_4: evidence.score_4 ?? emptyItemEvidence(),
+            score_5: evidence.score_5 ?? emptyItemEvidence(),
+          },
+        };
+      }),
+    },
     narratives: {
       dimensions: dimensionNarratives,
     },
     qualitative: qualitativeSummary,
+    context: {
+      factPack: {
+        status: factPackRow?.status ?? null,
+        submittedAt: factPackRow?.submitted_at ?? null,
+        response: factPackRow?.response_json ?? null,
+      },
+      serviceAccess: serviceAccessContext,
+    },
   };
 }

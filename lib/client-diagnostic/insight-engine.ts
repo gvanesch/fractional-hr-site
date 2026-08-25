@@ -79,11 +79,11 @@ function getAlignment(gap: number | null): AlignmentStatus | null {
     return null;
   }
 
-  if (gap >= 1.5) {
+  if (gap >= 0.75) {
     return "significant_gap";
   }
 
-  if (gap >= 0.75) {
+  if (gap >= 0.4) {
     return "emerging_gap";
   }
 

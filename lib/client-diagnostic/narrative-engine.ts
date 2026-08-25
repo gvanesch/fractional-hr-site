@@ -223,7 +223,7 @@ function formatGap(value: number | null): string {
 }
 
 function buildGapOverlay(analysis: DimensionAnalysis): string | null {
-  const { gapPattern, scores, gap, alignment } = analysis;
+  const { gapPattern, gap, alignment } = analysis;
 
   if (
     alignment !== "emerging_gap" &&
@@ -233,15 +233,15 @@ function buildGapOverlay(analysis: DimensionAnalysis): string | null {
   }
 
   if (gapPattern === "manager_lower_than_others") {
-    return `Managers are rating this materially lower than both HR and Leadership, which suggests the model is stronger in design than in practical application.`;
+    return `Managers are rating this materially lower than both HR and Leadership, indicating a weaker manager experience on this dimension.`;
   }
 
   if (gapPattern === "hr_lower_than_leadership") {
-    return `HR is reading this more cautiously than Leadership, which suggests the friction is being experienced more directly than it is being seen from above.`;
+    return `HR is rating this materially lower than Leadership, indicating that the experience of this dimension differs depending on respondent perspective.`;
   }
 
   if (gapPattern === "leadership_lower_than_others") {
-    return `Leadership is more cautious on this dimension than the groups closer to daily execution, which suggests concern about resilience or control at a broader operating level.`;
+    return `Leadership is rating this materially lower than both HR and Managers, indicating a different leadership perspective on this dimension.`;
   }
 
   return `The spread between respondent groups is ${formatGap(
@@ -489,6 +489,8 @@ export function buildDimensionNarratives(
 export function buildDimensionNarrativesFromInsights(
   _insights: DimensionInsight[],
 ): DimensionNarrative[] {
+  void _insights;
+
   throw new Error(
     "buildDimensionNarrativesFromInsights is deprecated. Build DimensionAnalysis objects first and then call buildDimensionNarratives(analyses).",
   );

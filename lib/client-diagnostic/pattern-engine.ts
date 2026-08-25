@@ -65,15 +65,6 @@ function isBelow(
   return value !== null && value < threshold;
 }
 
-function isAtOrAbove(
-  questionScores: QuestionScoreMap,
-  key: string,
-  threshold: number,
-): boolean {
-  const value = getQuestionScore(questionScores, key);
-  return value !== null && value >= threshold;
-}
-
 function countTriggeredPatterns(
   patterns: PatternDefinition[],
   params: PatternDetectionParams,
@@ -152,80 +143,100 @@ export function getGapPattern(insight: DimensionInsight): GapPattern {
 const PROCESS_CLARITY_PATTERNS: PatternDefinition[] = [
   {
     code: "PROCESS_INTERPRETATION_DEPENDENCY",
-    label: "Workflow depends on interpretation",
+    label: "Workflow still depends on clarification",
     description:
-      "The workflow exists, but people still need to interpret or reconstruct what should happen next.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q2", 3) || isBelow(questionScores, "q6", 3),
+      "People cannot navigate core HR processes confidently enough without additional clarification.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
   {
     code: "PROCESS_HANDOFF_AMBIGUITY",
     label: "Handoffs are creating ambiguity",
     description:
-      "The workflow is weakening at transition points between roles or teams.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q4", 3),
+      "The next action or owner is not consistently clear when work moves between roles or teams.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
   },
   {
     code: "PROCESS_EDGE_CASE_BREAKDOWN",
     label: "Non-standard cases are not clear",
     description:
-      "The process works better for routine work than for more complex or less common scenarios.",
-    detect: ({ questionScores }) => isBelow(questionScores, "q7", 3),
+      "Complex or non-standard scenarios do not have a sufficiently clear route for handling.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
 ];
 
 const OWNERSHIP_PATTERNS: PatternDefinition[] = [
   {
-    code: "OWNERSHIP_EXECUTION_GAP",
-    label: "Ownership is clear in design, not in use",
+    code: "OWNERSHIP_ROLE_CLARITY_GAP",
+    label: "Responsibilities are not clear enough",
     description:
-      "The accountability model exists, but it is not landing consistently at the point of execution.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q6", 3),
-  },
-  {
-    code: "OWNERSHIP_HANDOFF_BREAKDOWN",
-    label: "Ownership weakens at handoffs",
-    description:
-      "Responsibility is becoming blurred as work crosses roles or team boundaries.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q7", 3),
+      "Responsibilities across HR, managers and supporting roles are not sufficiently clear in core processes.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_1", 3),
   },
   {
     code: "OWNERSHIP_DECISION_AMBIGUITY",
     label: "Decision ownership is not clear enough",
     description:
-      "The line between decision owner and contributor is not sufficiently explicit.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q2", 3) || isBelow(questionScores, "q4", 3),
+      "Decision authority and supporting roles are not sufficiently explicit.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
+  },
+  {
+    code: "OWNERSHIP_HANDOFF_BREAKDOWN",
+    label: "Ownership weakens at handoffs",
+    description:
+      "Responsibility for the next action is not transferring clearly enough when work moves between roles or teams.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
+  },
+  {
+    code: "OWNERSHIP_ACCOUNTABILITY_GAP",
+    label: "End-to-end accountability is not clear enough",
+    description:
+      "Accountability for ensuring work progresses to completion is not sufficiently clear.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
+  },
+  {
+    code: "OWNERSHIP_COMPLEXITY_BREAKDOWN",
+    label: "Ownership weakens in complex situations",
+    description:
+      "Ownership becomes less dependable when work spans several teams, roles or functions.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
 const SERVICE_ACCESS_PATTERNS: PatternDefinition[] = [
   {
-    code: "SERVICE_MULTIPLE_FRONT_DOORS",
-    label: "Too many access routes",
+    code: "SERVICE_ENTRY_POINT_CLARITY",
+    label: "The starting point for support is not clear enough",
     description:
-      "The access model is fragmented and people are navigating multiple competing entry points.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q2", 3) || isBelow(questionScores, "q6", 3),
+      "Employees and managers do not have sufficient clarity about where to start when they need HR support.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_1", 3),
   },
   {
-    code: "SERVICE_COGNITIVE_LOAD",
-    label: "Choosing the right route is too hard",
+    code: "SERVICE_ROUTE_CLARITY",
+    label: "Support routes are not clear enough",
     description:
-      "The access model is creating too much decision effort before support can be reached.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q4", 3),
+      "Different types of HR request do not have sufficiently clear and appropriate routes for support.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
   },
   {
-    code: "SERVICE_BYPASS_BEHAVIOUR",
-    label: "Standard access routes are being bypassed",
+    code: "SERVICE_NAVIGATION_FRICTION",
+    label: "The support model is difficult to navigate",
     description:
-      "People are not consistently trusting or using the intended front door into HR support.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q8", 3),
+      "Users are experiencing unnecessary difficulty identifying or navigating the right support route.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
+  },
+  {
+    code: "SERVICE_CHANNEL_ADOPTION_GAP",
+    label: "Intended support channels are not being used confidently",
+    description:
+      "Users are not consistently confident using the intended support channels for their requests.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
+  },
+  {
+    code: "SERVICE_ROUTE_TRUST_GAP",
+    label: "Confidence in the support route is too low",
+    description:
+      "Users do not have sufficient confidence that the appropriate support route will connect them with the right help.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
@@ -234,159 +245,190 @@ const KNOWLEDGE_PATTERNS: PatternDefinition[] = [
     code: "KNOWLEDGE_DEMAND_LOOP",
     label: "Self-service is not reducing demand",
     description:
-      "Guidance exists, but HR remains the translation layer for routine questions.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q6", 3) && isBelow(questionScores, "q8", 3),
+      "Guidance and self-service are not enabling routine needs to be resolved with sufficiently little HR intervention.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
   {
     code: "KNOWLEDGE_LOW_TRUST",
     label: "Guidance is not trusted enough",
     description:
-      "People do not trust the guidance enough to act on it without checking with HR.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q7", 3),
+      "Users do not have sufficient confidence that HR guidance is accurate and up to date.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
   {
     code: "KNOWLEDGE_POLICY_NOT_PRACTICAL",
-    label: "Guidance is not usable in practice",
+    label: "Guidance is not usable enough in practice",
     description:
-      "The content may exist, but it is not translating cleanly into action at the point of need.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q4", 3),
+      "Available guidance is not practical or clear enough to support the right action in real situations.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
   },
 ];
 
 const SYSTEMS_PATTERNS: PatternDefinition[] = [
   {
     code: "SYSTEM_WORKFLOW_MISALIGNMENT",
-    label: "System and workflow are misaligned",
+    label: "System and operating model are not aligned enough",
     description:
-      "The platform is not matching the intended process closely enough to support it cleanly.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q1", 3) || isBelow(questionScores, "q2", 3),
+      "The systems environment is not supporting the intended HR operating model strongly enough.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_1", 3),
   },
   {
-    code: "SYSTEM_WORKAROUND_MODEL",
-    label: "Workaround is compensating for system weakness",
+    code: "SYSTEM_USABILITY_GAP",
+    label: "Common system activity is not efficient enough",
     description:
-      "People are relying on workaround or extra effort because the system is not supporting the workflow cleanly.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q4", 3),
+      "Users cannot complete common HR activities efficiently and confidently enough in the systems available.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
+  },
+  {
+    code: "SYSTEM_WORKFLOW_ENABLEMENT_GAP",
+    label: "Workflow enablement is not strong enough",
+    description:
+      "Routine workflow, approvals and handoffs are not being supported efficiently enough by the systems available.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
   },
   {
     code: "SYSTEM_DUPLICATION_GAP",
-    label: "Duplication and rekeying are creating drag",
+    label: "System connections are creating duplicate effort",
     description:
-      "The technology environment is creating repeat entry, manual reconciliation, or avoidable control effort.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q8", 3),
+      "Information is not moving between systems cleanly enough to avoid unnecessary re-entry, reconciliation or duplication.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
+  },
+  {
+    code: "SYSTEM_VISIBILITY_GAP",
+    label: "System visibility is not strong enough",
+    description:
+      "The systems do not provide sufficiently reliable status and information for operational control.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
 const CASE_MANAGEMENT_PATTERNS: PatternDefinition[] = [
   {
-    code: "CASE_INTAKE_FRAGMENTATION",
-    label: "Case intake is not controlled enough",
+    code: "CASE_INTAKE_CONTROL_GAP",
+    label: "Case intake is not structured enough",
     description:
-      "Requests are not entering the case model in one structured, dependable way.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q1", 3) || isBelow(questionScores, "q2", 3),
+      "Requests and issues are not being captured through a sufficiently structured and consistent process.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_1", 3),
+  },
+  {
+    code: "CASE_ROUTING_WEAKNESS",
+    label: "Case routing is not efficient enough",
+    description:
+      "Requests and cases are not being routed to the right person or team efficiently enough.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
+  },
+  {
+    code: "CASE_OWNERSHIP_WEAKNESS",
+    label: "Case ownership is not clear enough",
+    description:
+      "Ownership is not remaining sufficiently clear as cases move through different stages or teams.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
   },
   {
     code: "CASE_TRACKING_VISIBILITY_GAP",
     label: "Work in flight is not visible enough",
     description:
-      "Once work enters the model, visibility and status control are not strong enough.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q6", 3),
+      "The current status and next action for cases are not sufficiently visible to the people who need them.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
   {
-    code: "CASE_SHADOW_MANAGEMENT",
-    label: "Case work is being managed outside the case model",
+    code: "CASE_CONTROL_WEAKNESS",
+    label: "Case control and traceability are not strong enough",
     description:
-      "Side conversations or manual tracking are compensating for weaknesses in the formal case path.",
-    detect: ({ questionScores }) => isBelow(questionScores, "q8", 3),
+      "Case handling is not providing sufficiently dependable process control and traceability.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
 const DATA_HANDOFF_PATTERNS: PatternDefinition[] = [
   {
     code: "DATA_INPUT_OUTPUT_AMBIGUITY",
-    label: "Inputs and outputs are not clear enough",
+    label: "Handoff requirements are not clear enough",
     description:
-      "Work is moving forward without one consistent understanding of what is required before transfer.",
+      "The information required before work can move forward is not consistently clear.",
     detect: ({ questionScores }) =>
-      isBelow(questionScores, "q1", 3) || isBelow(questionScores, "q2", 3),
+      isBelow(questionScores, "score_1", 3) ||
+      isBelow(questionScores, "score_2", 3),
   },
   {
     code: "DATA_LOW_TRUST_HANDOFF",
-    label: "Incoming work is not trusted enough",
+    label: "Incoming information is not dependable enough",
     description:
-      "Teams are checking, validating, or correcting work because handoffs are not dependable enough.",
+      "Information moving between teams or systems is not sufficiently reliable for receiving teams to proceed confidently.",
     detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q6", 3),
+      isBelow(questionScores, "score_3", 3) ||
+      isBelow(questionScores, "score_4", 3),
   },
   {
     code: "DATA_REWORK_ENGINE",
-    label: "Rework is accumulating at transfer points",
+    label: "Handoff quality is creating repeat effort",
     description:
-      "Handoffs are creating correction effort and slowing the flow of work between stages.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q5", 3) || isBelow(questionScores, "q7", 3),
+      "Information quality at transfer points is not strong enough to support work progressing correctly first time.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
 const CONSISTENCY_PATTERNS: PatternDefinition[] = [
   {
-    code: "CONSISTENCY_MANAGER_VARIATION",
-    label: "Manager judgement is driving variation",
+    code: "CONSISTENCY_PRINCIPLES_GAP",
+    label: "Consistent principles are not holding strongly enough",
     description:
-      "Similar situations are not being handled consistently because local judgement still plays too large a role.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q2", 3) || isBelow(questionScores, "q4", 3),
+      "Similar people situations are not being handled using sufficiently consistent principles across the organisation.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_1", 3),
   },
   {
-    code: "CONSISTENCY_HR_CORRECTION_LAYER",
-    label: "HR is acting as a correction layer",
+    code: "CONSISTENCY_MANAGER_APPLICATION_GAP",
+    label: "Manager application of standards is uneven",
     description:
-      "The function is stepping in to preserve consistency rather than the model producing it on its own.",
-    detect: ({ questionScores }) => isBelow(questionScores, "q5", 3),
+      "The guidance and application of HR policies and decision criteria are not producing sufficient consistency at manager level.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
+  },
+  {
+    code: "CONSISTENCY_EXPERIENCE_VARIATION",
+    label: "The HR experience varies too much",
+    description:
+      "Employees and managers are not receiving a sufficiently consistent HR experience across teams, functions or locations.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
+  },
+  {
+    code: "CONSISTENCY_PROCESS_VARIATION",
+    label: "Standard processes are not applied consistently enough",
+    description:
+      "Standard HR processes are not being applied with sufficient consistency across the organisation.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
   {
     code: "CONSISTENCY_EXCEPTION_BREAKDOWN",
     label: "Exceptions are not controlled consistently",
     description:
-      "The standard weakens when cases are less straightforward or require judgement.",
-    detect: ({ questionScores }) => isBelow(questionScores, "q8", 3),
+      "Exceptions are not being handled using sufficiently clear and consistent principles.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
 const CAPACITY_PATTERNS: PatternDefinition[] = [
   {
     code: "CAPACITY_TRUE_SHORTFALL",
-    label: "The model is carrying a real capacity shortfall",
+    label: "The model is carrying a capacity shortfall",
     description:
-      "The operating model does not appear to have enough usable capacity for current demand.",
+      "Current demand and delivery timeframes indicate that usable operating capacity may be insufficient.",
     detect: ({ questionScores }) =>
-      isBelow(questionScores, "q1", 3) &&
-      isBelow(questionScores, "q2", 3) &&
-      isBelow(questionScores, "q7", 3),
+      isBelow(questionScores, "score_1", 3) &&
+      isBelow(questionScores, "score_2", 3),
   },
   {
     code: "CAPACITY_REACTIVE_MODEL",
-    label: "The model is operating too reactively",
+    label: "The model is vulnerable to reactive demand",
     description:
-      "Interruptions and unplanned work are consuming too much of the model's usable capacity.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q3", 3) || isBelow(questionScores, "q4", 3),
+      "The function is not absorbing urgent or unexpected demand strongly enough while maintaining core delivery.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_3", 3),
   },
   {
     code: "CAPACITY_AVOIDABLE_DEMAND",
-    label: "Avoidable demand is consuming headroom",
+    label: "Routine demand is consuming too much headroom",
     description:
-      "A meaningful share of workload is being created by repeat issues or preventable operating friction.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q6", 3) || isBelow(questionScores, "q8", 3),
+      "Routine demand is not being managed efficiently enough to protect capacity for higher-value work.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
 ];
 
@@ -395,25 +437,22 @@ const CHANGE_PATTERNS: PatternDefinition[] = [
     code: "CHANGE_MANAGER_ENABLEMENT_GAP",
     label: "Managers are not enabled strongly enough for change",
     description:
-      "The model for change depends too much on launch and not enough on manager-level usability.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q2", 3) || isBelow(questionScores, "q3", 3),
+      "Managers and employees are not receiving enough support to adopt new processes or ways of working confidently.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_2", 3),
   },
   {
     code: "CHANGE_REINFORCEMENT_GAP",
     label: "Changes are not reinforced strongly enough",
     description:
-      "Launch activity is happening, but reinforcement and follow-through are not strong enough to embed change.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q4", 3) || isBelow(questionScores, "q5", 3),
+      "New processes and behaviours are not being reinforced sufficiently after launch.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_4", 3),
   },
   {
     code: "CHANGE_REVERSION_RISK",
     label: "The model is vulnerable to reversion",
     description:
-      "New ways of working are not being sustained consistently enough over time.",
-    detect: ({ questionScores }) =>
-      isBelow(questionScores, "q6", 3) || isBelow(questionScores, "q8", 3),
+      "New ways of working are not becoming established strongly enough as normal operating practice.",
+    detect: ({ questionScores }) => isBelow(questionScores, "score_5", 3),
   },
 ];
 
@@ -464,21 +503,41 @@ function buildFallbackPattern(
 
   if (gapPattern === "manager_lower_than_others") {
     return {
-      code: "MANAGER_EXECUTION_GAP",
-      label: "Manager execution gap",
+      code: "MANAGER_EXPERIENCE_GAP",
+      label: "Manager experience gap",
       description:
-        "The model appears stronger in design than in application at manager level.",
+        "Managers are reporting a materially weaker experience than HR and Leadership.",
       severity: "high",
     };
   }
 
   if (gapPattern === "hr_lower_than_leadership") {
     return {
-      code: "HR_VISIBILITY_GAP",
-      label: "HR visibility gap",
+      code: "HR_EXPERIENCE_GAP",
+      label: "HR experience gap",
       description:
-        "HR is experiencing more friction than is being seen from above.",
+        "HR is reporting a materially weaker experience than Leadership, with Manager responses providing an additional comparison point.",
       severity: "high",
+    };
+  }
+
+  if (gapPattern === "leadership_lower_than_others") {
+    return {
+      code: "LEADERSHIP_EXPERIENCE_GAP",
+      label: "Leadership experience gap",
+      description:
+        "Leadership is reporting a materially weaker experience than HR and Managers.",
+      severity: "high",
+    };
+  }
+
+  if (gapPattern === "general_spread") {
+    return {
+      code: "CROSS_GROUP_VARIATION",
+      label: "Cross-group variation",
+      description:
+        "Respondent groups are reporting meaningfully different experiences, without one group consistently accounting for the variation.",
+      severity: "moderate",
     };
   }
 

@@ -97,6 +97,23 @@ export type ClientDiagnosticReport = {
       insufficient: number;
     };
   };
+  evidenceBase: {
+    respondentGroups: {
+      hr: {
+        invited: number;
+        completed: number;
+      };
+      manager: {
+        invited: number;
+        completed: number;
+      };
+      leadership: {
+        invited: number;
+        completed: number;
+      };
+    };
+  };
+  segmentation: ProjectSummaryResponse["segmentation"];
   analytics: {
     overallScore: number | null;
     alignmentScore: number | null;
@@ -121,6 +138,53 @@ export type ClientDiagnosticReport = {
   analyses: {
     dimensions: DimensionAnalysis[];
   };
+  itemEvidence: {
+    dimensions: Array<{
+      dimensionKey: string;
+      items: {
+        score_1: {
+          combined: number | null;
+          groups: {
+            hr: { mean: number | null; n: number };
+            manager: { mean: number | null; n: number };
+            leadership: { mean: number | null; n: number };
+          };
+        };
+        score_2: {
+          combined: number | null;
+          groups: {
+            hr: { mean: number | null; n: number };
+            manager: { mean: number | null; n: number };
+            leadership: { mean: number | null; n: number };
+          };
+        };
+        score_3: {
+          combined: number | null;
+          groups: {
+            hr: { mean: number | null; n: number };
+            manager: { mean: number | null; n: number };
+            leadership: { mean: number | null; n: number };
+          };
+        };
+        score_4: {
+          combined: number | null;
+          groups: {
+            hr: { mean: number | null; n: number };
+            manager: { mean: number | null; n: number };
+            leadership: { mean: number | null; n: number };
+          };
+        };
+        score_5: {
+          combined: number | null;
+          groups: {
+            hr: { mean: number | null; n: number };
+            manager: { mean: number | null; n: number };
+            leadership: { mean: number | null; n: number };
+          };
+        };
+      };
+    }>;
+  };
   narratives: {
     dimensions: DimensionNarrative[];
   };
@@ -140,6 +204,23 @@ export type ClientDiagnosticReport = {
       advisoryRead: string | null;
       illustrativeSignals: string[];
       confidence: "high" | "medium" | "low";
+    }>;
+  };
+  context: {
+    factPack: {
+      status: string | null;
+      submittedAt: string | null;
+      response: Record<string, unknown> | null;
+    };
+    serviceAccess: Array<{
+      participant_id: string;
+      questionnaire_type: "hr" | "manager";
+      routes_used: string[];
+      usual_route: string | null;
+      usual_route_effectiveness: number | null;
+      intended_access_model: string | null;
+      intended_primary_route: string | null;
+      specific_route_detail: string | null;
     }>;
   };
   methodology: {
@@ -367,7 +448,7 @@ function buildExecutiveSummary({
       "There are clear differences in how HR, managers, and leadership experience people operations, suggesting inconsistency in how processes are understood or applied.";
   } else if (emergingGaps > 0) {
     alignmentStatement =
-      "There are early signs of variation between respondent groups, indicating that some processes may not be consistently experienced across the organisation.";
+      "Several dimensions show meaningful differences in how HR, managers, and leadership experience the operating model. The pattern is not organisation-wide disagreement, but it does indicate that important parts of the model are landing differently across respondent groups.";
   } else {
     alignmentStatement =
       "Perceptions across HR, managers, and leadership are broadly aligned, suggesting that processes are generally understood and applied consistently.";
@@ -518,6 +599,8 @@ export async function buildClientDiagnosticReport(
       totalRespondentGroups,
     },
     insightSummary: summaryInsightSummary,
+    evidenceBase: summary.evidenceBase,
+    segmentation: summary.segmentation,
     analytics: {
       overallScore,
       alignmentScore,
@@ -537,10 +620,12 @@ export async function buildClientDiagnosticReport(
     analyses: {
       dimensions: summaryAnalyses,
     },
+    itemEvidence: summary.itemEvidence,
     narratives: {
       dimensions: summaryNarratives,
     },
     qualitative: clientSafeQualitative,
+    context: summary.context,
     methodology: {
       scoredQuestionnaireTypes: SCORED_QUESTIONNAIRE_TYPES,
       contextualQuestionnaireTypesExcluded: EXCLUDED_CONTEXTUAL_TYPES,

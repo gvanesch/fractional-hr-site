@@ -87,6 +87,15 @@ type FactPackFormState = {
       | "multi_country_limited_entity_variation"
       | "multi_country_multiple_entities"
       | "complex_global_multi_regime";
+    workforceComposition: {
+      directEmployees: number | null;
+      employerOfRecordEmployees: number | null;
+      agencyTemporaryWorkers: number | null;
+      independentContractors: number | null;
+      otherContingentWorkers: number | null;
+      otherContingentDescription: string;
+      diagnosticPopulationInScope: number | null;
+    };
     operatingModelShape:
       | "largely_local"
       | "partially_standardised"
@@ -240,6 +249,15 @@ function createChangeInitiative(): ChangeInitiative {
 const INITIAL_STATE: FactPackFormState = {
   operatingContext: {
     workforceStructure: "multi_country_limited_entity_variation",
+    workforceComposition: {
+      directEmployees: null,
+      employerOfRecordEmployees: null,
+      agencyTemporaryWorkers: null,
+      independentContractors: null,
+      otherContingentWorkers: null,
+      otherContingentDescription: "",
+      diagnosticPopulationInScope: null,
+    },
     operatingModelShape: "partially_standardised",
     geographicFootprint: "",
     regulatoryExposure: "",
@@ -448,6 +466,24 @@ export default function ClientFactPackForm({
     }));
   }
 
+  function updateWorkforceCompositionField<
+    TField extends keyof FactPackFormState["operatingContext"]["workforceComposition"],
+  >(
+    field: TField,
+    value: FactPackFormState["operatingContext"]["workforceComposition"][TField],
+  ) {
+    setFormState((current) => ({
+      ...current,
+      operatingContext: {
+        ...current.operatingContext,
+        workforceComposition: {
+          ...current.operatingContext.workforceComposition,
+          [field]: value,
+        },
+      },
+    }));
+  }
+
   function updateSystemRecord(
     id: string,
     field: keyof SystemRecord,
@@ -629,6 +665,27 @@ export default function ClientFactPackForm({
     );
   }
 
+  const workforceComposition =
+    formState.operatingContext.workforceComposition;
+
+  const totalWorkforceRepresented = [
+    workforceComposition.directEmployees,
+    workforceComposition.employerOfRecordEmployees,
+    workforceComposition.agencyTemporaryWorkers,
+    workforceComposition.independentContractors,
+    workforceComposition.otherContingentWorkers,
+  ].reduce<number>(
+    (total, value) => total + (typeof value === "number" ? value : 0),
+    0,
+  );
+
+  const hasWorkforceCount =
+    workforceComposition.directEmployees !== null ||
+    workforceComposition.employerOfRecordEmployees !== null ||
+    workforceComposition.agencyTemporaryWorkers !== null ||
+    workforceComposition.independentContractors !== null ||
+    workforceComposition.otherContingentWorkers !== null;
+
   return (
     <section className="brand-light-section">
       <div className="brand-container py-10 sm:py-12">
@@ -651,6 +708,125 @@ export default function ClientFactPackForm({
                 diagnostic. It captures how HR operations are currently enabled,
                 constrained, governed, and expected to evolve. It is not used in
                 scored statistical analysis.
+              </div>
+            </section>
+
+            <section className="brand-surface-card p-6 sm:p-8">
+              <p className="brand-section-kicker">Workforce composition</p>
+              <h2 className="brand-heading-sm mt-3 text-[var(--brand-light-text)]">
+                Workforce size and diagnostic scope
+              </h2>
+
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+                Please provide approximate current headcount by workforce arrangement.
+                Count individual people rather than FTE. Estimates are acceptable where
+                exact figures are not readily available.
+              </p>
+
+              <div className="mt-8 grid gap-6 md:grid-cols-2">
+                <NumberInputField
+                  label="Direct employees"
+                  helpText="People employed directly by one of your organisation’s legal entities."
+                  value={workforceComposition.directEmployees}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField("directEmployees", value)
+                  }
+                />
+
+                <NumberInputField
+                  label="Employer of Record employees"
+                  helpText="People working for your organisation but legally employed through an Employer of Record."
+                  value={workforceComposition.employerOfRecordEmployees}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "employerOfRecordEmployees",
+                      value,
+                    )
+                  }
+                />
+
+                <NumberInputField
+                  label="Agency or temporary workers"
+                  helpText="Contingent or temporary workers supplied through a staffing or employment agency."
+                  value={workforceComposition.agencyTemporaryWorkers}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "agencyTemporaryWorkers",
+                      value,
+                    )
+                  }
+                />
+
+                <NumberInputField
+                  label="Independent contractors or freelancers"
+                  helpText="Individuals providing services independently rather than as employees."
+                  value={workforceComposition.independentContractors}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "independentContractors",
+                      value,
+                    )
+                  }
+                />
+
+                <NumberInputField
+                  label="Other contingent workers"
+                  helpText="Other workers who are not directly employed and do not fit the categories above."
+                  value={workforceComposition.otherContingentWorkers}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "otherContingentWorkers",
+                      value,
+                    )
+                  }
+                />
+
+                <TextInputField
+                  label="Other contingent workforce description"
+                  helpText="Optional. Describe the workforce arrangement included in ‘Other contingent workers’."
+                  placeholder="Example: embedded consultants or outsourced service personnel"
+                  value={workforceComposition.otherContingentDescription}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "otherContingentDescription",
+                      value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="mt-8 grid gap-6 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+                  <p className="text-sm font-medium text-slate-900">
+                    Total workforce represented
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-slate-500">
+                    Automatically calculated from the workforce categories above.
+                  </p>
+                  <p className="mt-4 text-2xl font-semibold tracking-tight text-[var(--brand-light-text)]">
+                    {hasWorkforceCount
+                      ? totalWorkforceRepresented.toLocaleString()
+                      : "Not provided"}
+                  </p>
+                </div>
+
+                <NumberInputField
+                  label="Diagnostic population in scope"
+                  helpText="How many people are covered by this diagnostic? This may be the whole organisation or a specific business, region, function, or population."
+                  value={workforceComposition.diagnosticPopulationInScope}
+                  onChange={(value) =>
+                    updateWorkforceCompositionField(
+                      "diagnosticPopulationInScope",
+                      value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700">
+                Workforce size and diagnostic scope help us interpret response coverage
+                and determine which levels of subgroup analysis are supportable. They do
+                not change individual diagnostic scores.
               </div>
             </section>
 
@@ -1734,6 +1910,48 @@ function TextInputField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        className={CONTROL_CLASS}
+      />
+    </FieldShell>
+  );
+}
+
+function NumberInputField({
+  label,
+  value,
+  onChange,
+  helpText,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (value: number | null) => void;
+  helpText?: string;
+}) {
+  return (
+    <FieldShell label={label} helpText={helpText}>
+      <input
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        value={value ?? ""}
+        onChange={(event) => {
+          const rawValue = event.target.value;
+
+          if (rawValue === "") {
+            onChange(null);
+            return;
+          }
+
+          const nextValue = Number(rawValue);
+
+          onChange(
+            Number.isFinite(nextValue) && nextValue >= 0
+              ? Math.floor(nextValue)
+              : null,
+          );
+        }}
+        placeholder="Approximate headcount"
         className={CONTROL_CLASS}
       />
     </FieldShell>
