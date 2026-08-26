@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import AdvisorReportClient from "@/app/components/advisor/AdvisorReportClient";
@@ -33,7 +34,32 @@ export default async function AdvisorReportPage({ params }: PageProps) {
 
   try {
     const report = await buildClientDiagnosticReport(projectId);
-    return <AdvisorReportClient report={report} />;
+
+    return (
+      <>
+        <div className="border-b border-slate-200 bg-white">
+          <div className="brand-container flex flex-wrap items-center justify-between gap-3 py-3">
+            <Link
+              href={`/advisor/project/${projectId}`}
+              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
+            >
+              ← Back to project workspace
+            </Link>
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/advisor/explore/${projectId}`}
+                className="inline-flex items-center justify-center rounded-xl bg-[#1E6FD9] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1859ad]"
+              >
+                Open Explorer
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <AdvisorReportClient report={report} />
+      </>
+    );
   } catch (error) {
     if (error instanceof BuildProjectSummaryError && error.status === 404) {
       notFound();
