@@ -32,7 +32,7 @@ export default async function AdvisorReportPage({ params }: PageProps) {
     notFound();
   }
 
-  let report;
+  let report: Awaited<ReturnType<typeof buildClientDiagnosticReport>>;
 
   try {
     report = await buildClientDiagnosticReport(projectId);
