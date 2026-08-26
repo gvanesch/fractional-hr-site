@@ -122,8 +122,51 @@ export default async function AdvisorDiagnosticExplorerPage({
     throw error;
   }
 
+  const reportingMinN = summary.reportingPolicy.segmentReportingMinN;
+  const hasNarrowingFilters =
+    explorerCohort.filters.length > 0 && !explorerCohort.isOverallEquivalent;
+  const hasRestrictedPerspective = Object.values(explorerCohort.respondentGroups).some(
+    (count) => count > 0 && count < reportingMinN,
+  );
+  const qualitativeRestricted =
+    explorerCohort.qualitative.disclosureControl.status !== "visible";
+  const showRestrictedEvidenceNotice =
+    hasNarrowingFilters &&
+    (explorerCohort.respondentCount < reportingMinN ||
+      hasRestrictedPerspective ||
+      qualitativeRestricted);
+  const isEffectivelyIndividual =
+    hasNarrowingFilters && explorerCohort.respondentCount === 1;
+
   return (
     <div className={styles.explorerPage}>
+      {showRestrictedEvidenceNotice ? (
+        <div className="border-b border-rose-200 bg-rose-50">
+          <div className="brand-container py-4">
+            <div className="rounded-2xl border border-rose-200 bg-white px-5 py-4 text-sm leading-6 text-rose-950 shadow-sm">
+              <p className="font-semibold">
+                {isEffectivelyIndividual
+                  ? "Highly restricted filtered evidence"
+                  : "Restricted filtered evidence"}
+              </p>
+              <p className="mt-1">
+                {isEffectivelyIndividual
+                  ? `This filter resolves to one respondent. Quantitative scores remain advisor-visible only as a qualified individual-level signal. Verbatim written responses are withheld server-side.`
+                  : `One or more parts of this filtered cohort fall below the current n=${reportingMinN} threshold. Low-N quantitative signals remain advisor-visible for qualified interpretation, while verbatim comments from restricted cohorts or respondent perspectives are withheld server-side.`}
+              </p>
+              {explorerCohort.qualitative.withheldCommentCount > 0 ? (
+                <p className="mt-1 font-medium">
+                  {explorerCohort.qualitative.withheldCommentCount} written
+                  {explorerCohort.qualitative.withheldCommentCount === 1
+                    ? " response is"
+                    : " responses are"} withheld in this view.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <AdvisorDiagnosticExplorerClient
         summary={summary}
         explorerCohort={explorerCohort}
