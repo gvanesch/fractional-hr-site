@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import AdvisorProjectNav from "@/app/components/advisor/AdvisorProjectNav";
 import AdvisorReportClient from "@/app/components/advisor/AdvisorReportClient";
 import { buildClientDiagnosticReport } from "@/lib/client-diagnostic/build-client-diagnostic-report";
 import { BuildProjectSummaryError } from "@/lib/client-diagnostic/build-project-summary";
@@ -37,26 +37,11 @@ export default async function AdvisorReportPage({ params }: PageProps) {
 
     return (
       <>
-        <div className="border-b border-slate-200 bg-white">
-          <div className="brand-container flex flex-wrap items-center justify-between gap-3 py-3">
-            <Link
-              href={`/advisor/project/${projectId}`}
-              className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
-            >
-              ← Back to project workspace
-            </Link>
-
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/advisor/explore/${projectId}`}
-                className="inline-flex items-center justify-center rounded-xl bg-[#1E6FD9] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1859ad]"
-              >
-                Open Explorer
-              </Link>
-            </div>
-          </div>
-        </div>
-
+        <AdvisorProjectNav
+          projectId={projectId}
+          projectLabel={report.project.companyName}
+          crmSearchTerm={report.project.companyName}
+        />
         <AdvisorReportClient report={report} />
       </>
     );
