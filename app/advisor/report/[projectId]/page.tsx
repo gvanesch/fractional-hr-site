@@ -32,19 +32,10 @@ export default async function AdvisorReportPage({ params }: PageProps) {
     notFound();
   }
 
-  try {
-    const report = await buildClientDiagnosticReport(projectId);
+  let report;
 
-    return (
-      <>
-        <AdvisorProjectNav
-          projectId={projectId}
-          projectLabel={report.project.companyName}
-          crmSearchTerm={report.project.companyName}
-        />
-        <AdvisorReportClient report={report} />
-      </>
-    );
+  try {
+    report = await buildClientDiagnosticReport(projectId);
   } catch (error) {
     if (error instanceof BuildProjectSummaryError && error.status === 404) {
       notFound();
@@ -59,4 +50,15 @@ export default async function AdvisorReportPage({ params }: PageProps) {
 
     throw error;
   }
+
+  return (
+    <>
+      <AdvisorProjectNav
+        projectId={projectId}
+        projectLabel={report.project.companyName}
+        crmSearchTerm={report.project.companyName}
+      />
+      <AdvisorReportClient report={report} />
+    </>
+  );
 }
