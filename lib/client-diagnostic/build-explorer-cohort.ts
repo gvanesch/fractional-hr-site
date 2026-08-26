@@ -45,8 +45,11 @@ export type ExplorerCohortQualitativeComment = {
 
 export type ExplorerCohortQualitativeDimension = {
   dimensionKey: string;
+  sourceCommentCount: number;
   commentCount: number;
+  withheldCommentCount: number;
   respondentGroupsWithComments: ExplorerPerspective[];
+  withheldRespondentGroups: ExplorerPerspective[];
   comments: ExplorerCohortQualitativeComment[];
 };
 
@@ -61,8 +64,19 @@ export type ExplorerCohort = {
   confidentialityStatus: Segment["confidentialityStatus"];
   dimensions: SegmentDimension[];
   qualitative: {
+    sourceTotalCommentCount: number;
     totalCommentCount: number;
+    withheldCommentCount: number;
     respondentGroupsWithComments: ExplorerPerspective[];
+    withheldRespondentGroups: ExplorerPerspective[];
+    disclosureControl: {
+      status: "visible" | "partially_withheld" | "withheld";
+      threshold: number;
+      reason:
+        | "meets_threshold"
+        | "cohort_below_threshold"
+        | "perspective_below_threshold";
+    };
     dimensions: ExplorerCohortQualitativeDimension[];
   };
 };
@@ -311,9 +325,15 @@ function buildCohortDimensions({
 function buildCohortQualitative({
   participantIds,
   comments,
+  respondentCount,
+  respondentGroups,
+  reportingMinN,
 }: {
   participantIds: Set<string>;
   comments: CommentRow[];
+  respondentCount: number;
+  respondentGroups: Record<ExplorerPerspective, number>;
+  reportingMinN: number;
 }): ExplorerCohort["qualitative"] {
   const matchingComments = comments.filter(
     (row) =>
@@ -323,23 +343,73 @@ function buildCohortQualitative({
       row.comment_text.trim().length > 0,
   );
 
-  const respondentGroupsWithComments = PERSPECTIVES.filter((perspective) =>
-    matchingComments.some((row) => row.questionnaire_type === perspective),
+  const cohortMeetsThreshold = respondentCount >= reportingMinN;
+  const visibleComments = cohortMeetsThreshold
+    ? matchingComments.filter(
+        (row) =>
+          respondentGroups[row.questionnaire_type as ExplorerPerspective] >=
+          reportingMinN,
+      )
+    : [];
+  const visibleCommentSet = new Set(visibleComments);
+  const withheldComments = matchingComments.filter(
+    (row) => !visibleCommentSet.has(row),
   );
 
+  const respondentGroupsWithComments = PERSPECTIVES.filter((perspective) =>
+    visibleComments.some((row) => row.questionnaire_type === perspective),
+  );
+  const withheldRespondentGroups = PERSPECTIVES.filter((perspective) =>
+    withheldComments.some((row) => row.questionnaire_type === perspective),
+  );
+
+  const disclosureStatus =
+    withheldComments.length === 0
+      ? "visible"
+      : visibleComments.length === 0
+        ? "withheld"
+        : "partially_withheld";
+  const disclosureReason =
+    withheldComments.length === 0
+      ? "meets_threshold"
+      : !cohortMeetsThreshold
+        ? "cohort_below_threshold"
+        : "perspective_below_threshold";
+
   return {
-    totalCommentCount: matchingComments.length,
+    sourceTotalCommentCount: matchingComments.length,
+    totalCommentCount: visibleComments.length,
+    withheldCommentCount: withheldComments.length,
     respondentGroupsWithComments,
+    withheldRespondentGroups,
+    disclosureControl: {
+      status: disclosureStatus,
+      threshold: reportingMinN,
+      reason: disclosureReason,
+    },
     dimensions: dimensionDefinitions.map((dimension) => {
-      const dimensionComments = matchingComments.filter(
+      const sourceDimensionComments = matchingComments.filter(
+        (row) => row.dimension_key === dimension.key,
+      );
+      const dimensionComments = visibleComments.filter(
+        (row) => row.dimension_key === dimension.key,
+      );
+      const withheldDimensionComments = withheldComments.filter(
         (row) => row.dimension_key === dimension.key,
       );
 
       return {
         dimensionKey: dimension.key,
+        sourceCommentCount: sourceDimensionComments.length,
         commentCount: dimensionComments.length,
+        withheldCommentCount: withheldDimensionComments.length,
         respondentGroupsWithComments: PERSPECTIVES.filter((perspective) =>
           dimensionComments.some(
+            (row) => row.questionnaire_type === perspective,
+          ),
+        ),
+        withheldRespondentGroups: PERSPECTIVES.filter((perspective) =>
+          withheldDimensionComments.some(
             (row) => row.questionnaire_type === perspective,
           ),
         ),
@@ -487,6 +557,9 @@ export async function buildExplorerCohort({
     qualitative: buildCohortQualitative({
       participantIds,
       comments,
+      respondentCount,
+      respondentGroups,
+      reportingMinN,
     }),
   };
 }
