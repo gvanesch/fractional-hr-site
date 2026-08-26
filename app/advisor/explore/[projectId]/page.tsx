@@ -6,6 +6,7 @@ import {
   BuildProjectSummaryError,
 } from "@/lib/client-diagnostic/build-project-summary";
 import { buildExplorerCohort } from "@/lib/client-diagnostic/build-explorer-cohort";
+import styles from "./explorer.module.css";
 
 export const metadata = {
   title: "Diagnostic Explorer | Van Esch Advisory",
@@ -122,9 +123,11 @@ export default async function AdvisorDiagnosticExplorerPage({
   }
 
   return (
-    <AdvisorDiagnosticExplorerClient
-      summary={summary}
-      explorerCohort={explorerCohort}
-    />
+    <div className={styles.explorerPage}>
+      <AdvisorDiagnosticExplorerClient
+        summary={summary}
+        explorerCohort={explorerCohort}
+      />
+    </div>
   );
 }
