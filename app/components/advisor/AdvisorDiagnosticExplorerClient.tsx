@@ -223,8 +223,8 @@ export default function AdvisorDiagnosticExplorerClient({
       </section>
 
       <div className="brand-container py-8">
-        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="self-start rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <aside className="self-start rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:w-[300px] lg:flex-none">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Analysis filters
@@ -367,7 +367,7 @@ export default function AdvisorDiagnosticExplorerClient({
             </div>
           </aside>
 
-          <section className="min-w-0 space-y-6">
+          <section className="min-w-0 flex-1 space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
