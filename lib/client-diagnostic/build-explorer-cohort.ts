@@ -20,9 +20,17 @@ type DimensionScoreRow = {
   average_score: number;
 };
 
+type CommentRow = {
+  participant_id: string;
+  questionnaire_type: string;
+  dimension_key: string;
+  question_key: string;
+  comment_text: string | null;
+  updated_at: string;
+};
+
 type Segment = ProjectSummaryResponse["segmentation"]["segments"][number];
 type SegmentDimension = Segment["dimensions"][number];
-
 type AvailableKey = ProjectSummaryResponse["segmentation"]["availableKeys"][number];
 
 export type ExplorerCohortFilter = {
@@ -30,7 +38,20 @@ export type ExplorerCohortFilter = {
   values: string[];
 };
 
+export type ExplorerCohortQualitativeComment = {
+  questionnaireType: ExplorerPerspective;
+  commentText: string;
+};
+
+export type ExplorerCohortQualitativeDimension = {
+  dimensionKey: string;
+  commentCount: number;
+  respondentGroupsWithComments: ExplorerPerspective[];
+  comments: ExplorerCohortQualitativeComment[];
+};
+
 export type ExplorerCohort = {
+  selections: ExplorerCohortFilter[];
   filters: ExplorerCohortFilter[];
   isOverallEquivalent: boolean;
   respondentCount: number;
@@ -39,6 +60,11 @@ export type ExplorerCohort = {
   compositionStatus: Segment["compositionStatus"];
   confidentialityStatus: Segment["confidentialityStatus"];
   dimensions: SegmentDimension[];
+  qualitative: {
+    totalCommentCount: number;
+    respondentGroupsWithComments: ExplorerPerspective[];
+    dimensions: ExplorerCohortQualitativeDimension[];
+  };
 };
 
 const PERSPECTIVES: ExplorerPerspective[] = ["hr", "manager", "leadership"];
@@ -49,7 +75,7 @@ function isScoredQuestionnaireType(
   return PERSPECTIVES.includes(questionnaireType as ExplorerPerspective);
 }
 
-function normalizeFilters({
+function normalizeSelections({
   requestedFilters,
   availableKeys,
 }: {
@@ -62,23 +88,44 @@ function normalizeFilters({
       (value) => availableKey.values.includes(value),
     );
 
-    if (
-      uniqueValidValues.length === 0 ||
-      uniqueValidValues.length === availableKey.values.length
-    ) {
+    if (uniqueValidValues.length === 0) {
       return [];
     }
-
-    const orderedValues = availableKey.values.filter((value) =>
-      uniqueValidValues.includes(value),
-    );
 
     return [
       {
         key: availableKey.key,
-        values: orderedValues,
+        values: availableKey.values.filter((value) =>
+          uniqueValidValues.includes(value),
+        ),
       },
     ];
+  });
+}
+
+function getEffectiveFilters({
+  selections,
+  availableKeys,
+  scoredParticipants,
+}: {
+  selections: ExplorerCohortFilter[];
+  availableKeys: AvailableKey[];
+  scoredParticipants: ParticipantRow[];
+}): ExplorerCohortFilter[] {
+  return selections.filter((selection) => {
+    const availableKey = availableKeys.find((item) => item.key === selection.key);
+
+    if (!availableKey || selection.values.length < availableKey.values.length) {
+      return true;
+    }
+
+    return scoredParticipants.some((participant) => {
+      const participantValue = participant.segmentation_values?.[selection.key];
+      return (
+        typeof participantValue !== "string" ||
+        !availableKey.values.includes(participantValue)
+      );
+    });
   });
 }
 
@@ -88,7 +135,10 @@ function participantMatchesFilters(
 ): boolean {
   return filters.every((filter) => {
     const participantValue = participant.segmentation_values?.[filter.key];
-    return typeof participantValue === "string" && filter.values.includes(participantValue);
+    return (
+      typeof participantValue === "string" &&
+      filter.values.includes(participantValue)
+    );
   });
 }
 
@@ -258,6 +308,50 @@ function buildCohortDimensions({
   });
 }
 
+function buildCohortQualitative({
+  participantIds,
+  comments,
+}: {
+  participantIds: Set<string>;
+  comments: CommentRow[];
+}): ExplorerCohort["qualitative"] {
+  const matchingComments = comments.filter(
+    (row) =>
+      participantIds.has(row.participant_id) &&
+      isScoredQuestionnaireType(row.questionnaire_type) &&
+      typeof row.comment_text === "string" &&
+      row.comment_text.trim().length > 0,
+  );
+
+  const respondentGroupsWithComments = PERSPECTIVES.filter((perspective) =>
+    matchingComments.some((row) => row.questionnaire_type === perspective),
+  );
+
+  return {
+    totalCommentCount: matchingComments.length,
+    respondentGroupsWithComments,
+    dimensions: dimensionDefinitions.map((dimension) => {
+      const dimensionComments = matchingComments.filter(
+        (row) => row.dimension_key === dimension.key,
+      );
+
+      return {
+        dimensionKey: dimension.key,
+        commentCount: dimensionComments.length,
+        respondentGroupsWithComments: PERSPECTIVES.filter((perspective) =>
+          dimensionComments.some(
+            (row) => row.questionnaire_type === perspective,
+          ),
+        ),
+        comments: dimensionComments.map((row) => ({
+          questionnaireType: row.questionnaire_type as ExplorerPerspective,
+          commentText: row.comment_text!.trim(),
+        })),
+      };
+    }),
+  };
+}
+
 export async function buildExplorerCohort({
   projectId,
   requestedFilters,
@@ -296,7 +390,7 @@ export async function buildExplorerCohort({
     }
   }
 
-  const [participants, dimensionScores] = await Promise.all([
+  const [participants, dimensionScores, comments] = await Promise.all([
     loadPagedRows<ParticipantRow>(async (from, to) => {
       const { data, error } = await supabase
         .from("client_participants")
@@ -324,6 +418,21 @@ export async function buildExplorerCohort({
 
       return { data, error };
     }),
+    loadPagedRows<CommentRow>(async (from, to) => {
+      const { data, error } = await supabase
+        .from("client_responses")
+        .select(
+          "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
+        )
+        .eq("project_id", projectId)
+        .not("comment_text", "is", null)
+        .order("participant_id", { ascending: true })
+        .order("question_key", { ascending: true })
+        .range(from, to)
+        .returns<CommentRow[]>();
+
+      return { data, error };
+    }),
   ]);
 
   const scoredParticipants = participants.filter(
@@ -331,7 +440,12 @@ export async function buildExplorerCohort({
       participant.participant_status === "completed" &&
       isScoredQuestionnaireType(participant.questionnaire_type),
   );
-  const filters = normalizeFilters({ requestedFilters, availableKeys });
+  const selections = normalizeSelections({ requestedFilters, availableKeys });
+  const filters = getEffectiveFilters({
+    selections,
+    availableKeys,
+    scoredParticipants,
+  });
   const matchingParticipants = scoredParticipants.filter((participant) =>
     participantMatchesFilters(participant, filters),
   );
@@ -353,8 +467,12 @@ export async function buildExplorerCohort({
   const respondentCount = matchingParticipants.length;
 
   return {
+    selections,
     filters,
-    isOverallEquivalent: sameParticipantSet(scoredParticipants, matchingParticipants),
+    isOverallEquivalent: sameParticipantSet(
+      scoredParticipants,
+      matchingParticipants,
+    ),
     respondentCount,
     respondentGroups,
     analyticalStrength: getAnalyticalStrength(respondentCount),
@@ -365,6 +483,10 @@ export async function buildExplorerCohort({
       participantIds,
       dimensionScores,
       reportingMinN,
+    }),
+    qualitative: buildCohortQualitative({
+      participantIds,
+      comments,
     }),
   };
 }
