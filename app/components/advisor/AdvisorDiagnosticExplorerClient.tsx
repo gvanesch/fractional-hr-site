@@ -5,21 +5,20 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { ProjectSummaryResponse } from "@/lib/client-diagnostic/build-project-summary";
 import type {
+  ExplorerCohort,
+  ExplorerCohortFilter,
   ExplorerPerspective,
-  ExplorerSegmentSelection,
-} from "@/lib/client-diagnostic/explorer-segment-selection";
+} from "@/lib/client-diagnostic/build-explorer-cohort";
 
 type AdvisorDiagnosticExplorerClientProps = {
   summary: ProjectSummaryResponse;
-  initialViewBy: string;
-  initialSegmentValues: string[];
-  segmentSelection: ExplorerSegmentSelection | null;
+  explorerCohort: ExplorerCohort;
 };
 
 type DimensionAnalysis = ProjectSummaryResponse["analyses"]["dimensions"][number];
 type DimensionQualitative =
   ProjectSummaryResponse["qualitative"]["dimensions"][number];
-type SegmentDimension = ExplorerSegmentSelection["dimensions"][number];
+type CohortDimension = ExplorerCohort["dimensions"][number];
 type Perspective = ExplorerPerspective;
 
 const PERSPECTIVE_LABELS: Record<Perspective, string> = {
@@ -30,14 +29,10 @@ const PERSPECTIVE_LABELS: Record<Perspective, string> = {
 
 export default function AdvisorDiagnosticExplorerClient({
   summary,
-  initialViewBy,
-  initialSegmentValues,
-  segmentSelection,
+  explorerCohort,
 }: AdvisorDiagnosticExplorerClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [viewBy, setViewBy] = useState(initialViewBy);
-  const [segmentValues, setSegmentValues] = useState(initialSegmentValues);
   const [dimensionKey, setDimensionKey] = useState("all");
   const [perspectives, setPerspectives] = useState<Record<Perspective, boolean>>({
     hr: true,
@@ -45,32 +40,27 @@ export default function AdvisorDiagnosticExplorerClient({
     leadership: true,
   });
 
-  const selectedKey = summary.segmentation.availableKeys.find(
-    (item) => item.key === viewBy,
+  const activeFilters = explorerCohort.filters;
+  const hasNarrowingFilters =
+    activeFilters.length > 0 && !explorerCohort.isOverallEquivalent;
+  const activeFilterMap = new Map(
+    activeFilters.map((filter) => [filter.key, filter.values]),
   );
-  const selectedSegment = segmentSelection;
 
   const selectedPerspectives = (Object.keys(perspectives) as Perspective[]).filter(
     (perspective) => perspectives[perspective],
   );
-
   const selectedPerspectiveLabel = selectedPerspectives
     .map((item) => PERSPECTIVE_LABELS[item])
     .join(" + ");
 
-  const presentPerspectives = selectedSegment
-    ? (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
-        (perspective) => selectedSegment.respondentGroups[perspective] > 0,
-      )
-    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
-        (perspective) =>
-          summary.evidenceBase.respondentGroups[perspective].completed > 0,
-      );
-
+  const presentPerspectives = (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).filter(
+    (perspective) => explorerCohort.respondentGroups[perspective] > 0,
+  );
   const perspectiveContextLabel =
     selectedPerspectives.length < 3
       ? `${selectedPerspectiveLabel} shown`
-      : selectedSegment
+      : hasNarrowingFilters
         ? `${presentPerspectives
             .map((item) => PERSPECTIVE_LABELS[item])
             .join(" + ")} present`
@@ -83,22 +73,17 @@ export default function AdvisorDiagnosticExplorerClient({
           (dimension) => dimension.dimensionKey === dimensionKey,
         ) ?? null;
 
-  const scoredRespondentCount = selectedSegment
-    ? selectedSegment.respondentCount
-    : (Object.keys(PERSPECTIVE_LABELS) as Perspective[]).reduce(
-        (total, perspective) =>
-          total + summary.evidenceBase.respondentGroups[perspective].completed,
-        0,
-      );
-
-  const scoredPerspectiveCount = presentPerspectives.length;
+  const segmentationContextLabel = hasNarrowingFilters
+    ? activeFilters
+        .map(
+          (filter) =>
+            `${formatLabel(filter.key)}: ${filter.values.map(formatLabel).join(" + ")}`,
+        )
+        .join(" · ")
+    : "Overall diagnostic";
 
   const contextLabel = [
-    selectedSegment
-      ? `${formatLabel(selectedSegment.key)}: ${selectedSegment.values
-          .map(formatLabel)
-          .join(" + ")}`
-      : "Overall diagnostic",
+    segmentationContextLabel,
     perspectiveContextLabel,
     selectedDimension?.dimensionLabel ?? "All dimensions",
   ].join(" · ");
@@ -109,26 +94,30 @@ export default function AdvisorDiagnosticExplorerClient({
     (dimension) =>
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
-
-  const visibleSegmentDimensions = (selectedSegment?.dimensions ?? []).filter(
+  const visibleCohortDimensions = explorerCohort.dimensions.filter(
     (dimension) =>
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
-
   const visibleQualitativeDimensions = summary.qualitative.dimensions.filter(
     (dimension) =>
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
 
-  function navigateSegmentSelection(nextViewBy: string, nextValues: string[]) {
-    setViewBy(nextViewBy);
-    setSegmentValues(nextValues);
+  function selectedValuesFor(key: string, allValues: string[]): string[] {
+    return activeFilterMap.get(key) ?? allValues;
+  }
 
+  function navigateFilters(nextFilters: ExplorerCohortFilter[]) {
     const params = new URLSearchParams();
+    const orderedFilters = summary.segmentation.availableKeys.flatMap((availableKey) => {
+      const filter = nextFilters.find((item) => item.key === availableKey.key);
+      return filter ? [filter] : [];
+    });
 
-    if (nextViewBy !== "overall") {
-      params.set("viewBy", nextViewBy);
-      nextValues.forEach((value) => params.append("segment", value));
+    for (const filter of orderedFilters) {
+      for (const value of filter.values) {
+        params.append(`segment.${filter.key}`, value);
+      }
     }
 
     const query = params.toString();
@@ -141,30 +130,42 @@ export default function AdvisorDiagnosticExplorerClient({
     });
   }
 
-  function handleViewByChange(nextViewBy: string) {
-    if (nextViewBy === "overall") {
-      navigateSegmentSelection("overall", []);
+  function toggleSegmentValue(key: string, value: string) {
+    const availableKey = summary.segmentation.availableKeys.find(
+      (item) => item.key === key,
+    );
+
+    if (!availableKey) {
       return;
     }
 
-    const nextKey = summary.segmentation.availableKeys.find(
-      (item) => item.key === nextViewBy,
-    );
-    navigateSegmentSelection(nextViewBy, nextKey?.values.slice(0, 1) ?? []);
+    const selectedValues = selectedValuesFor(key, availableKey.values);
+    const isSelected = selectedValues.includes(value);
+
+    if (isSelected && selectedValues.length === 1) {
+      return;
+    }
+
+    const nextSelectedValues = isSelected
+      ? selectedValues.filter((item) => item !== value)
+      : availableKey.values.filter(
+          (item) => selectedValues.includes(item) || item === value,
+        );
+
+    const nextFilters = activeFilters.filter((filter) => filter.key !== key);
+
+    if (nextSelectedValues.length < availableKey.values.length) {
+      nextFilters.push({
+        key,
+        values: nextSelectedValues,
+      });
+    }
+
+    navigateFilters(nextFilters);
   }
 
-  function toggleSegmentValue(value: string) {
-    const nextValues = segmentValues.includes(value)
-      ? segmentValues.length === 1
-        ? segmentValues
-        : segmentValues.filter((item) => item !== value)
-      : [...segmentValues, value];
-
-    navigateSegmentSelection(viewBy, nextValues);
-  }
-
-  function selectAllSegmentValues() {
-    navigateSegmentSelection(viewBy, selectedKey?.values ?? []);
+  function selectAllSegmentValues(key: string) {
+    navigateFilters(activeFilters.filter((filter) => filter.key !== key));
   }
 
   function togglePerspective(perspective: Perspective) {
@@ -183,7 +184,7 @@ export default function AdvisorDiagnosticExplorerClient({
   function resetFilters() {
     setDimensionKey("all");
     setPerspectives({ hr: true, manager: true, leadership: true });
-    navigateSegmentSelection("overall", []);
+    navigateFilters([]);
   }
 
   return (
@@ -225,71 +226,83 @@ export default function AdvisorDiagnosticExplorerClient({
       </section>
 
       <div className="brand-container py-8">
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="self-start rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Analysis filters
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Filter scored evidence by project-defined segment, respondent
-                perspective visibility, and diagnostic dimension.
+                Select one or more values within each segmentation dimension.
+                Values are combined with OR within a dimension and AND across
+                dimensions.
               </p>
             </div>
 
-            <div className="mt-6">
-              <p className="text-sm font-semibold text-slate-900">View by</p>
-              <div className="mt-3 space-y-2">
-                <RadioFilter
-                  label="Overall"
-                  checked={viewBy === "overall"}
-                  onChange={() => handleViewByChange("overall")}
-                />
-                {summary.segmentation.availableKeys.map((dimension) => (
-                  <RadioFilter
-                    key={dimension.key}
-                    label={formatLabel(dimension.key)}
-                    checked={viewBy === dimension.key}
-                    onChange={() => handleViewByChange(dimension.key)}
-                  />
-                ))}
-              </div>
-            </div>
+            <div className="mt-6 space-y-3">
+              {summary.segmentation.availableKeys.map((segmentationDimension) => {
+                const selectedValues = selectedValuesFor(
+                  segmentationDimension.key,
+                  segmentationDimension.values,
+                );
+                const isFiltered = activeFilterMap.has(segmentationDimension.key);
 
-            {viewBy !== "overall" && selectedKey ? (
-              <div className="mt-6">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">Segments</p>
-                  {segmentValues.length < selectedKey.values.length ? (
-                    <button
-                      type="button"
-                      onClick={selectAllSegmentValues}
-                      disabled={isPending}
-                      className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
-                    >
-                      Select all
-                    </button>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Select one or more values within this segmentation dimension.
-                </p>
-                <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
-                  {selectedKey.values.map((value) => (
-                    <CheckboxFilter
-                      key={value}
-                      label={formatLabel(value)}
-                      checked={segmentValues.includes(value)}
-                      disabled={
-                        isPending ||
-                        (segmentValues.includes(value) && segmentValues.length === 1)
-                      }
-                      onChange={() => toggleSegmentValue(value)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+                return (
+                  <details
+                    key={segmentationDimension.key}
+                    defaultOpen={isFiltered}
+                    className="rounded-xl border border-slate-200 bg-slate-50"
+                  >
+                    <summary className="cursor-pointer list-none px-3 py-3 text-sm font-semibold text-slate-900">
+                      <span className="flex items-center justify-between gap-3">
+                        <span>{formatLabel(segmentationDimension.key)}</span>
+                        <span className="text-xs font-medium text-slate-500">
+                          {isFiltered
+                            ? `${selectedValues.length}/${segmentationDimension.values.length}`
+                            : "All"}
+                        </span>
+                      </span>
+                    </summary>
+
+                    <div className="border-t border-slate-200 px-3 pb-3 pt-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-xs leading-5 text-slate-500">
+                          Select one or more values.
+                        </p>
+                        {isFiltered ? (
+                          <button
+                            type="button"
+                            onClick={() => selectAllSegmentValues(segmentationDimension.key)}
+                            disabled={isPending}
+                            className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
+                          >
+                            Select all
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                        {segmentationDimension.values.map((value) => (
+                          <CheckboxFilter
+                            key={value}
+                            label={formatLabel(value)}
+                            checked={selectedValues.includes(value)}
+                            disabled={
+                              isPending ||
+                              (selectedValues.includes(value) &&
+                                selectedValues.length === 1)
+                            }
+                            onChange={() =>
+                              toggleSegmentValue(segmentationDimension.key, value)
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
 
             <div className="mt-7 border-t border-slate-200 pt-6">
               <p className="text-sm font-semibold text-slate-900">
@@ -340,7 +353,8 @@ export default function AdvisorDiagnosticExplorerClient({
             <button
               type="button"
               onClick={resetFilters}
-              className="mt-6 text-sm font-medium text-[#1E6FD9] hover:text-[#1859ad]"
+              disabled={isPending}
+              className="mt-6 text-sm font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
             >
               Reset filters
             </button>
@@ -375,9 +389,11 @@ export default function AdvisorDiagnosticExplorerClient({
 
                 <div className="flex flex-wrap gap-2 text-sm">
                   {isPending ? <StatusPill>Updating analysis...</StatusPill> : null}
-                  <StatusPill>{scoredRespondentCount} scored respondents</StatusPill>
                   <StatusPill>
-                    {scoredPerspectiveCount}/3 scored perspectives present
+                    {explorerCohort.respondentCount} scored respondents
+                  </StatusPill>
+                  <StatusPill>
+                    {presentPerspectives.length}/3 scored perspectives present
                   </StatusPill>
                   <StatusPill>
                     {factPackAvailable
@@ -393,14 +409,14 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Dimension analytics"
-              description="Canonical scored evidence. Multiple selected values within one segmentation dimension are combined by the deterministic server analysis using respondent weighting; respondent perspective controls which group scores are visible."
+              description="Canonical scored evidence. Segmentation filters use OR within each dimension and AND across dimensions; filtered cohorts are calculated from participant-level evidence on the server. Respondent perspective controls which group scores are visible."
             >
-              {selectedSegment ? (
+              {hasNarrowingFilters ? (
                 <>
-                  <SegmentContextCard segment={selectedSegment} />
+                  <CohortContextCard cohort={explorerCohort} />
                   <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                    {visibleSegmentDimensions.map((dimension) => (
-                      <SegmentDimensionCard
+                    {visibleCohortDimensions.map((dimension) => (
+                      <CohortDimensionCard
                         key={dimension.dimensionKey}
                         dimension={dimension}
                         summary={summary}
@@ -409,7 +425,7 @@ export default function AdvisorDiagnosticExplorerClient({
                     ))}
                   </div>
                 </>
-              ) : viewBy === "overall" ? (
+              ) : (
                 <div className="grid gap-4 xl:grid-cols-2">
                   {visibleOverallDimensions.map((dimension) => (
                     <DimensionAnalyticsCard
@@ -419,8 +435,6 @@ export default function AdvisorDiagnosticExplorerClient({
                     />
                   ))}
                 </div>
-              ) : (
-                <EmptyState message="Updating or no scored evidence is available for the selected segments." />
               )}
             </ExplorerSection>
 
@@ -428,14 +442,12 @@ export default function AdvisorDiagnosticExplorerClient({
               title="Qualitative evidence"
               description="Written-response evidence provides context for the scored diagnostic. It should enrich or challenge interpretation, not recalculate the scores."
             >
-              {selectedSegment ? (
+              {hasNarrowingFilters ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
                   The canonical summary does not currently expose qualitative
-                  evidence by segment. Whole-project comments are therefore not
-                  presented as though they were specific to the selected{" "}
-                  {formatLabel(selectedSegment.key)} values: {selectedSegment.values
-                    .map(formatLabel)
-                    .join(", ")}.
+                  evidence for filtered cohorts. Whole-project comments are
+                  therefore not presented as though they were specific to the
+                  current segmentation filters: {formatFilters(activeFilters)}.
                 </div>
               ) : (
                 <>
@@ -461,8 +473,8 @@ export default function AdvisorDiagnosticExplorerClient({
             </ExplorerSection>
 
             <ExplorerSection
-              title="Segment comparison"
-              description="Multiple values can be combined within a single project-defined segmentation dimension. Direct side-by-side comparison and cross-dimension intersections remain separate future analytical views."
+              title="Cohort comparison"
+              description="The Explorer now supports multidimensional cohort filtering. Direct side-by-side cohort comparison remains a separate future analytical view."
             >
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
                 <p className="text-sm font-medium text-slate-900">
@@ -488,39 +500,35 @@ export default function AdvisorDiagnosticExplorerClient({
   );
 }
 
-function SegmentContextCard({
-  segment,
-}: {
-  segment: ExplorerSegmentSelection;
-}) {
-  const meetsCurrentThreshold = segment.confidentialityStatus === "reportable";
+function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
+  const meetsCurrentThreshold = cohort.confidentialityStatus === "reportable";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-center gap-2">
+        <Badge>{cohort.respondentCount} respondents</Badge>
         <Badge>
-          {segment.respondentCount} respondents across {segment.values.length}{" "}
-          {segment.values.length === 1 ? "segment" : "segments"}
+          {cohort.filters.length} active segmentation {cohort.filters.length === 1 ? "filter" : "filters"}
         </Badge>
-        <Badge>{formatLabel(segment.analyticalStrength)} analytical strength</Badge>
-        <Badge>{formatLabel(segment.compositionStatus)} composition</Badge>
+        <Badge>{formatLabel(cohort.analyticalStrength)} analytical strength</Badge>
+        {cohort.respondentCount > 0 ? (
+          <Badge>{formatLabel(cohort.compositionStatus)} composition</Badge>
+        ) : null}
         <Badge>
           {meetsCurrentThreshold
             ? "Meets current client threshold"
             : "Below current client threshold"}
         </Badge>
+        <InfoTooltip label="Filtered cohort logic">
+          Values selected within one segmentation dimension are combined with OR.
+          Active segmentation dimensions are then combined with AND. The cohort is
+          calculated from participant-level scored evidence on the server.
+        </InfoTooltip>
         <InfoTooltip label="Current client reporting status">
           {meetsCurrentThreshold
-            ? "This selection meets the project's current minimum reporting threshold. Final client shareability remains subject to the separate client-reporting projection, including complementary suppression and anti-differencing controls."
-            : "This selection is below the project's current minimum reporting threshold. Exact results remain available here for advisor analysis but should not be treated as client-shareable."}
+            ? "This cohort meets the project's current minimum reporting threshold. Final client shareability remains subject to the separate client-reporting projection, including complementary suppression and anti-differencing controls."
+            : "This cohort is below the project's current minimum reporting threshold. Exact results remain available here for advisor analysis but should not be treated as client-shareable."}
         </InfoTooltip>
-        {segment.values.length > 1 ? (
-          <InfoTooltip label="Combined segment selection">
-            Selected values within the same segmentation dimension are mutually
-            exclusive at participant level. The deterministic analysis combines
-            counts and means using respondent weighting.
-          </InfoTooltip>
-        ) : null}
       </div>
     </div>
   );
@@ -624,12 +632,12 @@ function DimensionAnalyticsCard({
   );
 }
 
-function SegmentDimensionCard({
+function CohortDimensionCard({
   dimension,
   summary,
   perspectives,
 }: {
-  dimension: SegmentDimension;
+  dimension: CohortDimension;
   summary: ProjectSummaryResponse;
   perspectives: Record<Perspective, boolean>;
 }) {
@@ -667,7 +675,7 @@ function SegmentDimensionCard({
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Metric
-          label="Segment average"
+          label="Cohort average"
           value={formatMetricValue(dimension.averageScore)}
         />
         {perspectives.hr && dimension.groups.hr.n > 0 ? (
@@ -832,23 +840,6 @@ function QualitativeDimensionCard({
   );
 }
 
-function RadioFilter({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-700">
-      <input type="radio" name="viewBy" checked={checked} onChange={onChange} />
-      {label}
-    </label>
-  );
-}
-
 function CheckboxFilter({
   label,
   checked,
@@ -981,14 +972,6 @@ function InfoTooltip({
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-      {message}
-    </div>
-  );
-}
-
 function roundMetric(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -1002,6 +985,15 @@ function formatMetricValue(value: number | null): string {
   const normalized = Object.is(rounded, -0) ? 0 : rounded;
 
   return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(2);
+}
+
+function formatFilters(filters: ExplorerCohortFilter[]): string {
+  return filters
+    .map(
+      (filter) =>
+        `${formatLabel(filter.key)}: ${filter.values.map(formatLabel).join(" + ")}`,
+    )
+    .join("; ");
 }
 
 function formatLabel(value: string | null): string {
