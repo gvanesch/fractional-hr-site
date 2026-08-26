@@ -5,7 +5,7 @@ import {
   buildProjectSummary,
   BuildProjectSummaryError,
 } from "@/lib/client-diagnostic/build-project-summary";
-import { buildExplorerSegmentSelection } from "@/lib/client-diagnostic/explorer-segment-selection";
+import { buildExplorerCohort } from "@/lib/client-diagnostic/build-explorer-cohort";
 
 export const metadata = {
   title: "Diagnostic Explorer | Van Esch Advisory",
@@ -17,14 +17,13 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 type PageProps = {
   params: Promise<{
     projectId: string;
   }>;
-  searchParams: Promise<{
-    viewBy?: string | string[];
-    segment?: string | string[];
-  }>;
+  searchParams: Promise<SearchParams>;
 };
 
 function isUuid(value: string): boolean {
@@ -33,20 +32,48 @@ function isUuid(value: string): boolean {
   );
 }
 
-function firstQueryValue(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
-
-  return value ?? null;
-}
-
 function queryValues(value: string | string[] | undefined): string[] {
   if (Array.isArray(value)) {
     return value;
   }
 
   return value ? [value] : [];
+}
+
+function firstQueryValue(value: string | string[] | undefined): string | null {
+  return queryValues(value)[0] ?? null;
+}
+
+function parseRequestedFilters(searchParams: SearchParams): Record<string, string[]> {
+  const filters: Record<string, string[]> = {};
+
+  for (const [key, rawValue] of Object.entries(searchParams)) {
+    if (!key.startsWith("segment.")) {
+      continue;
+    }
+
+    const segmentationKey = key.slice("segment.".length);
+    if (!segmentationKey) {
+      continue;
+    }
+
+    filters[segmentationKey] = queryValues(rawValue);
+  }
+
+  if (Object.keys(filters).length > 0) {
+    return filters;
+  }
+
+  // Backward compatibility for Explorer links created before multidimensional
+  // filtering. New navigation uses segment.<dimension>=<value> query keys.
+  const legacyViewBy = firstQueryValue(searchParams.viewBy);
+  const legacyValues = queryValues(searchParams.segment);
+
+  if (legacyViewBy && legacyViewBy !== "overall" && legacyValues.length > 0) {
+    filters[legacyViewBy] = legacyValues;
+  }
+
+  return filters;
 }
 
 export default async function AdvisorDiagnosticExplorerPage({
@@ -65,16 +92,26 @@ export default async function AdvisorDiagnosticExplorerPage({
     notFound();
   }
 
+  const resolvedSearchParams = await searchParams;
+  const requestedFilters = parseRequestedFilters(resolvedSearchParams);
+
   let summary;
+  let explorerCohort;
 
   try {
     summary = await buildProjectSummary(projectId);
+    explorerCohort = await buildExplorerCohort({
+      projectId,
+      requestedFilters,
+      availableKeys: summary.segmentation.availableKeys,
+      reportingMinN: summary.reportingPolicy.segmentReportingMinN,
+    });
   } catch (error) {
     if (error instanceof BuildProjectSummaryError && error.status === 404) {
       notFound();
     }
 
-    console.error("[advisor-diagnostic-explorer-page] failed to build summary", {
+    console.error("[advisor-diagnostic-explorer-page] failed to build explorer", {
       projectId,
       error,
       message: error instanceof Error ? error.message : "Unknown error",
@@ -84,38 +121,10 @@ export default async function AdvisorDiagnosticExplorerPage({
     throw error;
   }
 
-  const resolvedSearchParams = await searchParams;
-  const requestedViewBy = firstQueryValue(resolvedSearchParams.viewBy);
-  const selectedKey = summary.segmentation.availableKeys.find(
-    (item) => item.key === requestedViewBy,
-  );
-  const initialViewBy = selectedKey?.key ?? "overall";
-
-  const requestedSegmentValues = queryValues(resolvedSearchParams.segment);
-  const validSegmentValues = selectedKey
-    ? requestedSegmentValues.filter((value) => selectedKey.values.includes(value))
-    : [];
-  const initialSegmentValues = selectedKey
-    ? validSegmentValues.length > 0
-      ? Array.from(new Set(validSegmentValues))
-      : selectedKey.values.slice(0, 1)
-    : [];
-
-  const segmentSelection = selectedKey
-    ? buildExplorerSegmentSelection({
-        segmentation: summary.segmentation,
-        key: selectedKey.key,
-        values: initialSegmentValues,
-        reportingMinN: summary.reportingPolicy.segmentReportingMinN,
-      })
-    : null;
-
   return (
     <AdvisorDiagnosticExplorerClient
       summary={summary}
-      initialViewBy={initialViewBy}
-      initialSegmentValues={initialSegmentValues}
-      segmentSelection={segmentSelection}
+      explorerCohort={explorerCohort}
     />
   );
 }
