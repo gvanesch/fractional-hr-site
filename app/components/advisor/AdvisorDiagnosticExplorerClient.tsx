@@ -19,6 +19,7 @@ type DimensionAnalysis = ProjectSummaryResponse["analyses"]["dimensions"][number
 type DimensionQualitative =
   ProjectSummaryResponse["qualitative"]["dimensions"][number];
 type CohortDimension = ExplorerCohort["dimensions"][number];
+type CohortQualitativeDimension = ExplorerCohort["qualitative"]["dimensions"][number];
 type Perspective = ExplorerPerspective;
 
 const PERSPECTIVE_LABELS: Record<Perspective, string> = {
@@ -43,8 +44,8 @@ export default function AdvisorDiagnosticExplorerClient({
   const activeFilters = explorerCohort.filters;
   const hasNarrowingFilters =
     activeFilters.length > 0 && !explorerCohort.isOverallEquivalent;
-  const activeFilterMap = new Map(
-    activeFilters.map((filter) => [filter.key, filter.values]),
+  const selectionMap = new Map(
+    explorerCohort.selections.map((selection) => [selection.key, selection.values]),
   );
 
   const selectedPerspectives = (Object.keys(perspectives) as Perspective[]).filter(
@@ -102,21 +103,30 @@ export default function AdvisorDiagnosticExplorerClient({
     (dimension) =>
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
+  const visibleCohortQualitativeDimensions = explorerCohort.qualitative.dimensions.filter(
+    (dimension) =>
+      dimension.commentCount > 0 &&
+      (dimensionKey === "all" || dimension.dimensionKey === dimensionKey),
+  );
 
   function selectedValuesFor(key: string): string[] {
-    return activeFilterMap.get(key) ?? [];
+    return selectionMap.get(key) ?? [];
   }
 
-  function navigateFilters(nextFilters: ExplorerCohortFilter[]) {
+  function navigateSelections(nextSelections: ExplorerCohortFilter[]) {
     const params = new URLSearchParams();
-    const orderedFilters = summary.segmentation.availableKeys.flatMap((availableKey) => {
-      const filter = nextFilters.find((item) => item.key === availableKey.key);
-      return filter ? [filter] : [];
-    });
+    const orderedSelections = summary.segmentation.availableKeys.flatMap(
+      (availableKey) => {
+        const selection = nextSelections.find(
+          (item) => item.key === availableKey.key,
+        );
+        return selection ? [selection] : [];
+      },
+    );
 
-    for (const filter of orderedFilters) {
-      for (const value of filter.values) {
-        params.append(`segment.${filter.key}`, value);
+    for (const selection of orderedSelections) {
+      for (const value of selection.values) {
+        params.append(`segment.${selection.key}`, value);
       }
     }
 
@@ -146,23 +156,42 @@ export default function AdvisorDiagnosticExplorerClient({
       : availableKey.values.filter(
           (item) => selectedValues.includes(item) || item === value,
         );
-    const nextFilters = activeFilters.filter((filter) => filter.key !== key);
+    const nextSelections = explorerCohort.selections.filter(
+      (selection) => selection.key !== key,
+    );
 
-    if (
-      nextSelectedValues.length > 0 &&
-      nextSelectedValues.length < availableKey.values.length
-    ) {
-      nextFilters.push({
+    if (nextSelectedValues.length > 0) {
+      nextSelections.push({
         key,
         values: nextSelectedValues,
       });
     }
 
-    navigateFilters(nextFilters);
+    navigateSelections(nextSelections);
+  }
+
+  function selectAllSegmentValues(key: string) {
+    const availableKey = summary.segmentation.availableKeys.find(
+      (item) => item.key === key,
+    );
+
+    if (!availableKey) {
+      return;
+    }
+
+    navigateSelections([
+      ...explorerCohort.selections.filter((selection) => selection.key !== key),
+      {
+        key,
+        values: availableKey.values,
+      },
+    ]);
   }
 
   function clearSegmentFilter(key: string) {
-    navigateFilters(activeFilters.filter((filter) => filter.key !== key));
+    navigateSelections(
+      explorerCohort.selections.filter((selection) => selection.key !== key),
+    );
   }
 
   function togglePerspective(perspective: Perspective) {
@@ -181,7 +210,7 @@ export default function AdvisorDiagnosticExplorerClient({
   function resetFilters() {
     setDimensionKey("all");
     setPerspectives({ hr: true, manager: true, leadership: true });
-    navigateFilters([]);
+    navigateSelections([]);
   }
 
   return (
@@ -239,19 +268,21 @@ export default function AdvisorDiagnosticExplorerClient({
             <div className="mt-6 space-y-3">
               {summary.segmentation.availableKeys.map((segmentationDimension) => {
                 const selectedValues = selectedValuesFor(segmentationDimension.key);
-                const isFiltered = selectedValues.length > 0;
+                const hasSelection = selectedValues.length > 0;
+                const allSelected =
+                  selectedValues.length === segmentationDimension.values.length;
 
                 return (
                   <details
                     key={segmentationDimension.key}
-                    defaultOpen={isFiltered}
+                    defaultOpen={hasSelection}
                     className="rounded-xl border border-slate-200 bg-slate-50"
                   >
                     <summary className="cursor-pointer list-none px-3 py-3 text-sm font-semibold text-slate-900">
                       <span className="flex items-center justify-between gap-3">
                         <span>{formatLabel(segmentationDimension.key)}</span>
                         <span className="text-xs font-medium text-slate-500">
-                          {isFiltered
+                          {hasSelection
                             ? `${selectedValues.length}/${segmentationDimension.values.length}`
                             : "All"}
                         </span>
@@ -259,20 +290,36 @@ export default function AdvisorDiagnosticExplorerClient({
                     </summary>
 
                     <div className="border-t border-slate-200 px-3 pb-3 pt-3">
-                      <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="mb-3 flex items-start justify-between gap-3">
                         <p className="text-xs leading-5 text-slate-500">
                           Blank means all values.
                         </p>
-                        {isFiltered ? (
-                          <button
-                            type="button"
-                            onClick={() => clearSegmentFilter(segmentationDimension.key)}
-                            disabled={isPending}
-                            className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
-                          >
-                            Clear
-                          </button>
-                        ) : null}
+                        <div className="flex shrink-0 items-center gap-2">
+                          {!allSelected ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                selectAllSegmentValues(segmentationDimension.key)
+                              }
+                              disabled={isPending}
+                              className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
+                            >
+                              Select all
+                            </button>
+                          ) : null}
+                          {hasSelection ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                clearSegmentFilter(segmentationDimension.key)
+                              }
+                              disabled={isPending}
+                              className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
+                            >
+                              Clear
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
@@ -430,15 +477,15 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Qualitative evidence"
-              description="Written-response evidence provides context for the scored diagnostic. It should enrich or challenge interpretation, not recalculate the scores."
+              description="Written-response evidence provides context for the scored diagnostic. Filtered views show advisor-only comments from the matching cohort; the overall view retains the deterministic thematic summary."
             >
               {hasNarrowingFilters ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
-                  The canonical summary does not currently expose qualitative
-                  evidence for filtered cohorts. Whole-project comments are
-                  therefore not presented as though they were specific to the
-                  current segmentation filters: {formatFilters(activeFilters)}.
-                </div>
+                <FilteredQualitativeEvidence
+                  summary={summary}
+                  dimensions={visibleCohortQualitativeDimensions}
+                  selectedPerspectiveLabel={selectedPerspectiveLabel}
+                  perspectivesFiltered={selectedPerspectives.length < 3}
+                />
               ) : (
                 <>
                   {selectedPerspectives.length < 3 ? (
@@ -714,6 +761,106 @@ function CohortDimensionCard({
   );
 }
 
+function FilteredQualitativeEvidence({
+  summary,
+  dimensions,
+  selectedPerspectiveLabel,
+  perspectivesFiltered,
+}: {
+  summary: ProjectSummaryResponse;
+  dimensions: CohortQualitativeDimension[];
+  selectedPerspectiveLabel: string;
+  perspectivesFiltered: boolean;
+}) {
+  const visibleCommentCount = dimensions.reduce(
+    (total, dimension) => total + dimension.commentCount,
+    0,
+  );
+  const visiblePerspectives = new Set(
+    dimensions.flatMap((dimension) => dimension.respondentGroupsWithComments),
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">Advisor-only cohort comments</span>
+          <Badge>{visibleCommentCount} comments</Badge>
+          <Badge>{visiblePerspectives.size} perspectives</Badge>
+        </div>
+        <p className="mt-2">
+          These are written responses from participants in the filtered cohort.
+          They are contextual evidence, not scored evidence, and are not a
+          client-reporting projection.
+        </p>
+        {perspectivesFiltered ? (
+          <p className="mt-2 text-amber-900">
+            Respondent perspective visibility currently applies to scored
+            analytics only. These comments remain evidence from the full filtered
+            cohort rather than only {selectedPerspectiveLabel}.
+          </p>
+        ) : null}
+      </div>
+
+      {visibleCommentCount === 0 || dimensions.length === 0 ? (
+        <EmptyState message="No written comments are available for this filtered cohort and selected diagnostic dimension." />
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {dimensions.map((dimension) => (
+            <FilteredQualitativeDimensionCard
+              key={dimension.dimensionKey}
+              dimension={dimension}
+              summary={summary}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilteredQualitativeDimensionCard({
+  dimension,
+  summary,
+}: {
+  dimension: CohortQualitativeDimension;
+  summary: ProjectSummaryResponse;
+}) {
+  const metadata = summary.dimensions.find(
+    (item) => item.dimensionKey === dimension.dimensionKey,
+  );
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h3 className="font-semibold text-slate-900">
+          {metadata?.dimensionLabel ?? formatLabel(dimension.dimensionKey)}
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          <SubtlePill>{dimension.commentCount} comments</SubtlePill>
+          <SubtlePill>
+            {dimension.respondentGroupsWithComments.length} perspectives
+          </SubtlePill>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {dimension.comments.map((comment, index) => (
+          <div
+            key={`${comment.questionnaireType}-${index}`}
+            className="rounded-xl bg-slate-50 p-4"
+          >
+            <Badge>{PERSPECTIVE_LABELS[comment.questionnaireType]}</Badge>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {comment.commentText}
+            </p>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function OverallQualitativeCard({ summary }: { summary: ProjectSummaryResponse }) {
   const qualitative = summary.qualitative.overall;
 
@@ -962,6 +1109,14 @@ function InfoTooltip({
   );
 }
 
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+      {message}
+    </div>
+  );
+}
+
 function roundMetric(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -975,15 +1130,6 @@ function formatMetricValue(value: number | null): string {
   const normalized = Object.is(rounded, -0) ? 0 : rounded;
 
   return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(2);
-}
-
-function formatFilters(filters: ExplorerCohortFilter[]): string {
-  return filters
-    .map(
-      (filter) =>
-        `${formatLabel(filter.key)}: ${filter.values.map(formatLabel).join(" + ")}`,
-    )
-    .join("; ");
 }
 
 function formatLabel(value: string | null): string {
