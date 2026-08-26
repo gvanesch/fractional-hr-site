@@ -55,6 +55,13 @@ export default function AdvisorNav() {
           </a>
 
           <a
+            href="/advisor/explorers"
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
+            Explorers
+          </a>
+
+          <a
             href="/advisor/health-checks"
             className="text-sm text-slate-600 hover:text-slate-900"
           >
