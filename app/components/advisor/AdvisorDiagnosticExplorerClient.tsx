@@ -105,7 +105,7 @@ export default function AdvisorDiagnosticExplorerClient({
   );
   const visibleCohortQualitativeDimensions = explorerCohort.qualitative.dimensions.filter(
     (dimension) =>
-      dimension.commentCount > 0 &&
+      dimension.sourceCommentCount > 0 &&
       (dimensionKey === "all" || dimension.dimensionKey === dimensionKey),
   );
 
@@ -275,7 +275,7 @@ export default function AdvisorDiagnosticExplorerClient({
                 return (
                   <details
                     key={segmentationDimension.key}
-                    defaultOpen={hasSelection}
+                    open={hasSelection}
                     className="rounded-xl border border-slate-200 bg-slate-50"
                   >
                     <summary className="cursor-pointer list-none px-3 py-3 text-sm font-semibold text-slate-900">
@@ -477,11 +477,12 @@ export default function AdvisorDiagnosticExplorerClient({
 
             <ExplorerSection
               title="Qualitative evidence"
-              description="Written-response evidence provides context for the scored diagnostic. Filtered views show advisor-only comments from the matching cohort; the overall view retains the deterministic thematic summary."
+              description="Written-response evidence provides context for the scored diagnostic. Filtered views apply additional disclosure controls before verbatim comments are shown; the overall view retains the deterministic thematic summary."
             >
               {hasNarrowingFilters ? (
                 <FilteredQualitativeEvidence
                   summary={summary}
+                  qualitative={explorerCohort.qualitative}
                   dimensions={visibleCohortQualitativeDimensions}
                   selectedPerspectiveLabel={selectedPerspectiveLabel}
                   perspectivesFiltered={selectedPerspectives.length < 3}
@@ -539,6 +540,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
 function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
   const meetsCurrentThreshold = cohort.confidentialityStatus === "reportable";
+  const highlyRestricted = cohort.respondentCount === 1;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -551,6 +553,7 @@ function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
         {cohort.respondentCount > 0 ? (
           <Badge>{formatLabel(cohort.compositionStatus)} composition</Badge>
         ) : null}
+        {highlyRestricted ? <Badge>Highly restricted: single respondent</Badge> : null}
         <Badge>
           {meetsCurrentThreshold
             ? "Meets current client threshold"
@@ -566,6 +569,14 @@ function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
             ? "This cohort meets the project's current minimum reporting threshold. Final client shareability remains subject to the separate client-reporting projection, including complementary suppression and anti-differencing controls."
             : "This cohort is below the project's current minimum reporting threshold. Exact results remain available here for advisor analysis but should not be treated as client-shareable."}
         </InfoTooltip>
+        {highlyRestricted ? (
+          <InfoTooltip label="Highly restricted evidence">
+            This filtered cohort contains one scored respondent. Quantitative
+            results therefore represent effectively individual-level evidence.
+            Use them only as a qualified advisor signal. Verbatim written
+            responses are withheld by the qualitative disclosure controls.
+          </InfoTooltip>
+        ) : null}
       </div>
     </div>
   );
@@ -763,47 +774,84 @@ function CohortDimensionCard({
 
 function FilteredQualitativeEvidence({
   summary,
+  qualitative,
   dimensions,
   selectedPerspectiveLabel,
   perspectivesFiltered,
 }: {
   summary: ProjectSummaryResponse;
+  qualitative: ExplorerCohort["qualitative"];
   dimensions: CohortQualitativeDimension[];
   selectedPerspectiveLabel: string;
   perspectivesFiltered: boolean;
 }) {
+  const sourceCommentCount = dimensions.reduce(
+    (total, dimension) => total + dimension.sourceCommentCount,
+    0,
+  );
   const visibleCommentCount = dimensions.reduce(
     (total, dimension) => total + dimension.commentCount,
     0,
   );
-  const visiblePerspectives = new Set(
-    dimensions.flatMap((dimension) => dimension.respondentGroupsWithComments),
+  const withheldCommentCount = dimensions.reduce(
+    (total, dimension) => total + dimension.withheldCommentCount,
+    0,
   );
+  const sourcePerspectives = new Set(
+    dimensions.flatMap((dimension) => [
+      ...dimension.respondentGroupsWithComments,
+      ...dimension.withheldRespondentGroups,
+    ]),
+  );
+  const threshold = qualitative.disclosureControl.threshold;
+  const hasWithheldEvidence = withheldCommentCount > 0;
+
+  const withheldExplanation =
+    qualitative.disclosureControl.reason === "cohort_below_threshold"
+      ? `The filtered cohort is below the current privacy threshold of n=${threshold}.`
+      : `At least one respondent perspective represented in the comments is below the current privacy threshold of n=${threshold}.`;
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">Advisor-only cohort comments</span>
-          <Badge>{visibleCommentCount} comments</Badge>
-          <Badge>{visiblePerspectives.size} perspectives</Badge>
+          <span className="font-semibold">Filtered qualitative evidence</span>
+          <Badge>{sourceCommentCount} submitted</Badge>
+          <Badge>{visibleCommentCount} visible</Badge>
+          {withheldCommentCount > 0 ? (
+            <Badge>{withheldCommentCount} withheld</Badge>
+          ) : null}
+          <Badge>{sourcePerspectives.size} perspectives</Badge>
         </div>
         <p className="mt-2">
-          These are written responses from participants in the filtered cohort.
-          They are contextual evidence, not scored evidence, and are not a
-          client-reporting projection.
+          Written responses are contextual evidence, not scored evidence. In a
+          filtered view, verbatim text is only displayed when both the filtered
+          cohort and the relevant respondent perspective meet the current privacy
+          threshold.
         </p>
+        {hasWithheldEvidence ? (
+          <p className="mt-2 font-medium text-amber-950">
+            {withheldCommentCount} written {withheldCommentCount === 1 ? "response exists" : "responses exist"}
+            {" "}in this filtered view but {withheldCommentCount === 1 ? "is" : "are"}
+            {" "}not displayed because the disclosure controls limit identifiable
+            qualitative evidence. {withheldExplanation}
+          </p>
+        ) : null}
         {perspectivesFiltered ? (
           <p className="mt-2 text-amber-900">
             Respondent perspective visibility currently applies to scored
-            analytics only. These comments remain evidence from the full filtered
-            cohort rather than only {selectedPerspectiveLabel}.
+            analytics only. Qualitative disclosure controls are evaluated against
+            the full filtered cohort rather than only {selectedPerspectiveLabel}.
           </p>
         ) : null}
       </div>
 
-      {visibleCommentCount === 0 || dimensions.length === 0 ? (
-        <EmptyState message="No written comments are available for this filtered cohort and selected diagnostic dimension." />
+      {sourceCommentCount === 0 || dimensions.length === 0 ? (
+        <EmptyState message="No written responses were submitted for this filtered cohort and selected diagnostic dimension." />
+      ) : visibleCommentCount === 0 ? (
+        <EmptyState
+          message={`${sourceCommentCount} written ${sourceCommentCount === 1 ? "response exists" : "responses exist"} for this filtered cohort and selected diagnostic dimension, but ${withheldCommentCount === 1 ? "it is" : "they are"} withheld by the qualitative disclosure controls. No verbatim text is shown because the cohort or relevant respondent perspective is below the current privacy threshold of n=${threshold}.`}
+        />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {dimensions.map((dimension) => (
@@ -837,10 +885,11 @@ function FilteredQualitativeDimensionCard({
           {metadata?.dimensionLabel ?? formatLabel(dimension.dimensionKey)}
         </h3>
         <div className="flex flex-wrap gap-2">
-          <SubtlePill>{dimension.commentCount} comments</SubtlePill>
-          <SubtlePill>
-            {dimension.respondentGroupsWithComments.length} perspectives
-          </SubtlePill>
+          <SubtlePill>{dimension.sourceCommentCount} submitted</SubtlePill>
+          <SubtlePill>{dimension.commentCount} visible</SubtlePill>
+          {dimension.withheldCommentCount > 0 ? (
+            <SubtlePill>{dimension.withheldCommentCount} withheld</SubtlePill>
+          ) : null}
         </div>
       </div>
 
@@ -856,6 +905,15 @@ function FilteredQualitativeDimensionCard({
             </p>
           </div>
         ))}
+
+        {dimension.withheldCommentCount > 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            {dimension.withheldCommentCount} written {dimension.withheldCommentCount === 1 ? "response is" : "responses are"}
+            {" "}withheld for this dimension because the applicable privacy
+            threshold is not met. The existence and count of the evidence are
+            shown, but the verbatim text is not returned to the Explorer client.
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -1090,18 +1148,30 @@ function InfoTooltip({
   label: string;
   children: React.ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <span className="group relative inline-flex">
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
       <button
         type="button"
         aria-label={`About ${label}`}
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(true)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
         className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-semibold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E6FD9]/30"
       >
         i
       </button>
       <span
         role="tooltip"
-        className="pointer-events-none invisible absolute left-0 top-6 z-30 w-72 rounded-xl bg-slate-950 px-3 py-2.5 text-left text-xs font-normal leading-5 text-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+        className={`pointer-events-none absolute left-0 top-6 z-50 w-72 rounded-xl bg-slate-950 px-3 py-2.5 text-left text-xs font-normal leading-5 text-white shadow-xl transition ${
+          isOpen ? "visible opacity-100" : "invisible opacity-0"
+        }`}
       >
         {children}
       </span>
