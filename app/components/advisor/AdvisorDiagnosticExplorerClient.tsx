@@ -103,8 +103,8 @@ export default function AdvisorDiagnosticExplorerClient({
       dimensionKey === "all" || dimension.dimensionKey === dimensionKey,
   );
 
-  function selectedValuesFor(key: string, allValues: string[]): string[] {
-    return activeFilterMap.get(key) ?? allValues;
+  function selectedValuesFor(key: string): string[] {
+    return activeFilterMap.get(key) ?? [];
   }
 
   function navigateFilters(nextFilters: ExplorerCohortFilter[]) {
@@ -139,22 +139,19 @@ export default function AdvisorDiagnosticExplorerClient({
       return;
     }
 
-    const selectedValues = selectedValuesFor(key, availableKey.values);
+    const selectedValues = selectedValuesFor(key);
     const isSelected = selectedValues.includes(value);
-
-    if (isSelected && selectedValues.length === 1) {
-      return;
-    }
-
     const nextSelectedValues = isSelected
       ? selectedValues.filter((item) => item !== value)
       : availableKey.values.filter(
           (item) => selectedValues.includes(item) || item === value,
         );
-
     const nextFilters = activeFilters.filter((filter) => filter.key !== key);
 
-    if (nextSelectedValues.length < availableKey.values.length) {
+    if (
+      nextSelectedValues.length > 0 &&
+      nextSelectedValues.length < availableKey.values.length
+    ) {
       nextFilters.push({
         key,
         values: nextSelectedValues,
@@ -164,7 +161,7 @@ export default function AdvisorDiagnosticExplorerClient({
     navigateFilters(nextFilters);
   }
 
-  function selectAllSegmentValues(key: string) {
+  function clearSegmentFilter(key: string) {
     navigateFilters(activeFilters.filter((filter) => filter.key !== key));
   }
 
@@ -233,19 +230,16 @@ export default function AdvisorDiagnosticExplorerClient({
                 Analysis filters
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Select one or more values within each segmentation dimension.
-                Values are combined with OR within a dimension and AND across
-                dimensions.
+                Choose values to narrow the cohort. Multiple values within one
+                dimension use OR; selections across dimensions use AND. Leave a
+                dimension blank for All.
               </p>
             </div>
 
             <div className="mt-6 space-y-3">
               {summary.segmentation.availableKeys.map((segmentationDimension) => {
-                const selectedValues = selectedValuesFor(
-                  segmentationDimension.key,
-                  segmentationDimension.values,
-                );
-                const isFiltered = activeFilterMap.has(segmentationDimension.key);
+                const selectedValues = selectedValuesFor(segmentationDimension.key);
+                const isFiltered = selectedValues.length > 0;
 
                 return (
                   <details
@@ -267,16 +261,16 @@ export default function AdvisorDiagnosticExplorerClient({
                     <div className="border-t border-slate-200 px-3 pb-3 pt-3">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-xs leading-5 text-slate-500">
-                          Select one or more values.
+                          Blank means all values.
                         </p>
                         {isFiltered ? (
                           <button
                             type="button"
-                            onClick={() => selectAllSegmentValues(segmentationDimension.key)}
+                            onClick={() => clearSegmentFilter(segmentationDimension.key)}
                             disabled={isPending}
                             className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
                           >
-                            Select all
+                            Clear
                           </button>
                         ) : null}
                       </div>
@@ -287,11 +281,7 @@ export default function AdvisorDiagnosticExplorerClient({
                             key={value}
                             label={formatLabel(value)}
                             checked={selectedValues.includes(value)}
-                            disabled={
-                              isPending ||
-                              (selectedValues.includes(value) &&
-                                selectedValues.length === 1)
-                            }
+                            disabled={isPending}
                             onChange={() =>
                               toggleSegmentValue(segmentationDimension.key, value)
                             }
