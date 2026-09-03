@@ -21,6 +21,7 @@ type DimensionQualitative =
 type CohortDimension = ExplorerCohort["dimensions"][number];
 type CohortQualitativeDimension = ExplorerCohort["qualitative"]["dimensions"][number];
 type Perspective = ExplorerPerspective;
+type VisualTone = "positive" | "caution" | "critical" | "neutral";
 
 const PERSPECTIVE_LABELS: Record<Perspective, string> = {
   hr: "HR",
@@ -448,6 +449,7 @@ export default function AdvisorDiagnosticExplorerClient({
               title="Dimension analytics"
               description="Canonical scored evidence. Segmentation filters use OR within each dimension and AND across dimensions; filtered cohorts are calculated from participant-level evidence on the server. Respondent perspective controls which group scores are visible."
             >
+              <AnalyticsLegend />
               {hasNarrowingFilters ? (
                 <>
                   <CohortContextCard cohort={explorerCohort} />
@@ -582,6 +584,34 @@ function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
   );
 }
 
+function AnalyticsLegend() {
+  return (
+    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Score / strength
+          </span>
+          <SignalPill tone="positive">Strong</SignalPill>
+          <SignalPill tone="caution">Moderate</SignalPill>
+          <SignalPill tone="critical">Weak</SignalPill>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Alignment / gap
+          </span>
+          <SignalPill tone="positive">Aligned</SignalPill>
+          <SignalPill tone="caution">Emerging gap</SignalPill>
+          <SignalPill tone="critical">Significant gap</SignalPill>
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        Colours reflect existing deterministic classifications. Privacy and client-reporting controls remain separate.
+      </p>
+    </div>
+  );
+}
+
 function ExplorerSection({
   title,
   description,
@@ -609,8 +639,12 @@ function DimensionAnalyticsCard({
   dimension: DimensionAnalysis;
   perspectives: Record<Perspective, boolean>;
 }) {
+  const strengthVisualTone = strengthTone(dimension.strength);
+
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+    <article
+      className={`rounded-2xl border border-l-4 border-slate-200 bg-white p-5 ${toneRailClasses(strengthVisualTone)}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-semibold text-slate-900">
@@ -621,7 +655,9 @@ function DimensionAnalyticsCard({
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <Badge>{formatLabel(dimension.strength)}</Badge>
+          <SignalPill tone={strengthVisualTone}>
+            {formatLabel(dimension.strength)}
+          </SignalPill>
           <InfoTooltip label={`${dimension.dimensionLabel} strength`}>
             Strength is based on the deterministic overall dimension score:
             Weak below 3.0, Moderate from 3.0 to below 4.0, and Strong from 4.0.
@@ -631,27 +667,42 @@ function DimensionAnalyticsCard({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric label="Overall" value={formatMetricValue(dimension.averageScore)} />
+        <Metric
+          label="Overall"
+          value={formatMetricValue(dimension.averageScore)}
+          tone={scoreTone(dimension.averageScore)}
+        />
         {perspectives.hr ? (
-          <Metric label="HR" value={formatMetricValue(dimension.scores.hr)} />
+          <Metric
+            label="HR"
+            value={formatMetricValue(dimension.scores.hr)}
+            tone={scoreTone(dimension.scores.hr)}
+          />
         ) : null}
         {perspectives.manager ? (
           <Metric
             label="Manager"
             value={formatMetricValue(dimension.scores.manager)}
+            tone={scoreTone(dimension.scores.manager)}
           />
         ) : null}
         {perspectives.leadership ? (
           <Metric
             label="Leadership"
             value={formatMetricValue(dimension.scores.leadership)}
+            tone={scoreTone(dimension.scores.leadership)}
           />
         ) : null}
-        <Metric label="Gap" value={formatMetricValue(dimension.gap)} />
+        <Metric
+          label="Gap"
+          value={formatMetricValue(dimension.gap)}
+          tone={gapTone(dimension.gap)}
+        />
         <MetricWithInfo
           label="Alignment"
           value={formatLabel(dimension.alignment)}
           infoLabel={`${dimension.dimensionLabel} alignment`}
+          tone={alignmentTone(dimension.alignment)}
         >
           Alignment uses the observed respondent-group gap. Below 0.40 is
           Aligned, 0.40 to below 0.75 is Emerging gap, and 0.75 or above is
@@ -693,9 +744,12 @@ function CohortDimensionCard({
     (item) => item.dimensionKey === dimension.dimensionKey,
   );
   const meetsCurrentThreshold = dimension.clientReporting.status === "reportable";
+  const cohortVisualTone = scoreTone(dimension.averageScore);
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+    <article
+      className={`rounded-2xl border border-l-4 border-slate-200 bg-white p-5 ${toneRailClasses(cohortVisualTone)}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-semibold text-slate-900">
@@ -725,23 +779,27 @@ function CohortDimensionCard({
         <Metric
           label="Cohort average"
           value={formatMetricValue(dimension.averageScore)}
+          tone={cohortVisualTone}
         />
         {perspectives.hr && dimension.groups.hr.n > 0 ? (
           <Metric
             label={`HR · n=${dimension.groups.hr.n}`}
             value={formatMetricValue(dimension.groups.hr.mean)}
+            tone={scoreTone(dimension.groups.hr.mean)}
           />
         ) : null}
         {perspectives.manager && dimension.groups.manager.n > 0 ? (
           <Metric
             label={`Manager · n=${dimension.groups.manager.n}`}
             value={formatMetricValue(dimension.groups.manager.mean)}
+            tone={scoreTone(dimension.groups.manager.mean)}
           />
         ) : null}
         {perspectives.leadership && dimension.groups.leadership.n > 0 ? (
           <Metric
             label={`Leadership · n=${dimension.groups.leadership.n}`}
             value={formatMetricValue(dimension.groups.leadership.mean)}
+            tone={scoreTone(dimension.groups.leadership.mean)}
           />
         ) : null}
         <Metric label="Respondents" value={String(dimension.respondentCount)} />
@@ -1065,13 +1123,31 @@ function CheckboxFilter({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: VisualTone;
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        {label}
+    <div className={`rounded-xl border px-3 py-3 ${metricToneClasses(tone)}`}>
+      <div className="flex items-center gap-2">
+        {tone !== "neutral" ? (
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${toneDotClasses(tone)}`}
+          />
+        ) : null}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {label}
+        </p>
+      </div>
+      <p className={`mt-1 text-sm font-semibold ${toneTextClasses(tone)}`}>
+        {value}
       </p>
-      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -1081,22 +1157,52 @@ function MetricWithInfo({
   value,
   infoLabel,
   children,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
   infoLabel: string;
   children: React.ReactNode;
+  tone?: VisualTone;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+    <div className={`rounded-xl border px-3 py-3 ${metricToneClasses(tone)}`}>
       <div className="flex items-center gap-1.5">
+        {tone !== "neutral" ? (
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${toneDotClasses(tone)}`}
+          />
+        ) : null}
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           {label}
         </p>
         <InfoTooltip label={infoLabel}>{children}</InfoTooltip>
       </div>
-      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
+      <p className={`mt-1 text-sm font-semibold ${toneTextClasses(tone)}`}>
+        {value}
+      </p>
     </div>
+  );
+}
+
+function SignalPill({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: VisualTone;
+}) {
+  return (
+    <span
+      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${signalToneClasses(tone)}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${toneDotClasses(tone)}`}
+      />
+      {children}
+    </span>
   );
 }
 
@@ -1185,6 +1291,135 @@ function EmptyState({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+function scoreTone(value: number | null): VisualTone {
+  if (typeof value !== "number") {
+    return "neutral";
+  }
+
+  if (value >= 4) {
+    return "positive";
+  }
+
+  if (value >= 3) {
+    return "caution";
+  }
+
+  return "critical";
+}
+
+function strengthTone(value: string | null): VisualTone {
+  if (value === "strong") {
+    return "positive";
+  }
+
+  if (value === "moderate") {
+    return "caution";
+  }
+
+  if (value === "weak") {
+    return "critical";
+  }
+
+  return "neutral";
+}
+
+function gapTone(value: number | null): VisualTone {
+  if (typeof value !== "number") {
+    return "neutral";
+  }
+
+  if (value < 0.4) {
+    return "positive";
+  }
+
+  if (value < 0.75) {
+    return "caution";
+  }
+
+  return "critical";
+}
+
+function alignmentTone(value: string | null): VisualTone {
+  if (value === "aligned") {
+    return "positive";
+  }
+
+  if (value === "emerging_gap") {
+    return "caution";
+  }
+
+  if (value === "significant_gap") {
+    return "critical";
+  }
+
+  return "neutral";
+}
+
+function metricToneClasses(tone: VisualTone): string {
+  switch (tone) {
+    case "positive":
+      return "border-emerald-200 bg-emerald-50/70";
+    case "caution":
+      return "border-amber-200 bg-amber-50/70";
+    case "critical":
+      return "border-rose-200 bg-rose-50/70";
+    default:
+      return "border-slate-200 bg-slate-50";
+  }
+}
+
+function toneTextClasses(tone: VisualTone): string {
+  switch (tone) {
+    case "positive":
+      return "text-emerald-800";
+    case "caution":
+      return "text-amber-800";
+    case "critical":
+      return "text-rose-700";
+    default:
+      return "text-slate-900";
+  }
+}
+
+function toneDotClasses(tone: VisualTone): string {
+  switch (tone) {
+    case "positive":
+      return "bg-emerald-500";
+    case "caution":
+      return "bg-amber-500";
+    case "critical":
+      return "bg-rose-500";
+    default:
+      return "bg-slate-400";
+  }
+}
+
+function signalToneClasses(tone: VisualTone): string {
+  switch (tone) {
+    case "positive":
+      return "bg-emerald-50 text-emerald-800 ring-emerald-200";
+    case "caution":
+      return "bg-amber-50 text-amber-800 ring-amber-200";
+    case "critical":
+      return "bg-rose-50 text-rose-700 ring-rose-200";
+    default:
+      return "bg-slate-100 text-slate-700 ring-slate-200";
+  }
+}
+
+function toneRailClasses(tone: VisualTone): string {
+  switch (tone) {
+    case "positive":
+      return "border-l-emerald-400";
+    case "caution":
+      return "border-l-amber-400";
+    case "critical":
+      return "border-l-rose-400";
+    default:
+      return "border-l-slate-300";
+  }
 }
 
 function roundMetric(value: number): number {
