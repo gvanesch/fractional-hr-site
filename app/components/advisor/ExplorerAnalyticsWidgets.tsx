@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type VisualTone = "positive" | "caution" | "critical" | "neutral";
 
 type PerspectivePoint = {
@@ -25,9 +27,17 @@ export function DiagnosticProfile({
     <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            {title}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {title}
+            </p>
+            <InlineInfo label="Diagnostic profile">
+              Each bar shows the current overall score for one diagnostic dimension on
+              the same 1–5 scale. The profile is intended to show the shape of the
+              diagnostic quickly; exact values and perspective differences remain
+              available in the detailed cards below.
+            </InlineInfo>
+          </div>
           <p className="mt-1 text-sm text-slate-600">
             Common 1–5 scale across the selected diagnostic dimensions.
           </p>
@@ -74,9 +84,16 @@ export function DimensionScoreVisual({
     <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_8.5rem] lg:items-stretch">
       <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {overallLabel}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {overallLabel}
+            </p>
+            <InlineInfo label={overallLabel}>
+              This is the aggregate scored result for the dimension on the diagnostic
+              1–5 scale. It is descriptive evidence, not a pass/fail score and not a
+              statistical significance test.
+            </InlineInfo>
+          </div>
           <p className="text-lg font-semibold tabular-nums text-slate-900">
             {formatMetricValue(overall)}
           </p>
@@ -89,9 +106,17 @@ export function DimensionScoreVisual({
         {perspectives.length > 0 ? (
           <div className="mt-5 border-t border-slate-200 pt-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Perspective comparison
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Perspective comparison
+                </p>
+                <InlineInfo label="Perspective comparison">
+                  HR, Manager and Leadership scores are plotted on the same 1–5 scale
+                  so differences in experience can be seen quickly. A difference is a
+                  diagnostic signal for interpretation, not evidence that one
+                  perspective is correct and another is wrong.
+                </InlineInfo>
+              </div>
               <span className="text-[11px] text-slate-400">1–5 scale</span>
             </div>
             <div className="space-y-3">
@@ -139,9 +164,17 @@ export function GapRing({
           </span>
         </div>
       </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-        {caption}
-      </p>
+      <div className="mt-3 flex items-center justify-center gap-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+          {caption}
+        </p>
+        <InlineInfo label={caption} align="right">
+          The gap is the spread between scored respondent perspectives. Below 0.40 is
+          Aligned, 0.40 to below 0.75 is Emerging gap, and 0.75 or above is
+          Significant gap. These are deterministic descriptive thresholds, not tests
+          of statistical significance.
+        </InlineInfo>
+      </div>
       <p className={`mt-1 text-xs font-semibold ${toneTextClasses(tone)}`}>
         {alignmentLabel ?? "Not available"}
       </p>
@@ -152,7 +185,7 @@ export function GapRing({
 export function ScoreScaleKey({ compact = false }: { compact?: boolean }) {
   return (
     <div
-      className={`flex items-center gap-2 text-[10px] font-medium text-slate-500 ${
+      className={`flex flex-wrap items-center gap-2 text-[10px] font-medium text-slate-500 ${
         compact ? "mt-2 sm:mt-0" : "mt-2"
       }`}
     >
@@ -168,6 +201,25 @@ export function ScoreScaleKey({ compact = false }: { compact?: boolean }) {
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         Strong
       </span>
+      <InlineInfo label="Score strength bands" align="right">
+        <span className="block font-semibold text-white">Weak: below 3.0</span>
+        <span className="mt-1 block">
+          The scored experience is not yet consistently established and is likely to
+          warrant attention.
+        </span>
+        <span className="mt-2 block font-semibold text-white">
+          Moderate: 3.0 to below 4.0
+        </span>
+        <span className="mt-1 block">
+          The capability or experience is present, but evidence suggests it is not yet
+          consistently embedded across the diagnostic population.
+        </span>
+        <span className="mt-2 block font-semibold text-white">Strong: 4.0 or above</span>
+        <span className="mt-1 block">
+          The scored evidence indicates a comparatively well-established operating
+          strength that should generally be retained and understood before change.
+        </span>
+      </InlineInfo>
     </div>
   );
 }
@@ -287,6 +339,46 @@ function ScaleTrack({
         />
       ) : null}
     </div>
+  );
+}
+
+function InlineInfo({
+  label,
+  children,
+  align = "left",
+}: {
+  label: string;
+  children: React.ReactNode;
+  align?: "left" | "right";
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label={`About ${label}`}
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-semibold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E6FD9]/30"
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className={`pointer-events-none absolute top-6 z-50 w-72 rounded-xl bg-slate-950 px-3 py-2.5 text-left text-xs font-normal leading-5 text-white shadow-xl transition ${
+          align === "right" ? "right-0" : "left-0"
+        } ${isOpen ? "visible opacity-100" : "invisible opacity-0"}`}
+      >
+        {children}
+      </span>
+    </span>
   );
 }
 
