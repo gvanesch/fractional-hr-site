@@ -40,22 +40,81 @@ const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "leadership",
 ];
 
+const HR_OPERATIONAL_WEIGHT = 0.55;
+const MANAGER_OPERATIONAL_WEIGHT = 0.45;
+
 function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
 }
 
-function getAverageScore(scores: QuestionnaireTypeScores): number | null {
-  const numericScores = Object.values(scores).filter(
-    (value): value is number => typeof value === "number",
-  );
+/**
+ * Operational maturity is an HR + Manager measure.
+ * Leadership is retained as a separate strategic sponsor lens and must never be
+ * blended into the operational maturity score.
+ *
+ * At this layer the inputs are already aggregated group scores. When both HR and
+ * Manager scores exist we apply the agreed 55/45 weighting. If only one
+ * operational group is available, that group's score is returned and the
+ * completeness flag communicates that the evidence base is incomplete.
+ *
+ * The upstream summary layer is responsible for deciding whether a group score
+ * is sufficiently evidenced for inclusion. That keeps minimum-N policy separate
+ * from the scoring formula itself.
+ */
+function getOperationalAverageScore(
+  scores: QuestionnaireTypeScores,
+): number | null {
+  const hr = typeof scores.hr === "number" ? scores.hr : null;
+  const manager = typeof scores.manager === "number" ? scores.manager : null;
 
-  if (numericScores.length === 0) {
+  if (hr !== null && manager !== null) {
+    return roundToTwoDecimals(
+      hr * HR_OPERATIONAL_WEIGHT + manager * MANAGER_OPERATIONAL_WEIGHT,
+    );
+  }
+
+  if (hr !== null) {
+    return roundToTwoDecimals(hr);
+  }
+
+  if (manager !== null) {
+    return roundToTwoDecimals(manager);
+  }
+
+  return null;
+}
+
+/**
+ * Alignment is specifically the absolute HR-vs-Manager perception gap.
+ * Leadership is not part of operational alignment.
+ */
+function getOperationalGap(scores: QuestionnaireTypeScores): number | null {
+  const hr = typeof scores.hr === "number" ? scores.hr : null;
+  const manager = typeof scores.manager === "number" ? scores.manager : null;
+
+  if (hr === null || manager === null) {
     return null;
   }
 
-  const total = numericScores.reduce((sum, value) => sum + value, 0);
+  return roundToTwoDecimals(Math.abs(hr - manager));
+}
 
-  return roundToTwoDecimals(total / numericScores.length);
+function getOperationalRange(scores: QuestionnaireTypeScores): {
+  maxScore: number | null;
+  minScore: number | null;
+} {
+  const operationalScores = [scores.hr, scores.manager].filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  if (operationalScores.length === 0) {
+    return { maxScore: null, minScore: null };
+  }
+
+  return {
+    maxScore: roundToTwoDecimals(Math.max(...operationalScores)),
+    minScore: roundToTwoDecimals(Math.min(...operationalScores)),
+  };
 }
 
 function getStatus(averageScore: number | null): DimensionStatus | null {
@@ -79,15 +138,15 @@ function getAlignment(gap: number | null): AlignmentStatus | null {
     return null;
   }
 
-  if (gap >= 0.75) {
-    return "significant_gap";
+  if (gap <= 0.5) {
+    return "aligned";
   }
 
-  if (gap >= 0.4) {
+  if (gap <= 1.0) {
     return "emerging_gap";
   }
 
-  return "aligned";
+  return "significant_gap";
 }
 
 function getCompleteness(
@@ -118,7 +177,9 @@ function getCompleteness(
 export function buildDimensionInsight(
   dimension: DimensionInsightInput,
 ): DimensionInsight {
-  const averageScore = getAverageScore(dimension.scores);
+  const averageScore = getOperationalAverageScore(dimension.scores);
+  const gap = getOperationalGap(dimension.scores);
+  const { maxScore, minScore } = getOperationalRange(dimension.scores);
 
   return {
     dimensionKey: dimension.dimensionKey,
@@ -126,13 +187,13 @@ export function buildDimensionInsight(
     dimensionDescription: dimension.dimensionDescription,
     averageScore,
     status: getStatus(averageScore),
-    alignment: getAlignment(dimension.gap),
+    alignment: getAlignment(gap),
     completeness: getCompleteness(dimension.completedQuestionnaireTypes),
     completedQuestionnaireTypes: dimension.completedQuestionnaireTypes,
     missingQuestionnaireTypes: dimension.missingQuestionnaireTypes,
-    gap: dimension.gap,
-    maxScore: dimension.maxScore,
-    minScore: dimension.minScore,
+    gap,
+    maxScore,
+    minScore,
     scores: dimension.scores,
   };
 }
