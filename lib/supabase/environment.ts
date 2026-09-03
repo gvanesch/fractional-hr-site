@@ -3,18 +3,30 @@ export type AppEnvironment = "production" | "qa" | "local";
 const PRODUCTION_SUPABASE_PROJECT_REF = "qxddddhhpfrrxbaunwfw";
 const QA_SUPABASE_PROJECT_REF = "lrlapaiyejvbckqpbrwa";
 
-function getRequiredPublicEnv(name: string): string {
-  const value = process.env[name];
+function getRequiredAppEnvironmentValue(): string {
+  const value = process.env.NEXT_PUBLIC_APP_ENV;
 
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_APP_ENV");
+  }
+
+  return value;
+}
+
+function getRequiredSupabaseUrlValue(): string {
+  const value = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!value) {
+    throw new Error(
+      "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL",
+    );
   }
 
   return value;
 }
 
 export function getAppEnvironment(): AppEnvironment {
-  const value = getRequiredPublicEnv("NEXT_PUBLIC_APP_ENV").trim().toLowerCase();
+  const value = getRequiredAppEnvironmentValue().trim().toLowerCase();
 
   if (value === "production" || value === "qa" || value === "local") {
     return value;
@@ -74,7 +86,7 @@ export function assertSupabaseEnvironment(url: string): {
 }
 
 export function getValidatedSupabaseUrl(): string {
-  const url = getRequiredPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const url = getRequiredSupabaseUrlValue();
   assertSupabaseEnvironment(url);
   return url;
 }
