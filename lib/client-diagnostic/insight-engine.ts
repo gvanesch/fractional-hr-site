@@ -1,12 +1,16 @@
 import { type QuestionnaireType } from "./question-bank";
 
 export type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
+export type QuestionnaireTypeRespondentCounts = Partial<
+  Record<QuestionnaireType, number>
+>;
 
 export type DimensionInsightInput = {
   dimensionKey: string;
   dimensionLabel: string;
   dimensionDescription: string;
   scores: QuestionnaireTypeScores;
+  respondentCounts?: QuestionnaireTypeRespondentCounts;
   completedQuestionnaireTypes: QuestionnaireType[];
   missingQuestionnaireTypes: QuestionnaireType[];
   maxScore: number | null;
@@ -48,22 +52,48 @@ function roundToTwoDecimals(value: number): number {
 }
 
 /**
- * Operational maturity is an HR + Manager measure.
- * Leadership is retained as a separate strategic sponsor lens and must never be
- * blended into the operational maturity score.
+ * Canonical overall diagnostic maturity is the respondent-weighted mean across
+ * all scored respondent perspectives: HR, Manager and Leadership.
  *
- * At this layer the inputs are already aggregated group scores. When both HR and
- * Manager scores exist we apply the agreed 55/45 weighting. If only one
- * operational group is available, that group's score is returned and the
- * completeness flag communicates that the evidence base is incomplete.
+ * Each respondent therefore contributes equally to the aggregate irrespective
+ * of stakeholder group. Group means remain separate interpretive evidence and
+ * Leadership retains its distinct strategic/sponsor interpretation.
  *
- * The upstream summary layer is responsible for deciding whether a group score
- * is sufficiently evidenced for inclusion. That keeps minimum-N policy separate
- * from the scoring formula itself.
+ * The optional respondentCounts property is transitional while the two summary
+ * builders are migrated. Once supplied, it is the canonical calculation path.
+ * Existing callers without counts retain the previous HR/Manager calculation so
+ * this methodology migration can be wired safely without an intermediate break.
  */
-function getOperationalAverageScore(
+function getOverallAverageScore(
   scores: QuestionnaireTypeScores,
+  respondentCounts?: QuestionnaireTypeRespondentCounts,
 ): number | null {
+  if (respondentCounts) {
+    let weightedScoreTotal = 0;
+    let respondentTotal = 0;
+
+    for (const questionnaireType of SCORED_QUESTIONNAIRE_TYPES) {
+      const score = scores[questionnaireType];
+      const respondentCount = respondentCounts[questionnaireType] ?? 0;
+
+      if (
+        typeof score !== "number" ||
+        !Number.isFinite(score) ||
+        !Number.isFinite(respondentCount) ||
+        respondentCount <= 0
+      ) {
+        continue;
+      }
+
+      weightedScoreTotal += score * respondentCount;
+      respondentTotal += respondentCount;
+    }
+
+    return respondentTotal > 0
+      ? roundToTwoDecimals(weightedScoreTotal / respondentTotal)
+      : null;
+  }
+
   const hr = typeof scores.hr === "number" ? scores.hr : null;
   const manager = typeof scores.manager === "number" ? scores.manager : null;
 
@@ -85,8 +115,9 @@ function getOperationalAverageScore(
 }
 
 /**
- * Alignment is specifically the absolute HR-vs-Manager perception gap.
- * Leadership is not part of operational alignment.
+ * Operational alignment remains specifically the absolute HR-vs-Manager
+ * perception gap. Leadership is visible separately rather than being used to
+ * redefine the operational alignment signal.
  */
 function getOperationalGap(scores: QuestionnaireTypeScores): number | null {
   const hr = typeof scores.hr === "number" ? scores.hr : null;
@@ -177,7 +208,10 @@ function getCompleteness(
 export function buildDimensionInsight(
   dimension: DimensionInsightInput,
 ): DimensionInsight {
-  const averageScore = getOperationalAverageScore(dimension.scores);
+  const averageScore = getOverallAverageScore(
+    dimension.scores,
+    dimension.respondentCounts,
+  );
   const gap = getOperationalGap(dimension.scores);
   const { maxScore, minScore } = getOperationalRange(dimension.scores);
 
