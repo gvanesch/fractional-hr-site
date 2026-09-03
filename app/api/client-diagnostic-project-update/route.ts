@@ -1,22 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
-import { createClient } from "@supabase/supabase-js";
-
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase environment variables.");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -55,7 +39,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { error } = await supabase
       .from("client_projects")
