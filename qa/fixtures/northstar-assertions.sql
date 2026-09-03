@@ -45,10 +45,14 @@ order by dimension_key, questionnaire_type;
 -- * Leadership generally optimistic but n=2 and therefore below current
 --   recommended reporting threshold
 
--- 4. Operational maturity and alignment regression.
--- Leadership MUST NOT contribute to either operational_score or operational_gap.
--- Operational maturity = HR 55% + Manager 45% for this fixture because both
--- operational groups meet the current minimum N of 3.
+-- 4. Canonical maturity and alignment regression.
+-- Canonical dimension maturity is the mean across all valid scored respondents:
+-- HR + Manager + Leadership. Each respondent contributes equally, so differently
+-- sized perspective groups contribute in proportion to their valid respondent N.
+--
+-- Perspective interpretation remains separate. HR-vs-Manager absolute gap is the
+-- primary operational alignment signal. Leadership is retained as a separate
+-- strategic/sponsor perspective and is not part of the HR-vs-Manager gap.
 with grouped as (
   select dimension_key,
          questionnaire_type::text as respondent_group,
@@ -56,6 +60,7 @@ with grouped as (
          count(distinct participant_id) as n
   from public.client_dimension_scores
   where project_id='11111111-1111-4111-8111-111111111111'::uuid
+    and questionnaire_type in('hr','manager','leadership')
   group by dimension_key, questionnaire_type
 ), pivoted as (
   select dimension_key,
@@ -73,7 +78,18 @@ select dimension_key,
        round(manager,2) as manager,
        round(leadership,2) as leadership,
        hr_n, manager_n, leadership_n,
-       round(hr*0.55 + manager*0.45,2) as operational_score,
+       round(
+         (
+           coalesce(hr,0) * coalesce(hr_n,0) +
+           coalesce(manager,0) * coalesce(manager_n,0) +
+           coalesce(leadership,0) * coalesce(leadership_n,0)
+         ) /
+         nullif(
+           coalesce(hr_n,0) + coalesce(manager_n,0) + coalesce(leadership_n,0),
+           0
+         ),
+         2
+       ) as maturity_score,
        round(abs(hr-manager),2) as operational_gap,
        case when abs(hr-manager)<=0.5 then 'aligned'
             when abs(hr-manager)<=1.0 then 'emerging_gap'
@@ -81,18 +97,18 @@ select dimension_key,
 from pivoted
 order by dimension_key;
 -- Golden expected outputs:
--- case_management        operational 3.06 / gap 0.02 / aligned
--- change_resilience      operational 2.98 / gap 0.05 / aligned
--- consistency            operational 3.55 / gap 1.00 / emerging_gap
--- data_handoffs          operational 2.55 / gap 1.00 / emerging_gap
--- knowledge_self_service operational 2.55 / gap 1.00 / emerging_gap
--- operational_capacity   operational 2.61 / gap 1.02 / significant_gap
--- ownership              operational 3.49 / gap 0.98 / emerging_gap
--- process_clarity        operational 3.61 / gap 1.02 / significant_gap
--- service_access         operational 2.53 / gap 1.05 / significant_gap
--- systems_enablement     operational 2.51 / gap 0.93 / emerging_gap
+-- case_management        maturity 3.29 / gap 0.02 / aligned
+-- change_resilience      maturity 3.20 / gap 0.05 / aligned
+-- consistency            maturity 3.56 / gap 1.00 / emerging_gap
+-- data_handoffs          maturity 2.78 / gap 1.00 / emerging_gap
+-- knowledge_self_service maturity 2.76 / gap 1.00 / emerging_gap
+-- operational_capacity   maturity 2.62 / gap 1.02 / significant_gap
+-- ownership              maturity 3.51 / gap 0.98 / emerging_gap
+-- process_clarity        maturity 3.62 / gap 1.02 / significant_gap
+-- service_access         maturity 2.76 / gap 1.05 / significant_gap
+-- systems_enablement     maturity 2.73 / gap 0.93 / emerging_gap
 
--- Boundary expectations for alignment classification:
+-- Boundary expectations for HR-vs-Manager alignment classification:
 -- gap <= 0.50  => aligned
 -- gap <= 1.00  => emerging_gap
 -- gap >  1.00  => significant_gap
