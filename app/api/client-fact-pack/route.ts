@@ -4,24 +4,10 @@ import {
   getVerifiedSessionCookieName,
   validateParticipantVerifiedSession,
 } from "@/lib/security/client-participant-otp";
-import { createClient } from "@supabase/supabase-js";
-
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f-]{36}$/i.test(value);
-}
-
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error("Missing Supabase environment variables.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 export async function GET(request: Request) {
@@ -46,7 +32,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data: participant, error: participantError } = await supabase
       .from("client_participants")

@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import AdvisorProjectNav from "@/app/components/advisor/AdvisorProjectNav";
 import AdvisorProjectDashboardClient from "@/app/components/advisor/AdvisorProjectDashboardClient";
 
 export const metadata = {
@@ -39,5 +41,27 @@ export default async function AdvisorProjectWorkspacePage({
     notFound();
   }
 
-  return <AdvisorProjectDashboardClient projectId={projectId} />;
+  const supabase = createSupabaseAdminClient();
+  const { data: project } = await supabase
+    .from("client_projects")
+    .select("project_name, company_name")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  const projectLabel =
+    project?.project_name?.trim() ||
+    project?.company_name?.trim() ||
+    "Diagnostic project";
+  const crmSearchTerm = project?.company_name?.trim() || projectLabel;
+
+  return (
+    <>
+      <AdvisorProjectNav
+        projectId={projectId}
+        projectLabel={projectLabel}
+        crmSearchTerm={crmSearchTerm}
+      />
+      <AdvisorProjectDashboardClient projectId={projectId} />
+    </>
+  );
 }

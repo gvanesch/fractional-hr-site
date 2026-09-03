@@ -1,10 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
-import AdvisorDiagnosticExplorerClient from "@/app/components/advisor/AdvisorDiagnosticExplorerClient";
+import AdvisorProjectNav from "@/app/components/advisor/AdvisorProjectNav";
+import AdvisorDiagnosticExplorerClient from "@/app/components/advisor/AdvisorDiagnosticExplorerClientV2";
 import {
   buildProjectSummary,
   BuildProjectSummaryError,
 } from "@/lib/client-diagnostic/build-project-summary";
+import { buildExplorerCohort } from "@/lib/client-diagnostic/build-explorer-cohort";
+import styles from "./explorer.module.css";
 
 export const metadata = {
   title: "Diagnostic Explorer | Van Esch Advisory",
@@ -16,10 +19,13 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 type PageProps = {
   params: Promise<{
     projectId: string;
   }>;
+  searchParams: Promise<SearchParams>;
 };
 
 function isUuid(value: string): boolean {
@@ -28,8 +34,53 @@ function isUuid(value: string): boolean {
   );
 }
 
+function queryValues(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return value ? [value] : [];
+}
+
+function firstQueryValue(value: string | string[] | undefined): string | null {
+  return queryValues(value)[0] ?? null;
+}
+
+function parseRequestedFilters(searchParams: SearchParams): Record<string, string[]> {
+  const filters: Record<string, string[]> = {};
+
+  for (const [key, rawValue] of Object.entries(searchParams)) {
+    if (!key.startsWith("segment.")) {
+      continue;
+    }
+
+    const segmentationKey = key.slice("segment.".length);
+    if (!segmentationKey) {
+      continue;
+    }
+
+    filters[segmentationKey] = queryValues(rawValue);
+  }
+
+  if (Object.keys(filters).length > 0) {
+    return filters;
+  }
+
+  // Backward compatibility for Explorer links created before multidimensional
+  // filtering. New navigation uses segment.<dimension>=<value> query keys.
+  const legacyViewBy = firstQueryValue(searchParams.viewBy);
+  const legacyValues = queryValues(searchParams.segment);
+
+  if (legacyViewBy && legacyViewBy !== "overall" && legacyValues.length > 0) {
+    filters[legacyViewBy] = legacyValues;
+  }
+
+  return filters;
+}
+
 export default async function AdvisorDiagnosticExplorerPage({
   params,
+  searchParams,
 }: PageProps) {
   const advisorUser = await requireAdvisorUser();
 
@@ -43,16 +94,26 @@ export default async function AdvisorDiagnosticExplorerPage({
     notFound();
   }
 
+  const resolvedSearchParams = await searchParams;
+  const requestedFilters = parseRequestedFilters(resolvedSearchParams);
+
   let summary;
+  let explorerCohort;
 
   try {
     summary = await buildProjectSummary(projectId);
+    explorerCohort = await buildExplorerCohort({
+      projectId,
+      requestedFilters,
+      availableKeys: summary.segmentation.availableKeys,
+      reportingMinN: summary.reportingPolicy.segmentReportingMinN,
+    });
   } catch (error) {
     if (error instanceof BuildProjectSummaryError && error.status === 404) {
       notFound();
     }
 
-    console.error("[advisor-diagnostic-explorer-page] failed to build summary", {
+    console.error("[advisor-diagnostic-explorer-page] failed to build explorer", {
       projectId,
       error,
       message: error instanceof Error ? error.message : "Unknown error",
@@ -62,5 +123,63 @@ export default async function AdvisorDiagnosticExplorerPage({
     throw error;
   }
 
-  return <AdvisorDiagnosticExplorerClient summary={summary} />;
+  const reportingMinN = summary.reportingPolicy.segmentReportingMinN;
+  const hasNarrowingFilters =
+    explorerCohort.filters.length > 0 && !explorerCohort.isOverallEquivalent;
+  const hasRestrictedPerspective = Object.values(explorerCohort.respondentGroups).some(
+    (count) => count > 0 && count < reportingMinN,
+  );
+  const qualitativeRestricted =
+    explorerCohort.qualitative.disclosureControl.status !== "visible";
+  const showRestrictedEvidenceNotice =
+    hasNarrowingFilters &&
+    (explorerCohort.respondentCount < reportingMinN ||
+      hasRestrictedPerspective ||
+      qualitativeRestricted);
+  const isEffectivelyIndividual =
+    hasNarrowingFilters && explorerCohort.respondentCount === 1;
+
+  return (
+    <>
+      <AdvisorProjectNav
+        projectId={projectId}
+        projectLabel={summary.project.companyName}
+        crmSearchTerm={summary.project.companyName}
+      />
+
+      <div className={styles.explorerPage}>
+        {showRestrictedEvidenceNotice ? (
+          <div className="border-b border-rose-200 bg-rose-50">
+            <div className="brand-container py-4">
+              <div className="rounded-2xl border border-rose-200 bg-white px-5 py-4 text-sm leading-6 text-rose-950 shadow-sm">
+                <p className="font-semibold">
+                  {isEffectivelyIndividual
+                    ? "Highly restricted filtered evidence"
+                    : "Restricted filtered evidence"}
+                </p>
+                <p className="mt-1">
+                  {isEffectivelyIndividual
+                    ? `This filter resolves to one respondent. Quantitative scores remain advisor-visible only as a qualified individual-level signal. Verbatim written responses are withheld server-side.`
+                    : `One or more parts of this filtered cohort fall below the current n=${reportingMinN} threshold. Low-N quantitative signals remain advisor-visible for qualified interpretation, while verbatim comments from restricted cohorts or respondent perspectives are withheld server-side.`}
+                </p>
+                {explorerCohort.qualitative.withheldCommentCount > 0 ? (
+                  <p className="mt-1 font-medium">
+                    {explorerCohort.qualitative.withheldCommentCount} written
+                    {explorerCohort.qualitative.withheldCommentCount === 1
+                      ? " response is"
+                      : " responses are"} withheld in this view.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <AdvisorDiagnosticExplorerClient
+          summary={summary}
+          explorerCohort={explorerCohort}
+        />
+      </div>
+    </>
+  );
 }

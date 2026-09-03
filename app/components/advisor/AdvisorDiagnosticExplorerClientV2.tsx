@@ -9,6 +9,15 @@ import type {
   ExplorerCohortFilter,
   ExplorerPerspective,
 } from "@/lib/client-diagnostic/build-explorer-cohort";
+import {
+  alignmentFromGap,
+  DiagnosticProfile,
+  DimensionScoreVisual,
+  ScoreScaleKey,
+  scoreTone,
+  strengthTone,
+  visiblePerspectiveGap,
+} from "@/app/components/advisor/ExplorerAnalyticsWidgets";
 
 type AdvisorDiagnosticExplorerClientProps = {
   summary: ProjectSummaryResponse;
@@ -29,7 +38,7 @@ const PERSPECTIVE_LABELS: Record<Perspective, string> = {
   leadership: "Leadership",
 };
 
-export default function AdvisorDiagnosticExplorerClient({
+export default function AdvisorDiagnosticExplorerClientV2({
   summary,
   explorerCohort,
 }: AdvisorDiagnosticExplorerClientProps) {
@@ -110,6 +119,21 @@ export default function AdvisorDiagnosticExplorerClient({
       (dimensionKey === "all" || dimension.dimensionKey === dimensionKey),
   );
 
+  const profileDimensions = hasNarrowingFilters
+    ? visibleCohortDimensions.map((dimension) => ({
+        key: dimension.dimensionKey,
+        label:
+          summary.dimensions.find(
+            (item) => item.dimensionKey === dimension.dimensionKey,
+          )?.dimensionLabel ?? formatLabel(dimension.dimensionKey),
+        value: dimension.averageScore,
+      }))
+    : visibleOverallDimensions.map((dimension) => ({
+        key: dimension.dimensionKey,
+        label: dimension.dimensionLabel,
+        value: dimension.averageScore,
+      }));
+
   function selectedValuesFor(key: string): string[] {
     return selectionMap.get(key) ?? [];
   }
@@ -162,10 +186,7 @@ export default function AdvisorDiagnosticExplorerClient({
     );
 
     if (nextSelectedValues.length > 0) {
-      nextSelections.push({
-        key,
-        values: nextSelectedValues,
-      });
+      nextSelections.push({ key, values: nextSelectedValues });
     }
 
     navigateSelections(nextSelections);
@@ -182,10 +203,7 @@ export default function AdvisorDiagnosticExplorerClient({
 
     navigateSelections([
       ...explorerCohort.selections.filter((selection) => selection.key !== key),
-      {
-        key,
-        values: availableKey.values,
-      },
+      { key, values: availableKey.values },
     ]);
   }
 
@@ -196,9 +214,7 @@ export default function AdvisorDiagnosticExplorerClient({
   }
 
   function togglePerspective(perspective: Perspective) {
-    const activeCount = selectedPerspectives.length;
-
-    if (perspectives[perspective] && activeCount === 1) {
+    if (perspectives[perspective] && selectedPerspectives.length === 1) {
       return;
     }
 
@@ -240,13 +256,11 @@ export default function AdvisorDiagnosticExplorerClient({
           </div>
 
           <div className="mt-5 rounded-2xl border border-amber-300/50 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-950">
-            <p className="font-semibold">
-              Advisor confidential. Not for client distribution.
-            </p>
+            <p className="font-semibold">Advisor confidential. Not for client distribution.</p>
             <p className="mt-1">
-              This workspace may contain sensitive evidence and results that
-              are not permitted for client reporting. Advisor visibility does
-              not imply that a result can be shared with the client.
+              This workspace may contain sensitive evidence and results that are not
+              permitted for client reporting. Advisor visibility does not imply that
+              a result can be shared with the client.
             </p>
           </div>
         </div>
@@ -311,9 +325,7 @@ export default function AdvisorDiagnosticExplorerClient({
                           {hasSelection ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                clearSegmentFilter(segmentationDimension.key)
-                              }
+                              onClick={() => clearSegmentFilter(segmentationDimension.key)}
                               disabled={isPending}
                               className="text-xs font-medium text-[#1E6FD9] hover:text-[#1859ad] disabled:cursor-wait disabled:text-slate-400"
                             >
@@ -378,10 +390,7 @@ export default function AdvisorDiagnosticExplorerClient({
               >
                 <option value="all">All dimensions</option>
                 {summary.dimensions.map((dimension) => (
-                  <option
-                    key={dimension.dimensionKey}
-                    value={dimension.dimensionKey}
-                  >
+                  <option key={dimension.dimensionKey} value={dimension.dimensionKey}>
                     {dimension.dimensionLabel}
                   </option>
                 ))}
@@ -407,9 +416,9 @@ export default function AdvisorDiagnosticExplorerClient({
                 </span>
                 <InfoTooltip label="Client reporting threshold">
                   This threshold controls one part of client-facing reporting
-                  granularity and confidentiality. Evidence below the threshold
-                  may still inform advisor interpretation. Meeting the threshold
-                  does not by itself make a result safe to share with a client.
+                  granularity and confidentiality. Evidence below the threshold may
+                  still inform advisor interpretation. Meeting the threshold does not
+                  by itself make a result safe to share with a client.
                 </InfoTooltip>
               </div>
             </div>
@@ -427,16 +436,12 @@ export default function AdvisorDiagnosticExplorerClient({
 
                 <div className="flex flex-wrap gap-2 text-sm">
                   {isPending ? <StatusPill>Updating analysis...</StatusPill> : null}
-                  <StatusPill>
-                    {explorerCohort.respondentCount} scored respondents
-                  </StatusPill>
+                  <StatusPill>{explorerCohort.respondentCount} scored respondents</StatusPill>
                   <StatusPill>
                     {presentPerspectives.length}/3 scored perspectives present
                   </StatusPill>
                   <StatusPill>
-                    {factPackAvailable
-                      ? "Fact Pack complete"
-                      : "Fact Pack not available"}
+                    {factPackAvailable ? "Fact Pack complete" : "Fact Pack not available"}
                   </StatusPill>
                   <StatusPill>
                     {summary.segmentation.availableKeys.length} segmentation dimensions
@@ -450,6 +455,11 @@ export default function AdvisorDiagnosticExplorerClient({
               description="Canonical scored evidence. Segmentation filters use OR within each dimension and AND across dimensions; filtered cohorts are calculated from participant-level evidence on the server. Respondent perspective controls which group scores are visible."
             >
               <AnalyticsLegend />
+              <DiagnosticProfile
+                title={hasNarrowingFilters ? "Filtered cohort profile" : "Diagnostic profile"}
+                dimensions={profileDimensions}
+              />
+
               {hasNarrowingFilters ? (
                 <>
                   <CohortContextCard cohort={explorerCohort} />
@@ -493,10 +503,10 @@ export default function AdvisorDiagnosticExplorerClient({
                 <>
                   {selectedPerspectives.length < 3 ? (
                     <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                      Respondent perspective visibility currently applies to
-                      scored analytics only. Qualitative summaries remain
-                      whole-project evidence and are not presented as though
-                      they were filtered to {selectedPerspectiveLabel}.
+                      Respondent perspective visibility currently applies to scored
+                      analytics only. Qualitative summaries remain whole-project
+                      evidence and are not presented as though they were filtered to{" "}
+                      {selectedPerspectiveLabel}.
                     </div>
                   ) : null}
                   <OverallQualitativeCard summary={summary} />
@@ -540,6 +550,23 @@ export default function AdvisorDiagnosticExplorerClient({
   );
 }
 
+function AnalyticsLegend() {
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+          Visual scale
+        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Score markers use the existing Weak, Moderate and Strong thresholds.
+          Gap rings use the existing Aligned, Emerging gap and Significant gap thresholds.
+        </p>
+      </div>
+      <ScoreScaleKey compact />
+    </div>
+  );
+}
+
 function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
   const meetsCurrentThreshold = cohort.confidentialityStatus === "reportable";
   const highlyRestricted = cohort.respondentCount === 1;
@@ -549,7 +576,8 @@ function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{cohort.respondentCount} respondents</Badge>
         <Badge>
-          {cohort.filters.length} active segmentation {cohort.filters.length === 1 ? "filter" : "filters"}
+          {cohort.filters.length} active segmentation{" "}
+          {cohort.filters.length === 1 ? "filter" : "filters"}
         </Badge>
         <Badge>{formatLabel(cohort.analyticalStrength)} analytical strength</Badge>
         {cohort.respondentCount > 0 ? (
@@ -573,41 +601,13 @@ function CohortContextCard({ cohort }: { cohort: ExplorerCohort }) {
         </InfoTooltip>
         {highlyRestricted ? (
           <InfoTooltip label="Highly restricted evidence">
-            This filtered cohort contains one scored respondent. Quantitative
-            results therefore represent effectively individual-level evidence.
-            Use them only as a qualified advisor signal. Verbatim written
-            responses are withheld by the qualitative disclosure controls.
+            This filtered cohort contains one scored respondent. Quantitative results
+            therefore represent effectively individual-level evidence. Use them only
+            as a qualified advisor signal. Verbatim written responses are withheld by
+            the qualitative disclosure controls.
           </InfoTooltip>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function AnalyticsLegend() {
-  return (
-    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Score / strength
-          </span>
-          <SignalPill tone="positive">Strong</SignalPill>
-          <SignalPill tone="caution">Moderate</SignalPill>
-          <SignalPill tone="critical">Weak</SignalPill>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Alignment / gap
-          </span>
-          <SignalPill tone="positive">Aligned</SignalPill>
-          <SignalPill tone="caution">Emerging gap</SignalPill>
-          <SignalPill tone="critical">Significant gap</SignalPill>
-        </div>
-      </div>
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        Colours reflect existing deterministic classifications. Privacy and client-reporting controls remain separate.
-      </p>
     </div>
   );
 }
@@ -639,76 +639,41 @@ function DimensionAnalyticsCard({
   dimension: DimensionAnalysis;
   perspectives: Record<Perspective, boolean>;
 }) {
-  const strengthVisualTone = strengthTone(dimension.strength);
+  const perspectivePoints = (Object.keys(PERSPECTIVE_LABELS) as Perspective[])
+    .filter((perspective) => perspectives[perspective])
+    .map((perspective) => ({
+      key: perspective,
+      label: PERSPECTIVE_LABELS[perspective],
+      value: dimension.scores[perspective],
+    }));
 
   return (
-    <article
-      className={`rounded-2xl border border-l-4 border-slate-200 bg-white p-5 ${toneRailClasses(strengthVisualTone)}`}
-    >
+    <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold text-slate-900">
-            {dimension.dimensionLabel}
-          </h3>
+          <h3 className="font-semibold text-slate-900">{dimension.dimensionLabel}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
             {dimension.dimensionDescription}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <SignalPill tone={strengthVisualTone}>
+          <SignalPill tone={strengthTone(dimension.strength)}>
             {formatLabel(dimension.strength)}
           </SignalPill>
           <InfoTooltip label={`${dimension.dimensionLabel} strength`}>
-            Strength is based on the deterministic overall dimension score:
-            Weak below 3.0, Moderate from 3.0 to below 4.0, and Strong from 4.0.
-            Current overall score: {formatMetricValue(dimension.averageScore)}.
+            Strength is based on the deterministic overall dimension score: Weak
+            below 3.0, Moderate from 3.0 to below 4.0, and Strong from 4.0. Current
+            overall score: {formatMetricValue(dimension.averageScore)}.
           </InfoTooltip>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric
-          label="Overall"
-          value={formatMetricValue(dimension.averageScore)}
-          tone={scoreTone(dimension.averageScore)}
-        />
-        {perspectives.hr ? (
-          <Metric
-            label="HR"
-            value={formatMetricValue(dimension.scores.hr)}
-            tone={scoreTone(dimension.scores.hr)}
-          />
-        ) : null}
-        {perspectives.manager ? (
-          <Metric
-            label="Manager"
-            value={formatMetricValue(dimension.scores.manager)}
-            tone={scoreTone(dimension.scores.manager)}
-          />
-        ) : null}
-        {perspectives.leadership ? (
-          <Metric
-            label="Leadership"
-            value={formatMetricValue(dimension.scores.leadership)}
-            tone={scoreTone(dimension.scores.leadership)}
-          />
-        ) : null}
-        <Metric
-          label="Gap"
-          value={formatMetricValue(dimension.gap)}
-          tone={gapTone(dimension.gap)}
-        />
-        <MetricWithInfo
-          label="Alignment"
-          value={formatLabel(dimension.alignment)}
-          infoLabel={`${dimension.dimensionLabel} alignment`}
-          tone={alignmentTone(dimension.alignment)}
-        >
-          Alignment uses the observed respondent-group gap. Below 0.40 is
-          Aligned, 0.40 to below 0.75 is Emerging gap, and 0.75 or above is
-          Significant gap. Current gap: {formatMetricValue(dimension.gap)}.
-        </MetricWithInfo>
-      </div>
+      <DimensionScoreVisual
+        overall={dimension.averageScore}
+        perspectives={perspectivePoints}
+        gap={dimension.gap}
+        alignmentLabel={formatLabel(dimension.alignment)}
+      />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <PillWithInfo
@@ -744,12 +709,21 @@ function CohortDimensionCard({
     (item) => item.dimensionKey === dimension.dimensionKey,
   );
   const meetsCurrentThreshold = dimension.clientReporting.status === "reportable";
-  const cohortVisualTone = scoreTone(dimension.averageScore);
+  const perspectivePoints = (Object.keys(PERSPECTIVE_LABELS) as Perspective[])
+    .filter(
+      (perspective) => perspectives[perspective] && dimension.groups[perspective].n > 0,
+    )
+    .map((perspective) => ({
+      key: perspective,
+      label: `${PERSPECTIVE_LABELS[perspective]} · n=${dimension.groups[perspective].n}`,
+      value: dimension.groups[perspective].mean,
+    }));
+  const visibleGap = visiblePerspectiveGap(
+    perspectivePoints.map((point) => point.value),
+  );
 
   return (
-    <article
-      className={`rounded-2xl border border-l-4 border-slate-200 bg-white p-5 ${toneRailClasses(cohortVisualTone)}`}
-    >
+    <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-semibold text-slate-900">
@@ -761,7 +735,11 @@ function CohortDimensionCard({
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <SignalPill tone={scoreTone(dimension.averageScore)}>
+            {strengthLabelFromScore(dimension.averageScore)}
+          </SignalPill>
+          <Badge>{dimension.respondentCount} respondents</Badge>
           <Badge>
             {meetsCurrentThreshold
               ? "Meets current client threshold"
@@ -775,35 +753,14 @@ function CohortDimensionCard({
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric
-          label="Cohort average"
-          value={formatMetricValue(dimension.averageScore)}
-          tone={cohortVisualTone}
-        />
-        {perspectives.hr && dimension.groups.hr.n > 0 ? (
-          <Metric
-            label={`HR · n=${dimension.groups.hr.n}`}
-            value={formatMetricValue(dimension.groups.hr.mean)}
-            tone={scoreTone(dimension.groups.hr.mean)}
-          />
-        ) : null}
-        {perspectives.manager && dimension.groups.manager.n > 0 ? (
-          <Metric
-            label={`Manager · n=${dimension.groups.manager.n}`}
-            value={formatMetricValue(dimension.groups.manager.mean)}
-            tone={scoreTone(dimension.groups.manager.mean)}
-          />
-        ) : null}
-        {perspectives.leadership && dimension.groups.leadership.n > 0 ? (
-          <Metric
-            label={`Leadership · n=${dimension.groups.leadership.n}`}
-            value={formatMetricValue(dimension.groups.leadership.mean)}
-            tone={scoreTone(dimension.groups.leadership.mean)}
-          />
-        ) : null}
-        <Metric label="Respondents" value={String(dimension.respondentCount)} />
-      </div>
+      <DimensionScoreVisual
+        overallLabel="Cohort average"
+        overall={dimension.averageScore}
+        perspectives={perspectivePoints}
+        gap={visibleGap}
+        alignmentLabel={alignmentFromGap(visibleGap)}
+        gapCaption="Visible perspective gap"
+      />
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(Object.keys(PERSPECTIVE_LABELS) as Perspective[])
@@ -819,12 +776,20 @@ function CohortDimensionCard({
                 label={`${PERSPECTIVE_LABELS[perspective]}: advisor only`}
                 infoLabel={`${PERSPECTIVE_LABELS[perspective]} client reporting`}
               >
-                This exact subgroup result is available to the advisor but is
-                below the current client-reporting threshold. It should not be
-                treated as client-shareable.
+                This exact subgroup result is available to the advisor but is below
+                the current client-reporting threshold. It should not be treated as
+                client-shareable.
               </PillWithInfo>
             ) : null;
           })}
+        <PillWithInfo
+          label="Visible gap: display calculation"
+          infoLabel="Visible perspective gap"
+        >
+          The ring shows the maximum spread between the respondent perspectives
+          currently visible in this card. It is a display aid derived from the
+          server-provided subgroup means, not a separate client-reporting statistic.
+        </PillWithInfo>
       </div>
     </article>
   );
@@ -876,9 +841,7 @@ function FilteredQualitativeEvidence({
           <span className="font-semibold">Filtered qualitative evidence</span>
           <Badge>{sourceCommentCount} submitted</Badge>
           <Badge>{visibleCommentCount} visible</Badge>
-          {withheldCommentCount > 0 ? (
-            <Badge>{withheldCommentCount} withheld</Badge>
-          ) : null}
+          {withheldCommentCount > 0 ? <Badge>{withheldCommentCount} withheld</Badge> : null}
           <Badge>{sourcePerspectives.size} perspectives</Badge>
         </div>
         <p className="mt-2">
@@ -889,17 +852,18 @@ function FilteredQualitativeEvidence({
         </p>
         {hasWithheldEvidence ? (
           <p className="mt-2 font-medium text-amber-950">
-            {withheldCommentCount} written {withheldCommentCount === 1 ? "response exists" : "responses exist"}
-            {" "}in this filtered view but {withheldCommentCount === 1 ? "is" : "are"}
-            {" "}not displayed because the disclosure controls limit identifiable
-            qualitative evidence. {withheldExplanation}
+            {withheldCommentCount} written{" "}
+            {withheldCommentCount === 1 ? "response exists" : "responses exist"}{" "}
+            in this filtered view but {withheldCommentCount === 1 ? "is" : "are"} not
+            displayed because the disclosure controls limit identifiable qualitative
+            evidence. {withheldExplanation}
           </p>
         ) : null}
         {perspectivesFiltered ? (
           <p className="mt-2 text-amber-900">
-            Respondent perspective visibility currently applies to scored
-            analytics only. Qualitative disclosure controls are evaluated against
-            the full filtered cohort rather than only {selectedPerspectiveLabel}.
+            Respondent perspective visibility currently applies to scored analytics
+            only. Qualitative disclosure controls are evaluated against the full
+            filtered cohort rather than only {selectedPerspectiveLabel}.
           </p>
         ) : null}
       </div>
@@ -958,18 +922,17 @@ function FilteredQualitativeDimensionCard({
             className="rounded-xl bg-slate-50 p-4"
           >
             <Badge>{PERSPECTIVE_LABELS[comment.questionnaireType]}</Badge>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {comment.commentText}
-            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{comment.commentText}</p>
           </div>
         ))}
 
         {dimension.withheldCommentCount > 0 ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            {dimension.withheldCommentCount} written {dimension.withheldCommentCount === 1 ? "response is" : "responses are"}
-            {" "}withheld for this dimension because the applicable privacy
-            threshold is not met. The existence and count of the evidence are
-            shown, but the verbatim text is not returned to the Explorer client.
+            {dimension.withheldCommentCount} written{" "}
+            {dimension.withheldCommentCount === 1 ? "response is" : "responses are"}{" "}
+            withheld for this dimension because the applicable privacy threshold is
+            not met. The existence and count of the evidence are shown, but the
+            verbatim text is not returned to the Explorer client.
           </div>
         ) : null}
       </div>
@@ -997,9 +960,7 @@ function OverallQualitativeCard({ summary }: { summary: ProjectSummaryResponse }
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <StatusPill>{qualitative.totalCommentCount} comments</StatusPill>
-          <StatusPill>
-            {qualitative.respondentGroupsWithComments.length} groups
-          </StatusPill>
+          <StatusPill>{qualitative.respondentGroupsWithComments.length} groups</StatusPill>
         </div>
       </div>
 
@@ -1016,17 +977,11 @@ function OverallQualitativeCard({ summary }: { summary: ProjectSummaryResponse }
   );
 }
 
-function QualitativeDimensionCard({
-  dimension,
-}: {
-  dimension: DimensionQualitative;
-}) {
+function QualitativeDimensionCard({ dimension }: { dimension: DimensionQualitative }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h3 className="font-semibold text-slate-900">
-          {dimension.dimensionLabel}
-        </h3>
+        <h3 className="font-semibold text-slate-900">{dimension.dimensionLabel}</h3>
         <div className="flex items-center gap-1.5">
           <Badge>{formatLabel(dimension.confidence)} confidence</Badge>
           <InfoTooltip label={`${dimension.dimensionLabel} qualitative confidence`}>
@@ -1037,17 +992,15 @@ function QualitativeDimensionCard({
               ? " perspective"
               : " perspectives"}
             . The current model classifies that evidence as {dimension.confidence}{" "}
-            qualitative confidence. Treat the comments as contextual evidence,
-            not scored evidence.
+            qualitative confidence. Treat the comments as contextual evidence, not
+            scored evidence.
           </InfoTooltip>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <SubtlePill>{dimension.commentCount} comments</SubtlePill>
-        <SubtlePill>
-          {dimension.respondentGroupsWithComments.length} groups
-        </SubtlePill>
+        <SubtlePill>{dimension.respondentGroupsWithComments.length} groups</SubtlePill>
         <SubtlePill>{dimension.keyThemes.length} themes</SubtlePill>
       </div>
 
@@ -1112,77 +1065,9 @@ function CheckboxFilter({
           : "cursor-pointer text-slate-700"
       }`}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-      />
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} />
       {label}
     </label>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  tone?: VisualTone;
-}) {
-  return (
-    <div className={`rounded-xl border px-3 py-3 ${metricToneClasses(tone)}`}>
-      <div className="flex items-center gap-2">
-        {tone !== "neutral" ? (
-          <span
-            aria-hidden="true"
-            className={`h-2 w-2 shrink-0 rounded-full ${toneDotClasses(tone)}`}
-          />
-        ) : null}
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          {label}
-        </p>
-      </div>
-      <p className={`mt-1 text-sm font-semibold ${toneTextClasses(tone)}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function MetricWithInfo({
-  label,
-  value,
-  infoLabel,
-  children,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  infoLabel: string;
-  children: React.ReactNode;
-  tone?: VisualTone;
-}) {
-  return (
-    <div className={`rounded-xl border px-3 py-3 ${metricToneClasses(tone)}`}>
-      <div className="flex items-center gap-1.5">
-        {tone !== "neutral" ? (
-          <span
-            aria-hidden="true"
-            className={`h-2 w-2 shrink-0 rounded-full ${toneDotClasses(tone)}`}
-          />
-        ) : null}
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          {label}
-        </p>
-        <InfoTooltip label={infoLabel}>{children}</InfoTooltip>
-      </div>
-      <p className={`mt-1 text-sm font-semibold ${toneTextClasses(tone)}`}>
-        {value}
-      </p>
-    </div>
   );
 }
 
@@ -1197,10 +1082,7 @@ function SignalPill({
     <span
       className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${signalToneClasses(tone)}`}
     >
-      <span
-        aria-hidden="true"
-        className={`h-1.5 w-1.5 rounded-full ${toneDotClasses(tone)}`}
-      />
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${toneDotClasses(tone)}`} />
       {children}
     </span>
   );
@@ -1293,107 +1175,17 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function scoreTone(value: number | null): VisualTone {
+function strengthLabelFromScore(value: number | null): string {
   if (typeof value !== "number") {
-    return "neutral";
+    return "Not available";
   }
-
   if (value >= 4) {
-    return "positive";
+    return "Strong";
   }
-
   if (value >= 3) {
-    return "caution";
+    return "Moderate";
   }
-
-  return "critical";
-}
-
-function strengthTone(value: string | null): VisualTone {
-  if (value === "strong") {
-    return "positive";
-  }
-
-  if (value === "moderate") {
-    return "caution";
-  }
-
-  if (value === "weak") {
-    return "critical";
-  }
-
-  return "neutral";
-}
-
-function gapTone(value: number | null): VisualTone {
-  if (typeof value !== "number") {
-    return "neutral";
-  }
-
-  if (value < 0.4) {
-    return "positive";
-  }
-
-  if (value < 0.75) {
-    return "caution";
-  }
-
-  return "critical";
-}
-
-function alignmentTone(value: string | null): VisualTone {
-  if (value === "aligned") {
-    return "positive";
-  }
-
-  if (value === "emerging_gap") {
-    return "caution";
-  }
-
-  if (value === "significant_gap") {
-    return "critical";
-  }
-
-  return "neutral";
-}
-
-function metricToneClasses(tone: VisualTone): string {
-  switch (tone) {
-    case "positive":
-      return "border-emerald-200 bg-emerald-50/70";
-    case "caution":
-      return "border-amber-200 bg-amber-50/70";
-    case "critical":
-      return "border-rose-200 bg-rose-50/70";
-    default:
-      return "border-slate-200 bg-slate-50";
-  }
-}
-
-function toneTextClasses(tone: VisualTone): string {
-  switch (tone) {
-    case "positive":
-      return "text-emerald-800";
-    case "caution":
-      return "text-amber-800";
-    case "critical":
-      return "text-rose-700";
-    default:
-      return "text-slate-900";
-  }
-}
-
-function toneDotClasses(tone: VisualTone): string {
-  switch (tone) {
-    case "positive":
-      return "bg-emerald-500";
-    case "caution":
-      return "bg-amber-500";
-    case "critical":
-      return "bg-rose-500";
-    default:
-      return "bg-slate-400";
-  }
+  return "Weak";
 }
 
 function signalToneClasses(tone: VisualTone): string {
@@ -1409,16 +1201,16 @@ function signalToneClasses(tone: VisualTone): string {
   }
 }
 
-function toneRailClasses(tone: VisualTone): string {
+function toneDotClasses(tone: VisualTone): string {
   switch (tone) {
     case "positive":
-      return "border-l-emerald-400";
+      return "bg-emerald-500";
     case "caution":
-      return "border-l-amber-400";
+      return "bg-amber-500";
     case "critical":
-      return "border-l-rose-400";
+      return "bg-rose-500";
     default:
-      return "border-l-slate-300";
+      return "bg-slate-400";
   }
 }
 

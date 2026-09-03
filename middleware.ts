@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import { checkClientDiagnosticInviteRateLimit } from "@/lib/security/client-diagnostic-invite-rate-limit";
+import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
 
 function applyProtectedHeaders(response: NextResponse) {
   response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -101,6 +102,31 @@ async function protectClientDiagnosticInvite(
   }
 }
 
+function protectPublicSupabaseWrite(): NextResponse {
+  try {
+    getValidatedSupabaseUrl();
+    return NextResponse.next();
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "public_supabase_environment_mismatch",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown Supabase environment validation error.",
+      }),
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Service temporarily unavailable.",
+      },
+      { status: 503 },
+    );
+  }
+}
+
 async function protectAdvisorRoute(
   request: NextRequest,
 ): Promise<NextResponse> {
@@ -108,7 +134,7 @@ async function protectAdvisorRoute(
   const response = NextResponse.next();
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getValidatedSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -160,6 +186,13 @@ async function protectAdvisorRoute(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (
+    pathname === "/api/diagnostic-complete" ||
+    pathname === "/api/contact"
+  ) {
+    return protectPublicSupabaseWrite();
+  }
+
   if (pathname.startsWith("/client-diagnostic/respond/")) {
     return protectClientDiagnosticInvite(request);
   }
@@ -179,5 +212,7 @@ export const config = {
   matcher: [
     "/advisor/:path*",
     "/client-diagnostic/respond/:path*",
+    "/api/diagnostic-complete",
+    "/api/contact",
   ],
 };
