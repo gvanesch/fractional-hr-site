@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import AdvisorProjectNav from "@/app/components/advisor/AdvisorProjectNav";
-import AdvisorDiagnosticExplorerClient from "@/app/components/advisor/AdvisorDiagnosticExplorerClient";
+import AdvisorDiagnosticExplorerClient from "@/app/components/advisor/AdvisorDiagnosticExplorerClientV2";
 import {
   buildProjectSummary,
   BuildProjectSummaryError,
