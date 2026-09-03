@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import { checkClientDiagnosticInviteRateLimit } from "@/lib/security/client-diagnostic-invite-rate-limit";
+import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
 
 function applyProtectedHeaders(response: NextResponse) {
   response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -108,7 +109,7 @@ async function protectAdvisorRoute(
   const response = NextResponse.next();
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getValidatedSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
