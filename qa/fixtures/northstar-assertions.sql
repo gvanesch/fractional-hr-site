@@ -45,24 +45,57 @@ order by dimension_key, questionnaire_type;
 -- * Leadership generally optimistic but n=2 and therefore below current
 --   recommended reporting threshold
 
--- 4. Key operational gaps. These should remain material enough to exercise
--- alignment/gap logic.
-with g as (
-  select questionnaire_type::text as respondent_group,
-         dimension_key,
-         avg(average_score)::numeric as avg_score
+-- 4. Operational maturity and alignment regression.
+-- Leadership MUST NOT contribute to either operational_score or operational_gap.
+-- Operational maturity = HR 55% + Manager 45% for this fixture because both
+-- operational groups meet the current minimum N of 3.
+with grouped as (
+  select dimension_key,
+         questionnaire_type::text as respondent_group,
+         avg(average_score)::numeric as avg_score,
+         count(distinct participant_id) as n
   from public.client_dimension_scores
   where project_id='11111111-1111-4111-8111-111111111111'::uuid
-  group by questionnaire_type, dimension_key
+  group by dimension_key, questionnaire_type
+), pivoted as (
+  select dimension_key,
+         max(avg_score) filter(where respondent_group='hr') as hr,
+         max(avg_score) filter(where respondent_group='manager') as manager,
+         max(avg_score) filter(where respondent_group='leadership') as leadership,
+         max(n) filter(where respondent_group='hr') as hr_n,
+         max(n) filter(where respondent_group='manager') as manager_n,
+         max(n) filter(where respondent_group='leadership') as leadership_n
+  from grouped
+  group by dimension_key
 )
-select h.dimension_key,
-       round(h.avg_score,2) as hr,
-       round(m.avg_score,2) as manager,
-       round(abs(h.avg_score-m.avg_score),2) as gap
-from g h
-join g m using(dimension_key)
-where h.respondent_group='hr' and m.respondent_group='manager'
-order by gap desc, dimension_key;
+select dimension_key,
+       round(hr,2) as hr,
+       round(manager,2) as manager,
+       round(leadership,2) as leadership,
+       hr_n, manager_n, leadership_n,
+       round(hr*0.55 + manager*0.45,2) as operational_score,
+       round(abs(hr-manager),2) as operational_gap,
+       case when abs(hr-manager)<=0.5 then 'aligned'
+            when abs(hr-manager)<=1.0 then 'emerging_gap'
+            else 'significant_gap' end as alignment
+from pivoted
+order by dimension_key;
+-- Golden expected outputs:
+-- case_management        operational 3.06 / gap 0.02 / aligned
+-- change_resilience      operational 2.98 / gap 0.05 / aligned
+-- consistency            operational 3.55 / gap 1.00 / emerging_gap
+-- data_handoffs          operational 2.55 / gap 1.00 / emerging_gap
+-- knowledge_self_service operational 2.55 / gap 1.00 / emerging_gap
+-- operational_capacity   operational 2.61 / gap 1.02 / significant_gap
+-- ownership              operational 3.49 / gap 0.98 / emerging_gap
+-- process_clarity        operational 3.61 / gap 1.02 / significant_gap
+-- service_access         operational 2.53 / gap 1.05 / significant_gap
+-- systems_enablement     operational 2.51 / gap 0.93 / emerging_gap
+
+-- Boundary expectations for alignment classification:
+-- gap <= 0.50  => aligned
+-- gap <= 1.00  => emerging_gap
+-- gap >  1.00  => significant_gap
 
 -- 5. Segment composition. This deliberately includes below-threshold and
 -- group-dominated cuts for privacy/anti-differencing regression QA.
