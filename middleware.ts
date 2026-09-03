@@ -102,6 +102,31 @@ async function protectClientDiagnosticInvite(
   }
 }
 
+function protectPublicSupabaseWrite(): NextResponse {
+  try {
+    getValidatedSupabaseUrl();
+    return NextResponse.next();
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "public_supabase_environment_mismatch",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown Supabase environment validation error.",
+      }),
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Service temporarily unavailable.",
+      },
+      { status: 503 },
+    );
+  }
+}
+
 async function protectAdvisorRoute(
   request: NextRequest,
 ): Promise<NextResponse> {
@@ -161,6 +186,13 @@ async function protectAdvisorRoute(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (
+    pathname === "/api/diagnostic-complete" ||
+    pathname === "/api/contact"
+  ) {
+    return protectPublicSupabaseWrite();
+  }
+
   if (pathname.startsWith("/client-diagnostic/respond/")) {
     return protectClientDiagnosticInvite(request);
   }
@@ -180,5 +212,7 @@ export const config = {
   matcher: [
     "/advisor/:path*",
     "/client-diagnostic/respond/:path*",
+    "/api/diagnostic-complete",
+    "/api/contact",
   ],
 };
