@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import AdvisorProjectNav from "@/app/components/advisor/AdvisorProjectNav";
 import AdvisorReportClient from "@/app/components/advisor/AdvisorReportClient";
 import { buildClientDiagnosticReport } from "@/lib/client-diagnostic/build-client-diagnostic-report";
 import { BuildProjectSummaryError } from "@/lib/client-diagnostic/build-project-summary";
@@ -31,9 +32,10 @@ export default async function AdvisorReportPage({ params }: PageProps) {
     notFound();
   }
 
+  let report: Awaited<ReturnType<typeof buildClientDiagnosticReport>>;
+
   try {
-    const report = await buildClientDiagnosticReport(projectId);
-    return <AdvisorReportClient report={report} />;
+    report = await buildClientDiagnosticReport(projectId);
   } catch (error) {
     if (error instanceof BuildProjectSummaryError && error.status === 404) {
       notFound();
@@ -48,4 +50,15 @@ export default async function AdvisorReportPage({ params }: PageProps) {
 
     throw error;
   }
+
+  return (
+    <>
+      <AdvisorProjectNav
+        projectId={projectId}
+        projectLabel={report.project.companyName}
+        crmSearchTerm={report.project.companyName}
+      />
+      <AdvisorReportClient report={report} />
+    </>
+  );
 }

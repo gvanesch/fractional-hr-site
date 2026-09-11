@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -12,7 +13,7 @@ function getRequiredEnv(name: string): string {
 
 export function createSupabaseAdminClient() {
   return createClient(
-    getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    getValidatedSupabaseUrl(),
     getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
     {
       auth: {

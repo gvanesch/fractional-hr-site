@@ -23,6 +23,23 @@ export const metadata: Metadata = {
   },
 };
 
+function QaEnvironmentMarker() {
+  const environment = process.env.NEXT_PUBLIC_APP_ENV?.trim().toLowerCase();
+
+  if (environment !== "qa" && environment !== "local") {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="sticky top-0 z-[100] border-b border-amber-300 bg-amber-100 px-4 py-2 text-center text-xs font-bold uppercase tracking-[0.16em] text-amber-950"
+    >
+      QA environment · synthetic data only
+    </div>
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -31,6 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <QaEnvironmentMarker />
         {children}
         <CookieBanner />
       </body>

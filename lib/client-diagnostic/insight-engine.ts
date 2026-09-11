@@ -1,12 +1,16 @@
 import { type QuestionnaireType } from "./question-bank";
 
 export type QuestionnaireTypeScores = Partial<Record<QuestionnaireType, number>>;
+export type QuestionnaireTypeRespondentCounts = Partial<
+  Record<QuestionnaireType, number>
+>;
 
 export type DimensionInsightInput = {
   dimensionKey: string;
   dimensionLabel: string;
   dimensionDescription: string;
   scores: QuestionnaireTypeScores;
+  respondentCounts: QuestionnaireTypeRespondentCounts;
   completedQuestionnaireTypes: QuestionnaireType[];
   missingQuestionnaireTypes: QuestionnaireType[];
   maxScore: number | null;
@@ -44,18 +48,76 @@ function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
 }
 
-function getAverageScore(scores: QuestionnaireTypeScores): number | null {
-  const numericScores = Object.values(scores).filter(
-    (value): value is number => typeof value === "number",
-  );
+/**
+ * Canonical overall diagnostic maturity is the respondent-weighted mean across
+ * all scored respondent perspectives: HR, Manager and Leadership.
+ *
+ * Each completed scored respondent therefore contributes equally to the
+ * aggregate through their respondent-level dimension score. Group means remain
+ * separate interpretive evidence and Leadership retains its distinct
+ * strategic/sponsor interpretation.
+ */
+function getOverallAverageScore(
+  scores: QuestionnaireTypeScores,
+  respondentCounts: QuestionnaireTypeRespondentCounts,
+): number | null {
+  let weightedScoreTotal = 0;
+  let respondentTotal = 0;
 
-  if (numericScores.length === 0) {
+  for (const questionnaireType of SCORED_QUESTIONNAIRE_TYPES) {
+    const score = scores[questionnaireType];
+    const respondentCount = respondentCounts[questionnaireType] ?? 0;
+
+    if (
+      typeof score !== "number" ||
+      !Number.isFinite(score) ||
+      !Number.isFinite(respondentCount) ||
+      respondentCount <= 0
+    ) {
+      continue;
+    }
+
+    weightedScoreTotal += score * respondentCount;
+    respondentTotal += respondentCount;
+  }
+
+  return respondentTotal > 0
+    ? roundToTwoDecimals(weightedScoreTotal / respondentTotal)
+    : null;
+}
+
+/**
+ * Operational alignment remains specifically the absolute HR-vs-Manager
+ * perception gap. Leadership is visible separately rather than being used to
+ * redefine the operational alignment signal.
+ */
+function getOperationalGap(scores: QuestionnaireTypeScores): number | null {
+  const hr = typeof scores.hr === "number" ? scores.hr : null;
+  const manager = typeof scores.manager === "number" ? scores.manager : null;
+
+  if (hr === null || manager === null) {
     return null;
   }
 
-  const total = numericScores.reduce((sum, value) => sum + value, 0);
+  return roundToTwoDecimals(Math.abs(hr - manager));
+}
 
-  return roundToTwoDecimals(total / numericScores.length);
+function getOperationalRange(scores: QuestionnaireTypeScores): {
+  maxScore: number | null;
+  minScore: number | null;
+} {
+  const operationalScores = [scores.hr, scores.manager].filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  if (operationalScores.length === 0) {
+    return { maxScore: null, minScore: null };
+  }
+
+  return {
+    maxScore: roundToTwoDecimals(Math.max(...operationalScores)),
+    minScore: roundToTwoDecimals(Math.min(...operationalScores)),
+  };
 }
 
 function getStatus(averageScore: number | null): DimensionStatus | null {
@@ -79,15 +141,15 @@ function getAlignment(gap: number | null): AlignmentStatus | null {
     return null;
   }
 
-  if (gap >= 0.75) {
-    return "significant_gap";
+  if (gap <= 0.5) {
+    return "aligned";
   }
 
-  if (gap >= 0.4) {
+  if (gap <= 1.0) {
     return "emerging_gap";
   }
 
-  return "aligned";
+  return "significant_gap";
 }
 
 function getCompleteness(
@@ -118,7 +180,12 @@ function getCompleteness(
 export function buildDimensionInsight(
   dimension: DimensionInsightInput,
 ): DimensionInsight {
-  const averageScore = getAverageScore(dimension.scores);
+  const averageScore = getOverallAverageScore(
+    dimension.scores,
+    dimension.respondentCounts,
+  );
+  const gap = getOperationalGap(dimension.scores);
+  const { maxScore, minScore } = getOperationalRange(dimension.scores);
 
   return {
     dimensionKey: dimension.dimensionKey,
@@ -126,13 +193,13 @@ export function buildDimensionInsight(
     dimensionDescription: dimension.dimensionDescription,
     averageScore,
     status: getStatus(averageScore),
-    alignment: getAlignment(dimension.gap),
+    alignment: getAlignment(gap),
     completeness: getCompleteness(dimension.completedQuestionnaireTypes),
     completedQuestionnaireTypes: dimension.completedQuestionnaireTypes,
     missingQuestionnaireTypes: dimension.missingQuestionnaireTypes,
-    gap: dimension.gap,
-    maxScore: dimension.maxScore,
-    minScore: dimension.minScore,
+    gap,
+    maxScore,
+    minScore,
     scores: dimension.scores,
   };
 }

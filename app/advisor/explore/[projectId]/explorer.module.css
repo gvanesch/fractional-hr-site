@@ -1,0 +1,17 @@
+@media (min-width: 1024px) {
+  .explorerPage > main > :global(.brand-container) > div {
+    display: grid !important;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .explorerPage > main > :global(.brand-container) > div > aside {
+    width: 18rem !important;
+    min-width: 18rem;
+    max-width: 18rem;
+  }
+
+  .explorerPage > main > :global(.brand-container) > div > section {
+    min-width: 0;
+  }
+}
