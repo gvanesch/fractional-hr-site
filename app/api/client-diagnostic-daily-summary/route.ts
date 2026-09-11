@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { questionnaireTypes } from "@/lib/client-diagnostic/question-bank";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 
 type ClientProjectRow = {
@@ -34,17 +34,6 @@ type SummaryProjectResult = {
   respondentProgress: RespondentProgressRow[];
   dashboardUrl: string | null;
 };
-
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error("Missing Supabase environment variables.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey);
-}
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -245,7 +234,7 @@ function buildEmailHtml(projects: SummaryProjectResult[]) {
 }
 
 async function loadActiveProjects() {
-  const supabase = getSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
     .from("client_projects")
@@ -265,7 +254,7 @@ async function buildProjectResult(
   project: ClientProjectRow,
   appBaseUrl: string | null,
 ): Promise<SummaryProjectResult> {
-  const supabase = getSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
   const { data: participants, error: participantsError } = await supabase
     .from("client_participants")
