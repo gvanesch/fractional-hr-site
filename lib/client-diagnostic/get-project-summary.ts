@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   buildDimensionInsights,
   type DimensionInsight,
@@ -624,26 +624,6 @@ const DIMENSION_THEME_LIBRARY: Record<string, QualitativeThemeDefinition[]> = {
   ],
 };
 
-function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.");
-  }
-
-  if (!supabaseServiceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
 export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -884,17 +864,24 @@ function buildDimensionSummaries(
       }
     }
 
-    const numericScores = Object.values(scores).filter(
+    const hrScore = typeof scores.hr === "number" ? scores.hr : null;
+    const managerScore =
+      typeof scores.manager === "number" ? scores.manager : null;
+    const operationalScores = [hrScore, managerScore].filter(
       (value): value is number => typeof value === "number",
     );
 
     const maxScore =
-      numericScores.length > 0 ? roundToTwo(Math.max(...numericScores)) : null;
+      operationalScores.length > 0
+        ? roundToTwo(Math.max(...operationalScores))
+        : null;
     const minScore =
-      numericScores.length > 0 ? roundToTwo(Math.min(...numericScores)) : null;
+      operationalScores.length > 0
+        ? roundToTwo(Math.min(...operationalScores))
+        : null;
     const gap =
-      maxScore !== null && minScore !== null
-        ? roundToTwo(maxScore - minScore)
+      hrScore !== null && managerScore !== null
+        ? roundToTwo(Math.abs(hrScore - managerScore))
         : null;
 
     return {
@@ -1298,7 +1285,7 @@ export async function getProjectSummaryData(
     throw new Error("projectId must be a valid UUID.");
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient();
 
   const [
     { data: project, error: projectError },
@@ -1441,7 +1428,52 @@ export async function getProjectSummaryData(
 
   const dimensions = buildDimensionSummaries(dimensionScoreRows);
 
-  const dimensionInsights = buildDimensionInsights(dimensions);
+  const dimensionInsights = buildDimensionInsights(
+    dimensions.map((dimension) => ({
+      ...dimension,
+      respondentCounts: {
+        hr: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "hr",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+        manager: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "manager",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+        leadership: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "leadership",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+      },
+    })),
+  );
 
   const dimensionAnalyses = buildDimensionAnalyses({
     insights: dimensionInsights,

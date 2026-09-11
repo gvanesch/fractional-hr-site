@@ -882,17 +882,24 @@ function buildDimensionSummaries(
       }
     }
 
-    const numericScores = Object.values(scores).filter(
+    const hrScore = typeof scores.hr === "number" ? scores.hr : null;
+    const managerScore =
+      typeof scores.manager === "number" ? scores.manager : null;
+    const operationalScores = [hrScore, managerScore].filter(
       (value): value is number => typeof value === "number",
     );
 
     const maxScore =
-      numericScores.length > 0 ? roundToTwo(Math.max(...numericScores)) : null;
+      operationalScores.length > 0
+        ? roundToTwo(Math.max(...operationalScores))
+        : null;
     const minScore =
-      numericScores.length > 0 ? roundToTwo(Math.min(...numericScores)) : null;
+      operationalScores.length > 0
+        ? roundToTwo(Math.min(...operationalScores))
+        : null;
     const gap =
-      maxScore !== null && minScore !== null
-        ? roundToTwo(maxScore - minScore)
+      hrScore !== null && managerScore !== null
+        ? roundToTwo(Math.abs(hrScore - managerScore))
         : null;
 
     return {
@@ -2229,7 +2236,52 @@ export async function buildProjectSummary(
     dimensionScoreRows,
     reportingPolicy.segmentReportingMinN,
   );
-  const dimensionInsights = buildDimensionInsights(dimensions);
+  const dimensionInsights = buildDimensionInsights(
+    dimensions.map((dimension) => ({
+      ...dimension,
+      respondentCounts: {
+        hr: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "hr",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+        manager: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "manager",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+        leadership: new Set(
+          dimensionScoreRows
+            .filter(
+              (row) =>
+                row.dimension_key === dimension.dimensionKey &&
+                row.questionnaire_type === "leadership",
+            )
+            .map((row) => row.participant_id)
+            .filter(
+              (participantId): participantId is string =>
+                participantId !== null,
+            ),
+        ).size,
+      },
+    })),
+  );
   const questionScoresByDimension = buildQuestionScoresByDimension(
     scoredResponseRows ?? [],
   );

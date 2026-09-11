@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 
 type AdvisorProspectRow = {
@@ -54,17 +54,6 @@ type DigestData = {
     contactFormDiagnostics: ContactFormDiagnosticRow[];
     activeProjects: ProjectDigestRow[];
 };
-
-function getSupabaseAdminClient() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-        throw new Error("Missing Supabase environment variables.");
-    }
-
-    return createClient(supabaseUrl, supabaseServiceRoleKey);
-}
 
 function getResendClient() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -441,7 +430,7 @@ async function loadProspectsForDigest(
     nextSevenDaysProspects: AdvisorProspectRow[];
     noNextActionProspects: AdvisorProspectRow[];
 }> {
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
         .from("advisor_prospects")
@@ -498,7 +487,7 @@ async function loadProjectsForDigest(
     today: string,
     nextSevenDays: string,
 ): Promise<ProjectDigestRow[]> {
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data: projects, error: projectsError } = await supabase
         .from("client_projects")
@@ -561,7 +550,7 @@ async function loadProjectsForDigest(
 }
 
 async function loadContactFormDiagnostics(): Promise<ContactFormDiagnosticRow[]> {
-    const supabase = getSupabaseAdminClient();
+    const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
         .from("diagnostic_submissions")

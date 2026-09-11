@@ -280,19 +280,26 @@ function buildClientSafeDimensionSummary(
     (questionnaireType) => typeof scores[questionnaireType] !== "number",
   );
 
-  const numericScores = Object.values(scores).filter(
+  const hrScore = typeof scores.hr === "number" ? scores.hr : null;
+  const managerScore =
+    typeof scores.manager === "number" ? scores.manager : null;
+  const operationalScores = [hrScore, managerScore].filter(
     (value): value is number => typeof value === "number",
   );
 
   const maxScore =
-    numericScores.length > 0 ? Number(Math.max(...numericScores).toFixed(2)) : null;
+    operationalScores.length > 0
+      ? Number(Math.max(...operationalScores).toFixed(2))
+      : null;
 
   const minScore =
-    numericScores.length > 0 ? Number(Math.min(...numericScores).toFixed(2)) : null;
+    operationalScores.length > 0
+      ? Number(Math.min(...operationalScores).toFixed(2))
+      : null;
 
   const gap =
-    maxScore !== null && minScore !== null
-      ? Number((maxScore - minScore).toFixed(2))
+    hrScore !== null && managerScore !== null
+      ? Number(Math.abs(hrScore - managerScore).toFixed(2))
       : null;
 
   return {
@@ -326,26 +333,26 @@ function sortDimensionsByGap(
 
 function buildAnalyticsDimensions(
   dimensions: ClientSafeDimensionSummary[],
+  insights: DimensionInsight[],
 ): ReportAnalyticsDimension[] {
   return dimensions.map((dimension) => {
     const hrScore = dimension.scores.hr ?? null;
     const managerScore = dimension.scores.manager ?? null;
     const leadershipScore = dimension.scores.leadership ?? null;
-
-    const overallAverage = average(
-      [hrScore, managerScore, leadershipScore].filter(
-        (value): value is number => typeof value === "number",
-      ),
+    const insight = insights.find(
+      (candidate) => candidate.dimensionKey === dimension.dimensionKey,
     );
+    const overallAverage = insight?.averageScore ?? null;
+    const gap = insight?.gap ?? dimension.gap;
 
     const issueType = classifyIssueType({
       overallAverage,
-      gap: dimension.gap,
+      gap,
     });
 
     const priorityScore = calculatePriorityScore({
       overallAverage,
-      gap: dimension.gap,
+      gap,
     });
 
     return {
@@ -355,7 +362,7 @@ function buildAnalyticsDimensions(
       hrScore,
       managerScore,
       leadershipScore,
-      gap: dimension.gap,
+      gap,
       priorityScore,
       issueType,
     };
@@ -442,16 +449,16 @@ function buildExecutiveSummary({
 
   if (alignmentScore !== null && alignmentScore < 60) {
     alignmentStatement =
-      "There are meaningful differences in how HR, managers, and leadership experience people operations, suggesting that the current model is not being experienced consistently across the organisation.";
+      "There are meaningful differences between HR and Manager experience of people operations, suggesting that important parts of the current model are not being experienced consistently in day-to-day operation. Leadership should be interpreted separately as a strategic perspective.";
   } else if (significantGaps > 0) {
     alignmentStatement =
-      "There are clear differences in how HR, managers, and leadership experience people operations, suggesting inconsistency in how processes are understood or applied.";
+      "There are clear differences between HR and Manager experience of people operations, suggesting inconsistency in how processes are understood or applied in day-to-day operation. Leadership remains a separate strategic perspective.";
   } else if (emergingGaps > 0) {
     alignmentStatement =
-      "Several dimensions show meaningful differences in how HR, managers, and leadership experience the operating model. The pattern is not organisation-wide disagreement, but it does indicate that important parts of the model are landing differently across respondent groups.";
+      "Several dimensions show meaningful differences between HR and Manager experience of the operating model. The pattern is not organisation-wide disagreement, but it does indicate that important parts of the model are landing differently in operational experience. Leadership should be read separately as a strategic perspective.";
   } else {
     alignmentStatement =
-      "Perceptions across HR, managers, and leadership are broadly aligned, suggesting that processes are generally understood and applied consistently.";
+      "HR and Manager perceptions are broadly aligned on the operational experience. This indicates similar views of how the model is working, not that the underlying capabilities are necessarily strong. Leadership remains a separate strategic perspective.";
   }
 
   let completenessStatement = "";
@@ -532,7 +539,10 @@ export async function buildClientDiagnosticReport(
     summary.qualitative,
   );
 
-  const analyticsDimensions = buildAnalyticsDimensions(clientSafeDimensions);
+  const analyticsDimensions = buildAnalyticsDimensions(
+    clientSafeDimensions,
+    summaryInsights,
+  );
   const priorityAreas = buildPriorityAreas(analyticsDimensions);
   const priorityClusters = buildPriorityClusters(priorityAreas);
   const overallScore = calculateOverallScore(

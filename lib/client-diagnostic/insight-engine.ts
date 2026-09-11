@@ -10,7 +10,7 @@ export type DimensionInsightInput = {
   dimensionLabel: string;
   dimensionDescription: string;
   scores: QuestionnaireTypeScores;
-  respondentCounts?: QuestionnaireTypeRespondentCounts;
+  respondentCounts: QuestionnaireTypeRespondentCounts;
   completedQuestionnaireTypes: QuestionnaireType[];
   missingQuestionnaireTypes: QuestionnaireType[];
   maxScore: number | null;
@@ -44,9 +44,6 @@ const SCORED_QUESTIONNAIRE_TYPES: QuestionnaireType[] = [
   "leadership",
 ];
 
-const HR_OPERATIONAL_WEIGHT = 0.55;
-const MANAGER_OPERATIONAL_WEIGHT = 0.45;
-
 function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
 }
@@ -55,63 +52,38 @@ function roundToTwoDecimals(value: number): number {
  * Canonical overall diagnostic maturity is the respondent-weighted mean across
  * all scored respondent perspectives: HR, Manager and Leadership.
  *
- * Each respondent therefore contributes equally to the aggregate irrespective
- * of stakeholder group. Group means remain separate interpretive evidence and
- * Leadership retains its distinct strategic/sponsor interpretation.
- *
- * The optional respondentCounts property is transitional while the two summary
- * builders are migrated. Once supplied, it is the canonical calculation path.
- * Existing callers without counts retain the previous HR/Manager calculation so
- * this methodology migration can be wired safely without an intermediate break.
+ * Each completed scored respondent therefore contributes equally to the
+ * aggregate through their respondent-level dimension score. Group means remain
+ * separate interpretive evidence and Leadership retains its distinct
+ * strategic/sponsor interpretation.
  */
 function getOverallAverageScore(
   scores: QuestionnaireTypeScores,
-  respondentCounts?: QuestionnaireTypeRespondentCounts,
+  respondentCounts: QuestionnaireTypeRespondentCounts,
 ): number | null {
-  if (respondentCounts) {
-    let weightedScoreTotal = 0;
-    let respondentTotal = 0;
+  let weightedScoreTotal = 0;
+  let respondentTotal = 0;
 
-    for (const questionnaireType of SCORED_QUESTIONNAIRE_TYPES) {
-      const score = scores[questionnaireType];
-      const respondentCount = respondentCounts[questionnaireType] ?? 0;
+  for (const questionnaireType of SCORED_QUESTIONNAIRE_TYPES) {
+    const score = scores[questionnaireType];
+    const respondentCount = respondentCounts[questionnaireType] ?? 0;
 
-      if (
-        typeof score !== "number" ||
-        !Number.isFinite(score) ||
-        !Number.isFinite(respondentCount) ||
-        respondentCount <= 0
-      ) {
-        continue;
-      }
-
-      weightedScoreTotal += score * respondentCount;
-      respondentTotal += respondentCount;
+    if (
+      typeof score !== "number" ||
+      !Number.isFinite(score) ||
+      !Number.isFinite(respondentCount) ||
+      respondentCount <= 0
+    ) {
+      continue;
     }
 
-    return respondentTotal > 0
-      ? roundToTwoDecimals(weightedScoreTotal / respondentTotal)
-      : null;
+    weightedScoreTotal += score * respondentCount;
+    respondentTotal += respondentCount;
   }
 
-  const hr = typeof scores.hr === "number" ? scores.hr : null;
-  const manager = typeof scores.manager === "number" ? scores.manager : null;
-
-  if (hr !== null && manager !== null) {
-    return roundToTwoDecimals(
-      hr * HR_OPERATIONAL_WEIGHT + manager * MANAGER_OPERATIONAL_WEIGHT,
-    );
-  }
-
-  if (hr !== null) {
-    return roundToTwoDecimals(hr);
-  }
-
-  if (manager !== null) {
-    return roundToTwoDecimals(manager);
-  }
-
-  return null;
+  return respondentTotal > 0
+    ? roundToTwoDecimals(weightedScoreTotal / respondentTotal)
+    : null;
 }
 
 /**
