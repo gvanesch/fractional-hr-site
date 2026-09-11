@@ -6,7 +6,7 @@
 //
 // If no external dependencies are confirmed, this route should be removed in a future cleanup.
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   calculateDiagnosticResult,
@@ -86,17 +86,6 @@ type SuccessResponse = {
   };
   advisorBrief: AdvisorBrief | null;
 };
-
-function createSupabaseAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase server environment variables.");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey);
-}
 
 async function requireAdvisorSessionForApi() {
   const supabase = await createSupabaseServerClient();
