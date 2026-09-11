@@ -161,6 +161,10 @@ export default function DiagnosticAssessmentPage() {
             <p className="brand-body-lg">
               The Diagnostic Assessment is used when a quick read is no longer enough. It helps you understand what is driving the pattern, how widely it is experienced, and where it is most important to focus.
             </p>
+
+            <p className="brand-body-lg">
+              It is designed for organisations with an established or substantially established HR operating model. Where a new model is still being designed, consolidated, or regionalised, an operating-model discovery and design conversation is usually the better starting point than assessing a current state that is already being replaced.
+            </p>
           </div>
 
           <div className="brand-section-body-xl">
