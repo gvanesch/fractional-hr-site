@@ -1,0 +1,61 @@
+name: Temporary release validation
+
+on:
+  push:
+    branches:
+      - advisor-explorer-migrate-analytics
+    paths:
+      - .github/workflows/release-validation-temp.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_ENV: qa
+      NEXT_PUBLIC_SUPABASE_URL: https://lrlapaiyejvbckqpbrwa.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: build-only-placeholder
+      ADVISOR_ALLOWED_EMAILS: build@example.com
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      RESEND_API_KEY: re_build_only_placeholder
+      CRON_SECRET: build-only-placeholder
+      DAILY_SUMMARY_RECIPIENT: build@example.com
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Runtime dependency audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Full dependency audit
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
+
+      - name: Focused lint
+        run: |
+          npx eslint \
+            lib/client-diagnostic/build-project-summary.ts \
+            lib/client-diagnostic/get-project-summary.ts \
+            lib/client-diagnostic/insight-engine.ts \
+            lib/client-diagnostic/build-client-diagnostic-report.ts \
+            lib/client-diagnostic/build-explorer-cohort.ts \
+            app/api/advisor-daily-action-digest/route.ts \
+            app/api/client-diagnostic-daily-summary/route.ts \
+            app/api/advisor-submission/route.ts \
+            'app/(public)/diagnostic-assessment/page.tsx'
+
+      - name: Production build
+        run: npm run build
