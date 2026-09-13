@@ -17,6 +17,7 @@ const exploreLinks = [
 
 const legalLinks = [
   { href: "/privacy", label: "Privacy Policy" },
+  { href: "/data-protection-complaints", label: "Data Protection Complaints" },
   { href: "/terms", label: "Terms of Use" },
   { href: "/cookies", label: "Cookie Policy" },
   { href: "/modern-slavery", label: "Modern Slavery Statement" },
