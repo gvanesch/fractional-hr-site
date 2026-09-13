@@ -224,7 +224,7 @@ export default function HrOperatingModelArticlePage() {
                 organisation.
               </p>
               <p className="brand-body mt-4">
-                I explore that pattern in more detail in{" ""}
+                I explore that pattern in more detail in{" "}
                 <Link
                   href="/insights/why-hr-operations-break-as-companies-grow"
                   className="brand-link font-medium"
