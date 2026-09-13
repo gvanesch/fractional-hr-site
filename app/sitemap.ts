@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://vanesch.uk";
-  const lastModified = new Date();
+  const baseUrl = "https://www.vanesch.uk";
 
   const routes = [
     { path: "", changeFrequency: "weekly" as const, priority: 1.0 },
@@ -11,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/services/growing-companies", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/services/hr-chaos-signals", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/services/hr-foundations-sprint", changeFrequency: "monthly" as const, priority: 0.8 },
+    { path: "/services/fractional-hr-advisory", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/diagnostic-assessment", changeFrequency: "weekly" as const, priority: 0.9 },
     { path: "/diagnostic", changeFrequency: "weekly" as const, priority: 0.8 },
     { path: "/approach", changeFrequency: "monthly" as const, priority: 0.8 },
@@ -24,7 +24,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly" as const,
       priority: 0.6,
     },
+    { path: "/cyber-essentials", changeFrequency: "yearly" as const, priority: 0.4 },
     { path: "/privacy", changeFrequency: "yearly" as const, priority: 0.3 },
+    { path: "/data-protection-complaints", changeFrequency: "yearly" as const, priority: 0.3 },
     { path: "/terms", changeFrequency: "yearly" as const, priority: 0.3 },
     { path: "/modern-slavery", changeFrequency: "yearly" as const, priority: 0.3 },
     { path: "/cookies", changeFrequency: "yearly" as const, priority: 0.3 },
@@ -32,7 +34,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return routes.map((route) => ({
     url: `${baseUrl}${route.path}`,
-    lastModified,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
