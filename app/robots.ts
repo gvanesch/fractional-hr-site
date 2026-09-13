@@ -13,6 +13,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: "https://vanesch.uk/sitemap.xml",
+    sitemap: "https://www.vanesch.uk/sitemap.xml",
   };
 }
