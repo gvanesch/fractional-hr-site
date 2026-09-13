@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Modern Slavery Statement | Van Esch Advisory Ltd",
+  title: "Modern Slavery Statement",
   description:
     "Voluntary Modern Slavery Statement for https://vanesch.uk and Van Esch Advisory Ltd.",
 };

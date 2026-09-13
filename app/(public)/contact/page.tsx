@@ -4,7 +4,7 @@ import ContactPageClient from "./contactpageclient";
 
 
 export const metadata: Metadata = {
-  title: "Contact | Van Esch Advisory Ltd",
+  title: "Contact",
   description:
     "Contact Van Esch Advisory Ltd to make an enquiry about HR operations, service delivery, HR technology, or transformation support.",
 };

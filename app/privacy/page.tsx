@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Van Esch Advisory Ltd",
+  title: "Privacy Policy",
   description:
     "Privacy Policy for https://vanesch.uk, explaining how personal information is collected, used, stored, shared, and protected.",
 };

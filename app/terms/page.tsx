@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Use | Van Esch Advisory Ltd",
+  title: "Terms of Use",
   description:
     "Terms of Use for vanesch.uk, setting out how the website may be used and the limits of liability and reliance.",
 };

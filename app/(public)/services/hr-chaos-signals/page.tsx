@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "HR Chaos Signals | Van Esch Advisory Ltd",
+  title: "HR Chaos Signals",
   description:
     "Common signs that HR operations are becoming messy, reactive, or inconsistent in growing companies, and how to move from early signal to clearer diagnosis.",
 };

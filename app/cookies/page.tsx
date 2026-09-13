@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy | Van Esch Advisory Ltd",
+  title: "Cookie Policy",
   description:
     "Cookie Policy for vanesch.uk, explaining how cookies and similar technologies are used on the website.",
 };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "HR Foundations Sprint | Van Esch Advisory Ltd",
+  title: "HR Foundations Sprint",
   description:
     "A focused 4 week engagement for organisations that need stronger HR foundations, clearer processes, and a practical roadmap for improvement built on structured diagnostic insight.",
 };

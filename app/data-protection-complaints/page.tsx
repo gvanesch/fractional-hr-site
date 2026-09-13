@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Data Protection Complaints | Van Esch Advisory Ltd",
+  title: "Data Protection Complaints",
   description:
     "How to raise a data protection complaint with Van Esch Advisory Ltd and what to expect from the complaints process.",
 };

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Cyber Essentials Certified | Van Esch Advisory Ltd",
+  title: "Cyber Essentials Certified",
   description:
     "Cyber Essentials certification information for Van Esch Advisory Ltd.",
 };
