@@ -3,6 +3,7 @@
   "main": ".open-next/worker.js",
   "name": "fractional-hr-site",
   "compatibility_date": "2025-05-05",
+  "keep_vars": true,
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
