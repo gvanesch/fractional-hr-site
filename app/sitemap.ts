@@ -20,6 +20,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/contact", changeFrequency: "monthly" as const, priority: 0.7 },
     { path: "/insights", changeFrequency: "weekly" as const, priority: 0.7 },
     {
+      path: "/insights/what-is-an-hr-operating-model",
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    },
+    {
       path: "/insights/why-hr-operations-break-as-companies-grow",
       changeFrequency: "monthly" as const,
       priority: 0.6,
