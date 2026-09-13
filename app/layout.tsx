@@ -3,7 +3,7 @@ import "./globals.css";
 import CookieBanner from "@/app/components/CookieBanner";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://vanesch.uk"),
+  metadataBase: new URL("https://www.vanesch.uk"),
 
   title: {
     default: "Van Esch Advisory Ltd",
@@ -17,9 +17,25 @@ export const metadata: Metadata = {
     title: "Van Esch Advisory Ltd",
     description:
       "HR Operations, Service Delivery, and Transformation Advisory.",
-    url: "https://vanesch.uk",
+    url: "https://www.vanesch.uk",
     siteName: "Van Esch Advisory Ltd",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 672,
+        alt: "Greg van Esch | HR Operations & Transformation Advisor",
+      },
+    ],
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Van Esch Advisory Ltd",
+    description:
+      "HR Operations, Service Delivery, and Transformation Advisory.",
+    images: ["/og-image.png"],
   },
 };
 
