@@ -8,6 +8,9 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "vars": {
+    "D1_SYSTEM_EVENTS_MODE": "off"
+  },
   "observability": {
     "logs": {
       "enabled": true,
@@ -33,6 +36,9 @@
   ],
   "env": {
     "qa": {
+      "vars": {
+        "D1_SYSTEM_EVENTS_MODE": "shadow"
+      },
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
