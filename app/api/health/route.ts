@@ -4,10 +4,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 async function checkD1Connection(): Promise<"connected" | "unavailable"> {
   try {
     const result = await getD1Database()
-      .prepare("SELECT 1 AS ok")
-      .first<{ ok: number }>();
+      .prepare("SELECT COUNT(*) AS event_count FROM system_events")
+      .first<{ event_count: number }>();
 
-    if (result?.ok !== 1) {
+    if (!result || typeof result.event_count !== "number") {
       throw new Error("Unexpected D1 health-check response.");
     }
 
