@@ -23,5 +23,33 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "fractional-hr-site"
     }
-  ]
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vanesch-prod",
+      "database_id": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc"
+    }
+  ],
+  "env": {
+    "qa": {
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "fractional-hr-site-qa"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "vanesch-qa",
+          "database_id": "b25d59da-5f93-4301-9996-7be0c9708789"
+        }
+      ]
+    }
+  }
 }
