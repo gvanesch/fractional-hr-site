@@ -8,6 +8,12 @@ function isUuid(value: string): boolean {
   );
 }
 
+function isOptionalText(
+  value: unknown,
+): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === "string";
+}
+
 export async function PATCH(request: Request) {
   try {
     const advisorUser = await requireAdvisorUser();
@@ -19,7 +25,14 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const body: unknown = await request.json();
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body." },
+        { status: 400 },
+      );
+    }
 
     const {
       projectId,
@@ -30,11 +43,29 @@ export async function PATCH(request: Request) {
       msaStatus,
       dpaStatus,
       notes,
-    } = body;
+    } = body as Record<string, unknown>;
 
-    if (!projectId || !isUuid(projectId)) {
+    if (typeof projectId !== "string" || !isUuid(projectId)) {
       return NextResponse.json(
         { success: false, error: "Valid projectId is required." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !isOptionalText(billingContactName) ||
+      !isOptionalText(billingContactEmail) ||
+      !isOptionalText(companyWebsite) ||
+      !isOptionalText(purchaseOrderNumber) ||
+      !isOptionalText(msaStatus) ||
+      !isOptionalText(dpaStatus) ||
+      !isOptionalText(notes)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Project detail fields must be strings or null.",
+        },
         { status: 400 },
       );
     }
