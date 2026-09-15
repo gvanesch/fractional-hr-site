@@ -1,3 +1,5 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+
 import { getD1Database } from "./d1/database";
 import { createSupabaseAdminClient } from "./supabase/admin";
 
@@ -21,8 +23,22 @@ type SystemEventRecord = {
     createdAt: string;
 };
 
+type D1MigrationEnv = CloudflareEnv & {
+    D1_SYSTEM_EVENTS_MODE?: string;
+};
+
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : "Unknown error";
+}
+
+function shouldShadowWriteToD1(): boolean {
+    try {
+        const env = getCloudflareContext().env as D1MigrationEnv;
+
+        return env.D1_SYSTEM_EVENTS_MODE === "shadow";
+    } catch {
+        return false;
+    }
 }
 
 async function logSystemEventToSupabase(
@@ -116,8 +132,11 @@ export async function logSystemEvent(
         createdAt: new Date().toISOString(),
     };
 
-    await Promise.all([
-        logSystemEventToSupabase(event),
-        logSystemEventToD1(event),
-    ]);
+    const writes: Promise<void>[] = [logSystemEventToSupabase(event)];
+
+    if (shouldShadowWriteToD1()) {
+        writes.push(logSystemEventToD1(event));
+    }
+
+    await Promise.all(writes);
 }
