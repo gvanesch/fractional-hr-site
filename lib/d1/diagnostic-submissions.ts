@@ -29,9 +29,22 @@ export type D1HealthCheckSubmissionRow = {
   publicToken: string;
 };
 
+function serializeJson(value: unknown, fieldName: string): string {
+  const serialized = JSON.stringify(value);
+
+  if (typeof serialized !== "string") {
+    throw new Error(`Unable to serialize ${fieldName} for D1.`);
+  }
+
+  return serialized;
+}
+
 export async function insertD1HealthCheckSubmission(
   row: D1HealthCheckSubmissionRow,
 ): Promise<void> {
+  const answers = serializeJson(row.answers, "answers");
+  const advisorBrief = serializeJson(row.advisorBrief, "advisor brief");
+
   const result = await getD1Database()
     .prepare(
       `INSERT INTO diagnostic_submissions (
@@ -87,9 +100,9 @@ export async function insertD1HealthCheckSubmission(
       row.operationalCapacityScore,
       row.dataHandoffsScore,
       row.changeResilienceScore,
-      JSON.stringify(row.answers),
+      answers,
       row.submissionId,
-      JSON.stringify(row.advisorBrief),
+      advisorBrief,
       row.completedAt,
       row.submissionSource,
       row.completionVersion,
