@@ -1,3 +1,5 @@
+import { isD1DiagnosticSubmissionsShadowWriteEnabled } from "../../../lib/d1/database";
+import { insertD1HealthCheckSubmission } from "../../../lib/d1/diagnostic-submissions";
 import { logSystemEvent } from "../../../lib/system-events";
 import { NextResponse } from "next/server";
 import {
@@ -35,6 +37,19 @@ type ResendSendResponse = {
 type DimensionScoreRow = {
   label: string;
   score: number;
+};
+
+type DimensionScoreColumns = {
+  process_clarity_score: number | null;
+  consistency_score: number | null;
+  service_access_score: number | null;
+  ownership_score: number | null;
+  onboarding_score: number | null;
+  technology_alignment_score: number | null;
+  knowledge_self_service_score: number | null;
+  operational_capacity_score: number | null;
+  data_handoffs_score: number | null;
+  change_resilience_score: number | null;
 };
 
 const MAX_CONTEXT_LENGTH = 120;
@@ -397,7 +412,7 @@ function parseRequestBody(input: unknown): DiagnosticCompleteRequestBody {
 
 function buildDimensionScoreColumns(
   dimensionScores: DimensionScoreRow[],
-): Record<string, number | null> {
+): DimensionScoreColumns {
   const scoreMap = new Map(
     dimensionScores.map((dimension) => [dimension.label, dimension.score]),
   );
@@ -458,6 +473,7 @@ async function createCompletionSubmission(params: {
   }
 
   const dimensionScores = getDimensionScores(answers);
+  const dimensionScoreColumns = buildDimensionScoreColumns(dimensionScores);
   const submissionId = crypto.randomUUID();
   const publicToken = createPublicToken();
   const completedAt = new Date().toISOString();
@@ -477,7 +493,7 @@ async function createCompletionSubmission(params: {
     score,
     band: bandLabel,
     advisor_brief: advisorBrief,
-    ...buildDimensionScoreColumns(dimensionScores),
+    ...dimensionScoreColumns,
   };
 
   const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
@@ -505,7 +521,10 @@ async function createCompletionSubmission(params: {
 
   const data = await response.json();
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (
+    !Array.isArray(data) ||
+    typeof data[0]?.submission_id !== "string"
+  ) {
     console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
       submissionId,
       error: "Supabase insert succeeded but no submission_id was returned.",
@@ -516,26 +535,91 @@ async function createCompletionSubmission(params: {
     );
   }
 
+  const returnedRow = data[0] as Record<string, unknown>;
+  const returnedSubmissionId = returnedRow.submission_id as string;
+  const returnedPublicToken =
+    typeof returnedRow.public_token === "string"
+      ? returnedRow.public_token
+      : publicToken;
+
+  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+    try {
+      if (
+        typeof returnedRow.id !== "string" ||
+        typeof returnedRow.created_at !== "string"
+      ) {
+        throw new Error(
+          "Supabase response did not include the D1 parity identifiers.",
+        );
+      }
+
+      await insertD1HealthCheckSubmission({
+        id: returnedRow.id,
+        createdAt: returnedRow.created_at,
+        companySize: rowToInsert.company_size,
+        industry: rowToInsert.industry,
+        role: rowToInsert.role,
+        countryRegion: rowToInsert.country_region,
+        email: rowToInsert.email,
+        score: rowToInsert.score,
+        band: rowToInsert.band,
+        processClarityScore:
+          dimensionScoreColumns.process_clarity_score,
+        consistencyScore: dimensionScoreColumns.consistency_score,
+        serviceAccessScore:
+          dimensionScoreColumns.service_access_score,
+        ownershipScore: dimensionScoreColumns.ownership_score,
+        onboardingScore: dimensionScoreColumns.onboarding_score,
+        technologyAlignmentScore:
+          dimensionScoreColumns.technology_alignment_score,
+        knowledgeSelfServiceScore:
+          dimensionScoreColumns.knowledge_self_service_score,
+        operationalCapacityScore:
+          dimensionScoreColumns.operational_capacity_score,
+        dataHandoffsScore:
+          dimensionScoreColumns.data_handoffs_score,
+        changeResilienceScore:
+          dimensionScoreColumns.change_resilience_score,
+        answers: rowToInsert.answers,
+        submissionId: returnedSubmissionId,
+        advisorBrief: rowToInsert.advisor_brief,
+        completedAt: rowToInsert.completed_at,
+        submissionSource: "health-check",
+        completionVersion: "v1",
+        publicToken: returnedPublicToken,
+      });
+
+      console.log("HEALTH_CHECK_D1_SHADOW_INSERT_SUCCESS", {
+        submissionId: returnedSubmissionId,
+      });
+    } catch (error) {
+      console.error("HEALTH_CHECK_D1_SHADOW_INSERT_FAILED", {
+        submissionId: returnedSubmissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
   await logSystemEvent({
     eventType: "health_check_db_insert",
-    submissionId: data[0].submission_id,
-    publicToken: data[0].public_token || publicToken,
+    submissionId: returnedSubmissionId,
+    publicToken: returnedPublicToken,
     source: "health-check",
     metadata: {
-      hasPublicToken: Boolean(data[0].public_token || publicToken),
+      hasPublicToken: Boolean(returnedPublicToken),
       completedAt,
     },
   });
 
   console.log("HEALTH_CHECK_DB_INSERT_SUCCESS", {
-    submissionId: data[0].submission_id,
-    hasPublicToken: Boolean(data[0].public_token || publicToken),
+    submissionId: returnedSubmissionId,
+    hasPublicToken: Boolean(returnedPublicToken),
     completedAt,
   });
 
   return {
-    submissionId: data[0].submission_id as string,
-    publicToken: (data[0].public_token as string | null) ?? publicToken,
+    submissionId: returnedSubmissionId,
+    publicToken: returnedPublicToken,
     completedAt,
     rawScore,
   };
