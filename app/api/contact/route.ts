@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import {
+  insertD1ContactSubmission,
+  updateD1ContactSubmission,
+  type D1ContactSubmissionFields,
+} from "../../../lib/d1/diagnostic-submissions";
+import { isD1DiagnosticSubmissionsShadowWriteEnabled } from "../../../lib/d1/database";
+import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
   type DiagnosticAnswers,
@@ -244,6 +250,33 @@ function parseRequestBody(input: unknown): ContactRequestBody {
   };
 }
 
+function buildD1ContactSubmissionFields(params: {
+  body: ContactRequestBody;
+  result: DiagnosticResult | null;
+  advisorBrief: AdvisorBrief | null;
+  contactSubmittedAt: string;
+}): D1ContactSubmissionFields {
+  const { body, result, advisorBrief, contactSubmittedAt } = params;
+
+  return {
+    contactName: body.name,
+    contactEmail: body.email,
+    contactCompany: body.company || null,
+    contactTopic: body.topic || null,
+    contactMessage: body.message,
+    contactSource: body.source || "website",
+    companySize: body.companySize || null,
+    industry: body.industry || null,
+    role: body.role || null,
+    countryRegion: body.countryRegion || null,
+    answers: body.diagnosticAnswers || null,
+    score: result?.score ?? null,
+    band: result?.band.label ?? null,
+    advisorBrief: advisorBrief ?? null,
+    contactSubmittedAt,
+  };
+}
+
 async function createLeadSubmission(params: {
   body: ContactRequestBody;
   result: DiagnosticResult | null;
@@ -262,6 +295,7 @@ async function createLeadSubmission(params: {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   }
 
+  const contactSubmittedAt = new Date().toISOString();
   const rowToInsert = {
     contact_name: body.name,
     contact_email: body.email,
@@ -278,7 +312,7 @@ async function createLeadSubmission(params: {
     score: result?.score ?? null,
     band: result?.band.label ?? null,
     advisor_brief: advisorBrief ?? null,
-    contact_submitted_at: new Date().toISOString(),
+    contact_submitted_at: contactSubmittedAt,
   };
 
   const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
@@ -303,9 +337,16 @@ async function createLeadSubmission(params: {
     throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as unknown;
+  const returnedRow =
+    Array.isArray(data) &&
+    data[0] &&
+    typeof data[0] === "object" &&
+    !Array.isArray(data[0])
+      ? (data[0] as Record<string, unknown>)
+      : null;
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (!returnedRow || !isNonEmptyString(returnedRow.submission_id)) {
     console.error("CONTACT_DB_INSERT_FAILED", {
       error: "Supabase insert succeeded but no submission_id returned.",
     });
@@ -313,11 +354,46 @@ async function createLeadSubmission(params: {
     throw new Error("Supabase insert succeeded but no submission_id returned.");
   }
 
-  const submissionId = data[0].submission_id as string;
+  const submissionId = returnedRow.submission_id;
 
   console.log("CONTACT_DB_INSERT_SUCCESS", {
     submissionId,
   });
+
+  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+    try {
+      if (
+        !isNonEmptyString(returnedRow.id) ||
+        !isNonEmptyString(returnedRow.created_at)
+      ) {
+        throw new Error(
+          "Supabase insert did not return the D1 identity fields.",
+        );
+      }
+
+      await insertD1ContactSubmission({
+        ...buildD1ContactSubmissionFields({
+          body,
+          result,
+          advisorBrief,
+          contactSubmittedAt,
+        }),
+        id: returnedRow.id,
+        createdAt: returnedRow.created_at,
+        submissionId,
+        submissionSource: rowToInsert.submission_source,
+      });
+
+      console.log("CONTACT_D1_SHADOW_INSERT_SUCCESS", {
+        submissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_D1_SHADOW_INSERT_FAILED", {
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 
   return submissionId;
 }
@@ -341,6 +417,7 @@ async function updateExistingLeadSubmission(params: {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   }
 
+  const contactSubmittedAt = new Date().toISOString();
   const rowToUpdate = {
     contact_name: body.name,
     contact_email: body.email,
@@ -356,7 +433,7 @@ async function updateExistingLeadSubmission(params: {
     score: result?.score ?? null,
     band: result?.band.label ?? null,
     advisor_brief: advisorBrief ?? null,
-    contact_submitted_at: new Date().toISOString(),
+    contact_submitted_at: contactSubmittedAt,
   };
 
   const response = await fetch(
@@ -387,9 +464,16 @@ async function updateExistingLeadSubmission(params: {
     throw new Error(`Supabase update failed: ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as unknown;
+  const returnedRow =
+    Array.isArray(data) &&
+    data[0] &&
+    typeof data[0] === "object" &&
+    !Array.isArray(data[0])
+      ? (data[0] as Record<string, unknown>)
+      : null;
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (!returnedRow || !isNonEmptyString(returnedRow.submission_id)) {
     console.error("CONTACT_DB_UPDATE_FAILED", {
       submissionId,
       error: "Supabase update succeeded but no submission_id returned.",
@@ -398,11 +482,40 @@ async function updateExistingLeadSubmission(params: {
     throw new Error("Supabase update succeeded but no submission_id returned.");
   }
 
+  const returnedSubmissionId = returnedRow.submission_id;
+
   console.log("CONTACT_DB_UPDATE_SUCCESS", {
-    submissionId: data[0].submission_id,
+    submissionId: returnedSubmissionId,
   });
 
-  return data[0].submission_id as string;
+  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+    try {
+      const updated = await updateD1ContactSubmission({
+        ...buildD1ContactSubmissionFields({
+          body,
+          result,
+          advisorBrief,
+          contactSubmittedAt,
+        }),
+        submissionId: returnedSubmissionId,
+      });
+
+      if (!updated) {
+        throw new Error("No matching D1 submission was found.");
+      }
+
+      console.log("CONTACT_D1_SHADOW_UPDATE_SUCCESS", {
+        submissionId: returnedSubmissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_D1_SHADOW_UPDATE_FAILED", {
+        submissionId: returnedSubmissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  return returnedSubmissionId;
 }
 
 async function upsertProspect(params: {
