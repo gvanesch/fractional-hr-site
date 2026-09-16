@@ -6,6 +6,8 @@ const EXPECTED_SOURCE_COUNTS = {
   "website-contact": 1,
 };
 const OUTPUT_PATH = "/tmp/vanesch-d1-diagnostic-backfill.sql";
+const BACKFILL_ENV_PATH = ".env.backfill.local";
+const EXPECTED_SUPABASE_HOST = "qxddddhhpfrrxbaunwfw.supabase.co";
 
 const COLUMNS = [
   "id",
@@ -106,13 +108,13 @@ function parseEnvLine(line) {
   return { key, value };
 }
 
-async function loadLocalEnvironment() {
+async function loadBackfillEnvironment() {
   let envContents;
 
   try {
-    envContents = await readFile(".env.local", "utf8");
+    envContents = await readFile(BACKFILL_ENV_PATH, "utf8");
   } catch {
-    throw new Error("Unable to read .env.local.");
+    throw new Error(`Unable to read ${BACKFILL_ENV_PATH}.`);
   }
 
   for (const line of envContents.split(/\r?\n/)) {
@@ -134,7 +136,7 @@ function getRequiredEnvironmentVariable(name) {
   const value = process.env[name]?.trim();
 
   if (!value) {
-    throw new Error(`Missing ${name} in .env.local.`);
+    throw new Error(`Missing ${name} in ${BACKFILL_ENV_PATH}.`);
   }
 
   return value;
@@ -283,12 +285,23 @@ ${statements.join("\n\n")}
 
 async function fetchRows() {
   const supabaseUrl = getRequiredEnvironmentVariable(
-    "NEXT_PUBLIC_SUPABASE_URL",
+    "BACKFILL_SUPABASE_URL",
   );
   const serviceRoleKey = getRequiredEnvironmentVariable(
-    "SUPABASE_SERVICE_ROLE_KEY",
+    "BACKFILL_SUPABASE_SERVICE_ROLE_KEY",
   );
-  const endpoint = new URL("/rest/v1/diagnostic_submissions", supabaseUrl);
+  const parsedSupabaseUrl = new URL(supabaseUrl);
+
+  if (parsedSupabaseUrl.hostname !== EXPECTED_SUPABASE_HOST) {
+    throw new Error(
+      `Backfill project mismatch. Expected ${EXPECTED_SUPABASE_HOST} but found ${parsedSupabaseUrl.hostname}.`,
+    );
+  }
+
+  const endpoint = new URL(
+    "/rest/v1/diagnostic_submissions",
+    parsedSupabaseUrl,
+  );
 
   endpoint.searchParams.set("select", COLUMNS.join(","));
   endpoint.searchParams.set("order", "created_at.asc");
@@ -324,7 +337,7 @@ async function main() {
     throw new Error("Use either --check or --write, not both.");
   }
 
-  await loadLocalEnvironment();
+  await loadBackfillEnvironment();
 
   const rows = await fetchRows();
   const sourceCounts = validateRows(rows);
