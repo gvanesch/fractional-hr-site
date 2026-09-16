@@ -29,6 +29,35 @@ export type D1HealthCheckSubmissionRow = {
   publicToken: string;
 };
 
+export type D1ContactSubmissionFields = {
+  contactName: string;
+  contactEmail: string;
+  contactCompany: string | null;
+  contactTopic: string | null;
+  contactMessage: string;
+  contactSource: string;
+  companySize: string | null;
+  industry: string | null;
+  role: string | null;
+  countryRegion: string | null;
+  answers: unknown | null;
+  score: number | null;
+  band: string | null;
+  advisorBrief: unknown | null;
+  contactSubmittedAt: string;
+};
+
+export type D1ContactSubmissionRow = D1ContactSubmissionFields & {
+  id: string;
+  createdAt: string;
+  submissionId: string;
+  submissionSource: string;
+};
+
+export type D1ContactSubmissionUpdate = D1ContactSubmissionFields & {
+  submissionId: string;
+};
+
 function serializeJson(value: unknown, fieldName: string): string {
   const serialized = JSON.stringify(value);
 
@@ -37,6 +66,17 @@ function serializeJson(value: unknown, fieldName: string): string {
   }
 
   return serialized;
+}
+
+function serializeNullableJson(
+  value: unknown | null,
+  fieldName: string,
+): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  return serializeJson(value, fieldName);
 }
 
 export async function insertD1HealthCheckSubmission(
@@ -113,4 +153,125 @@ export async function insertD1HealthCheckSubmission(
   if (!result.success) {
     throw new Error("D1 Health Check submission insert did not succeed.");
   }
+}
+
+export async function insertD1ContactSubmission(
+  row: D1ContactSubmissionRow,
+): Promise<void> {
+  const answers = serializeNullableJson(row.answers, "answers");
+  const advisorBrief = serializeNullableJson(
+    row.advisorBrief,
+    "advisor brief",
+  );
+
+  const result = await getD1Database()
+    .prepare(
+      `INSERT INTO diagnostic_submissions (
+        id,
+        created_at,
+        company_size,
+        industry,
+        role,
+        country_region,
+        score,
+        band,
+        answers,
+        submission_id,
+        contact_name,
+        contact_email,
+        contact_company,
+        contact_topic,
+        contact_message,
+        contact_source,
+        advisor_brief,
+        contact_submitted_at,
+        submission_source
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )`,
+    )
+    .bind(
+      row.id,
+      row.createdAt,
+      row.companySize,
+      row.industry,
+      row.role,
+      row.countryRegion,
+      row.score,
+      row.band,
+      answers,
+      row.submissionId,
+      row.contactName,
+      row.contactEmail,
+      row.contactCompany,
+      row.contactTopic,
+      row.contactMessage,
+      row.contactSource,
+      advisorBrief,
+      row.contactSubmittedAt,
+      row.submissionSource,
+    )
+    .run();
+
+  if (!result.success) {
+    throw new Error("D1 contact submission insert did not succeed.");
+  }
+}
+
+export async function updateD1ContactSubmission(
+  row: D1ContactSubmissionUpdate,
+): Promise<boolean> {
+  const answers = serializeNullableJson(row.answers, "answers");
+  const advisorBrief = serializeNullableJson(
+    row.advisorBrief,
+    "advisor brief",
+  );
+
+  const result = await getD1Database()
+    .prepare(
+      `UPDATE diagnostic_submissions
+      SET
+        contact_name = ?,
+        contact_email = ?,
+        contact_company = ?,
+        contact_topic = ?,
+        contact_message = ?,
+        contact_source = ?,
+        company_size = ?,
+        industry = ?,
+        role = ?,
+        country_region = ?,
+        answers = ?,
+        score = ?,
+        band = ?,
+        advisor_brief = ?,
+        contact_submitted_at = ?
+      WHERE submission_id = ?`,
+    )
+    .bind(
+      row.contactName,
+      row.contactEmail,
+      row.contactCompany,
+      row.contactTopic,
+      row.contactMessage,
+      row.contactSource,
+      row.companySize,
+      row.industry,
+      row.role,
+      row.countryRegion,
+      answers,
+      row.score,
+      row.band,
+      advisorBrief,
+      row.contactSubmittedAt,
+      row.submissionId,
+    )
+    .run();
+
+  if (!result.success) {
+    throw new Error("D1 contact submission update did not succeed.");
+  }
+
+  return result.meta.changes === 1;
 }
