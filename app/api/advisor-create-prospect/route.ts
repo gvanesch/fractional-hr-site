@@ -144,33 +144,7 @@ export async function POST(request: Request) {
                 notes,
             })
             .select(
-                [
-                    "prospect_id",
-                    "name",
-                    "company",
-                    "role",
-                    "source",
-                    "segment",
-                    "diagnostic_status",
-                    "last_contact_date",
-                    "next_action_date",
-                    "observed_signals",
-                    "notes",
-                    "linked_submission_id",
-                    "created_at",
-                    "updated_at",
-                    "relationship_strength",
-                    "deal_stage",
-                    "lead_temperature",
-                    "next_step",
-                    "lost_reason",
-                    "contact_email",
-                    "contact_phone",
-                    "company_website",
-                    "billing_contact_name",
-                    "billing_contact_email",
-                    "linkedin_url",
-                ].join(","),
+                "prospect_id,name,company,role,source,segment,diagnostic_status,last_contact_date,next_action_date,observed_signals,notes,linked_submission_id,created_at,updated_at,relationship_strength,deal_stage,lead_temperature,next_step,lost_reason,contact_email,contact_phone,company_website,billing_contact_name,billing_contact_email,linkedin_url",
             )
             .single();
 
