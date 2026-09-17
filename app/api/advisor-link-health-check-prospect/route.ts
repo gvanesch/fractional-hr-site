@@ -8,17 +8,18 @@ export async function POST(request: Request) {
         const supabase = await createSupabaseServerClient();
 
         const {
-            data: { session },
-        } = await supabase.auth.getSession();
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser();
 
-        if (!session) {
+        if (authError || !user) {
             return NextResponse.json(
                 { success: false, error: "Unauthorized" },
                 { status: 401 },
             );
         }
 
-        const userEmail = session.user.email;
+        const userEmail = user.email;
 
         if (!isAllowedAdvisorEmail(userEmail)) {
             return NextResponse.json(
