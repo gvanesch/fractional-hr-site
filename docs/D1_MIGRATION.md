@@ -203,7 +203,7 @@ The wider privacy policy, DPA/subprocessor material, operational documentation a
 
 ### Phase 0 - Discovery and freeze
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 - establish this migration record
 - preserve existing production behaviour
@@ -218,7 +218,7 @@ Exit gate:
 
 ### Phase 1 - D1 foundations
 
-Status: NOT STARTED
+Status: COMPLETE
 
 - create `vanesch-prod` D1 with EU jurisdiction
 - create `vanesch-qa` D1 with EU jurisdiction
@@ -235,9 +235,24 @@ Exit gate:
 
 ### Phase 2 - Low-risk persistence paths
 
-Status: NOT STARTED
+Status: IN PROGRESS
 
-Move and test:
+Completed foundations and shadow-write coverage:
+
+- system events schema, backfill and exact reconciliation
+- public Health Check/contact submission schema and exact reconciliation
+- advisor CRM schema, backfill and exact reconciliation
+- guarded CRM mutation shadow writes
+- guarded public contact and Health Check shadow writes
+- application-level D1 write and transaction probes
+
+Remaining in this phase:
+
+- switch eligible reads to D1 after QA reconciliation
+- public result lookup cutover testing
+- advisor read-only dashboard cutover testing
+
+Original scope:
 
 - system events
 - public Health Check submissions
@@ -271,7 +286,15 @@ Exit gate:
 
 ### Phase 4 - Client diagnostic security and transactions
 
-Status: NOT STARTED
+Status: IN PROGRESS
+
+Schema prepared on `migration/d1`:
+
+- client diagnostic core tables in `0004_create_client_diagnostic_core.sql`
+- rate-limit, OTP challenge and verified-session tables in `0005_create_client_diagnostic_security.sql`
+- constraint, uniqueness, JSON and cascade smoke-test scripts for both schema slices
+
+The migrations are source-controlled and build-verified but are not yet applied to the remote D1 databases. Runtime security behaviour remains Supabase-authoritative until the D1 service layer and adversarial tests are complete.
 
 Reimplement and adversarially test:
 
@@ -337,7 +360,20 @@ Exit gate:
 
 Until Phase 5 has completed its soak/reconciliation gate, Supabase remains the rollback platform. No destructive Supabase cleanup should occur while production rollback could still be required.
 
+## Progress snapshot: 17 September 2026
+
+- EU-jurisdiction production and QA D1 databases exist and are bound as `DB`.
+- Migrations `0001` through `0003` are applied to both databases.
+- Production low-risk data was backfilled and reconciled exactly: 3 diagnostic submissions, 33 system events and 36 CRM records.
+- CRM mutation routes and public submission routes have guarded D1 shadow-write paths while Supabase remains authoritative.
+- GitHub Actions builds every push to `migration/d1`.
+- Client diagnostic migrations `0004` and `0005` are committed and build-verified, pending application and smoke testing against QA D1.
+- No client diagnostic runtime path has been switched to D1.
+- Production D1 feature flags remain off.
+
 ## Immediate next work
 
-1. Complete the code/config dependency inventory and classify each dependency as data, authentication, RPC/business logic, security, legacy or documentation/compliance.
-2. Define the initial D1 schema and binding approach on this migration branch before creating or changing production resources.
+1. Apply `0004` and `0005` to QA D1 and execute both smoke-test scripts.
+2. Add the client diagnostic D1 service layer behind an off-by-default migration flag.
+3. Mirror the lower-risk project and participant management writes in QA before porting OTP, session and final-submission transactions.
+4. Reconcile QA behavior before any production schema application or runtime cutover.
