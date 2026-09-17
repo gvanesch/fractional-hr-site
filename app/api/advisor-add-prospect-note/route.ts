@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import {
+    parseD1AdvisorProspectActivityRow,
+    parseD1AdvisorProspectRow,
+    syncD1AdvisorProspectMutation,
+} from "@/lib/d1/crm-prospects";
+import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
 
 type NoteType = "call" | "meeting" | "email" | "linkedin" | "internal";
 
@@ -102,7 +108,9 @@ export async function POST(request: Request) {
 
         const { data: prospect, error: prospectError } = await admin
             .from("advisor_prospects")
-            .select("linked_submission_id")
+            .select(
+                "prospect_id,name,company,role,source,segment,diagnostic_status,last_contact_date,next_action_date,observed_signals,notes,linked_submission_id,created_at,updated_at,relationship_strength,deal_stage,lead_temperature,next_step,lost_reason,contact_email,contact_phone,company_website,billing_contact_name,billing_contact_email,linkedin_url",
+            )
             .eq("prospect_id", prospectId)
             .single();
 
@@ -113,7 +121,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const { error: insertError } = await admin
+        const { data: activity, error: insertError } = await admin
             .from("advisor_prospect_activity")
             .insert({
                 prospect_id: prospectId,
@@ -122,7 +130,11 @@ export async function POST(request: Request) {
                 note_type: noteType,
                 note,
                 changed_by: user.email ?? null,
-            });
+            })
+            .select(
+                "activity_id,prospect_id,linked_submission_id,activity_type,field_name,old_value,new_value,note,changed_by,created_at,note_type",
+            )
+            .single();
 
         if (insertError) {
             return NextResponse.json(
@@ -143,17 +155,50 @@ export async function POST(request: Request) {
             updatePayload.next_step = nextStep;
         }
 
+        let updatedProspect = prospect;
+
         if (Object.keys(updatePayload).length > 1) {
-            const { error: updateError } = await admin
+            const { data, error: updateError } = await admin
                 .from("advisor_prospects")
                 .update(updatePayload)
-                .eq("prospect_id", prospectId);
+                .eq("prospect_id", prospectId)
+                .select(
+                    "prospect_id,name,company,role,source,segment,diagnostic_status,last_contact_date,next_action_date,observed_signals,notes,linked_submission_id,created_at,updated_at,relationship_strength,deal_stage,lead_temperature,next_step,lost_reason,contact_email,contact_phone,company_website,billing_contact_name,billing_contact_email,linkedin_url",
+                )
+                .single();
 
             if (updateError) {
                 return NextResponse.json(
                     { success: false, error: updateError.message },
                     { status: 500 },
                 );
+            }
+
+            updatedProspect = data;
+        }
+
+        if (isD1CrmProspectsShadowWriteEnabled()) {
+            try {
+                await syncD1AdvisorProspectMutation({
+                    prospect: parseD1AdvisorProspectRow(updatedProspect),
+                    activities: [
+                        parseD1AdvisorProspectActivityRow(activity),
+                    ],
+                });
+
+                console.log("ADVISOR_ADD_PROSPECT_NOTE_D1_SHADOW_SUCCESS", {
+                    prospectId,
+                    activityId: activity.activity_id,
+                });
+            } catch (shadowError) {
+                console.error("ADVISOR_ADD_PROSPECT_NOTE_D1_SHADOW_FAILED", {
+                    prospectId,
+                    activityId: activity.activity_id,
+                    error:
+                        shadowError instanceof Error
+                            ? shadowError.message
+                            : "Unknown D1 shadow-write error",
+                });
             }
         }
 
