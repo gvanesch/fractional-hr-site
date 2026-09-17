@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 
 const EXPECTED_ROW_COUNT = 3;
@@ -7,6 +8,8 @@ const EXPECTED_SOURCE_COUNTS = {
 };
 const OUTPUT_PATH = "/tmp/vanesch-d1-diagnostic-backfill.sql";
 const VERIFY_OUTPUT_PATH = "/tmp/vanesch-d1-diagnostic-verify.sql";
+const D1_QUERY_OUTPUT_PATH =
+  "/tmp/vanesch-d1-diagnostic-query-output.txt";
 const BACKFILL_ENV_PATH = ".env.backfill.local";
 const EXPECTED_SUPABASE_HOST = "qxddddhhpfrrxbaunwfw.supabase.co";
 
@@ -371,6 +374,173 @@ PRAGMA quick_check;
 `;
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonicalize(value[key])]),
+    );
+  }
+
+  return value;
+}
+
+function normalizeRow(row, sourceName) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    throw new Error(`${sourceName} returned an invalid row.`);
+  }
+
+  return Object.fromEntries(
+    COLUMNS.map((column) => {
+      if (!Object.hasOwn(row, column)) {
+        throw new Error(
+          `${sourceName} row is missing the ${column} column.`,
+        );
+      }
+
+      let value = row[column];
+
+      if (
+        JSON_COLUMNS.has(column) &&
+        typeof value === "string"
+      ) {
+        try {
+          value = JSON.parse(value);
+        } catch {
+          throw new Error(
+            `${sourceName} returned invalid JSON in ${column}.`,
+          );
+        }
+      }
+
+      return [column, canonicalize(value)];
+    }),
+  );
+}
+
+function normalizeAndHashRows(rows, sourceName) {
+  const normalizedRows = rows
+    .map((row) => normalizeRow(row, sourceName))
+    .sort((left, right) =>
+      left.submission_id.localeCompare(right.submission_id),
+    );
+  const serialized = JSON.stringify(normalizedRows);
+  const hash = createHash("sha256").update(serialized).digest("hex");
+
+  return { normalizedRows, hash };
+}
+
+function extractD1Rows(output) {
+  const cleaned = output.replace(
+    /\u001b\[[0-9;]*m/g,
+    "",
+  );
+  const preferredMarker = '[\n  {\n    "results"';
+  const preferredStart = cleaned.indexOf(preferredMarker);
+  const fallbackStart = cleaned.lastIndexOf("\n[");
+  const start =
+    preferredStart >= 0
+      ? preferredStart
+      : fallbackStart >= 0
+        ? fallbackStart + 1
+        : -1;
+  const end = cleaned.lastIndexOf("]");
+
+  if (start < 0 || end < start) {
+    throw new Error(
+      "Unable to find the Wrangler JSON result in the protected D1 output.",
+    );
+  }
+
+  let parsed;
+
+  try {
+    parsed = JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    throw new Error(
+      "Unable to parse the Wrangler JSON result from the protected D1 output.",
+    );
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Wrangler did not return an array.");
+  }
+
+  const rows = parsed.flatMap((entry) =>
+    Array.isArray(entry?.results) ? entry.results : [],
+  );
+
+  return rows;
+}
+
+function compareRows(sourceRows, d1Rows) {
+  const source = normalizeAndHashRows(sourceRows, "Supabase");
+  const d1 = normalizeAndHashRows(d1Rows, "D1");
+  const sourceBySubmissionId = new Map(
+    source.normalizedRows.map((row) => [
+      row.submission_id,
+      JSON.stringify(row),
+    ]),
+  );
+  const d1BySubmissionId = new Map(
+    d1.normalizedRows.map((row) => [
+      row.submission_id,
+      JSON.stringify(row),
+    ]),
+  );
+
+  let exactMatchRows = 0;
+  let missingRows = 0;
+  let mismatchedRows = 0;
+
+  for (const [submissionId, sourceRow] of sourceBySubmissionId) {
+    const d1Row = d1BySubmissionId.get(submissionId);
+
+    if (d1Row === undefined) {
+      missingRows += 1;
+    } else if (d1Row === sourceRow) {
+      exactMatchRows += 1;
+    } else {
+      mismatchedRows += 1;
+    }
+  }
+
+  let unexpectedRows = 0;
+
+  for (const submissionId of d1BySubmissionId.keys()) {
+    if (!sourceBySubmissionId.has(submissionId)) {
+      unexpectedRows += 1;
+    }
+  }
+
+  const passed =
+    source.normalizedRows.length === EXPECTED_ROW_COUNT &&
+    d1.normalizedRows.length === EXPECTED_ROW_COUNT &&
+    exactMatchRows === EXPECTED_ROW_COUNT &&
+    missingRows === 0 &&
+    mismatchedRows === 0 &&
+    unexpectedRows === 0 &&
+    source.hash === d1.hash;
+
+  return {
+    passed,
+    sourceRows: source.normalizedRows.length,
+    d1Rows: d1.normalizedRows.length,
+    exactMatchRows,
+    missingRows,
+    mismatchedRows,
+    unexpectedRows,
+    sourceHash: source.hash,
+    d1Hash: d1.hash,
+    hashMatch: source.hash === d1.hash,
+  };
+}
+
 async function fetchRows() {
   const supabaseUrl = getRequiredEnvironmentVariable(
     "BACKFILL_SUPABASE_URL",
@@ -417,6 +587,7 @@ async function main() {
     "--check",
     "--write",
     "--verify-write",
+    "--compare-d1-output",
   ]);
 
   for (const arg of args) {
@@ -427,7 +598,7 @@ async function main() {
 
   if (args.size > 1) {
     throw new Error(
-      "Use only one of --check, --write, or --verify-write.",
+      "Use only one mode at a time.",
     );
   }
 
@@ -435,6 +606,35 @@ async function main() {
 
   const rows = await fetchRows();
   const sourceCounts = validateRows(rows);
+
+  if (args.has("--compare-d1-output")) {
+    let d1Output;
+
+    try {
+      d1Output = await readFile(D1_QUERY_OUTPUT_PATH, "utf8");
+    } catch {
+      throw new Error(
+        `Unable to read ${D1_QUERY_OUTPUT_PATH}.`,
+      );
+    }
+
+    const d1Rows = extractD1Rows(d1Output);
+    const comparison = compareRows(rows, d1Rows);
+
+    console.log(
+      JSON.stringify({
+        status: comparison.passed ? "ok" : "error",
+        mode: "compare-d1-output",
+        ...comparison,
+      }),
+    );
+
+    if (!comparison.passed) {
+      process.exitCode = 1;
+    }
+
+    return;
+  }
 
   if (args.has("--write")) {
     const sql = buildSql(rows);
