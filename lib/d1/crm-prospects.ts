@@ -95,6 +95,280 @@ export type D1HealthCheckProspectActivityRow = {
   createdAt: string;
 };
 
+function requireRecord(
+  input: unknown,
+  rowName: string,
+): Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error(`Supabase returned an invalid ${rowName} row.`);
+  }
+
+  return input as Record<string, unknown>;
+}
+
+function requireString(
+  value: unknown,
+  fieldName: string,
+): string {
+  if (typeof value !== "string" || !value) {
+    throw new Error(`Supabase returned an invalid ${fieldName}.`);
+  }
+
+  return value;
+}
+
+function nullableString(
+  value: unknown,
+  fieldName: string,
+): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`Supabase returned an invalid ${fieldName}.`);
+  }
+
+  return value;
+}
+
+function nullableStringArray(
+  value: unknown,
+  fieldName: string,
+): string[] | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== "string")
+  ) {
+    throw new Error(`Supabase returned an invalid ${fieldName}.`);
+  }
+
+  return value;
+}
+
+function requireEnum<T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+  fieldName: string,
+): T {
+  if (
+    typeof value !== "string" ||
+    !allowedValues.includes(value as T)
+  ) {
+    throw new Error(`Supabase returned an invalid ${fieldName}.`);
+  }
+
+  return value as T;
+}
+
+function nullableEnum<T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+  fieldName: string,
+): T | null {
+  if (value === null) {
+    return null;
+  }
+
+  return requireEnum(value, allowedValues, fieldName);
+}
+
+export function parseD1AdvisorProspectRow(
+  input: unknown,
+): D1AdvisorProspectRow {
+  const row = requireRecord(input, "advisor prospect");
+
+  return {
+    prospectId: requireString(row.prospect_id, "prospect_id"),
+    name: nullableString(row.name, "name"),
+    company: nullableString(row.company, "company"),
+    role: nullableString(row.role, "role"),
+    source: requireEnum(
+      row.source,
+      ["linkedin", "referral", "website", "saas", "other"] as const,
+      "source",
+    ),
+    segment: nullableEnum(
+      row.segment,
+      ["smb", "mid", "enterprise"] as const,
+      "segment",
+    ),
+    diagnosticStatus: requireEnum(
+      row.diagnostic_status,
+      [
+        "not_invited",
+        "invited",
+        "started",
+        "completed",
+        "assessment_candidate",
+        "in_conversation",
+        "converted",
+      ] as const,
+      "diagnostic_status",
+    ),
+    lastContactDate: nullableString(
+      row.last_contact_date,
+      "last_contact_date",
+    ),
+    nextActionDate: nullableString(
+      row.next_action_date,
+      "next_action_date",
+    ),
+    observedSignals: nullableStringArray(
+      row.observed_signals,
+      "observed_signals",
+    ),
+    notes: nullableString(row.notes, "notes"),
+    linkedSubmissionId: nullableString(
+      row.linked_submission_id,
+      "linked_submission_id",
+    ),
+    createdAt: requireString(row.created_at, "created_at"),
+    updatedAt: requireString(row.updated_at, "updated_at"),
+    relationshipStrength: requireEnum(
+      row.relationship_strength,
+      ["unknown", "weak", "medium", "strong"] as const,
+      "relationship_strength",
+    ),
+    dealStage: requireEnum(
+      row.deal_stage,
+      [
+        "new",
+        "contacted",
+        "replied",
+        "meeting_booked",
+        "in_conversation",
+        "health_check_completed",
+        "diagnostic_assessment_candidate",
+        "proposal_discussed",
+        "converted",
+        "lost",
+        "nurture",
+      ] as const,
+      "deal_stage",
+    ),
+    leadTemperature: requireEnum(
+      row.lead_temperature,
+      ["cold", "warm", "hot"] as const,
+      "lead_temperature",
+    ),
+    nextStep: nullableString(row.next_step, "next_step"),
+    lostReason: nullableString(row.lost_reason, "lost_reason"),
+    contactEmail: nullableString(row.contact_email, "contact_email"),
+    contactPhone: nullableString(row.contact_phone, "contact_phone"),
+    companyWebsite: nullableString(
+      row.company_website,
+      "company_website",
+    ),
+    billingContactName: nullableString(
+      row.billing_contact_name,
+      "billing_contact_name",
+    ),
+    billingContactEmail: nullableString(
+      row.billing_contact_email,
+      "billing_contact_email",
+    ),
+    linkedinUrl: nullableString(row.linkedin_url, "linkedin_url"),
+  };
+}
+
+export function parseD1AdvisorProspectActivityRow(
+  input: unknown,
+): D1AdvisorProspectActivityRow {
+  const row = requireRecord(input, "advisor prospect activity");
+
+  return {
+    activityId: requireString(row.activity_id, "activity_id"),
+    prospectId: requireString(row.prospect_id, "prospect_id"),
+    linkedSubmissionId: nullableString(
+      row.linked_submission_id,
+      "linked_submission_id",
+    ),
+    activityType: requireString(row.activity_type, "activity_type"),
+    fieldName: nullableString(row.field_name, "field_name"),
+    oldValue: nullableString(row.old_value, "old_value"),
+    newValue: nullableString(row.new_value, "new_value"),
+    note: nullableString(row.note, "note"),
+    changedBy: nullableString(row.changed_by, "changed_by"),
+    createdAt: requireString(row.created_at, "created_at"),
+    noteType: nullableEnum(
+      row.note_type,
+      ["call", "meeting", "email", "linkedin", "internal"] as const,
+      "note_type",
+    ),
+  };
+}
+
+export function parseD1HealthCheckProspectRow(
+  input: unknown,
+): D1HealthCheckProspectRow {
+  const row = requireRecord(input, "Health Check prospect");
+
+  return {
+    prospectId: requireString(row.prospect_id, "prospect_id"),
+    submissionId: requireString(row.submission_id, "submission_id"),
+    name: nullableString(row.name, "name"),
+    company: nullableString(row.company, "company"),
+    relationship: requireEnum(
+      row.relationship,
+      ["weak", "medium", "strong"] as const,
+      "relationship",
+    ),
+    status: requireEnum(
+      row.status,
+      [
+        "not_contacted",
+        "contacted",
+        "replied",
+        "call_booked",
+        "opportunity",
+        "won",
+        "lost",
+      ] as const,
+      "status",
+    ),
+    lastContactDate: nullableString(
+      row.last_contact_date,
+      "last_contact_date",
+    ),
+    nextActionDate: nullableString(
+      row.next_action_date,
+      "next_action_date",
+    ),
+    source: requireEnum(
+      row.source,
+      ["network", "referral", "website", "other"] as const,
+      "source",
+    ),
+    notes: nullableString(row.notes, "notes"),
+    createdAt: requireString(row.created_at, "created_at"),
+    updatedAt: requireString(row.updated_at, "updated_at"),
+  };
+}
+
+export function parseD1HealthCheckProspectActivityRow(
+  input: unknown,
+): D1HealthCheckProspectActivityRow {
+  const row = requireRecord(input, "Health Check prospect activity");
+
+  return {
+    activityId: requireString(row.activity_id, "activity_id"),
+    prospectId: requireString(row.prospect_id, "prospect_id"),
+    submissionId: requireString(row.submission_id, "submission_id"),
+    activityType: requireString(row.activity_type, "activity_type"),
+    fieldName: nullableString(row.field_name, "field_name"),
+    oldValue: nullableString(row.old_value, "old_value"),
+    newValue: nullableString(row.new_value, "new_value"),
+    note: nullableString(row.note, "note"),
+    changedBy: nullableString(row.changed_by, "changed_by"),
+    createdAt: requireString(row.created_at, "created_at"),
+  };
+}
+
 function serializeNullableStringArray(
   value: string[] | null,
   fieldName: string,
