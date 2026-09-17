@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isD1ClientDiagnosticShadowWriteEnabled } from "@/lib/d1/database";
+import { updateD1ClientProjectDetails } from "@/lib/d1/client-diagnostic";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -72,7 +74,7 @@ export async function PATCH(request: Request) {
 
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase
+    const { data: updatedProject, error } = await supabase
       .from("client_projects")
       .update({
         billing_contact_name: billingContactName ?? null,
@@ -83,10 +85,33 @@ export async function PATCH(request: Request) {
         dpa_status: dpaStatus ?? null,
         notes: notes ?? null,
       })
-      .eq("project_id", projectId);
+      .eq("project_id", projectId)
+      .select("updated_at")
+      .single();
 
-    if (error) {
+    if (error || !updatedProject) {
       throw new Error("Failed to update project.");
+    }
+
+    if (isD1ClientDiagnosticShadowWriteEnabled()) {
+      try {
+        await updateD1ClientProjectDetails({
+          projectId,
+          billingContactName: billingContactName ?? null,
+          billingContactEmail: billingContactEmail ?? null,
+          companyWebsite: companyWebsite ?? null,
+          purchaseOrderNumber: purchaseOrderNumber ?? null,
+          msaStatus: msaStatus ?? null,
+          dpaStatus: dpaStatus ?? null,
+          notes: notes ?? null,
+          updatedAt: updatedProject.updated_at,
+        });
+      } catch (d1Error) {
+        console.error(
+          "[client-diagnostic-project-update] D1 shadow write failed",
+          d1Error,
+        );
+      }
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
