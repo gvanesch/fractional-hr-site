@@ -40,7 +40,7 @@ async function cleanupProbe(
     .bind(submissionId)
     .run();
 
-  if (!deleteResult.success || deleteResult.meta.changes !== 1) {
+  if (!deleteResult.success || deleteResult.meta.changes < 1) {
     return false;
   }
 
