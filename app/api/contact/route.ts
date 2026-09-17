@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import {
+  upsertD1HealthCheckProspect,
+  type D1HealthCheckProspectRow,
+} from "../../../lib/d1/crm-prospects";
+import {
   insertD1ContactSubmission,
   updateD1ContactSubmission,
   type D1ContactSubmissionFields,
 } from "../../../lib/d1/diagnostic-submissions";
-import { isD1DiagnosticSubmissionsShadowWriteEnabled } from "../../../lib/d1/database";
+import {
+  isD1CrmProspectsShadowWriteEnabled,
+  isD1DiagnosticSubmissionsShadowWriteEnabled,
+} from "../../../lib/d1/database";
 import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
@@ -68,6 +75,87 @@ function escapeHtml(value: string): string {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function parseD1HealthCheckProspectRow(
+  input: unknown,
+  expectedSubmissionId: string,
+): D1HealthCheckProspectRow {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Supabase prospect upsert returned an invalid row.");
+  }
+
+  const row = input as Record<string, unknown>;
+
+  if (
+    !isNonEmptyString(row.prospect_id) ||
+    row.submission_id !== expectedSubmissionId ||
+    !isNullableString(row.name) ||
+    !isNullableString(row.company) ||
+    !isNullableString(row.last_contact_date) ||
+    !isNullableString(row.next_action_date) ||
+    !isNullableString(row.notes) ||
+    !isNonEmptyString(row.created_at) ||
+    !isNonEmptyString(row.updated_at)
+  ) {
+    throw new Error(
+      "Supabase prospect upsert did not return the required D1 fields.",
+    );
+  }
+
+  const relationship = row.relationship;
+
+  if (
+    relationship !== "weak" &&
+    relationship !== "medium" &&
+    relationship !== "strong"
+  ) {
+    throw new Error("Supabase prospect returned an invalid relationship.");
+  }
+
+  const status = row.status;
+
+  if (
+    status !== "not_contacted" &&
+    status !== "contacted" &&
+    status !== "replied" &&
+    status !== "call_booked" &&
+    status !== "opportunity" &&
+    status !== "won" &&
+    status !== "lost"
+  ) {
+    throw new Error("Supabase prospect returned an invalid status.");
+  }
+
+  const source = row.source;
+
+  if (
+    source !== "network" &&
+    source !== "referral" &&
+    source !== "website" &&
+    source !== "other"
+  ) {
+    throw new Error("Supabase prospect returned an invalid source.");
+  }
+
+  return {
+    prospectId: row.prospect_id,
+    submissionId: expectedSubmissionId,
+    name: row.name,
+    company: row.company,
+    relationship,
+    status,
+    lastContactDate: row.last_contact_date,
+    nextActionDate: row.next_action_date,
+    source,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function normaliseOptionalString(
@@ -574,6 +662,27 @@ async function upsertProspect(params: {
   console.log("CONTACT_CRM_UPSERT_SUCCESS", {
     submissionId,
   });
+
+  if (isD1CrmProspectsShadowWriteEnabled()) {
+    try {
+      const data = (await response.json()) as unknown;
+      const returnedRow =
+        Array.isArray(data) && data.length === 1 ? data[0] : null;
+
+      await upsertD1HealthCheckProspect(
+        parseD1HealthCheckProspectRow(returnedRow, submissionId),
+      );
+
+      console.log("CONTACT_CRM_D1_SHADOW_UPSERT_SUCCESS", {
+        submissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_CRM_D1_SHADOW_UPSERT_FAILED", {
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 }
 
 function buildListHtml(items: string[]): string {
