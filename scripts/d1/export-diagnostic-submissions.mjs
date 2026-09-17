@@ -6,6 +6,7 @@ const EXPECTED_SOURCE_COUNTS = {
   "website-contact": 1,
 };
 const OUTPUT_PATH = "/tmp/vanesch-d1-diagnostic-backfill.sql";
+const VERIFY_OUTPUT_PATH = "/tmp/vanesch-d1-diagnostic-verify.sql";
 const BACKFILL_ENV_PATH = ".env.backfill.local";
 const EXPECTED_SUPABASE_HOST = "qxddddhhpfrrxbaunwfw.supabase.co";
 
@@ -283,6 +284,93 @@ ${statements.join("\n\n")}
 `;
 }
 
+function buildVerificationSql(rows) {
+  const expectedColumns = COLUMNS.join(",\n    ");
+  const expectedValues = rows
+    .map((row) => {
+      const values = COLUMNS.map((column) =>
+        sqlValue(column, row[column]),
+      ).join(",\n      ");
+
+      return `(
+      ${values}
+    )`;
+    })
+    .join(",\n    ");
+
+  const comparisons = COLUMNS.filter(
+    (column) => column !== "submission_id",
+  ).map((column) => {
+    if (JSON_COLUMNS.has(column)) {
+      return `(
+          (d.${column} IS NULL AND e.${column} IS NULL)
+          OR (
+            d.${column} IS NOT NULL
+            AND e.${column} IS NOT NULL
+            AND json(d.${column}) = json(e.${column})
+          )
+        )`;
+    }
+
+    return `d.${column} IS e.${column}`;
+  });
+
+  return `-- One-time diagnostic_submissions parity verification.
+-- Contains live personal data in expected values. Do not commit or retain.
+-- Query output contains counts only.
+
+WITH expected (
+    ${expectedColumns}
+  ) AS (
+    VALUES
+    ${expectedValues}
+  ),
+  comparison AS (
+    SELECT
+      CASE
+        WHEN d.submission_id IS NOT NULL THEN 1
+        ELSE 0
+      END AS present,
+      CASE
+        WHEN
+          d.submission_id IS NOT NULL
+          AND ${comparisons.join("\n          AND ")}
+        THEN 1
+        ELSE 0
+      END AS exact_match
+    FROM expected AS e
+    LEFT JOIN diagnostic_submissions AS d
+      ON d.submission_id = e.submission_id
+  )
+SELECT
+  (SELECT COUNT(*) FROM diagnostic_submissions) AS d1_total_rows,
+  COUNT(*) AS expected_rows,
+  COALESCE(SUM(present), 0) AS present_rows,
+  COALESCE(SUM(exact_match), 0) AS exact_match_rows,
+  COALESCE(
+    SUM(
+      CASE
+        WHEN present = 1 AND exact_match = 0 THEN 1
+        ELSE 0
+      END
+    ),
+    0
+  ) AS mismatched_rows,
+  (
+    SELECT COUNT(*)
+    FROM diagnostic_submissions AS d
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM expected AS e
+      WHERE e.submission_id = d.submission_id
+    )
+  ) AS unexpected_rows
+FROM comparison;
+
+PRAGMA quick_check;
+`;
+}
+
 async function fetchRows() {
   const supabaseUrl = getRequiredEnvironmentVariable(
     "BACKFILL_SUPABASE_URL",
@@ -325,7 +413,11 @@ async function fetchRows() {
 
 async function main() {
   const args = new Set(process.argv.slice(2));
-  const allowedArgs = new Set(["--check", "--write"]);
+  const allowedArgs = new Set([
+    "--check",
+    "--write",
+    "--verify-write",
+  ]);
 
   for (const arg of args) {
     if (!allowedArgs.has(arg)) {
@@ -333,8 +425,10 @@ async function main() {
     }
   }
 
-  if (args.has("--check") && args.has("--write")) {
-    throw new Error("Use either --check or --write, not both.");
+  if (args.size > 1) {
+    throw new Error(
+      "Use only one of --check, --write, or --verify-write.",
+    );
   }
 
   await loadBackfillEnvironment();
@@ -342,36 +436,59 @@ async function main() {
   const rows = await fetchRows();
   const sourceCounts = validateRows(rows);
 
-  if (!args.has("--write")) {
+  if (args.has("--write")) {
+    const sql = buildSql(rows);
+
+    await writeFile(OUTPUT_PATH, sql, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await chmod(OUTPUT_PATH, 0o600);
+
     console.log(
       JSON.stringify({
         status: "ok",
-        mode: "check",
+        mode: "write",
         rows: rows.length,
         sources: sourceCounts,
-        outputWritten: false,
+        outputWritten: true,
+        outputPath: OUTPUT_PATH,
+        permissions: "0600",
       }),
     );
     return;
   }
 
-  const sql = buildSql(rows);
+  if (args.has("--verify-write")) {
+    const sql = buildVerificationSql(rows);
 
-  await writeFile(OUTPUT_PATH, sql, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await chmod(OUTPUT_PATH, 0o600);
+    await writeFile(VERIFY_OUTPUT_PATH, sql, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await chmod(VERIFY_OUTPUT_PATH, 0o600);
+
+    console.log(
+      JSON.stringify({
+        status: "ok",
+        mode: "verify-write",
+        rows: rows.length,
+        sources: sourceCounts,
+        outputWritten: true,
+        outputPath: VERIFY_OUTPUT_PATH,
+        permissions: "0600",
+      }),
+    );
+    return;
+  }
 
   console.log(
     JSON.stringify({
       status: "ok",
-      mode: "write",
+      mode: "check",
       rows: rows.length,
       sources: sourceCounts,
-      outputWritten: true,
-      outputPath: OUTPUT_PATH,
-      permissions: "0600",
+      outputWritten: false,
     }),
   );
 }
