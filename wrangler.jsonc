@@ -11,7 +11,8 @@
   "vars": {
     "D1_SYSTEM_EVENTS_MODE": "off",
     "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "off",
-    "D1_CRM_PROSPECTS_MODE": "off"
+    "D1_CRM_PROSPECTS_MODE": "off",
+    "D1_CLIENT_DIAGNOSTIC_MODE": "off"
   },
   "observability": {
     "logs": {
@@ -41,7 +42,8 @@
       "vars": {
         "D1_SYSTEM_EVENTS_MODE": "shadow",
         "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "off",
-        "D1_CRM_PROSPECTS_MODE": "shadow"
+        "D1_CRM_PROSPECTS_MODE": "shadow",
+        "D1_CLIENT_DIAGNOSTIC_MODE": "off"
       },
       "assets": {
         "directory": ".open-next/assets",
