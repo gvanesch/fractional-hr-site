@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isD1ClientDiagnosticShadowWriteEnabled } from "@/lib/d1/database";
+import { shadowClientProjectFromSupabase } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
 import {
   validateSegmentationValues,
@@ -238,6 +240,17 @@ export async function POST(request: Request): Promise<Response> {
         { success: false, error: "Unable to create participant." },
         { status: 500 },
       );
+    }
+
+    if (isD1ClientDiagnosticShadowWriteEnabled()) {
+      try {
+        await shadowClientProjectFromSupabase(projectId);
+      } catch (d1Error) {
+        console.error(
+          "[advisor-project-participants] D1 shadow write failed",
+          d1Error,
+        );
+      }
     }
 
     const resend = new Resend(getEnv("RESEND_API_KEY"));
