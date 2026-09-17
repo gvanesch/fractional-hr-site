@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import {
+  parseD1HealthCheckProspectActivityRow,
+  parseD1HealthCheckProspectRow,
+  syncD1HealthCheckProspectMutation,
+} from "@/lib/d1/crm-prospects";
+import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
 
 type ProspectSource = "network" | "referral" | "website" | "other";
 
@@ -252,10 +258,14 @@ export async function POST(request: Request) {
       updatePayload.notes = nextNotes;
     }
 
-    const { error: updateError } = await admin
+    const { data: updatedProspect, error: updateError } = await admin
       .from("health_check_prospects")
       .update(updatePayload)
-      .eq("prospect_id", prospectId);
+      .eq("prospect_id", prospectId)
+      .select(
+        "prospect_id,submission_id,name,company,relationship,status,last_contact_date,next_action_date,source,notes,created_at,updated_at",
+      )
+      .single();
 
     if (updateError) {
       return NextResponse.json(
@@ -350,16 +360,48 @@ export async function POST(request: Request) {
       });
     }
 
+    let insertedActivities: unknown[] = [];
+
     if (activityRows.length > 0) {
-      const { error: activityError } = await admin
+      const { data, error: activityError } = await admin
         .from("health_check_prospect_activity")
-        .insert(activityRows);
+        .insert(activityRows)
+        .select(
+          "activity_id,prospect_id,submission_id,activity_type,field_name,old_value,new_value,note,changed_by,created_at",
+        );
 
       if (activityError) {
         return NextResponse.json(
           { success: false, error: activityError.message },
           { status: 500 },
         );
+      }
+
+      insertedActivities = data;
+    }
+
+    if (isD1CrmProspectsShadowWriteEnabled()) {
+      try {
+        await syncD1HealthCheckProspectMutation({
+          prospect: parseD1HealthCheckProspectRow(updatedProspect),
+          activities: insertedActivities.map((activity) =>
+            parseD1HealthCheckProspectActivityRow(activity),
+          ),
+        });
+
+        console.log("PROSPECT_UPDATE_D1_SHADOW_SUCCESS", {
+          prospectId,
+          activityCount: insertedActivities.length,
+        });
+      } catch (shadowError) {
+        console.error("PROSPECT_UPDATE_D1_SHADOW_FAILED", {
+          prospectId,
+          activityCount: insertedActivities.length,
+          error:
+            shadowError instanceof Error
+              ? shadowError.message
+              : "Unknown D1 shadow-write error",
+        });
       }
     }
 
