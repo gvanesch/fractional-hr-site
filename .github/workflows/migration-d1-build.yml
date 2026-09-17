@@ -1,0 +1,50 @@
+name: Migration branch build
+
+on:
+  push:
+    branches:
+      - migration/d1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-d1-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Next.js build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_SUPABASE_URL: https://lrlapaiyejvbckqpbrwa.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      ADVISOR_ALLOWED_EMAILS: advisor@example.com
+      RESEND_API_KEY: re_ci_placeholder
+      CONTACT_FROM_EMAIL: advisor@example.com
+      CONTACT_TO_EMAIL: advisor@example.com
+      CRON_SECRET: ci-placeholder-cron-secret
+      DAILY_SUMMARY_RECIPIENT: advisor@example.com
+      CLIENT_DIAGNOSTIC_OTP_SECRET: ci-placeholder-otp-secret
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
