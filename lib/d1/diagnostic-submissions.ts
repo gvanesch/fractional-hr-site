@@ -58,6 +58,15 @@ export type D1ContactSubmissionUpdate = D1ContactSubmissionFields & {
   submissionId: string;
 };
 
+export type D1PublicDiagnosticSubmission = {
+  submissionId: string;
+  answers: unknown;
+  companySize: string | null;
+  industry: string | null;
+  role: string | null;
+  email: string | null;
+};
+
 function serializeJson(value: unknown, fieldName: string): string {
   const serialized = JSON.stringify(value);
 
@@ -271,6 +280,76 @@ export async function updateD1ContactSubmission(
 
   if (!result.success) {
     throw new Error("D1 contact submission update did not succeed.");
+  }
+
+  return result.meta.changes === 1;
+}
+
+export async function getD1PublicDiagnosticSubmission(
+  publicToken: string,
+): Promise<D1PublicDiagnosticSubmission | null> {
+  const row = await getD1Database()
+    .prepare(
+      `SELECT
+        submission_id,
+        answers,
+        company_size,
+        industry,
+        role,
+        email
+      FROM diagnostic_submissions
+      WHERE public_token = ?
+      LIMIT 1`,
+    )
+    .bind(publicToken)
+    .first<{
+      submission_id: string;
+      answers: string | null;
+      company_size: string | null;
+      industry: string | null;
+      role: string | null;
+      email: string | null;
+    }>();
+
+  if (!row) {
+    return null;
+  }
+
+  let answers: unknown = null;
+
+  if (row.answers !== null) {
+    try {
+      answers = JSON.parse(row.answers);
+    } catch {
+      throw new Error("D1 returned invalid diagnostic answers JSON.");
+    }
+  }
+
+  return {
+    submissionId: row.submission_id,
+    answers,
+    companySize: row.company_size,
+    industry: row.industry,
+    role: row.role,
+    email: row.email,
+  };
+}
+
+export async function updateD1PublicDiagnosticEmail(
+  publicToken: string,
+  email: string,
+): Promise<boolean> {
+  const result = await getD1Database()
+    .prepare(
+      `UPDATE diagnostic_submissions
+      SET email = ?
+      WHERE public_token = ?`,
+    )
+    .bind(email, publicToken)
+    .run();
+
+  if (!result.success) {
+    throw new Error("D1 public diagnostic email update did not succeed.");
   }
 
   return result.meta.changes === 1;
