@@ -7,6 +7,11 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 import {
+  D1ClientDiagnosticMutationError,
+  submitD1ClientDiagnostic,
+} from "@/lib/d1/client-diagnostic-mutations";
+import { isD1ClientDiagnosticWriteEnabled } from "@/lib/d1/database";
+import {
   getQuestionsForQuestionnaireType,
   type ClientDiagnosticQuestion,
   type QuestionnaireType,
@@ -473,6 +478,10 @@ function buildResponseRows(responses: SubmittedResponse[]) {
   return responses
     .map((response) => {
       if (response.kind === "score") {
+        if (typeof response.value !== "number") {
+          return null;
+        }
+
         return {
           dimension_key: response.dimension,
           question_key: response.questionId,
@@ -639,6 +648,34 @@ export async function POST(request: Request): Promise<Response> {
 
     const responseRows = buildResponseRows(responses);
     const dimensionScoreRows = buildDimensionScoreRows(responses);
+
+    if (isD1ClientDiagnosticWriteEnabled()) {
+      try {
+        const result = await submitD1ClientDiagnostic({
+          projectId,
+          participantId,
+          inviteToken,
+          questionnaireType,
+          responseRows,
+          dimensionScoreRows,
+          serviceAccessContext,
+        });
+
+        return NextResponse.json(result);
+      } catch (error) {
+        if (error instanceof D1ClientDiagnosticMutationError) {
+          const mapped = mapRpcErrorToResponse(error.message);
+
+          return NextResponse.json(
+            { success: false, error: mapped.error },
+            { status: mapped.status },
+          );
+        }
+
+        console.error("D1 client diagnostic submission failed.", error);
+        throw error;
+      }
+    }
 
     const supabase = createSupabaseAdminClient();
 
