@@ -7,7 +7,11 @@ import {
     parseD1AdvisorProspectRow,
     syncD1AdvisorProspectMutation,
 } from "@/lib/d1/crm-prospects";
-import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1CrmProspectsShadowWriteEnabled,
+} from "@/lib/d1/database";
 
 type ProspectSource = "linkedin" | "referral" | "website" | "saas" | "other";
 type ProspectSegment = "smb" | "mid" | "enterprise" | null;
@@ -346,12 +350,46 @@ export async function POST(request: Request) {
             lost_reason: normaliseOptionalText(body.lost_reason, 1000),
         };
 
-        const admin = createSupabaseAdminClient();
+        const d1Enabled = isD1CrmProspectsEnabled();
+        const admin = d1Enabled ? null : createSupabaseAdminClient();
+        let currentRow: ProspectRow | null = null;
 
-        const { data: currentRow, error: currentError } = await admin
-            .from("advisor_prospects")
-            .select(
-                `
+        if (d1Enabled) {
+            currentRow = await getD1Database()
+                .prepare(
+                    `SELECT
+          prospect_id,
+          name,
+          company,
+          role,
+          contact_email,
+          contact_phone,
+          company_website,
+          billing_contact_name,
+          billing_contact_email,
+          linkedin_url,
+          source,
+          segment,
+          diagnostic_status,
+          deal_stage,
+          relationship_strength,
+          lead_temperature,
+          last_contact_date,
+          next_action_date,
+          next_step,
+          lost_reason,
+          linked_submission_id
+                    FROM advisor_prospects
+                    WHERE prospect_id = ?
+                    LIMIT 1`,
+                )
+                .bind(prospectId)
+                .first<ProspectRow>();
+        } else {
+            const { data, error: currentError } = await admin!
+                .from("advisor_prospects")
+                .select(
+                    `
           prospect_id,
           name,
           company,
@@ -374,15 +412,18 @@ export async function POST(request: Request) {
           lost_reason,
           linked_submission_id
         `,
-            )
-            .eq("prospect_id", prospectId)
-            .maybeSingle();
+                )
+                .eq("prospect_id", prospectId)
+                .maybeSingle();
 
-        if (currentError) {
-            return NextResponse.json(
-                { success: false, error: currentError.message },
-                { status: 500 },
-            );
+            if (currentError) {
+                return NextResponse.json(
+                    { success: false, error: currentError.message },
+                    { status: 500 },
+                );
+            }
+
+            currentRow = data as ProspectRow | null;
         }
 
         if (!currentRow) {
@@ -392,7 +433,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const current = currentRow as ProspectRow;
+        const current = currentRow;
 
         const updatePayload: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
@@ -450,7 +491,73 @@ export async function POST(request: Request) {
             });
         }
 
-        const { data: updatedProspect, error: updateError } = await admin
+        const groupedChangeNote = changes
+            .map(
+                (change) =>
+                    `${formatFieldLabel(change.field)}: ${valueToDisplay(
+                        change.oldValue,
+                    )} → ${valueToDisplay(change.newValue)}`,
+            )
+            .join("\n");
+
+        if (d1Enabled) {
+            const database = getD1Database();
+            const activityId = crypto.randomUUID();
+            const activityCreatedAt = new Date().toISOString();
+            const assignments = Object.keys(updatePayload).map(
+                (field) => `${field} = ?`,
+            );
+            const bindings = [
+                ...Object.values(updatePayload),
+                prospectId,
+            ];
+            const results = await database.batch([
+                database
+                    .prepare(
+                        `UPDATE advisor_prospects
+                        SET ${assignments.join(", ")}
+                        WHERE prospect_id = ?`,
+                    )
+                    .bind(...bindings),
+                database
+                    .prepare(
+                        `INSERT INTO advisor_prospect_activity (
+                            activity_id,
+                            prospect_id,
+                            linked_submission_id,
+                            activity_type,
+                            field_name,
+                            note,
+                            changed_by,
+                            created_at
+                        ) VALUES (?, ?, ?, 'crm_record_updated', 'multiple_fields', ?, ?, ?)`,
+                    )
+                    .bind(
+                        activityId,
+                        prospectId,
+                        current.linked_submission_id,
+                        groupedChangeNote,
+                        user.email ?? null,
+                        activityCreatedAt,
+                    ),
+            ]);
+
+            if (
+                results.length !== 2 ||
+                results.some(
+                    (result) => !result.success || result.meta.changes !== 1,
+                )
+            ) {
+                throw new Error("D1 did not update the prospect atomically.");
+            }
+
+            return NextResponse.json(
+                { success: true, loggedActivityCount: 1 },
+                { headers: { "Cache-Control": "no-store" } },
+            );
+        }
+
+        const { data: updatedProspect, error: updateError } = await admin!
             .from("advisor_prospects")
             .update(updatePayload)
             .eq("prospect_id", prospectId)
@@ -466,16 +573,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const groupedChangeNote = changes
-            .map(
-                (change) =>
-                    `${formatFieldLabel(change.field)}: ${valueToDisplay(
-                        change.oldValue,
-                    )} → ${valueToDisplay(change.newValue)}`,
-            )
-            .join("\n");
-
-        const { data: activity, error: activityError } = await admin
+        const { data: activity, error: activityError } = await admin!
             .from("advisor_prospect_activity")
             .insert({
                 prospect_id: prospectId,
