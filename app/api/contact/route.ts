@@ -10,6 +10,7 @@ import {
 } from "../../../lib/d1/diagnostic-submissions";
 import {
   isD1CrmProspectsShadowWriteEnabled,
+  isD1DiagnosticSubmissionsEnabled,
   isD1DiagnosticSubmissionsShadowWriteEnabled,
 } from "../../../lib/d1/database";
 import {
@@ -372,17 +373,6 @@ async function createLeadSubmission(params: {
 }) {
   const { body, result, advisorBrief } = params;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
   const contactSubmittedAt = new Date().toISOString();
   const rowToInsert = {
     contact_name: body.name,
@@ -402,6 +392,37 @@ async function createLeadSubmission(params: {
     advisor_brief: advisorBrief ?? null,
     contact_submitted_at: contactSubmittedAt,
   };
+
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const submissionId = crypto.randomUUID();
+
+    await insertD1ContactSubmission({
+      ...buildD1ContactSubmissionFields({
+        body,
+        result,
+        advisorBrief,
+        contactSubmittedAt,
+      }),
+      id: crypto.randomUUID(),
+      createdAt: contactSubmittedAt,
+      submissionId,
+      submissionSource: rowToInsert.submission_source,
+    });
+
+    console.log("CONTACT_D1_INSERT_SUCCESS", { submissionId });
+    return submissionId;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
 
   const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
     method: "POST",
@@ -494,17 +515,6 @@ async function updateExistingLeadSubmission(params: {
 }) {
   const { submissionId, body, result, advisorBrief } = params;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
   const contactSubmittedAt = new Date().toISOString();
   const rowToUpdate = {
     contact_name: body.name,
@@ -523,6 +533,36 @@ async function updateExistingLeadSubmission(params: {
     advisor_brief: advisorBrief ?? null,
     contact_submitted_at: contactSubmittedAt,
   };
+
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const updated = await updateD1ContactSubmission({
+      ...buildD1ContactSubmissionFields({
+        body,
+        result,
+        advisorBrief,
+        contactSubmittedAt,
+      }),
+      submissionId,
+    });
+
+    if (!updated) {
+      throw new Error("No matching D1 submission was found.");
+    }
+
+    console.log("CONTACT_D1_UPDATE_SUCCESS", { submissionId });
+    return submissionId;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
 
   const response = await fetch(
     `${supabaseUrl}/rest/v1/diagnostic_submissions?submission_id=eq.${encodeURIComponent(
