@@ -5,6 +5,7 @@ import {
   validateParticipantVerifiedSession,
 } from "@/lib/security/client-participant-otp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 
 type FactPackSubmitRequest = {
   projectId: string;
@@ -194,6 +195,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const result = data as SaveClientFactPackRpcResult;
+
+    await shadowClientProjectAfterSupabaseMutation(
+      projectId,
+      "client-fact-pack-submit",
+    );
 
     return NextResponse.json({
       success: true,
