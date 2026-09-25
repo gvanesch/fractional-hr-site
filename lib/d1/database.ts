@@ -61,6 +61,9 @@ export function isD1ClientDiagnosticWriteEnabled(): boolean {
   }
 }
 
+export const isD1ClientDiagnosticEnabled =
+  isD1ClientDiagnosticWriteEnabled;
+
 export function isD1ClientDiagnosticSecurityEnabled(): boolean {
   try {
     const env = getCloudflareContext().env as D1MigrationEnv;
