@@ -31,6 +31,16 @@ export function isD1DiagnosticSubmissionsShadowWriteEnabled(): boolean {
   }
 }
 
+export function isD1DiagnosticSubmissionsEnabled(): boolean {
+  try {
+    const env = getCloudflareContext().env as D1MigrationEnv;
+
+    return env.D1_DIAGNOSTIC_SUBMISSIONS_MODE === "d1";
+  } catch {
+    return false;
+  }
+}
+
 export function isD1ClientDiagnosticShadowWriteEnabled(): boolean {
   try {
     const env = getCloudflareContext().env as D1MigrationEnv;
