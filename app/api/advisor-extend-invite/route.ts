@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
 
 export const dynamic = "force-dynamic";
@@ -236,6 +237,11 @@ export async function POST(request: Request): Promise<Response> {
         { status: 500 },
       );
     }
+
+    await shadowClientProjectAfterSupabaseMutation(
+      participant.project_id,
+      "advisor-extend-invite",
+    );
 
     let emailWarning: string | null = null;
 
