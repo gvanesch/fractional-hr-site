@@ -12,6 +12,7 @@ type DealStage =
     | "replied"
     | "meeting_booked"
     | "in_conversation"
+    | "health_check_completed"
     | "diagnostic_assessment_candidate"
     | "proposal_discussed"
     | "converted"
@@ -167,6 +168,9 @@ export default function ProspectDealControlPanel({
                                 <option value="replied">Replied</option>
                                 <option value="meeting_booked">Meeting booked</option>
                                 <option value="in_conversation">In conversation</option>
+                                <option value="health_check_completed">
+                                    Health Check completed
+                                </option>
                                 <option value="diagnostic_assessment_candidate">
                                     Diagnostic Assessment candidate
                                 </option>
