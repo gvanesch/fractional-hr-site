@@ -41,6 +41,16 @@ function shouldShadowWriteToD1(): boolean {
     }
 }
 
+function shouldWriteOnlyToD1(): boolean {
+    try {
+        const env = getCloudflareContext().env as D1MigrationEnv;
+
+        return env.D1_SYSTEM_EVENTS_MODE === "d1";
+    } catch {
+        return false;
+    }
+}
+
 async function logSystemEventToSupabase(
     event: SystemEventRecord,
 ): Promise<void> {
@@ -131,6 +141,11 @@ export async function logSystemEvent(
         metadata,
         createdAt: new Date().toISOString(),
     };
+
+    if (shouldWriteOnlyToD1()) {
+        await logSystemEventToD1(event);
+        return;
+    }
 
     const writes: Promise<void>[] = [logSystemEventToSupabase(event)];
 
