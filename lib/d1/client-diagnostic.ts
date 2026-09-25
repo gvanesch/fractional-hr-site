@@ -558,6 +558,7 @@ export type D1ParticipantInvite = {
   inviteExpiresAt: string | null;
   inviteRevokedAt: string | null;
   projectStatus: string;
+  name: string | null;
 };
 
 export async function getD1ParticipantInvite(
@@ -573,6 +574,7 @@ export async function getD1ParticipantInvite(
         participant.completed_at,
         participant.invite_expires_at,
         participant.invite_revoked_at,
+        participant.name,
         project.project_status
       FROM client_participants AS participant
       INNER JOIN client_projects AS project
@@ -589,6 +591,7 @@ export async function getD1ParticipantInvite(
       completed_at: string | null;
       invite_expires_at: string | null;
       invite_revoked_at: string | null;
+      name: string | null;
       project_status: string;
     }>();
 
@@ -605,6 +608,7 @@ export async function getD1ParticipantInvite(
     inviteExpiresAt: row.invite_expires_at,
     inviteRevokedAt: row.invite_revoked_at,
     projectStatus: row.project_status,
+    name: row.name,
   };
 }
 
