@@ -7,7 +7,11 @@ import {
     parseD1AdvisorProspectRow,
     syncD1AdvisorProspectMutation,
 } from "@/lib/d1/crm-prospects";
-import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1CrmProspectsShadowWriteEnabled,
+} from "@/lib/d1/database";
 
 export async function POST(request: Request) {
     try {
@@ -46,6 +50,93 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { success: false, error: "Missing prospect_id or submission_id" },
                 { status: 400 },
+            );
+        }
+
+        if (isD1CrmProspectsEnabled()) {
+            const database = getD1Database();
+            const prospect = await database
+                .prepare(
+                    `SELECT linked_submission_id
+                    FROM advisor_prospects
+                    WHERE prospect_id = ?
+                    LIMIT 1`,
+                )
+                .bind(prospectId)
+                .first<{ linked_submission_id: string | null }>();
+
+            if (!prospect) {
+                return NextResponse.json(
+                    { success: false, error: "Prospect not found" },
+                    { status: 404 },
+                );
+            }
+
+            if (
+                prospect.linked_submission_id &&
+                prospect.linked_submission_id !== submissionId
+            ) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error:
+                            "This prospect is already linked to a different Health Check. Unlink it first before linking a new one.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            if (prospect.linked_submission_id === submissionId) {
+                return NextResponse.json({ success: true, alreadyLinked: true });
+            }
+
+            const now = new Date().toISOString();
+            const results = await database.batch([
+                database
+                    .prepare(
+                        `UPDATE advisor_prospects
+                        SET linked_submission_id = ?,
+                            diagnostic_status = 'completed',
+                            updated_at = ?
+                        WHERE prospect_id = ? AND linked_submission_id IS NULL`,
+                    )
+                    .bind(submissionId, now, prospectId),
+                database
+                    .prepare(
+                        `INSERT INTO advisor_prospect_activity (
+                            activity_id,
+                            prospect_id,
+                            linked_submission_id,
+                            activity_type,
+                            field_name,
+                            old_value,
+                            new_value,
+                            changed_by,
+                            created_at
+                        ) VALUES (?, ?, ?, 'health_check_linked', 'linked_submission_id', NULL, ?, ?, ?)`,
+                    )
+                    .bind(
+                        crypto.randomUUID(),
+                        prospectId,
+                        submissionId,
+                        submissionId,
+                        userEmail,
+                        now,
+                    ),
+            ]);
+
+            if (
+                results.length !== 2 ||
+                results.some(
+                    (result) => !result.success || result.meta.changes !== 1,
+                )
+            ) {
+                throw new Error("D1 did not link the Health Check atomically.");
+            }
+
+            return NextResponse.json(
+                { success: true },
+                { headers: { "Cache-Control": "no-store" } },
             );
         }
 
