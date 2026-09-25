@@ -204,7 +204,7 @@ jobs:
           trap cleanup EXIT
 
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:8787/api/health > /dev/null; then
+            if curl --fail --silent http://127.0.0.1:8787/ > /dev/null; then
               break
             fi
 
