@@ -1,5 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  issueD1ParticipantOtpChallenge,
+  validateD1ParticipantVerifiedSession,
+  verifyD1ParticipantOtpChallenge,
+} from "@/lib/d1/client-diagnostic-security";
+import { isD1ClientDiagnosticSecurityEnabled } from "@/lib/d1/database";
 
 const OTP_EXPIRY_MINUTES = 10;
 const VERIFIED_SESSION_HOURS = 12;
@@ -109,6 +115,31 @@ export async function issueParticipantOtp(params: {
   const expiresAt = new Date(
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000,
   ).toISOString();
+
+  if (isD1ClientDiagnosticSecurityEnabled()) {
+    const challengeId = randomUUID();
+    const otpHash = await hashOtp({
+      challengeContext: challengeId,
+      otpCode,
+    });
+    const result = await issueD1ParticipantOtpChallenge({
+      challengeId,
+      participantId,
+      projectId,
+      inviteToken,
+      otpHash,
+      expiresAt,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return {
+      ...result,
+      otpCode,
+    };
+  }
 
   const challengeContext = `${participantId}:${projectId}:${inviteToken}:${expiresAt}`;
 
@@ -228,6 +259,30 @@ export async function verifyParticipantOtp(params: {
     Date.now() + VERIFIED_SESSION_HOURS * 60 * 60 * 1000,
   ).toISOString();
 
+  if (isD1ClientDiagnosticSecurityEnabled()) {
+    const result = await verifyD1ParticipantOtpChallenge({
+      challengeId,
+      participantId,
+      projectId,
+      inviteToken,
+      otpHash,
+      sessionId: randomUUID(),
+      sessionTokenHash,
+      sessionExpiresAt,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return {
+      success: true,
+      sessionToken,
+      sessionId: result.sessionId,
+      expiresAt: result.expiresAt,
+    };
+  }
+
   const { data, error } = await supabase.rpc(
     "verify_client_participant_otp_challenge",
     {
@@ -294,6 +349,15 @@ export async function validateParticipantVerifiedSession(params: {
 
   const supabase = createSupabaseAdminClient();
   const sessionTokenHash = await hashSessionToken(sessionToken);
+
+  if (isD1ClientDiagnosticSecurityEnabled()) {
+    return validateD1ParticipantVerifiedSession({
+      participantId,
+      projectId,
+      inviteToken,
+      sessionTokenHash,
+    });
+  }
 
   const { data, error } = await supabase.rpc(
     "validate_client_participant_verified_session",
