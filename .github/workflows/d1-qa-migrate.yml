@@ -107,6 +107,67 @@ jobs:
             echo "=== Security-state smoke test ==="
             npx wrangler d1 execute DB --env qa --remote --file scripts/d1/client-diagnostic-security-smoke-test.sql
 
+            echo "=== Fail-closed QA assertions ==="
+            npx wrangler d1 execute DB --env qa --remote --command "
+              SELECT
+                CASE WHEN (
+                  SELECT count(*)
+                  FROM d1_migrations
+                  WHERE name IN (
+                    '0004_create_client_diagnostic_core.sql',
+                    '0005_create_client_diagnostic_security.sql'
+                  )
+                ) = 2
+                THEN 'passed'
+                ELSE json_extract('migration assertion failed', '$')
+                END AS migrations_0004_0005;
+
+              SELECT
+                CASE WHEN (
+                  (SELECT count(*) FROM client_projects
+                    WHERE project_id LIKE 'd1-core-probe-%'
+                       OR project_id LIKE 'd1-security-probe-%')
+                  + (SELECT count(*) FROM client_participants
+                    WHERE participant_id LIKE 'd1-core-probe-%'
+                       OR participant_id LIKE 'd1-security-probe-%')
+                  + (SELECT count(*) FROM client_responses
+                    WHERE response_id LIKE 'd1-core-probe-%')
+                  + (SELECT count(*) FROM client_dimension_scores
+                    WHERE score_id LIKE 'd1-core-probe-%')
+                  + (SELECT count(*) FROM client_fact_packs
+                    WHERE fact_pack_id LIKE 'd1-core-probe-%')
+                  + (SELECT count(*) FROM client_functional_signal_requests
+                    WHERE signal_request_id LIKE 'd1-core-probe-%')
+                  + (SELECT count(*) FROM client_service_access_context
+                    WHERE context_id LIKE 'd1-core-probe-%')
+                  + (SELECT count(*) FROM client_diagnostic_invite_rate_limits
+                    WHERE ip_hash LIKE 'd1-security-probe-%')
+                  + (SELECT count(*) FROM client_participant_otp_challenges
+                    WHERE challenge_id LIKE 'd1-security-probe-%')
+                  + (SELECT count(*) FROM client_participant_verified_sessions
+                    WHERE session_id LIKE 'd1-security-probe-%')
+                ) = 0
+                THEN 'passed'
+                ELSE json_extract('probe cleanup assertion failed', '$')
+                END AS probe_cleanup;
+
+              SELECT
+                CASE WHEN (SELECT count(*) FROM pragma_foreign_key_check) = 0
+                THEN 'passed'
+                ELSE json_extract('foreign key assertion failed', '$')
+                END AS foreign_key_check;
+
+              SELECT
+                CASE WHEN (
+                  SELECT quick_check
+                  FROM pragma_quick_check
+                  LIMIT 1
+                ) = 'ok'
+                THEN 'passed'
+                ELSE json_extract('integrity assertion failed', '$')
+                END AS quick_check;
+            "
+
             echo "=== Applied migrations after verification ==="
             npx wrangler d1 migrations list DB --env qa --remote
           } 2>&1 | tee -a d1-qa-migration.log
