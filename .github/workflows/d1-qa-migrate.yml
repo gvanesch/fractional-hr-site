@@ -253,6 +253,36 @@ jobs:
           }
           NODE
 
+          mutation_response="$(
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              http://127.0.0.1:8787/api/d1-client-mutation-probe
+          )"
+          printf '%s\n' "$mutation_response"
+
+          PROBE_RESPONSE="$mutation_response" node <<'NODE'
+          const response = JSON.parse(process.env.PROBE_RESPONSE);
+          const expected = [
+            "diagnosticSubmission",
+            "duplicateSubmission",
+            "transactionRollback",
+            "factPackDraft",
+            "factPackSubmission",
+            "duplicateFactPack",
+            "cascadeCleanup",
+          ];
+
+          if (response.status !== "ok") {
+            throw new Error("D1 client mutation probe did not return ok.");
+          }
+
+          for (const key of expected) {
+            if (response.d1?.[key] !== "passed") {
+              throw new Error(`D1 client mutation assertion failed: ${key}`);
+            }
+          }
+          NODE
+
       - name: Retain migration log
         if: always()
         uses: actions/upload-artifact@v4
