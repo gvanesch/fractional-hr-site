@@ -245,11 +245,12 @@ Completed foundations and shadow-write coverage:
 - guarded CRM mutation shadow writes
 - guarded public contact and Health Check shadow writes
 - application-level D1 write and transaction probes
+- guarded D1-primary Health Check and contact persistence
+- guarded D1 public diagnostic result and email-update reads/writes
 
 Remaining in this phase:
 
-- switch eligible reads to D1 after QA reconciliation
-- public result lookup cutover testing
+- switch advisor CRM reads and mutations to D1
 - advisor read-only dashboard cutover testing
 
 Original scope:
@@ -288,13 +289,19 @@ Exit gate:
 
 Status: IN PROGRESS
 
-Schema prepared on `migration/d1`:
+Completed on `migration/d1` and QA D1:
 
 - client diagnostic core tables in `0004_create_client_diagnostic_core.sql`
 - rate-limit, OTP challenge and verified-session tables in `0005_create_client_diagnostic_security.sql`
 - constraint, uniqueness, JSON and cascade smoke-test scripts for both schema slices
+- exact invite-rate-limit, OTP and verified-session service behavior
+- invitation lookup and participant access checks
+- atomic diagnostic submission, dimension-score and Service Access persistence
+- atomic Fact Pack draft/save/submit behavior
+- participant lifecycle shadow snapshots
+- application-runtime probes covering replay rejection, rollback and cleanup
 
-The migrations are source-controlled and build-verified but are not yet applied to the remote D1 databases. Runtime security behaviour remains Supabase-authoritative until the D1 service layer and adversarial tests are complete.
+Migrations `0004` and `0005` are applied to QA D1 and are verified on every relevant branch change by GitHub Actions. The D1 runtime services and respondent read/write paths are behind off-by-default feature gates. Runtime security remains Supabase-authoritative until the controlled QA and production cutover gates are passed.
 
 Reimplement and adversarially test:
 
@@ -360,20 +367,25 @@ Exit gate:
 
 Until Phase 5 has completed its soak/reconciliation gate, Supabase remains the rollback platform. No destructive Supabase cleanup should occur while production rollback could still be required.
 
-## Progress snapshot: 17 September 2026
+## Progress snapshot: 25 September 2026
 
 - EU-jurisdiction production and QA D1 databases exist and are bound as `DB`.
 - Migrations `0001` through `0003` are applied to both databases.
 - Production low-risk data was backfilled and reconciled exactly: 3 diagnostic submissions, 33 system events and 36 CRM records.
 - CRM mutation routes and public submission routes have guarded D1 shadow-write paths while Supabase remains authoritative.
 - GitHub Actions builds every push to `migration/d1`.
-- Client diagnostic migrations `0004` and `0005` are committed and build-verified, pending application and smoke testing against QA D1.
-- No client diagnostic runtime path has been switched to D1.
+- Client diagnostic migrations `0004` and `0005` are applied and continuously verified on QA D1.
+- D1 security services preserve the live Supabase invite-rate-limit, OTP and verified-session rules.
+- D1 diagnostic submission and Fact Pack mutations are atomic and have passed application-runtime rollback and replay tests.
+- Respondent invitation, questionnaire, Fact Pack and public Health Check result paths have guarded D1-primary branches.
+- Health Check, contact and system-event persistence have guarded D1-primary branches.
+- All new D1-primary branches remain disabled in production and QA configuration.
 - Production D1 feature flags remain off.
 
 ## Immediate next work
 
-1. Apply `0004` and `0005` to QA D1 and execute both smoke-test scripts.
-2. Add the client diagnostic D1 service layer behind an off-by-default migration flag.
-3. Mirror the lower-risk project and participant management writes in QA before porting OTP, session and final-submission transactions.
-4. Reconcile QA behavior before any production schema application or runtime cutover.
+1. Complete D1-primary advisor CRM reads and mutations, including dashboard views.
+2. Complete D1-primary client-project administration and reporting reads.
+3. Configure and prove Cloudflare Access for every advisor page and management API before removing Supabase Auth.
+4. Apply `0004` and `0005` to production D1 only after the remaining application paths and cutover checklist are complete.
+5. Perform final incremental reconciliation, then enable D1 in QA before any production cutover.
