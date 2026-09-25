@@ -1,4 +1,7 @@
-import { isD1DiagnosticSubmissionsShadowWriteEnabled } from "../../../lib/d1/database";
+import {
+  isD1DiagnosticSubmissionsEnabled,
+  isD1DiagnosticSubmissionsShadowWriteEnabled,
+} from "../../../lib/d1/database";
 import { insertD1HealthCheckSubmission } from "../../../lib/d1/diagnostic-submissions";
 import { logSystemEvent } from "../../../lib/system-events";
 import { NextResponse } from "next/server";
@@ -461,17 +464,6 @@ async function createCompletionSubmission(params: {
     email,
   } = params;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
   const dimensionScores = getDimensionScores(answers);
   const dimensionScoreColumns = buildDimensionScoreColumns(dimensionScores);
   const submissionId = crypto.randomUUID();
@@ -496,130 +488,140 @@ async function createCompletionSubmission(params: {
     ...dimensionScoreColumns,
   };
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(rowToInsert),
+  const buildD1Row = (id: string, createdAt: string) => ({
+    id,
+    createdAt,
+    companySize: rowToInsert.company_size,
+    industry: rowToInsert.industry,
+    role: rowToInsert.role,
+    countryRegion: rowToInsert.country_region,
+    email: rowToInsert.email,
+    score: rowToInsert.score,
+    band: rowToInsert.band,
+    processClarityScore: dimensionScoreColumns.process_clarity_score,
+    consistencyScore: dimensionScoreColumns.consistency_score,
+    serviceAccessScore: dimensionScoreColumns.service_access_score,
+    ownershipScore: dimensionScoreColumns.ownership_score,
+    onboardingScore: dimensionScoreColumns.onboarding_score,
+    technologyAlignmentScore:
+      dimensionScoreColumns.technology_alignment_score,
+    knowledgeSelfServiceScore:
+      dimensionScoreColumns.knowledge_self_service_score,
+    operationalCapacityScore:
+      dimensionScoreColumns.operational_capacity_score,
+    dataHandoffsScore: dimensionScoreColumns.data_handoffs_score,
+    changeResilienceScore: dimensionScoreColumns.change_resilience_score,
+    answers: rowToInsert.answers,
+    submissionId,
+    advisorBrief: rowToInsert.advisor_brief,
+    completedAt: rowToInsert.completed_at,
+    submissionSource: "health-check" as const,
+    completionVersion: "v1",
+    publicToken,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-
-    console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
-      submissionId,
-      status: response.status,
-      error: errorText,
-    });
-
-    throw new Error(`Supabase insert failed: ${errorText}`);
-  }
-
-  const data = await response.json();
-
-  if (
-    !Array.isArray(data) ||
-    typeof data[0]?.submission_id !== "string"
-  ) {
-    console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
-      submissionId,
-      error: "Supabase insert succeeded but no submission_id was returned.",
-    });
-
-    throw new Error(
-      "Supabase insert succeeded but no submission_id was returned.",
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    await insertD1HealthCheckSubmission(
+      buildD1Row(crypto.randomUUID(), completedAt),
     );
-  }
+  } else {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const returnedRow = data[0] as Record<string, unknown>;
-  const returnedSubmissionId = returnedRow.submission_id as string;
-  const returnedPublicToken =
-    typeof returnedRow.public_token === "string"
-      ? returnedRow.public_token
-      : publicToken;
+    if (!supabaseUrl) {
+      throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+    }
 
-  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
-    try {
-      if (
-        typeof returnedRow.id !== "string" ||
-        typeof returnedRow.created_at !== "string"
-      ) {
-        throw new Error(
-          "Supabase response did not include the D1 parity identifiers.",
+    if (!supabaseKey) {
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+    }
+
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/diagnostic_submissions`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(rowToInsert),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error("HEALTH_CHECK_DB_INSERT_FAILED", {
+        submissionId,
+        status: response.status,
+        error: errorText,
+      });
+
+      throw new Error(`Supabase insert failed: ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    if (
+      !Array.isArray(data) ||
+      typeof data[0]?.submission_id !== "string"
+    ) {
+      throw new Error(
+        "Supabase insert succeeded but no submission_id was returned.",
+      );
+    }
+
+    const returnedRow = data[0] as Record<string, unknown>;
+
+    if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+      try {
+        if (
+          typeof returnedRow.id !== "string" ||
+          typeof returnedRow.created_at !== "string"
+        ) {
+          throw new Error(
+            "Supabase response did not include the D1 parity identifiers.",
+          );
+        }
+
+        await insertD1HealthCheckSubmission(
+          buildD1Row(returnedRow.id, returnedRow.created_at),
         );
+
+        console.log("HEALTH_CHECK_D1_SHADOW_INSERT_SUCCESS", {
+          submissionId,
+        });
+      } catch (error) {
+        console.error("HEALTH_CHECK_D1_SHADOW_INSERT_FAILED", {
+          submissionId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       }
-
-      await insertD1HealthCheckSubmission({
-        id: returnedRow.id,
-        createdAt: returnedRow.created_at,
-        companySize: rowToInsert.company_size,
-        industry: rowToInsert.industry,
-        role: rowToInsert.role,
-        countryRegion: rowToInsert.country_region,
-        email: rowToInsert.email,
-        score: rowToInsert.score,
-        band: rowToInsert.band,
-        processClarityScore:
-          dimensionScoreColumns.process_clarity_score,
-        consistencyScore: dimensionScoreColumns.consistency_score,
-        serviceAccessScore:
-          dimensionScoreColumns.service_access_score,
-        ownershipScore: dimensionScoreColumns.ownership_score,
-        onboardingScore: dimensionScoreColumns.onboarding_score,
-        technologyAlignmentScore:
-          dimensionScoreColumns.technology_alignment_score,
-        knowledgeSelfServiceScore:
-          dimensionScoreColumns.knowledge_self_service_score,
-        operationalCapacityScore:
-          dimensionScoreColumns.operational_capacity_score,
-        dataHandoffsScore:
-          dimensionScoreColumns.data_handoffs_score,
-        changeResilienceScore:
-          dimensionScoreColumns.change_resilience_score,
-        answers: rowToInsert.answers,
-        submissionId: returnedSubmissionId,
-        advisorBrief: rowToInsert.advisor_brief,
-        completedAt: rowToInsert.completed_at,
-        submissionSource: "health-check",
-        completionVersion: "v1",
-        publicToken: returnedPublicToken,
-      });
-
-      console.log("HEALTH_CHECK_D1_SHADOW_INSERT_SUCCESS", {
-        submissionId: returnedSubmissionId,
-      });
-    } catch (error) {
-      console.error("HEALTH_CHECK_D1_SHADOW_INSERT_FAILED", {
-        submissionId: returnedSubmissionId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
     }
   }
 
   await logSystemEvent({
     eventType: "health_check_db_insert",
-    submissionId: returnedSubmissionId,
-    publicToken: returnedPublicToken,
+    submissionId,
+    publicToken,
     source: "health-check",
     metadata: {
-      hasPublicToken: Boolean(returnedPublicToken),
+      hasPublicToken: Boolean(publicToken),
       completedAt,
     },
   });
 
   console.log("HEALTH_CHECK_DB_INSERT_SUCCESS", {
-    submissionId: returnedSubmissionId,
-    hasPublicToken: Boolean(returnedPublicToken),
+    submissionId,
+    hasPublicToken: Boolean(publicToken),
     completedAt,
   });
 
   return {
-    submissionId: returnedSubmissionId,
-    publicToken: returnedPublicToken,
+    submissionId,
+    publicToken,
     completedAt,
     rawScore,
   };
