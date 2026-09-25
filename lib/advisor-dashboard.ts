@@ -1,8 +1,14 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  getD1Database,
+  isD1ClientDiagnosticEnabled,
+  isD1CrmProspectsEnabled,
+  isD1DiagnosticSubmissionsEnabled,
+} from "@/lib/d1/database";
 
 // Aggregated, read-only data model for the advisor overview dashboard.
 // Each source is fetched independently and degrades gracefully: if one
-// Supabase query fails, that section reports an error while the rest of the
+// database query fails, that section reports an error while the rest of the
 // dashboard still renders.
 
 export type DashboardProject = {
@@ -24,6 +30,7 @@ export type DashboardProspect = {
     | "replied"
     | "meeting_booked"
     | "in_conversation"
+    | "health_check_completed"
     | "diagnostic_assessment_candidate"
     | "proposal_discussed"
     | "converted"
@@ -87,6 +94,10 @@ export function addDaysToDateString(dateString: string, days: number): string {
 
 async function loadProjects(): Promise<DashboardSection<DashboardProject[]>> {
   try {
+    if (isD1ClientDiagnosticEnabled()) {
+      return await loadD1DashboardProjects();
+    }
+
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("client_projects")
@@ -109,6 +120,10 @@ async function loadProjects(): Promise<DashboardSection<DashboardProject[]>> {
 
 async function loadProspects(): Promise<DashboardSection<DashboardProspect[]>> {
   try {
+    if (isD1CrmProspectsEnabled()) {
+      return await loadD1DashboardProspects();
+    }
+
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("advisor_prospects")
@@ -146,6 +161,10 @@ async function loadHealthChecks(): Promise<
   DashboardSection<DashboardHealthCheck[]>
 > {
   try {
+    if (isD1DiagnosticSubmissionsEnabled()) {
+      return await loadD1DashboardHealthChecks();
+    }
+
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("diagnostic_submissions")
@@ -172,6 +191,93 @@ async function loadHealthChecks(): Promise<
     }
 
     return { data: (data ?? []) as DashboardHealthCheck[], error: null };
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function loadD1DashboardProjects(
+  db: D1Database = getD1Database(),
+): Promise<DashboardSection<DashboardProject[]>> {
+  try {
+    const result = await db
+      .prepare(
+        `SELECT project_id, project_name, company_name, project_status, created_at
+        FROM client_projects
+        ORDER BY created_at DESC
+        LIMIT 250`,
+      )
+      .all<DashboardProject>();
+
+    return { data: result.results, error: null };
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function loadD1DashboardProspects(
+  db: D1Database = getD1Database(),
+): Promise<DashboardSection<DashboardProspect[]>> {
+  try {
+    const result = await db
+      .prepare(
+        `SELECT
+          prospect_id,
+          name,
+          company,
+          role,
+          deal_stage,
+          lead_temperature,
+          next_step,
+          next_action_date,
+          linked_submission_id,
+          updated_at
+        FROM advisor_prospects
+        ORDER BY updated_at DESC
+        LIMIT 250`,
+      )
+      .all<DashboardProspect>();
+
+    return { data: result.results, error: null };
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function loadD1DashboardHealthChecks(
+  db: D1Database = getD1Database(),
+): Promise<DashboardSection<DashboardHealthCheck[]>> {
+  try {
+    const result = await db
+      .prepare(
+        `SELECT
+          submission_id,
+          completed_at,
+          contact_submitted_at,
+          contact_name,
+          contact_email,
+          email,
+          contact_company,
+          industry,
+          score,
+          band
+        FROM diagnostic_submissions
+        WHERE completed_at IS NOT NULL
+        ORDER BY completed_at DESC
+        LIMIT 250`,
+      )
+      .all<DashboardHealthCheck>();
+
+    return { data: result.results, error: null };
   } catch (error) {
     return {
       data: [],
