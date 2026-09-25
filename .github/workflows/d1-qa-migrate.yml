@@ -27,6 +27,19 @@ jobs:
       CI: "true"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+      NEXT_PUBLIC_APP_ENV: local
+      NEXT_PUBLIC_SUPABASE_URL: https://lrlapaiyejvbckqpbrwa.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key
+      NEXT_PUBLIC_SITE_URL: http://localhost:8787
+      ADVISOR_ALLOWED_EMAILS: advisor@example.com
+      RESEND_API_KEY: re_ci_placeholder
+      CONTACT_FROM_EMAIL: advisor@example.com
+      CONTACT_TO_EMAIL: advisor@example.com
+      CRON_SECRET: ci-placeholder-cron-secret
+      DAILY_SUMMARY_RECIPIENT: advisor@example.com
+      CLIENT_DIAGNOSTIC_OTP_SECRET: ci-placeholder-otp-secret
+      INVITE_RATE_LIMIT_SALT: ci-placeholder-rate-limit-salt
 
     steps:
       - name: Check out repository
@@ -175,11 +188,78 @@ jobs:
             npx wrangler d1 migrations list DB --env qa --remote
           } 2>&1 | tee -a d1-qa-migration.log
 
+      - name: Verify application security service against local D1
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npx wrangler d1 migrations apply DB --local
+          npm run preview > d1-security-runtime.log 2>&1 &
+          preview_pid=$!
+
+          cleanup() {
+            kill "$preview_pid" 2>/dev/null || true
+            wait "$preview_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8787/api/health > /dev/null; then
+              break
+            fi
+
+            if ! kill -0 "$preview_pid" 2>/dev/null; then
+              cat d1-security-runtime.log
+              exit 1
+            fi
+
+            if [[ "$attempt" -eq 90 ]]; then
+              cat d1-security-runtime.log
+              echo "::error::Local Worker preview did not become ready."
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          response="$(
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              http://127.0.0.1:8787/api/d1-security-service-probe
+          )"
+          printf '%s\n' "$response"
+
+          PROBE_RESPONSE="$response" node <<'NODE'
+          const response = JSON.parse(process.env.PROBE_RESPONSE);
+          const expected = [
+            "inviteRateLimit",
+            "otpIssuance",
+            "resendControls",
+            "attemptLimit",
+            "sessionCreation",
+            "singleUseChallenge",
+            "invitationRevalidation",
+            "cleanup",
+          ];
+
+          if (response.status !== "ok") {
+            throw new Error("D1 security service probe did not return ok.");
+          }
+
+          for (const key of expected) {
+            if (response.d1?.[key] !== "passed") {
+              throw new Error(`D1 security service assertion failed: ${key}`);
+            }
+          }
+          NODE
+
       - name: Retain migration log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: d1-qa-migration-log-${{ github.run_id }}
-          path: d1-qa-migration.log
+          path: |
+            d1-qa-migration.log
+            d1-security-runtime.log
           if-no-files-found: warn
           retention-days: 14
