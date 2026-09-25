@@ -3,6 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 type D1MigrationEnv = CloudflareEnv & {
   D1_CRM_PROSPECTS_MODE?: string;
   D1_CLIENT_DIAGNOSTIC_MODE?: string;
+  D1_CLIENT_DIAGNOSTIC_SECURITY_MODE?: string;
   D1_DIAGNOSTIC_SUBMISSIONS_MODE?: string;
 };
 
@@ -35,6 +36,16 @@ export function isD1ClientDiagnosticShadowWriteEnabled(): boolean {
     const env = getCloudflareContext().env as D1MigrationEnv;
 
     return env.D1_CLIENT_DIAGNOSTIC_MODE === "shadow";
+  } catch {
+    return false;
+  }
+}
+
+export function isD1ClientDiagnosticSecurityEnabled(): boolean {
+  try {
+    const env = getCloudflareContext().env as D1MigrationEnv;
+
+    return env.D1_CLIENT_DIAGNOSTIC_SECURITY_MODE === "d1";
   } catch {
     return false;
   }
