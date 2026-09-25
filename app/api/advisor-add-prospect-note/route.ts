@@ -7,7 +7,11 @@ import {
     parseD1AdvisorProspectRow,
     syncD1AdvisorProspectMutation,
 } from "@/lib/d1/crm-prospects";
-import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1CrmProspectsShadowWriteEnabled,
+} from "@/lib/d1/database";
 
 type NoteType = "call" | "meeting" | "email" | "linkedin" | "internal";
 
@@ -101,6 +105,93 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { success: false, error: "Invalid note_type" },
                 { status: 400 },
+            );
+        }
+
+        if (isD1CrmProspectsEnabled()) {
+            const database = getD1Database();
+            const prospect = await database
+                .prepare(
+                    `SELECT linked_submission_id
+                    FROM advisor_prospects
+                    WHERE prospect_id = ?
+                    LIMIT 1`,
+                )
+                .bind(prospectId)
+                .first<{ linked_submission_id: string | null }>();
+
+            if (!prospect) {
+                return NextResponse.json(
+                    { success: false, error: "Prospect not found" },
+                    { status: 404 },
+                );
+            }
+
+            const now = new Date().toISOString();
+            const statements: D1PreparedStatement[] = [
+                database
+                    .prepare(
+                        `INSERT INTO advisor_prospect_activity (
+                            activity_id,
+                            prospect_id,
+                            linked_submission_id,
+                            activity_type,
+                            note_type,
+                            note,
+                            changed_by,
+                            created_at
+                        ) VALUES (?, ?, ?, 'note_added', ?, ?, ?, ?)`,
+                    )
+                    .bind(
+                        crypto.randomUUID(),
+                        prospectId,
+                        prospect.linked_submission_id,
+                        noteType,
+                        note,
+                        user.email ?? null,
+                        now,
+                    ),
+            ];
+
+            if (nextActionDate !== undefined || nextStep !== undefined) {
+                const assignments = ["updated_at = ?"];
+                const bindings: unknown[] = [now];
+
+                if (nextActionDate !== undefined) {
+                    assignments.push("next_action_date = ?");
+                    bindings.push(nextActionDate);
+                }
+
+                if (nextStep !== undefined) {
+                    assignments.push("next_step = ?");
+                    bindings.push(nextStep);
+                }
+
+                bindings.push(prospectId);
+                statements.push(
+                    database
+                        .prepare(
+                            `UPDATE advisor_prospects
+                            SET ${assignments.join(", ")}
+                            WHERE prospect_id = ?`,
+                        )
+                        .bind(...bindings),
+                );
+            }
+
+            const results = await database.batch(statements);
+            if (
+                results.length !== statements.length ||
+                results.some(
+                    (result) => !result.success || result.meta.changes !== 1,
+                )
+            ) {
+                throw new Error("D1 did not save the prospect note atomically.");
+            }
+
+            return NextResponse.json(
+                { success: true },
+                { headers: { "Cache-Control": "no-store" } },
             );
         }
 
