@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 
 type QuestionnaireType =
   | "hr"
@@ -237,6 +238,11 @@ export async function PATCH(request: Request): Promise<Response> {
         );
       }
 
+      await shadowClientProjectAfterSupabaseMutation(
+        updatedNameOnlyParticipant.project_id,
+        "advisor-update-participant",
+      );
+
       return NextResponse.json({
         success: true,
         participant: {
@@ -359,6 +365,11 @@ export async function PATCH(request: Request): Promise<Response> {
         { status: 500 },
       );
     }
+
+    await shadowClientProjectAfterSupabaseMutation(
+      updatedParticipant.project_id,
+      "advisor-update-participant",
+    );
 
     return NextResponse.json({
       success: true,
