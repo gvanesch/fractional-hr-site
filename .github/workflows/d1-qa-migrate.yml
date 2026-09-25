@@ -1,0 +1,98 @@
+name: D1 QA migrations
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - migration/d1
+    paths:
+      - migrations/**
+      - scripts/d1/**
+      - .github/workflows/d1-qa-migrate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-qa-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-verify:
+    name: Apply and verify QA migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CI: "true"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify QA target
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8"));
+          const qa = config.env?.qa?.d1_databases?.find((database) => database.binding === "DB");
+          const production = config.d1_databases?.find((database) => database.binding === "DB");
+
+          if (!qa || qa.database_name !== "vanesch-qa") {
+            throw new Error("QA D1 binding is missing or does not target vanesch-qa.");
+          }
+
+          if (qa.database_id !== "b25d59da-5f93-4301-9996-7be0c9708789") {
+            throw new Error("QA D1 database ID does not match the approved QA database.");
+          }
+
+          if (qa.database_id === production?.database_id) {
+            throw new Error("QA and production resolve to the same D1 database.");
+          }
+
+          console.log(`Verified QA target: ${qa.database_name} (${qa.database_id})`);
+          NODE
+
+      - name: Apply migrations and run smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > d1-qa-migration.log
+
+          {
+            echo "=== Pending migrations before apply ==="
+            npx wrangler d1 migrations list DB --env qa --remote
+
+            echo "=== Applying QA migrations ==="
+            npx wrangler d1 migrations apply DB --env qa --remote
+
+            echo "=== Core client diagnostic smoke test ==="
+            npx wrangler d1 execute DB               --env qa               --remote               --file scripts/d1/client-diagnostic-core-smoke-test.sql
+
+            echo "=== Security-state smoke test ==="
+            npx wrangler d1 execute DB               --env qa               --remote               --file scripts/d1/client-diagnostic-security-smoke-test.sql
+
+            echo "=== Applied migrations after verification ==="
+            npx wrangler d1 migrations list DB --env qa --remote
+          } 2>&1 | tee -a d1-qa-migration.log
+
+      - name: Retain migration log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-qa-migration-log-${{ github.run_id }}
+          path: d1-qa-migration.log
+          if-no-files-found: warn
+          retention-days: 14
