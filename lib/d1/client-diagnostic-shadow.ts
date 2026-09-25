@@ -1,6 +1,8 @@
-import { writeD1ClientProjectWithParticipants } from "./client-diagnostic";
+import { writeD1ClientProjectSnapshot } from "./client-diagnostic";
 import { isD1ClientDiagnosticShadowWriteEnabled } from "./database";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+const SUPABASE_PAGE_SIZE = 1000;
 
 type ShadowProjectRow = {
   project_id: string;
@@ -54,33 +56,152 @@ type ShadowParticipantRow = {
   reinstated_at: string | null;
 };
 
+type ShadowResponseRow = {
+  response_id: string;
+  project_id: string;
+  participant_id: string;
+  questionnaire_type: "hr" | "manager" | "leadership" | "payroll";
+  dimension_key: string;
+  question_key: string;
+  answer_value: number | null;
+  comment_text: string | null;
+  created_at: string;
+  updated_at: string;
+  responses: unknown | null;
+  submitted_at: string | null;
+};
+
+type ShadowDimensionScoreRow = {
+  score_id: string;
+  project_id: string;
+  questionnaire_type: "hr" | "manager" | "leadership" | "payroll";
+  dimension_key: string;
+  average_score: number;
+  response_count: number;
+  updated_at: string;
+  participant_id: string | null;
+  score: number | null;
+};
+
+type ShadowFactPackRow = {
+  fact_pack_id: string;
+  project_id: string;
+  participant_id: string;
+  invite_token: string | null;
+  response_json: unknown;
+  status: "in_progress" | "completed";
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ShadowFunctionalSignalRequestRow = {
+  signal_request_id: string;
+  project_id: string;
+  module_type: "it" | "payroll" | "finance" | "other";
+  module_label: string | null;
+  recipient_name: string;
+  recipient_email: string;
+  invite_token: string;
+  signal_status: "invited" | "started" | "completed" | "archived";
+  response_data: unknown | null;
+  invited_at: string | null;
+  invite_expires_at: string | null;
+  invite_last_used_at: string | null;
+  started_at: string | null;
+  submitted_at: string | null;
+  completed_at: string | null;
+  archived_at: string | null;
+  archive_reason: string | null;
+  archive_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ShadowServiceAccessContextRow = {
+  context_id: string;
+  project_id: string;
+  participant_id: string;
+  questionnaire_type: "hr" | "manager";
+  routes_used: string[];
+  usual_route: string | null;
+  usual_route_effectiveness: number | null;
+  intended_primary_route: string | null;
+  specific_route_detail: string | null;
+  created_at: string;
+  updated_at: string;
+  intended_access_model: string | null;
+};
+
+async function loadProjectRows<T>(
+  table: string,
+  projectId: string,
+): Promise<T[]> {
+  const supabase = createSupabaseAdminClient();
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq("project_id", projectId)
+      .range(from, from + SUPABASE_PAGE_SIZE - 1)
+      .returns<T[]>();
+
+    if (error || !data) {
+      throw new Error(`Unable to reload ${table} for D1 shadowing.`);
+    }
+
+    rows.push(...data);
+
+    if (data.length < SUPABASE_PAGE_SIZE) {
+      return rows;
+    }
+  }
+}
+
 export async function shadowClientProjectFromSupabase(
   projectId: string,
 ): Promise<void> {
   const supabase = createSupabaseAdminClient();
   const [
     { data: project, error: projectError },
-    { data: participants, error: participantsError },
+    participants,
+    responses,
+    dimensionScores,
+    factPacks,
+    functionalSignalRequests,
+    serviceAccessContexts,
   ] = await Promise.all([
     supabase
       .from("client_projects")
       .select("*")
       .eq("project_id", projectId)
       .single<ShadowProjectRow>(),
-    supabase
-      .from("client_participants")
-      .select("*")
-      .eq("project_id", projectId)
-      .returns<ShadowParticipantRow[]>(),
+    loadProjectRows<ShadowParticipantRow>("client_participants", projectId),
+    loadProjectRows<ShadowResponseRow>("client_responses", projectId),
+    loadProjectRows<ShadowDimensionScoreRow>(
+      "client_dimension_scores",
+      projectId,
+    ),
+    loadProjectRows<ShadowFactPackRow>("client_fact_packs", projectId),
+    loadProjectRows<ShadowFunctionalSignalRequestRow>(
+      "client_functional_signal_requests",
+      projectId,
+    ),
+    loadProjectRows<ShadowServiceAccessContextRow>(
+      "client_service_access_context",
+      projectId,
+    ),
   ]);
 
-  if (projectError || participantsError || !project || !participants) {
+  if (projectError || !project) {
     throw new Error(
       "Unable to reload the Supabase project for D1 shadowing.",
     );
   }
 
-  await writeD1ClientProjectWithParticipants({
+  await writeD1ClientProjectSnapshot({
     project: {
       projectId: project.project_id,
       companyName: project.company_name,
@@ -125,6 +246,78 @@ export async function shadowClientProjectFromSupabase(
       reinstateReason: participant.reinstate_reason,
       reinstateNote: participant.reinstate_note,
       reinstatedAt: participant.reinstated_at,
+    })),
+    responses: responses.map((response) => ({
+      responseId: response.response_id,
+      projectId: response.project_id,
+      participantId: response.participant_id,
+      questionnaireType: response.questionnaire_type,
+      dimensionKey: response.dimension_key,
+      questionKey: response.question_key,
+      answerValue: response.answer_value,
+      commentText: response.comment_text,
+      createdAt: response.created_at,
+      updatedAt: response.updated_at,
+      responses: response.responses,
+      submittedAt: response.submitted_at,
+    })),
+    dimensionScores: dimensionScores.map((dimensionScore) => ({
+      scoreId: dimensionScore.score_id,
+      projectId: dimensionScore.project_id,
+      questionnaireType: dimensionScore.questionnaire_type,
+      dimensionKey: dimensionScore.dimension_key,
+      averageScore: dimensionScore.average_score,
+      responseCount: dimensionScore.response_count,
+      updatedAt: dimensionScore.updated_at,
+      participantId: dimensionScore.participant_id,
+      score: dimensionScore.score,
+    })),
+    factPacks: factPacks.map((factPack) => ({
+      factPackId: factPack.fact_pack_id,
+      projectId: factPack.project_id,
+      participantId: factPack.participant_id,
+      inviteToken: factPack.invite_token,
+      responseJson: factPack.response_json,
+      status: factPack.status,
+      submittedAt: factPack.submitted_at,
+      createdAt: factPack.created_at,
+      updatedAt: factPack.updated_at,
+    })),
+    functionalSignalRequests: functionalSignalRequests.map((signalRequest) => ({
+      signalRequestId: signalRequest.signal_request_id,
+      projectId: signalRequest.project_id,
+      moduleType: signalRequest.module_type,
+      moduleLabel: signalRequest.module_label,
+      recipientName: signalRequest.recipient_name,
+      recipientEmail: signalRequest.recipient_email,
+      inviteToken: signalRequest.invite_token,
+      signalStatus: signalRequest.signal_status,
+      responseData: signalRequest.response_data,
+      invitedAt: signalRequest.invited_at,
+      inviteExpiresAt: signalRequest.invite_expires_at,
+      inviteLastUsedAt: signalRequest.invite_last_used_at,
+      startedAt: signalRequest.started_at,
+      submittedAt: signalRequest.submitted_at,
+      completedAt: signalRequest.completed_at,
+      archivedAt: signalRequest.archived_at,
+      archiveReason: signalRequest.archive_reason,
+      archiveNote: signalRequest.archive_note,
+      createdAt: signalRequest.created_at,
+      updatedAt: signalRequest.updated_at,
+    })),
+    serviceAccessContexts: serviceAccessContexts.map((context) => ({
+      contextId: context.context_id,
+      projectId: context.project_id,
+      participantId: context.participant_id,
+      questionnaireType: context.questionnaire_type,
+      routesUsed: context.routes_used,
+      usualRoute: context.usual_route,
+      usualRouteEffectiveness: context.usual_route_effectiveness,
+      intendedPrimaryRoute: context.intended_primary_route,
+      specificRouteDetail: context.specific_route_detail,
+      createdAt: context.created_at,
+      updatedAt: context.updated_at,
+      intendedAccessModel: context.intended_access_model,
     })),
   });
 }
