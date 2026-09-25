@@ -6,7 +6,11 @@ import {
     parseD1AdvisorProspectRow,
     syncD1AdvisorProspectMutation,
 } from "@/lib/d1/crm-prospects";
-import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1CrmProspectsShadowWriteEnabled,
+} from "@/lib/d1/database";
 
 type ProspectSource = "linkedin" | "referral" | "website" | "saas" | "other";
 type ProspectSegment = "smb" | "mid" | "enterprise";
@@ -125,6 +129,52 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { success: false, error: "Invalid lead_temperature" },
                 { status: 400 },
+            );
+        }
+
+        if (isD1CrmProspectsEnabled()) {
+            const prospectId = crypto.randomUUID();
+            const now = new Date().toISOString();
+            const result = await getD1Database()
+                .prepare(
+                    `INSERT INTO advisor_prospects (
+                        prospect_id,
+                        name,
+                        company,
+                        role,
+                        source,
+                        segment,
+                        relationship_strength,
+                        lead_temperature,
+                        next_step,
+                        notes,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                )
+                .bind(
+                    prospectId,
+                    name,
+                    company,
+                    role,
+                    source,
+                    segment,
+                    relationshipStrength,
+                    leadTemperature,
+                    nextStep,
+                    notes,
+                    now,
+                    now,
+                )
+                .run();
+
+            if (!result.success || result.meta.changes !== 1) {
+                throw new Error("D1 did not create the advisor prospect.");
+            }
+
+            return NextResponse.json(
+                { success: true, prospect_id: prospectId },
+                { headers: { "Cache-Control": "no-store" } },
             );
         }
 
