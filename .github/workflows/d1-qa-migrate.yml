@@ -35,7 +35,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -79,10 +79,10 @@ jobs:
             npx wrangler d1 migrations apply DB --env qa --remote
 
             echo "=== Core client diagnostic smoke test ==="
-            npx wrangler d1 execute DB               --env qa               --remote               --file scripts/d1/client-diagnostic-core-smoke-test.sql
+            npx wrangler d1 execute DB --env qa --remote --file scripts/d1/client-diagnostic-core-smoke-test.sql
 
             echo "=== Security-state smoke test ==="
-            npx wrangler d1 execute DB               --env qa               --remote               --file scripts/d1/client-diagnostic-security-smoke-test.sql
+            npx wrangler d1 execute DB --env qa --remote --file scripts/d1/client-diagnostic-security-smoke-test.sql
 
             echo "=== Applied migrations after verification ==="
             npx wrangler d1 migrations list DB --env qa --remote
