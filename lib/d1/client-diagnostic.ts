@@ -549,6 +549,123 @@ export async function writeD1ClientProjectSnapshot(
   }
 }
 
+export type D1ParticipantInvite = {
+  participantId: string;
+  projectId: string;
+  questionnaireType: string;
+  participantStatus: string;
+  completedAt: string | null;
+  inviteExpiresAt: string | null;
+  inviteRevokedAt: string | null;
+  projectStatus: string;
+};
+
+export async function getD1ParticipantInvite(
+  inviteToken: string,
+): Promise<D1ParticipantInvite | null> {
+  const row = await getD1Database()
+    .prepare(
+      `SELECT
+        participant.participant_id,
+        participant.project_id,
+        participant.questionnaire_type,
+        participant.participant_status,
+        participant.completed_at,
+        participant.invite_expires_at,
+        participant.invite_revoked_at,
+        project.project_status
+      FROM client_participants AS participant
+      INNER JOIN client_projects AS project
+        ON project.project_id = participant.project_id
+      WHERE participant.invite_token = ?
+      LIMIT 1`,
+    )
+    .bind(inviteToken)
+    .first<{
+      participant_id: string;
+      project_id: string;
+      questionnaire_type: string;
+      participant_status: string;
+      completed_at: string | null;
+      invite_expires_at: string | null;
+      invite_revoked_at: string | null;
+      project_status: string;
+    }>();
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    participantId: row.participant_id,
+    projectId: row.project_id,
+    questionnaireType: row.questionnaire_type,
+    participantStatus: row.participant_status,
+    completedAt: row.completed_at,
+    inviteExpiresAt: row.invite_expires_at,
+    inviteRevokedAt: row.invite_revoked_at,
+    projectStatus: row.project_status,
+  };
+}
+
+export async function getD1ClientFactPack(params: {
+  projectId: string;
+  participantId: string;
+  inviteToken: string;
+}): Promise<
+  | { found: false }
+  | {
+      found: true;
+      questionnaireType: string;
+      inviteTokenMatches: boolean;
+      responseJson: Record<string, unknown> | null;
+      status: string;
+    }
+> {
+  const participant = await getD1Database()
+    .prepare(
+      `SELECT questionnaire_type, invite_token
+      FROM client_participants
+      WHERE participant_id = ? AND project_id = ?`,
+    )
+    .bind(params.participantId, params.projectId)
+    .first<{ questionnaire_type: string; invite_token: string }>();
+
+  if (!participant) {
+    return { found: false };
+  }
+
+  const factPack = await getD1Database()
+    .prepare(
+      `SELECT response_json, status
+      FROM client_fact_packs
+      WHERE project_id = ? AND participant_id = ?
+      LIMIT 1`,
+    )
+    .bind(params.projectId, params.participantId)
+    .first<{ response_json: string; status: string }>();
+
+  let responseJson: Record<string, unknown> | null = null;
+
+  if (factPack) {
+    const parsed = JSON.parse(factPack.response_json) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("D1 returned invalid client fact pack JSON.");
+    }
+
+    responseJson = parsed as Record<string, unknown>;
+  }
+
+  return {
+    found: true,
+    questionnaireType: participant.questionnaire_type,
+    inviteTokenMatches: participant.invite_token === params.inviteToken,
+    responseJson,
+    status: factPack?.status ?? "not_started",
+  };
+}
+
 export async function writeD1ClientProjectWithParticipants(input: {
   project: D1ClientProjectWrite;
   participants: D1ClientParticipantWrite[];
