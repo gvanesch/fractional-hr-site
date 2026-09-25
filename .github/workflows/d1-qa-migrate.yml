@@ -107,6 +107,9 @@ jobs:
             echo "=== Security-state smoke test ==="
             npx wrangler d1 execute DB --env qa --remote --file scripts/d1/client-diagnostic-security-smoke-test.sql
 
+            echo "=== Security-service behaviour smoke test ==="
+            npx wrangler d1 execute DB --env qa --remote --file scripts/d1/client-diagnostic-security-service-smoke-test.sql
+
             echo "=== Fail-closed QA assertions ==="
             npx wrangler d1 execute DB --env qa --remote --command "
               SELECT
