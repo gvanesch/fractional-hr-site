@@ -269,6 +269,8 @@ jobs:
             "factPackDraft",
             "factPackSubmission",
             "duplicateFactPack",
+            "publicDiagnosticRead",
+            "publicDiagnosticEmailUpdate",
             "cascadeCleanup",
           ];
 
