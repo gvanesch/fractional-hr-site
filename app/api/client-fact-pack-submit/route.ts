@@ -6,6 +6,11 @@ import {
 } from "@/lib/security/client-participant-otp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
+import {
+  D1ClientDiagnosticMutationError,
+  saveD1ClientFactPack,
+} from "@/lib/d1/client-diagnostic-mutations";
+import { isD1ClientDiagnosticWriteEnabled } from "@/lib/d1/database";
 
 type FactPackSubmitRequest = {
   projectId: string;
@@ -168,6 +173,32 @@ export async function POST(request: Request): Promise<Response> {
         },
         { status: 403 },
       );
+    }
+
+    if (isD1ClientDiagnosticWriteEnabled()) {
+      try {
+        const result = await saveD1ClientFactPack({
+          projectId,
+          participantId,
+          inviteToken,
+          responseJson,
+          mode,
+        });
+
+        return NextResponse.json(result);
+      } catch (error) {
+        if (error instanceof D1ClientDiagnosticMutationError) {
+          const mapped = mapRpcErrorToResponse(error.message);
+
+          return NextResponse.json(
+            { success: false, error: mapped.error },
+            { status: mapped.status },
+          );
+        }
+
+        console.error("D1 client fact pack save failed.", error);
+        throw error;
+      }
     }
 
     const supabase = createSupabaseAdminClient();
