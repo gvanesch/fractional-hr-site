@@ -21,6 +21,7 @@ type DealStage =
     | "replied"
     | "meeting_booked"
     | "in_conversation"
+    | "health_check_completed"
     | "diagnostic_assessment_candidate"
     | "proposal_discussed"
     | "converted"
@@ -74,6 +75,7 @@ const VALID_DEAL_STAGES: DealStage[] = [
     "replied",
     "meeting_booked",
     "in_conversation",
+    "health_check_completed",
     "diagnostic_assessment_candidate",
     "proposal_discussed",
     "converted",
