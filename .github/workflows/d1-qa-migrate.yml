@@ -273,6 +273,7 @@ jobs:
             "publicDiagnosticEmailUpdate",
             "participantInviteRead",
             "factPackRead",
+            "advisorDashboardReads",
             "cascadeCleanup",
           ];
 
