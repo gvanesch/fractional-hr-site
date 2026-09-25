@@ -7,7 +7,11 @@ import {
     parseD1AdvisorProspectRow,
     syncD1AdvisorProspectMutation,
 } from "@/lib/d1/crm-prospects";
-import { isD1CrmProspectsShadowWriteEnabled } from "@/lib/d1/database";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1CrmProspectsShadowWriteEnabled,
+} from "@/lib/d1/database";
 
 export async function POST(request: Request) {
     try {
@@ -42,6 +46,88 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { success: false, error: "Missing prospect_id" },
                 { status: 400 },
+            );
+        }
+
+        if (isD1CrmProspectsEnabled()) {
+            const database = getD1Database();
+            const prospect = await database
+                .prepare(
+                    `SELECT linked_submission_id
+                    FROM advisor_prospects
+                    WHERE prospect_id = ?
+                    LIMIT 1`,
+                )
+                .bind(prospectId)
+                .first<{ linked_submission_id: string | null }>();
+
+            if (!prospect) {
+                return NextResponse.json(
+                    { success: false, error: "Prospect not found" },
+                    { status: 404 },
+                );
+            }
+
+            const linkedSubmissionId = prospect.linked_submission_id;
+            if (!linkedSubmissionId) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "No Health Check is linked to this prospect.",
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const now = new Date().toISOString();
+            const results = await database.batch([
+                database
+                    .prepare(
+                        `UPDATE advisor_prospects
+                        SET linked_submission_id = NULL,
+                            diagnostic_status = 'in_conversation',
+                            updated_at = ?
+                        WHERE prospect_id = ? AND linked_submission_id = ?`,
+                    )
+                    .bind(now, prospectId, linkedSubmissionId),
+                database
+                    .prepare(
+                        `INSERT INTO advisor_prospect_activity (
+                            activity_id,
+                            prospect_id,
+                            linked_submission_id,
+                            activity_type,
+                            field_name,
+                            old_value,
+                            new_value,
+                            note,
+                            changed_by,
+                            created_at
+                        ) VALUES (?, ?, ?, 'health_check_unlinked', 'linked_submission_id', ?, NULL, ?, ?, ?)`,
+                    )
+                    .bind(
+                        crypto.randomUUID(),
+                        prospectId,
+                        linkedSubmissionId,
+                        linkedSubmissionId,
+                        "Health Check submission unlinked from prospect. Prospect returned to conversation workflow.",
+                        user.email ?? null,
+                        now,
+                    ),
+            ]);
+
+            if (
+                results.length !== 2 ||
+                results.some(
+                    (result) => !result.success || result.meta.changes !== 1,
+                )
+            ) {
+                throw new Error("D1 did not unlink the Health Check atomically.");
+            }
+
+            return NextResponse.json(
+                { success: true },
+                { headers: { "Cache-Control": "no-store" } },
             );
         }
 
