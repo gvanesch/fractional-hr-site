@@ -5,6 +5,10 @@ import {
   submitD1ClientDiagnostic,
 } from "@/lib/d1/client-diagnostic-mutations";
 import { getD1Database } from "@/lib/d1/database";
+import {
+  getD1PublicDiagnosticSubmission,
+  updateD1PublicDiagnosticEmail,
+} from "@/lib/d1/diagnostic-submissions";
 
 function isLocalRequest(request: Request): boolean {
   const hostname = new URL(request.url).hostname;
@@ -36,6 +40,8 @@ export async function POST(request: Request) {
   const diagnosticInvite = `d1-mutation-runtime-diagnostic-invite-${probeId}`;
   const rollbackInvite = `d1-mutation-runtime-rollback-invite-${probeId}`;
   const factPackInvite = `d1-mutation-runtime-fact-pack-invite-${probeId}`;
+  const publicSubmissionId = `d1-mutation-runtime-public-${probeId}`;
+  const publicToken = `d1-mutation-runtime-public-token-${probeId}`;
   const startedAt = new Date();
   const expiresAt = new Date(
     startedAt.getTime() + 24 * 60 * 60 * 1000,
@@ -128,14 +134,64 @@ export async function POST(request: Request) {
           "fact-pack@example.invalid",
           expiresAt,
         ),
+      db
+        .prepare(
+          `INSERT INTO diagnostic_submissions (
+            id,
+            submission_id,
+            public_token,
+            submission_source,
+            answers,
+            score,
+            band,
+            company_size,
+            industry,
+            role,
+            completed_at
+          ) VALUES (?, ?, ?, 'health-check', ?, 75, 'Established', ?, ?, ?, ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          publicSubmissionId,
+          publicToken,
+          JSON.stringify({ 1: 4, 2: 3 }),
+          "51-200",
+          "Technology",
+          "HR leader",
+          startedAt.toISOString(),
+        ),
     ]);
 
     assert(
-      seedResults.length === 4 &&
+      seedResults.length === 5 &&
         seedResults.every(
           (result) => result.success && result.meta.changes === 1,
         ),
       "D1 mutation runtime seed failed.",
+    );
+
+    const publicSubmission =
+      await getD1PublicDiagnosticSubmission(publicToken);
+    assert(
+      publicSubmission?.submissionId === publicSubmissionId &&
+        publicSubmission.companySize === "51-200" &&
+        publicSubmission.industry === "Technology" &&
+        publicSubmission.role === "HR leader" &&
+        publicSubmission.email === null &&
+        typeof publicSubmission.answers === "object",
+      "The D1 public diagnostic lookup was incomplete.",
+    );
+
+    const emailUpdated = await updateD1PublicDiagnosticEmail(
+      publicToken,
+      "probe-email@example.invalid",
+    );
+    const updatedPublicSubmission =
+      await getD1PublicDiagnosticSubmission(publicToken);
+    assert(
+      emailUpdated &&
+        updatedPublicSubmission?.email === "probe-email@example.invalid",
+      "The D1 public diagnostic email was not updated.",
     );
 
     const diagnosticResult = await submitD1ClientDiagnostic({
@@ -360,10 +416,16 @@ export async function POST(request: Request) {
       "A completed D1 fact pack could be submitted twice.",
     );
 
-    await db
-      .prepare("DELETE FROM client_projects WHERE project_id = ?")
-      .bind(projectId)
-      .run();
+    await db.batch([
+      db
+        .prepare("DELETE FROM client_projects WHERE project_id = ?")
+        .bind(projectId),
+      db
+        .prepare(
+          "DELETE FROM diagnostic_submissions WHERE submission_id = ?",
+        )
+        .bind(publicSubmissionId),
+    ]);
 
     const remaining = await db
       .prepare(
@@ -374,9 +436,18 @@ export async function POST(request: Request) {
           + (SELECT count(*) FROM client_dimension_scores WHERE project_id = ?)
           + (SELECT count(*) FROM client_service_access_context WHERE project_id = ?)
           + (SELECT count(*) FROM client_fact_packs WHERE project_id = ?)
+          + (SELECT count(*) FROM diagnostic_submissions WHERE submission_id = ?)
           AS count`,
       )
-      .bind(projectId, projectId, projectId, projectId, projectId, projectId)
+      .bind(
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        projectId,
+        publicSubmissionId,
+      )
       .first<{ count: number }>();
     assert(remaining?.count === 0, "D1 mutation runtime cleanup failed.");
 
@@ -389,15 +460,23 @@ export async function POST(request: Request) {
         factPackDraft: "passed",
         factPackSubmission: "passed",
         duplicateFactPack: "passed",
+        publicDiagnosticRead: "passed",
+        publicDiagnosticEmailUpdate: "passed",
         cascadeCleanup: "passed",
       },
     });
   } catch (error) {
     try {
-      await db
-        .prepare("DELETE FROM client_projects WHERE project_id = ?")
-        .bind(projectId)
-        .run();
+      await db.batch([
+        db
+          .prepare("DELETE FROM client_projects WHERE project_id = ?")
+          .bind(projectId),
+        db
+          .prepare(
+            "DELETE FROM diagnostic_submissions WHERE submission_id = ?",
+          )
+          .bind(publicSubmissionId),
+      ]);
     } catch {
       // Best-effort cleanup after a failed local-only probe.
     }
