@@ -1,4 +1,5 @@
 import { writeD1ClientProjectWithParticipants } from "./client-diagnostic";
+import { isD1ClientDiagnosticShadowWriteEnabled } from "./database";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type ShadowProjectRow = {
@@ -126,4 +127,19 @@ export async function shadowClientProjectFromSupabase(
       reinstatedAt: participant.reinstated_at,
     })),
   });
+}
+
+export async function shadowClientProjectAfterSupabaseMutation(
+  projectId: string,
+  source: string,
+): Promise<void> {
+  if (!isD1ClientDiagnosticShadowWriteEnabled()) {
+    return;
+  }
+
+  try {
+    await shadowClientProjectFromSupabase(projectId);
+  } catch (error) {
+    console.error(`[${source}] D1 shadow write failed`, error);
+  }
 }
