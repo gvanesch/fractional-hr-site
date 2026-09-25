@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+} from "@/lib/d1/database";
 import LinkHealthCheckToProspectButton from "@/app/components/advisor/LinkHealthCheckToProspectButton";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +51,7 @@ type AdvisorProspect = {
     | "replied"
     | "meeting_booked"
     | "in_conversation"
+    | "health_check_completed"
     | "diagnostic_assessment_candidate"
     | "proposal_discussed"
     | "converted"
@@ -129,6 +134,71 @@ async function getProspects(
     searchQuery: string,
     nextActionFilter: NextActionFilter,
 ): Promise<AdvisorProspect[]> {
+    if (isD1CrmProspectsEnabled()) {
+        const conditions: string[] = [];
+        const bindings: unknown[] = [];
+
+        if (searchQuery) {
+            const pattern = `%${searchQuery.replace(/[%_]/g, "").toLowerCase()}%`;
+            conditions.push(`(
+                lower(coalesce(name, '')) LIKE ?
+                OR lower(coalesce(company, '')) LIKE ?
+                OR lower(coalesce(role, '')) LIKE ?
+                OR lower(source) LIKE ?
+                OR lower(coalesce(segment, '')) LIKE ?
+                OR lower(diagnostic_status) LIKE ?
+            )`);
+            bindings.push(pattern, pattern, pattern, pattern, pattern, pattern);
+        }
+
+        const today = getLondonDateString(new Date());
+
+        if (nextActionFilter === "due") {
+            conditions.push("next_action_date <= ?");
+            bindings.push(today);
+        }
+
+        if (nextActionFilter === "seven_days") {
+            conditions.push("next_action_date >= ? AND next_action_date <= ?");
+            bindings.push(today, addDaysToDateString(today, 7));
+        }
+
+        if (nextActionFilter === "none") {
+            conditions.push("next_action_date IS NULL");
+        }
+
+        const whereClause = conditions.length
+            ? `WHERE ${conditions.join(" AND ")}`
+            : "";
+        const result = await getD1Database()
+            .prepare(
+                `SELECT
+                    prospect_id,
+                    name,
+                    company,
+                    role,
+                    source,
+                    segment,
+                    diagnostic_status,
+                    deal_stage,
+                    lead_temperature,
+                    next_step,
+                    last_contact_date,
+                    next_action_date,
+                    linked_submission_id,
+                    created_at,
+                    updated_at
+                FROM advisor_prospects
+                ${whereClause}
+                ORDER BY updated_at DESC
+                LIMIT 250`,
+            )
+            .bind(...bindings)
+            .all<AdvisorProspect>();
+
+        return result.results;
+    }
+
     const supabase = createSupabaseAdminClient();
 
     let query = supabase
@@ -273,6 +343,8 @@ function formatDealStage(value: AdvisorProspect["deal_stage"]): string {
             return "Meeting booked";
         case "in_conversation":
             return "In conversation";
+        case "health_check_completed":
+            return "Health Check completed";
         case "diagnostic_assessment_candidate":
             return "Diagnostic Assessment candidate";
         case "proposal_discussed":
