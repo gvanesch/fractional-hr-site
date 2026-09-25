@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 
 const ALLOWED_WITHDRAW_REASONS = [
   "wrong_details",
@@ -144,6 +145,11 @@ export async function PATCH(request: Request): Promise<Response> {
         { status: 500 },
       );
     }
+
+    await shadowClientProjectAfterSupabaseMutation(
+      updatedParticipant.project_id,
+      "advisor-archive-participant",
+    );
 
     console.info(
       JSON.stringify({
