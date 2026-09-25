@@ -5,6 +5,7 @@ import {
   validateParticipantVerifiedSession,
 } from "@/lib/security/client-participant-otp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 import {
   getQuestionsForQuestionnaireType,
   type ClientDiagnosticQuestion,
@@ -666,6 +667,11 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const result = data as SubmitClientDiagnosticRpcResult;
+
+    await shadowClientProjectAfterSupabaseMutation(
+      result.projectId,
+      "client-diagnostic-submit",
+    );
 
     return NextResponse.json({
       success: true,
