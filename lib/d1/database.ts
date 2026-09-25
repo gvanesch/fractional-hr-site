@@ -21,6 +21,16 @@ export function isD1CrmProspectsShadowWriteEnabled(): boolean {
   }
 }
 
+export function isD1CrmProspectsEnabled(): boolean {
+  try {
+    const env = getCloudflareContext().env as D1MigrationEnv;
+
+    return env.D1_CRM_PROSPECTS_MODE === "d1";
+  } catch {
+    return false;
+  }
+}
+
 export function isD1DiagnosticSubmissionsShadowWriteEnabled(): boolean {
   try {
     const env = getCloudflareContext().env as D1MigrationEnv;
