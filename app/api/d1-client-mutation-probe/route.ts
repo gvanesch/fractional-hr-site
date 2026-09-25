@@ -6,6 +6,10 @@ import {
 } from "@/lib/d1/client-diagnostic-mutations";
 import { getD1Database } from "@/lib/d1/database";
 import {
+  getD1ClientFactPack,
+  getD1ParticipantInvite,
+} from "@/lib/d1/client-diagnostic";
+import {
   getD1PublicDiagnosticSubmission,
   updateD1PublicDiagnosticEmail,
 } from "@/lib/d1/diagnostic-submissions";
@@ -168,6 +172,16 @@ export async function POST(request: Request) {
           (result) => result.success && result.meta.changes === 1,
         ),
       "D1 mutation runtime seed failed.",
+    );
+
+    const participantInvite = await getD1ParticipantInvite(diagnosticInvite);
+    assert(
+      participantInvite?.participantId === diagnosticParticipantId &&
+        participantInvite.projectId === projectId &&
+        participantInvite.questionnaireType === "hr" &&
+        participantInvite.participantStatus === "invited" &&
+        participantInvite.projectStatus === "active",
+      "The D1 participant invitation lookup was incomplete.",
     );
 
     const publicSubmission =
@@ -396,6 +410,20 @@ export async function POST(request: Request) {
       "The D1 fact pack state was incomplete.",
     );
 
+    const factPackRead = await getD1ClientFactPack({
+      projectId,
+      participantId: factPackParticipantId,
+      inviteToken: factPackInvite,
+    });
+    assert(
+      factPackRead.found &&
+        factPackRead.questionnaireType === "client_fact_pack" &&
+        factPackRead.inviteTokenMatches &&
+        factPackRead.status === "completed" &&
+        factPackRead.responseJson?.employeeCount === 30,
+      "The D1 fact pack read path was incomplete.",
+    );
+
     let duplicateFactPackRejected = false;
     try {
       await saveD1ClientFactPack({
@@ -462,6 +490,8 @@ export async function POST(request: Request) {
         duplicateFactPack: "passed",
         publicDiagnosticRead: "passed",
         publicDiagnosticEmailUpdate: "passed",
+        participantInviteRead: "passed",
+        factPackRead: "passed",
         cascadeCleanup: "passed",
       },
     });
