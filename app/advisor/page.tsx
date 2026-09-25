@@ -48,6 +48,8 @@ function formatDealStage(value: DashboardProspect["deal_stage"]): string {
       return "Meeting booked";
     case "in_conversation":
       return "In conversation";
+    case "health_check_completed":
+      return "Health Check completed";
     case "diagnostic_assessment_candidate":
       return "Assessment candidate";
     case "proposal_discussed":
