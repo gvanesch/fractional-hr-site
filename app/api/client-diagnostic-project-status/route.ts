@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 
 type UpdateProjectStatusRequest = {
   projectId: string;
@@ -67,6 +68,11 @@ export async function PATCH(request: Request) {
         { status: 500 },
       );
     }
+
+    await shadowClientProjectAfterSupabaseMutation(
+      data.project_id,
+      "client-diagnostic-project-status",
+    );
 
     return NextResponse.json({
       success: true,
