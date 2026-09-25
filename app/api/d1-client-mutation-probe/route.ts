@@ -13,6 +13,11 @@ import {
   getD1PublicDiagnosticSubmission,
   updateD1PublicDiagnosticEmail,
 } from "@/lib/d1/diagnostic-submissions";
+import {
+  loadD1DashboardHealthChecks,
+  loadD1DashboardProjects,
+  loadD1DashboardProspects,
+} from "@/lib/advisor-dashboard";
 
 function isLocalRequest(request: Request): boolean {
   const hostname = new URL(request.url).hostname;
@@ -46,6 +51,7 @@ export async function POST(request: Request) {
   const factPackInvite = `d1-mutation-runtime-fact-pack-invite-${probeId}`;
   const publicSubmissionId = `d1-mutation-runtime-public-${probeId}`;
   const publicToken = `d1-mutation-runtime-public-token-${probeId}`;
+  const prospectId = `d1-mutation-runtime-prospect-${probeId}`;
   const startedAt = new Date();
   const expiresAt = new Date(
     startedAt.getTime() + 24 * 60 * 60 * 1000,
@@ -164,10 +170,35 @@ export async function POST(request: Request) {
           "HR leader",
           startedAt.toISOString(),
         ),
+      db
+        .prepare(
+          `INSERT INTO advisor_prospects (
+            prospect_id,
+            name,
+            company,
+            role,
+            linked_submission_id,
+            deal_stage,
+            lead_temperature,
+            next_step,
+            next_action_date,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, 'health_check_completed', 'hot', ?, ?, ?)`,
+        )
+        .bind(
+          prospectId,
+          "Dashboard Probe",
+          "D1 Dashboard Probe Ltd",
+          "HR leader",
+          publicSubmissionId,
+          "Book discovery call",
+          startedAt.toISOString().slice(0, 10),
+          startedAt.toISOString(),
+        ),
     ]);
 
     assert(
-      seedResults.length === 5 &&
+      seedResults.length === 6 &&
         seedResults.every(
           (result) => result.success && result.meta.changes === 1,
         ),
@@ -206,6 +237,30 @@ export async function POST(request: Request) {
       emailUpdated &&
         updatedPublicSubmission?.email === "probe-email@example.invalid",
       "The D1 public diagnostic email was not updated.",
+    );
+
+    const [dashboardProjects, dashboardProspects, dashboardHealthChecks] =
+      await Promise.all([
+        loadD1DashboardProjects(db),
+        loadD1DashboardProspects(db),
+        loadD1DashboardHealthChecks(db),
+      ]);
+    assert(
+      dashboardProjects.error === null &&
+        dashboardProjects.data.some(
+          (project) => project.project_id === projectId,
+        ) &&
+        dashboardProspects.error === null &&
+        dashboardProspects.data.some(
+          (prospect) =>
+            prospect.prospect_id === prospectId &&
+            prospect.deal_stage === "health_check_completed",
+        ) &&
+        dashboardHealthChecks.error === null &&
+        dashboardHealthChecks.data.some(
+          (submission) => submission.submission_id === publicSubmissionId,
+        ),
+      "The D1 advisor dashboard read paths were incomplete.",
     );
 
     const diagnosticResult = await submitD1ClientDiagnostic({
@@ -446,6 +501,9 @@ export async function POST(request: Request) {
 
     await db.batch([
       db
+        .prepare("DELETE FROM advisor_prospects WHERE prospect_id = ?")
+        .bind(prospectId),
+      db
         .prepare("DELETE FROM client_projects WHERE project_id = ?")
         .bind(projectId),
       db
@@ -464,6 +522,7 @@ export async function POST(request: Request) {
           + (SELECT count(*) FROM client_dimension_scores WHERE project_id = ?)
           + (SELECT count(*) FROM client_service_access_context WHERE project_id = ?)
           + (SELECT count(*) FROM client_fact_packs WHERE project_id = ?)
+          + (SELECT count(*) FROM advisor_prospects WHERE prospect_id = ?)
           + (SELECT count(*) FROM diagnostic_submissions WHERE submission_id = ?)
           AS count`,
       )
@@ -474,6 +533,7 @@ export async function POST(request: Request) {
         projectId,
         projectId,
         projectId,
+        prospectId,
         publicSubmissionId,
       )
       .first<{ count: number }>();
@@ -492,12 +552,16 @@ export async function POST(request: Request) {
         publicDiagnosticEmailUpdate: "passed",
         participantInviteRead: "passed",
         factPackRead: "passed",
+        advisorDashboardReads: "passed",
         cascadeCleanup: "passed",
       },
     });
   } catch (error) {
     try {
       await db.batch([
+        db
+          .prepare("DELETE FROM advisor_prospects WHERE prospect_id = ?")
+          .bind(prospectId),
         db
           .prepare("DELETE FROM client_projects WHERE project_id = ?")
           .bind(projectId),
