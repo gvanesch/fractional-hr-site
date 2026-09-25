@@ -3,6 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1DiagnosticSubmissionsEnabled,
+} from "@/lib/d1/database";
 import ProspectDealControlPanel from "@/app/components/advisor/ProspectDealControlPanel";
 import UnlinkHealthCheckButton from "@/app/components/advisor/UnlinkHealthCheckButton";
 import AddProspectNote from "@/app/components/advisor/AddProspectNote";
@@ -58,6 +63,7 @@ type AdvisorProspect = {
     | "replied"
     | "meeting_booked"
     | "in_conversation"
+    | "health_check_completed"
     | "diagnostic_assessment_candidate"
     | "proposal_discussed"
     | "converted"
@@ -218,6 +224,8 @@ function formatDealStage(value: AdvisorProspect["deal_stage"]): string {
             return "Meeting booked";
         case "in_conversation":
             return "In conversation";
+        case "health_check_completed":
+            return "Health Check completed";
         case "diagnostic_assessment_candidate":
             return "Diagnostic Assessment candidate";
         case "proposal_discussed":
@@ -292,6 +300,7 @@ function dealBadgeClasses(value: AdvisorProspect["deal_stage"]): string {
             return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200";
         case "meeting_booked":
         case "in_conversation":
+        case "health_check_completed":
             return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200";
         case "diagnostic_assessment_candidate":
         case "proposal_discussed":
@@ -361,6 +370,56 @@ async function requireAdvisorSession(prospectId: string) {
 async function getProspect(
     prospectId: string,
 ): Promise<AdvisorProspect | null> {
+    if (isD1CrmProspectsEnabled()) {
+        const row = await getD1Database()
+            .prepare(
+                `SELECT
+                    prospect_id,
+                    name,
+                    company,
+                    role,
+                    contact_email,
+                    contact_phone,
+                    company_website,
+                    billing_contact_name,
+                    billing_contact_email,
+                    linkedin_url,
+                    source,
+                    segment,
+                    diagnostic_status,
+                    deal_stage,
+                    relationship_strength,
+                    lead_temperature,
+                    last_contact_date,
+                    next_action_date,
+                    next_step,
+                    lost_reason,
+                    observed_signals,
+                    notes,
+                    linked_submission_id,
+                    created_at,
+                    updated_at
+                FROM advisor_prospects
+                WHERE prospect_id = ?
+                LIMIT 1`,
+            )
+            .bind(prospectId)
+            .first<Omit<AdvisorProspect, "observed_signals"> & {
+                observed_signals: string | null;
+            }>();
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            ...row,
+            observed_signals: row.observed_signals
+                ? (JSON.parse(row.observed_signals) as string[])
+                : null,
+        };
+    }
+
     const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
@@ -411,6 +470,43 @@ async function getLinkedHealthCheck(
         return null;
     }
 
+    if (isD1DiagnosticSubmissionsEnabled()) {
+        const row = await getD1Database()
+            .prepare(
+                `SELECT
+                    submission_id,
+                    completed_at,
+                    contact_name,
+                    contact_email,
+                    contact_company,
+                    contact_topic,
+                    company_size,
+                    industry,
+                    role,
+                    score,
+                    band,
+                    advisor_brief
+                FROM diagnostic_submissions
+                WHERE submission_id = ?
+                LIMIT 1`,
+            )
+            .bind(submissionId)
+            .first<Omit<HealthCheckSignal, "advisor_brief"> & {
+                advisor_brief: string | null;
+            }>();
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            ...row,
+            advisor_brief: row.advisor_brief
+                ? (JSON.parse(row.advisor_brief) as JsonValue)
+                : null,
+        };
+    }
+
     const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
@@ -442,6 +538,32 @@ async function getLinkedHealthCheck(
 }
 
 async function getActivity(prospectId: string): Promise<ProspectActivity[]> {
+    if (isD1CrmProspectsEnabled()) {
+        const result = await getD1Database()
+            .prepare(
+                `SELECT
+                    activity_id,
+                    prospect_id,
+                    linked_submission_id,
+                    activity_type,
+                    note_type,
+                    field_name,
+                    old_value,
+                    new_value,
+                    note,
+                    changed_by,
+                    created_at
+                FROM advisor_prospect_activity
+                WHERE prospect_id = ?
+                ORDER BY created_at DESC
+                LIMIT 100`,
+            )
+            .bind(prospectId)
+            .all<ProspectActivity>();
+
+        return result.results;
+    }
+
     const supabase = createSupabaseAdminClient();
 
     const { data, error } = await supabase
