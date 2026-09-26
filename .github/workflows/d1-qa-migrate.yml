@@ -8,6 +8,8 @@ on:
     paths:
       - migrations/**
       - scripts/d1/**
+      - app/api/cloudflare-access-probe/route.ts
+      - lib/cloudflare-access.ts
       - .github/workflows/d1-qa-migrate.yml
 
 permissions:

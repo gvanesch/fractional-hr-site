@@ -131,13 +131,16 @@ export async function POST(request: Request) {
         token,
       }),
     );
+    const tokenParts = token.split(".");
+    const signature = tokenParts[2];
+    const tamperedSignature = `${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
     const tamperedRejected = await rejects(() =>
       verifyCloudflareAdvisorAccessToken({
         audience,
         nowSeconds: now,
         signingKey,
         teamDomain,
-        token: `${token.slice(0, -1)}${token.endsWith("A") ? "B" : "A"}`,
+        token: `${tokenParts[0]}.${tokenParts[1]}.${tamperedSignature}`,
       }),
     );
 
