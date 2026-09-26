@@ -1,5 +1,9 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  getD1Database,
+  isD1ClientDiagnosticEnabled,
+} from "@/lib/d1/database";
+import {
   buildDimensionInsights,
   type DimensionInsight,
 } from "@/lib/client-diagnostic/insight-engine";
@@ -1285,82 +1289,193 @@ export async function getProjectSummaryData(
     throw new Error("projectId must be a valid UUID.");
   }
 
-  const supabase = createSupabaseAdminClient();
+  let project: ProjectRow | null = null;
+  let participants: ParticipantRow[] = [];
+  let factPackRows: FactPackRow[] = [];
+  let functionalSignalRows: FunctionalSignalRow[] = [];
+  let scoreRows: DimensionScoreRow[] = [];
+  let commentRows: CommentRow[] = [];
 
-  const [
-    { data: project, error: projectError },
-    { data: participants, error: participantsError },
-    { data: factPackRows, error: factPackError },
-    { data: functionalSignalRows, error: functionalSignalsError },
-    { data: scoreRows, error: scoresError },
-    { data: commentRows, error: commentsError },
-  ] = await Promise.all([
-    supabase
-      .from("client_projects")
-      .select(
-        "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, segmentation_schema, created_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .single<ProjectRow>(),
-    supabase
-      .from("client_participants")
-      .select(
-        "participant_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, invited_at, invite_expires_at, started_at, completed_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .returns<ParticipantRow[]>(),
-    supabase
-      .from("client_fact_packs")
-      .select("participant_id, status, submitted_at, updated_at, response_json")
-      .eq("project_id", projectId)
-      .returns<FactPackRow[]>(),
-    supabase
-      .from("client_functional_signal_requests")
-      .select(
-        "signal_request_id, module_type, module_label, recipient_name, recipient_email, signal_status, invited_at, started_at, completed_at, submitted_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: true })
-      .returns<FunctionalSignalRow[]>(),
-    supabase
-      .from("client_dimension_scores")
-      .select(
-        "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-      )
-      .eq("project_id", projectId)
-      .returns<DimensionScoreRow[]>(),
-    supabase
-      .from("client_responses")
-      .select(
-        "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
-      )
-      .eq("project_id", projectId)
-      .not("comment_text", "is", null)
-      .returns<CommentRow[]>(),
-  ]);
+  if (isD1ClientDiagnosticEnabled()) {
+    const database = getD1Database();
+    const [
+      projectRow,
+      participantResult,
+      factPackResult,
+      functionalSignalResult,
+      scoreResult,
+      commentResult,
+    ] = await Promise.all([
+      database
+        .prepare(
+          `SELECT project_id, company_name, primary_contact_name,
+            primary_contact_email, billing_contact_name,
+            billing_contact_email, company_website, purchase_order_number,
+            msa_status, dpa_status, project_status, notes,
+            segmentation_schema, created_at, updated_at
+          FROM client_projects WHERE project_id = ? LIMIT 1`,
+        )
+        .bind(projectId)
+        .first<Omit<ProjectRow, "segmentation_schema"> & {
+          segmentation_schema: string | null;
+        }>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, role_label, name, email,
+            segmentation_values, participant_status, invited_at,
+            invite_expires_at, started_at, completed_at, updated_at
+          FROM client_participants WHERE project_id = ?`,
+        )
+        .bind(projectId)
+        .all<Omit<ParticipantRow, "segmentation_values"> & {
+          segmentation_values: string | null;
+        }>(),
+      database
+        .prepare(
+          `SELECT participant_id, status, submitted_at, updated_at,
+            response_json
+          FROM client_fact_packs WHERE project_id = ?`,
+        )
+        .bind(projectId)
+        .all<Omit<FactPackRow, "response_json"> & {
+          response_json: string | null;
+        }>(),
+      database
+        .prepare(
+          `SELECT signal_request_id, module_type, module_label,
+            recipient_name, recipient_email, signal_status, invited_at,
+            started_at, completed_at, submitted_at, updated_at
+          FROM client_functional_signal_requests
+          WHERE project_id = ? ORDER BY created_at ASC`,
+        )
+        .bind(projectId)
+        .all<FunctionalSignalRow>(),
+      database
+        .prepare(
+          `SELECT score_id, project_id, participant_id, questionnaire_type,
+            dimension_key, average_score, response_count, updated_at
+          FROM client_dimension_scores WHERE project_id = ?`,
+        )
+        .bind(projectId)
+        .all<DimensionScoreRow>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, dimension_key,
+            question_key, comment_text, updated_at
+          FROM client_responses
+          WHERE project_id = ? AND comment_text IS NOT NULL`,
+        )
+        .bind(projectId)
+        .all<CommentRow>(),
+    ]);
 
-  if (projectError || !project) {
+    if (projectRow) {
+      project = {
+        ...projectRow,
+        segmentation_schema: projectRow.segmentation_schema
+          ? JSON.parse(projectRow.segmentation_schema) as SegmentationSchema
+          : null,
+      };
+    }
+
+    participants = participantResult.results.map((row) => ({
+      ...row,
+      segmentation_values: row.segmentation_values
+        ? JSON.parse(row.segmentation_values) as SegmentationValues
+        : null,
+    }));
+    factPackRows = factPackResult.results.map((row) => ({
+      ...row,
+      response_json: row.response_json
+        ? JSON.parse(row.response_json) as Record<string, unknown>
+        : null,
+    }));
+    functionalSignalRows = functionalSignalResult.results;
+    scoreRows = scoreResult.results;
+    commentRows = commentResult.results;
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const [
+      projectResult,
+      participantsResult,
+      factPackResult,
+      functionalSignalsResult,
+      scoresResult,
+      commentsResult,
+    ] = await Promise.all([
+      supabase
+        .from("client_projects")
+        .select(
+          "project_id, company_name, primary_contact_name, primary_contact_email, billing_contact_name, billing_contact_email, company_website, purchase_order_number, msa_status, dpa_status, project_status, notes, segmentation_schema, created_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .single<ProjectRow>(),
+      supabase
+        .from("client_participants")
+        .select(
+          "participant_id, questionnaire_type, role_label, name, email, segmentation_values, participant_status, invited_at, invite_expires_at, started_at, completed_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .returns<ParticipantRow[]>(),
+      supabase
+        .from("client_fact_packs")
+        .select("participant_id, status, submitted_at, updated_at, response_json")
+        .eq("project_id", projectId)
+        .returns<FactPackRow[]>(),
+      supabase
+        .from("client_functional_signal_requests")
+        .select(
+          "signal_request_id, module_type, module_label, recipient_name, recipient_email, signal_status, invited_at, started_at, completed_at, submitted_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true })
+        .returns<FunctionalSignalRow[]>(),
+      supabase
+        .from("client_dimension_scores")
+        .select(
+          "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
+        )
+        .eq("project_id", projectId)
+        .returns<DimensionScoreRow[]>(),
+      supabase
+        .from("client_responses")
+        .select(
+          "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
+        )
+        .eq("project_id", projectId)
+        .not("comment_text", "is", null)
+        .returns<CommentRow[]>(),
+    ]);
+
+    if (projectResult.error) {
+      throw new Error("Project not found.");
+    }
+    if (participantsResult.error) {
+      throw new Error("Unable to load project participants.");
+    }
+    if (factPackResult.error) {
+      throw new Error("Unable to load client fact pack summary.");
+    }
+    if (functionalSignalsResult.error) {
+      throw new Error("Unable to load functional signal requests.");
+    }
+    if (scoresResult.error) {
+      throw new Error("Unable to load project dimension scores.");
+    }
+    if (commentsResult.error) {
+      throw new Error("Unable to load project comments.");
+    }
+
+    project = projectResult.data;
+    participants = participantsResult.data ?? [];
+    factPackRows = factPackResult.data ?? [];
+    functionalSignalRows = functionalSignalsResult.data ?? [];
+    scoreRows = scoresResult.data ?? [];
+    commentRows = commentsResult.data ?? [];
+  }
+
+  if (!project) {
     throw new Error("Project not found.");
-  }
-
-  if (participantsError) {
-    throw new Error("Unable to load project participants.");
-  }
-
-  if (factPackError) {
-    throw new Error("Unable to load client fact pack summary.");
-  }
-
-  if (functionalSignalsError) {
-    throw new Error("Unable to load functional signal requests.");
-  }
-
-  if (scoresError) {
-    throw new Error("Unable to load project dimension scores.");
-  }
-
-  if (commentsError) {
-    throw new Error("Unable to load project comments.");
   }
 
   const participantRows = participants ?? [];
