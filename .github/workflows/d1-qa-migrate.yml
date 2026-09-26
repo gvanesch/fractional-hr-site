@@ -288,6 +288,33 @@ jobs:
           }
           NODE
 
+          access_response="$(
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              http://127.0.0.1:8787/api/cloudflare-access-probe
+          )"
+          printf '%s\n' "$access_response"
+
+          PROBE_RESPONSE="$access_response" node <<'NODE'
+          const response = JSON.parse(process.env.PROBE_RESPONSE);
+          const expected = [
+            "validToken",
+            "wrongAudience",
+            "expiredToken",
+            "tamperedToken",
+          ];
+
+          if (response.status !== "ok") {
+            throw new Error("Cloudflare Access probe did not return ok.");
+          }
+
+          for (const key of expected) {
+            if (response.cloudflareAccess?.[key] !== "passed") {
+              throw new Error(`Cloudflare Access assertion failed: ${key}`);
+            }
+          }
+          NODE
+
       - name: Retain migration log
         if: always()
         uses: actions/upload-artifact@v4
