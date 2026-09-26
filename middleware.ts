@@ -102,7 +102,11 @@ async function protectClientDiagnosticInvite(
   }
 }
 
-function protectPublicSupabaseWrite(): NextResponse {
+function protectPublicDatabaseWrite(): NextResponse {
+  if (process.env.D1_DIAGNOSTIC_SUBMISSIONS_MODE === "d1") {
+    return NextResponse.next();
+  }
+
   try {
     getValidatedSupabaseUrl();
     return NextResponse.next();
@@ -190,7 +194,7 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/diagnostic-complete" ||
     pathname === "/api/contact"
   ) {
-    return protectPublicSupabaseWrite();
+    return protectPublicDatabaseWrite();
   }
 
   if (pathname.startsWith("/client-diagnostic/respond/")) {
