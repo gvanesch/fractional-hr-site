@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
+import {
+  getD1Database,
+  isD1DiagnosticSubmissionsEnabled,
+} from "@/lib/d1/database";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +238,42 @@ async function requireAdvisorSessionForHealthChecks() {
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const result = await getD1Database()
+      .prepare(
+        `SELECT
+          industry,
+          role,
+          company_size,
+          band,
+          contact_source,
+          submission_source
+        FROM diagnostic_submissions
+        WHERE completed_at IS NOT NULL OR contact_submitted_at IS NOT NULL
+        LIMIT 2000`,
+      )
+      .all<{
+        industry: string | null;
+        role: string | null;
+        company_size: string | null;
+        band: string | null;
+        contact_source: string | null;
+        submission_source: string | null;
+      }>();
+
+    const rows = result.results;
+
+    return {
+      industries: uniqueSorted(rows.map((row) => row.industry)),
+      roles: uniqueSorted(rows.map((row) => row.role)),
+      companySizes: uniqueSorted(rows.map((row) => row.company_size)),
+      bands: uniqueSorted(rows.map((row) => row.band)),
+      sources: uniqueSorted(
+        rows.flatMap((row) => [row.contact_source, row.submission_source]),
+      ),
+    };
+  }
+
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -281,7 +321,6 @@ async function getHealthChecks(
   filters: HealthCheckFilters,
   page: number,
 ): Promise<HealthCheckRow[]> {
-  const supabase = createSupabaseAdminClient();
   const sort = buildSort(filters.sort);
   const completedRange = getDateRange(
     filters.completedFrom,
@@ -290,6 +329,108 @@ async function getHealthChecks(
   const enquiryRange = getDateRange(filters.enquiryFrom, filters.enquiryTo);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const conditions = ["completed_at IS NOT NULL"];
+    const values: Array<string | number> = [];
+
+    if (filters.q) {
+      conditions.push(
+        `(lower(coalesce(contact_name, '')) LIKE lower(?)
+          OR lower(coalesce(contact_email, '')) LIKE lower(?)
+          OR lower(coalesce(contact_company, '')) LIKE lower(?)
+          OR lower(coalesce(email, '')) LIKE lower(?))`,
+      );
+      const query = `%${filters.q}%`;
+      values.push(query, query, query, query);
+    }
+
+    const addEquality = (column: string, value: string) => {
+      if (value) {
+        conditions.push(`${column} = ?`);
+        values.push(value);
+      }
+    };
+
+    addEquality("industry", filters.industry);
+    addEquality("role", filters.role);
+    addEquality("company_size", filters.companySize);
+    addEquality("band", filters.band);
+
+    if (filters.source) {
+      conditions.push("(contact_source = ? OR submission_source = ?)");
+      values.push(filters.source, filters.source);
+    }
+
+    if (completedRange.fromIso) {
+      conditions.push("completed_at >= ?");
+      values.push(completedRange.fromIso);
+    }
+
+    if (completedRange.toIsoExclusive) {
+      conditions.push("completed_at < ?");
+      values.push(completedRange.toIsoExclusive);
+    }
+
+    if (enquiryRange.fromIso) {
+      conditions.push("contact_submitted_at >= ?");
+      values.push(enquiryRange.fromIso);
+    }
+
+    if (enquiryRange.toIsoExclusive) {
+      conditions.push("contact_submitted_at < ?");
+      values.push(enquiryRange.toIsoExclusive);
+    }
+
+    if (filters.status === "completion_only") {
+      conditions.push("contact_submitted_at IS NULL");
+    } else if (filters.status === "with_enquiry") {
+      conditions.push("contact_submitted_at IS NOT NULL");
+    }
+
+    values.push(PAGE_SIZE, from);
+    const direction = sort.ascending ? "ASC" : "DESC";
+    const result = await getD1Database()
+      .prepare(
+        `SELECT
+          submission_id,
+          completed_at,
+          contact_submitted_at,
+          submission_source,
+          completion_version,
+          email,
+          contact_name,
+          contact_email,
+          contact_company,
+          contact_topic,
+          contact_source,
+          company_size,
+          industry,
+          role,
+          country_region,
+          score,
+          band,
+          advisor_brief,
+          contact_message
+        FROM diagnostic_submissions
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY ${sort.column} ${direction} NULLS LAST
+        LIMIT ? OFFSET ?`,
+      )
+      .bind(...values)
+      .all<Omit<HealthCheckRow, "advisor_brief"> & {
+        advisor_brief: string | null;
+      }>();
+
+    return result.results.map((row) => ({
+      ...row,
+      advisor_brief: row.advisor_brief
+        ? JSON.parse(row.advisor_brief)
+        : null,
+    }));
+  }
+
+  const supabase = createSupabaseAdminClient();
 
   let query = supabase
     .from("diagnostic_submissions")
