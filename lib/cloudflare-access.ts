@@ -191,6 +191,7 @@ function parseToken(token: string): {
 }
 
 export async function verifyCloudflareAdvisorAccessToken(params: {
+  allowedEmails?: readonly string[];
   audience: string;
   nowSeconds?: number;
   signingKey: AccessJwk;
@@ -239,7 +240,13 @@ export async function verifyCloudflareAdvisorAccessToken(params: {
   const email =
     typeof payload.email === "string" ? payload.email.toLowerCase() : "";
 
-  if (!email || !isAllowedAdvisorEmail(email)) {
+  const emailAllowed = params.allowedEmails
+    ? params.allowedEmails.some(
+        (allowedEmail) => allowedEmail.trim().toLowerCase() === email,
+      )
+    : isAllowedAdvisorEmail(email);
+
+  if (!email || !emailAllowed) {
     throw new Error("Cloudflare Access user is not an allowed advisor.");
   }
 

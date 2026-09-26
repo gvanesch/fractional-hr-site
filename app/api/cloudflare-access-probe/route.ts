@@ -102,6 +102,7 @@ export async function POST(request: Request) {
       teamDomain,
     });
     const verified = await verifyCloudflareAdvisorAccessToken({
+      allowedEmails: ["advisor@example.com"],
       audience,
       nowSeconds: now,
       signingKey,
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
 
     const wrongAudienceRejected = await rejects(() =>
       verifyCloudflareAdvisorAccessToken({
+        allowedEmails: ["advisor@example.com"],
         audience: "wrong-audience",
         nowSeconds: now,
         signingKey,
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
     );
     const expiredRejected = await rejects(() =>
       verifyCloudflareAdvisorAccessToken({
+        allowedEmails: ["advisor@example.com"],
         audience,
         nowSeconds: now + 301,
         signingKey,
@@ -136,6 +139,7 @@ export async function POST(request: Request) {
     const tamperedSignature = `${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
     const tamperedRejected = await rejects(() =>
       verifyCloudflareAdvisorAccessToken({
+        allowedEmails: ["advisor@example.com"],
         audience,
         nowSeconds: now,
         signingKey,
