@@ -1,5 +1,9 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
+  getD1Database,
+  isD1ClientDiagnosticEnabled,
+} from "@/lib/d1/database";
+import {
   buildDimensionInsights,
   type DimensionInsight,
 } from "@/lib/client-diagnostic/insight-engine";
@@ -1989,150 +1993,242 @@ export async function buildProjectSummary(
     );
   }
 
-  const supabase = createSupabaseAdminClient();
+  let project: ProjectRow | null = null;
+  let participants: ParticipantRow[] | null = [];
+  let scoreRows: DimensionScoreRow[] | null = [];
+  let scoredResponseRows: ScoredResponseRow[] | null = [];
+  let commentRows: CommentRow[] | null = [];
+  let factPackRows: FactPackRow[] | null = [];
+  let serviceAccessRows: ServiceAccessContextRow[] | null = [];
+  let projectError: unknown = null;
+  let participantsError: unknown = null;
+  let scoresError: unknown = null;
+  let scoredResponsesError: unknown = null;
+  let commentsError: unknown = null;
+  let factPackError: unknown = null;
+  let serviceAccessError: unknown = null;
 
-  async function loadPagedRows<T>(
-    loadPage: (
-      from: number,
-      to: number,
-    ) => Promise<{ data: T[] | null; error: unknown }>,
-  ): Promise<{ data: T[] | null; error: unknown }> {
-    const pageSize = 1000;
-    const rows: T[] = [];
+  if (isD1ClientDiagnosticEnabled()) {
+    const database = getD1Database();
+    const [
+      projectRow,
+      participantResult,
+      scoreResult,
+      scoredResponseResult,
+      commentResult,
+      factPackResult,
+      serviceAccessResult,
+    ] = await Promise.all([
+      database
+        .prepare(
+          `SELECT project_id, company_name, primary_contact_name,
+            primary_contact_email, project_status, notes, created_at,
+            updated_at
+          FROM client_projects WHERE project_id = ? LIMIT 1`,
+        )
+        .bind(projectId)
+        .first<ProjectRow>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, role_label,
+            participant_status, started_at, completed_at, updated_at,
+            segmentation_values
+          FROM client_participants
+          WHERE project_id = ? ORDER BY participant_id ASC`,
+        )
+        .bind(projectId)
+        .all<Omit<ParticipantRow, "segmentation_values"> & {
+          segmentation_values: string | null;
+        }>(),
+      database
+        .prepare(
+          `SELECT score_id, project_id, participant_id, questionnaire_type,
+            dimension_key, average_score, response_count, updated_at
+          FROM client_dimension_scores
+          WHERE project_id = ? ORDER BY score_id ASC`,
+        )
+        .bind(projectId)
+        .all<DimensionScoreRow>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, dimension_key,
+            question_key, answer_value
+          FROM client_responses
+          WHERE project_id = ? AND answer_value IS NOT NULL
+          ORDER BY participant_id ASC, question_key ASC`,
+        )
+        .bind(projectId)
+        .all<ScoredResponseRow>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, dimension_key,
+            question_key, comment_text, updated_at
+          FROM client_responses
+          WHERE project_id = ? AND comment_text IS NOT NULL
+          ORDER BY participant_id ASC, question_key ASC`,
+        )
+        .bind(projectId)
+        .all<CommentRow>(),
+      database
+        .prepare(
+          `SELECT participant_id, status, submitted_at, updated_at,
+            response_json
+          FROM client_fact_packs WHERE project_id = ?`,
+        )
+        .bind(projectId)
+        .all<Omit<FactPackRow, "response_json"> & {
+          response_json: string | null;
+        }>(),
+      database
+        .prepare(
+          `SELECT participant_id, questionnaire_type, routes_used,
+            usual_route, usual_route_effectiveness, intended_access_model,
+            intended_primary_route, specific_route_detail
+          FROM client_service_access_context
+          WHERE project_id = ? ORDER BY participant_id ASC`,
+        )
+        .bind(projectId)
+        .all<Omit<ServiceAccessContextRow, "routes_used"> & {
+          routes_used: string;
+        }>(),
+    ]);
 
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await loadPage(from, from + pageSize - 1);
+    project = projectRow;
+    participants = participantResult.results.map((participant) => ({
+      ...participant,
+      segmentation_values: participant.segmentation_values
+        ? JSON.parse(participant.segmentation_values) as Record<string, string>
+        : null,
+    }));
+    scoreRows = scoreResult.results;
+    scoredResponseRows = scoredResponseResult.results;
+    commentRows = commentResult.results;
+    factPackRows = factPackResult.results.map((row) => ({
+      ...row,
+      response_json: row.response_json
+        ? JSON.parse(row.response_json) as Record<string, unknown>
+        : null,
+    }));
+    serviceAccessRows = serviceAccessResult.results.map((row) => ({
+      ...row,
+      routes_used: JSON.parse(row.routes_used) as string[],
+    }));
+  } else {
+    const supabase = createSupabaseAdminClient();
 
-      if (error) {
-        return {
-          data: null,
-          error,
-        };
-      }
+    async function loadPagedRows<T>(
+      loadPage: (
+        from: number,
+        to: number,
+      ) => Promise<{ data: T[] | null; error: unknown }>,
+    ): Promise<{ data: T[] | null; error: unknown }> {
+      const pageSize = 1000;
+      const rows: T[] = [];
 
-      const pageRows = data ?? [];
-      rows.push(...pageRows);
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await loadPage(from, from + pageSize - 1);
 
-      if (pageRows.length < pageSize) {
-        return {
-          data: rows,
-          error: null,
-        };
+        if (error) return { data: null, error };
+        const pageRows = data ?? [];
+        rows.push(...pageRows);
+        if (pageRows.length < pageSize) return { data: rows, error: null };
       }
     }
+
+    const results = await Promise.all([
+      supabase
+        .from("client_projects")
+        .select(
+          "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
+        )
+        .eq("project_id", projectId)
+        .single<ProjectRow>(),
+      loadPagedRows<ParticipantRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("client_participants")
+          .select(
+            "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at, segmentation_values",
+          )
+          .eq("project_id", projectId)
+          .order("participant_id", { ascending: true })
+          .range(from, to)
+          .returns<ParticipantRow[]>();
+        return { data, error };
+      }),
+      loadPagedRows<DimensionScoreRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("client_dimension_scores")
+          .select(
+            "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
+          )
+          .eq("project_id", projectId)
+          .order("score_id", { ascending: true })
+          .range(from, to)
+          .returns<DimensionScoreRow[]>();
+        return { data, error };
+      }),
+      loadPagedRows<ScoredResponseRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("client_responses")
+          .select(
+            "participant_id, questionnaire_type, dimension_key, question_key, answer_value",
+          )
+          .eq("project_id", projectId)
+          .not("answer_value", "is", null)
+          .order("participant_id", { ascending: true })
+          .order("question_key", { ascending: true })
+          .range(from, to)
+          .returns<ScoredResponseRow[]>();
+        return { data, error };
+      }),
+      loadPagedRows<CommentRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("client_responses")
+          .select(
+            "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
+          )
+          .eq("project_id", projectId)
+          .not("comment_text", "is", null)
+          .order("participant_id", { ascending: true })
+          .order("question_key", { ascending: true })
+          .range(from, to)
+          .returns<CommentRow[]>();
+        return { data, error };
+      }),
+      supabase
+        .from("client_fact_packs")
+        .select("participant_id, status, submitted_at, updated_at, response_json")
+        .eq("project_id", projectId)
+        .returns<FactPackRow[]>(),
+      loadPagedRows<ServiceAccessContextRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("client_service_access_context")
+          .select(
+            "participant_id, questionnaire_type, routes_used, usual_route, usual_route_effectiveness, intended_access_model, intended_primary_route, specific_route_detail",
+          )
+          .eq("project_id", projectId)
+          .order("participant_id", { ascending: true })
+          .range(from, to)
+          .returns<ServiceAccessContextRow[]>();
+        return { data, error };
+      }),
+    ]);
+
+    project = results[0].data;
+    projectError = results[0].error;
+    participants = results[1].data;
+    participantsError = results[1].error;
+    scoreRows = results[2].data;
+    scoresError = results[2].error;
+    scoredResponseRows = results[3].data;
+    scoredResponsesError = results[3].error;
+    commentRows = results[4].data;
+    commentsError = results[4].error;
+    factPackRows = results[5].data;
+    factPackError = results[5].error;
+    serviceAccessRows = results[6].data;
+    serviceAccessError = results[6].error;
   }
-
-  const participantsPromise = loadPagedRows<ParticipantRow>(
-    async (from, to) => {
-      const { data, error } = await supabase
-        .from("client_participants")
-        .select(
-          "participant_id, questionnaire_type, role_label, participant_status, started_at, completed_at, updated_at, segmentation_values",
-        )
-        .eq("project_id", projectId)
-        .order("participant_id", { ascending: true })
-        .range(from, to)
-        .returns<ParticipantRow[]>();
-
-      return { data, error };
-    },
-  );
-
-  const dimensionScoresPromise = loadPagedRows<DimensionScoreRow>(
-    async (from, to) => {
-      const { data, error } = await supabase
-        .from("client_dimension_scores")
-        .select(
-          "score_id, project_id, participant_id, questionnaire_type, dimension_key, average_score, response_count, updated_at",
-        )
-        .eq("project_id", projectId)
-        .order("score_id", { ascending: true })
-        .range(from, to)
-        .returns<DimensionScoreRow[]>();
-
-      return { data, error };
-    },
-  );
-
-  const scoredResponsesPromise = loadPagedRows<ScoredResponseRow>(
-    async (from, to) => {
-      const { data, error } = await supabase
-        .from("client_responses")
-        .select(
-          "participant_id, questionnaire_type, dimension_key, question_key, answer_value",
-        )
-        .eq("project_id", projectId)
-        .not("answer_value", "is", null)
-        .order("participant_id", { ascending: true })
-        .order("question_key", { ascending: true })
-        .range(from, to)
-        .returns<ScoredResponseRow[]>();
-
-      return { data, error };
-    },
-  );
-
-  const commentsPromise = loadPagedRows<CommentRow>(
-    async (from, to) => {
-      const { data, error } = await supabase
-        .from("client_responses")
-        .select(
-          "participant_id, questionnaire_type, dimension_key, question_key, comment_text, updated_at",
-        )
-        .eq("project_id", projectId)
-        .not("comment_text", "is", null)
-        .order("participant_id", { ascending: true })
-        .order("question_key", { ascending: true })
-        .range(from, to)
-        .returns<CommentRow[]>();
-
-      return { data, error };
-    },
-  );
-
-  const serviceAccessPromise = loadPagedRows<ServiceAccessContextRow>(
-    async (from, to) => {
-      const { data, error } = await supabase
-        .from("client_service_access_context")
-        .select(
-          "participant_id, questionnaire_type, routes_used, usual_route, usual_route_effectiveness, intended_access_model, intended_primary_route, specific_route_detail",
-        )
-        .eq("project_id", projectId)
-        .order("participant_id", { ascending: true })
-        .range(from, to)
-        .returns<ServiceAccessContextRow[]>();
-
-      return { data, error };
-    },
-  );
-
-  const [
-    { data: project, error: projectError },
-    { data: participants, error: participantsError },
-    { data: scoreRows, error: scoresError },
-    { data: scoredResponseRows, error: scoredResponsesError },
-    { data: commentRows, error: commentsError },
-    { data: factPackRows, error: factPackError },
-    { data: serviceAccessRows, error: serviceAccessError },
-  ] = await Promise.all([
-    supabase
-      .from("client_projects")
-      .select(
-        "project_id, company_name, primary_contact_name, primary_contact_email, project_status, notes, created_at, updated_at",
-      )
-      .eq("project_id", projectId)
-      .single<ProjectRow>(),
-    participantsPromise,
-    dimensionScoresPromise,
-    scoredResponsesPromise,
-    commentsPromise,
-    supabase
-      .from("client_fact_packs")
-      .select("participant_id, status, submitted_at, updated_at, response_json")
-      .eq("project_id", projectId)
-      .returns<FactPackRow[]>(),
-    serviceAccessPromise,
-  ]);
 
   if (projectError || !project) {
     throw new BuildProjectSummaryError(
