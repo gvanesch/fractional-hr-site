@@ -7,8 +7,8 @@ export const metadata = {
 import Link from "next/link";
 import UnlinkHealthCheckButton from "@/app/components/advisor/UnlinkHealthCheckButton";
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
 import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
@@ -495,26 +495,10 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 }
 
 async function requireAdvisorSession(submissionId: string) {
-  const supabase = await createSupabaseServerClient();
+  const user = await requireAdvisorUser();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!user) {
     redirect(`/advisor/login?next=/advisor/${submissionId}`);
-  }
-
-  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  const userEmail = user.email?.toLowerCase() ?? "";
-
-  if (!userEmail || !allowedEmails.includes(userEmail)) {
-    redirect("/advisor/login?error=forbidden");
   }
 
   return user;

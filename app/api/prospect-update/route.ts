@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import { authenticateAdvisorRequest } from "@/lib/advisor-auth";
 import {
   parseD1HealthCheckProspectActivityRow,
   parseD1HealthCheckProspectRow,
@@ -116,29 +115,23 @@ function normaliseOptionalNotes(value: unknown): string | null | undefined {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await authenticateAdvisorRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 },
       );
     }
 
-    const userEmail = user.email;
+    const safeUserEmail = user.email?.trim().toLowerCase();
 
-    if (!isAllowedAdvisorEmail(userEmail)) {
+    if (!safeUserEmail) {
       return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
       );
     }
-
-    const safeUserEmail = userEmail as string;
 
     const body = (await request.json()) as {
       prospect_id?: string;

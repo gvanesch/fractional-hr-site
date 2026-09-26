@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
 import {
     getD1Database,
     isD1CrmProspectsEnabled,
@@ -79,19 +78,10 @@ const secondaryButtonClassName =
     "inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50";
 
 async function requireAdvisorSession() {
-    const supabase = await createSupabaseServerClient();
+    const user = await requireAdvisorUser();
 
-    const {
-        data: { user },
-        error,
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
+    if (!user) {
         redirect("/advisor/login?next=/advisor/prospects");
-    }
-
-    if (!isAllowedAdvisorEmail(user.email)) {
-        redirect("/advisor/login?error=forbidden");
     }
 
     return user;

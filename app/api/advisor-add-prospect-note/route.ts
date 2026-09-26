@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
+import { authenticateAdvisorRequest } from "@/lib/advisor-auth";
 import {
     parseD1AdvisorProspectActivityRow,
     parseD1AdvisorProspectRow,
@@ -56,24 +55,12 @@ function normaliseOptionalText(value: unknown, maxLength = 500) {
 
 export async function POST(request: Request) {
     try {
-        const supabase = await createSupabaseServerClient();
+        const user = await authenticateAdvisorRequest(request);
 
-        const {
-            data: { user },
-            error,
-        } = await supabase.auth.getUser();
-
-        if (error || !user) {
+        if (!user) {
             return NextResponse.json(
                 { success: false, error: "Unauthorized" },
                 { status: 401 },
-            );
-        }
-
-        if (!isAllowedAdvisorEmail(user.email)) {
-            return NextResponse.json(
-                { success: false, error: "Forbidden" },
-                { status: 403 },
             );
         }
 

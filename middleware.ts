@@ -4,6 +4,10 @@ import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import { checkClientDiagnosticInviteRateLimit } from "@/lib/security/client-diagnostic-invite-rate-limit";
 import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
+import {
+  isCloudflareAdvisorAuthEnabled,
+  verifyCloudflareAdvisorAccess,
+} from "@/lib/cloudflare-access";
 
 function applyProtectedHeaders(response: NextResponse) {
   response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -137,6 +141,20 @@ async function protectAdvisorRoute(
   const { pathname, search } = request.nextUrl;
   const response = NextResponse.next();
 
+  if (isCloudflareAdvisorAuthEnabled()) {
+    try {
+      await verifyCloudflareAdvisorAccess(request.headers);
+      return applyProtectedHeaders(response);
+    } catch (error) {
+      console.error("[advisor-auth] Cloudflare Access middleware rejected request", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      return applyProtectedHeaders(
+        NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      );
+    }
+  }
+
   const supabase = createServerClient(
     getValidatedSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -201,7 +219,7 @@ export async function middleware(request: NextRequest) {
     return protectClientDiagnosticInvite(request);
   }
 
-  if (pathname === "/advisor/login") {
+  if (pathname === "/advisor/login" && !isCloudflareAdvisorAuthEnabled()) {
     return NextResponse.next();
   }
 

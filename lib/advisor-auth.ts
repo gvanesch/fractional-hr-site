@@ -1,39 +1,47 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import {
+  isCloudflareAdvisorAuthEnabled,
+  verifyCloudflareAdvisorAccess,
+  type AdvisorAccessUser,
+} from "@/lib/cloudflare-access";
+import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 
-export async function requireAdvisorUser() {
-  try {
-    const supabase = await createSupabaseServerClient();
-
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error) {
-      console.error("[advisor-auth] supabase.auth.getUser() returned error", {
-        message: error.message,
-        name: error.name,
-        status: (error as { status?: number }).status,
+export async function authenticateAdvisorRequest(
+  request?: Request,
+): Promise<AdvisorAccessUser | Awaited<ReturnType<typeof getSupabaseAdvisorUser>>> {
+  if (isCloudflareAdvisorAuthEnabled()) {
+    try {
+      const requestHeaders = request?.headers ?? (await headers());
+      return await verifyCloudflareAdvisorAccess(requestHeaders);
+    } catch (error) {
+      console.error("[advisor-auth] Cloudflare Access validation failed", {
+        message: error instanceof Error ? error.message : "Unknown error",
       });
       return null;
     }
+  }
 
-    if (!user) {
-      return null;
-    }
+  return getSupabaseAdvisorUser();
+}
 
-    const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-      .split(",")
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean);
+async function getSupabaseAdvisorUser() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-    const userEmail = user.email?.toLowerCase() ?? "";
+  if (error || !user || !isAllowedAdvisorEmail(user.email)) {
+    return null;
+  }
 
-    if (!userEmail || !allowedEmails.includes(userEmail)) {
-      return null;
-    }
+  return user;
+}
 
-    return user;
+export async function requireAdvisorUser() {
+  try {
+    return await authenticateAdvisorRequest();
   } catch (error) {
     console.error("[advisor-auth] requireAdvisorUser failed", {
       error,

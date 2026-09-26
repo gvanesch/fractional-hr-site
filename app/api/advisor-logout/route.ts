@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
+import { isCloudflareAdvisorAuthEnabled } from "@/lib/cloudflare-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
+    if (isCloudflareAdvisorAuthEnabled()) {
+      return NextResponse.json(
+        { ok: true, logoutUrl: "/cdn-cgi/access/logout" },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
     const supabase = await createSupabaseServerClient();
     await supabase.auth.signOut();
 

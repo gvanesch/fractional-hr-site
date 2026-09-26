@@ -77,6 +77,15 @@ export default function AdvisorNav() {
         throw new Error("Logout failed.");
       }
 
+      const payload = (await response.json()) as {
+        logoutUrl?: string;
+      };
+
+      if (payload.logoutUrl) {
+        window.location.assign(payload.logoutUrl);
+        return;
+      }
+
       router.replace("/advisor/login");
       router.refresh();
     } catch (error) {

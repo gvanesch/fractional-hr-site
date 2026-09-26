@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -224,32 +224,13 @@ function uniqueSorted(values: Array<string | null | undefined>): string[] {
 }
 
 async function requireAdvisorSessionForHealthChecks() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const user = await requireAdvisorUser();
 
-  console.log("[advisor-health-checks] auth debug", {
-    hasSession: Boolean(session),
-    email: session?.user.email ?? null,
-  });
-
-  if (!session) {
+  if (!user) {
     redirect("/advisor/login?next=/advisor/health-checks");
   }
 
-  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  const userEmail = session.user.email?.toLowerCase() ?? "";
-
-  if (!userEmail || !allowedEmails.includes(userEmail)) {
-    redirect("/advisor/login?error=forbidden");
-  }
-
-  return session.user;
+  return user;
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
