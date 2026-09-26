@@ -291,7 +291,7 @@ jobs:
           NODE
 
           access_response="$(
-            curl --fail-with-body --silent --show-error \
+            curl --silent --show-error \
               --request POST \
               http://127.0.0.1:8787/api/cloudflare-access-probe
           )"
