@@ -39,6 +39,19 @@ function getInviteTokenFromPath(pathname: string): string | null {
   }
 }
 
+function isAdvisorApiPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/advisor-") ||
+    pathname === "/api/prospect-update" ||
+    pathname === "/api/client-diagnostic-create-project" ||
+    pathname === "/api/client-diagnostic-project-status" ||
+    pathname === "/api/client-diagnostic-project-summary" ||
+    pathname === "/api/client-diagnostic-project-update" ||
+    pathname === "/api/client-diagnostic-projects" ||
+    pathname === "/api/client-diagnostic-report"
+  );
+}
+
 async function protectClientDiagnosticInvite(
   request: NextRequest,
 ): Promise<NextResponse> {
@@ -219,6 +232,10 @@ export async function middleware(request: NextRequest) {
     return protectClientDiagnosticInvite(request);
   }
 
+  if (isAdvisorApiPath(pathname) && isCloudflareAdvisorAuthEnabled()) {
+    return protectAdvisorRoute(request);
+  }
+
   if (pathname === "/advisor/login" && !isCloudflareAdvisorAuthEnabled()) {
     return NextResponse.next();
   }
@@ -236,5 +253,6 @@ export const config = {
     "/client-diagnostic/respond/:path*",
     "/api/diagnostic-complete",
     "/api/contact",
+    "/api/:path*",
   ],
 };
