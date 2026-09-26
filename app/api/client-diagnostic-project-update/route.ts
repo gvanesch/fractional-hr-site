@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isD1ClientDiagnosticShadowWriteEnabled } from "@/lib/d1/database";
+import {
+  isD1ClientDiagnosticEnabled,
+  isD1ClientDiagnosticShadowWriteEnabled,
+} from "@/lib/d1/database";
+import { updateD1ClientProjectDetails } from "@/lib/d1/client-diagnostic";
 import { shadowClientProjectFromSupabase } from "@/lib/d1/client-diagnostic-shadow";
 
 function isUuid(value: string): boolean {
@@ -72,8 +76,23 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
+    if (isD1ClientDiagnosticEnabled()) {
+      await updateD1ClientProjectDetails({
+        projectId,
+        billingContactName: billingContactName ?? null,
+        billingContactEmail: billingContactEmail ?? null,
+        companyWebsite: companyWebsite ?? null,
+        purchaseOrderNumber: purchaseOrderNumber ?? null,
+        msaStatus: msaStatus ?? null,
+        dpaStatus: dpaStatus ?? null,
+        notes: notes ?? null,
+        updatedAt: new Date().toISOString(),
+      });
 
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
+    const supabase = createSupabaseAdminClient();
     const { data: updatedProject, error } = await supabase
       .from("client_projects")
       .update({

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
+import {
+  getD1Database,
+  isD1ClientDiagnosticEnabled,
+} from "@/lib/d1/database";
 
 type UpdateProjectStatusRequest = {
   projectId: string;
@@ -48,8 +52,31 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
+    if (isD1ClientDiagnosticEnabled()) {
+      const result = await getD1Database()
+        .prepare(
+          `UPDATE client_projects
+          SET project_status = ?, updated_at = ?
+          WHERE project_id = ?`,
+        )
+        .bind(body.projectStatus, new Date().toISOString(), body.projectId)
+        .run();
 
+      if (!result.success || result.meta.changes !== 1) {
+        return NextResponse.json(
+          { success: false, error: "Unable to update project status." },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        projectId: body.projectId,
+        projectStatus: body.projectStatus,
+      });
+    }
+
+    const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("client_projects")
       .update({
