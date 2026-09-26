@@ -5,6 +5,11 @@ import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
+import {
+  getD1AdminParticipant,
+  updateD1AdminParticipant,
+} from "@/lib/d1/client-participant-admin";
 
 const ALLOWED_REINSTATE_REASONS = [
   "withdrawn_in_error",
@@ -160,6 +165,107 @@ export async function PATCH(request: Request): Promise<Response> {
         },
         { status: 400 },
       );
+    }
+
+    if (isD1ClientDiagnosticEnabled()) {
+      const participant = await getD1AdminParticipant(participantId);
+      if (!participant) {
+        return NextResponse.json(
+          { success: false, error: "Participant not found." },
+          { status: 404 },
+        );
+      }
+      if (participant.project_status !== "active") {
+        return NextResponse.json(
+          { success: false, error: "Project is not active." },
+          { status: 409 },
+        );
+      }
+      if (participant.participant_status !== "archived") {
+        return NextResponse.json(
+          { success: false, error: "Only withdrawn participants can be reinstated." },
+          { status: 409 },
+        );
+      }
+      if (participant.completed_at !== null) {
+        return NextResponse.json(
+          { success: false, error: "Completed participants cannot be reinstated through this route." },
+          { status: 409 },
+        );
+      }
+
+      const now = new Date().toISOString();
+      const restoredInviteToken = participant.invite_token || randomUUID();
+      const restoredInviteExpiresAt = isFutureDate(participant.invite_expires_at)
+        ? participant.invite_expires_at
+        : getFreshInviteExpiry();
+      const updatedParticipant = await updateD1AdminParticipant(participantId, {
+        participantStatus: "invited",
+        inviteToken: restoredInviteToken,
+        inviteExpiresAt: restoredInviteExpiresAt,
+        inviteRevokedAt: null,
+        reinstateReason,
+        reinstateNote: reinstateNote || null,
+        reinstatedAt: now,
+        updatedAt: now,
+      });
+
+      if (!updatedParticipant) {
+        return NextResponse.json(
+          { success: false, error: "Unable to reinstate participant." },
+          { status: 500 },
+        );
+      }
+
+      let emailWarning: string | null = null;
+      try {
+        const emailQuestionnaireType = updatedParticipant.questionnaire_type;
+        if (emailQuestionnaireType === "payroll") {
+          throw new Error("Payroll participant emails are not supported.");
+        }
+        const emailResult = await sendParticipantEventEmail({
+          resend: new Resend(getEnv("RESEND_API_KEY")),
+          fromEmail: getEnv("CONTACT_FROM_EMAIL"),
+          replyToEmail: getEnv("CONTACT_TO_EMAIL"),
+          siteUrl: getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, ""),
+          projectName:
+            participant.project_name?.trim() || participant.company_name,
+          companyName: participant.company_name,
+          eventType: "participant_reinstated",
+          participant: {
+            name: getParticipantDisplayName(
+              updatedParticipant.name,
+              updatedParticipant.email ?? "",
+            ),
+            email: updatedParticipant.email ?? "",
+            questionnaireType: emailQuestionnaireType,
+            inviteToken: updatedParticipant.invite_token,
+            inviteExpiresAt: updatedParticipant.invite_expires_at,
+          },
+          metadata: {
+            updatedInviteExpiresAt: updatedParticipant.invite_expires_at,
+            reinstateReasonLabel: getReinstateReasonLabel(reinstateReason),
+            reinstateNote: reinstateNote || null,
+          },
+        });
+        if (!emailResult.success) {
+          emailWarning = "Participant was reinstated, but the confirmation email could not be sent.";
+        }
+      } catch (emailError) {
+        emailWarning = "Participant was reinstated, but the confirmation email could not be sent.";
+        console.error("Unexpected error sending D1 reinstate email", emailError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        participant: {
+          participantId: updatedParticipant.participant_id,
+          projectId: updatedParticipant.project_id,
+          participantStatus: updatedParticipant.participant_status,
+          completedAt: updatedParticipant.completed_at,
+        },
+        emailWarning,
+      });
     }
 
     const supabase = createSupabaseAdminClient();

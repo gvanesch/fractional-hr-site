@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
+import {
+  findD1ParticipantsByEmail,
+  getD1AdminParticipant,
+  updateD1AdminParticipant,
+} from "@/lib/d1/client-participant-admin";
 
 type QuestionnaireType =
   | "hr"
@@ -161,6 +167,107 @@ export async function PATCH(request: Request): Promise<Response> {
       );
     }
 
+    const normalisedSegmentationValues = normaliseSegmentationValues(
+      questionnaireType,
+      rawSegmentationValues,
+    );
+
+    if (isD1ClientDiagnosticEnabled()) {
+      const existingParticipant = await getD1AdminParticipant(participantId);
+      if (!existingParticipant) {
+        return NextResponse.json(
+          { success: false, error: "Participant not found." },
+          { status: 404 },
+        );
+      }
+      if (existingParticipant.participant_status === "archived") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Withdrawn participants cannot be edited. Reinstate the participant first if this was done in error.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const startedOrCompleted =
+        existingParticipant.participant_status === "started" ||
+        existingParticipant.participant_status === "completed" ||
+        existingParticipant.completed_at !== null;
+      let updatedParticipant = existingParticipant;
+
+      if (startedOrCompleted) {
+        if (name !== existingParticipant.name) {
+          const updated = await updateD1AdminParticipant(participantId, {
+            name,
+            updatedAt: new Date().toISOString(),
+          });
+          if (!updated) {
+            return NextResponse.json(
+              { success: false, error: "Unable to update participant." },
+              { status: 500 },
+            );
+          }
+          updatedParticipant = updated;
+        }
+      } else {
+        const conflicts = (
+          await findD1ParticipantsByEmail(existingParticipant.project_id, email)
+        ).filter((row) => row.participant_id !== participantId);
+
+        if (
+          questionnaireType === "client_fact_pack"
+            ? conflicts.some(
+                (row) => row.questionnaire_type === "client_fact_pack",
+              )
+            : conflicts.length > 0
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                questionnaireType === "client_fact_pack"
+                  ? "Only one Client Fact Pack participant is allowed per project."
+                  : "This email address is already assigned to another participant in this project.",
+            },
+            { status: 409 },
+          );
+        }
+
+        const updated = await updateD1AdminParticipant(participantId, {
+          name,
+          email,
+          roleLabel,
+          questionnaireType,
+          segmentationValues: normalisedSegmentationValues,
+          updatedAt: new Date().toISOString(),
+        });
+        if (!updated) {
+          return NextResponse.json(
+            { success: false, error: "Unable to update participant." },
+            { status: 500 },
+          );
+        }
+        updatedParticipant = updated;
+      }
+
+      return NextResponse.json({
+        success: true,
+        participant: {
+          participantId: updatedParticipant.participant_id,
+          projectId: updatedParticipant.project_id,
+          questionnaireType: updatedParticipant.questionnaire_type,
+          roleLabel: updatedParticipant.role_label,
+          name: updatedParticipant.name,
+          email: updatedParticipant.email,
+          segmentationValues: updatedParticipant.segmentation_values,
+          participantStatus: updatedParticipant.participant_status,
+          completedAt: updatedParticipant.completed_at,
+        },
+      });
+    }
+
     const supabase = createSupabaseAdminClient();
 
     const { data: existingParticipant, error: existingParticipantError } =
@@ -192,11 +299,6 @@ export async function PATCH(request: Request): Promise<Response> {
 
     const participantIsCompleted = isCompletedParticipant(existingParticipant);
     const participantIsStarted = isStartedParticipant(existingParticipant);
-
-    const normalisedSegmentationValues = normaliseSegmentationValues(
-      questionnaireType,
-      rawSegmentationValues,
-    );
 
     if (participantIsStarted || participantIsCompleted) {
       if (name === existingParticipant.name) {

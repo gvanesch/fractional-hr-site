@@ -5,6 +5,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isD1ClientDiagnosticShadowWriteEnabled } from "@/lib/d1/database";
 import { shadowClientProjectFromSupabase } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
+import { randomUUID } from "crypto";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
+import {
+  findD1ParticipantsByEmail,
+  getD1AdminProject,
+  insertD1AdminParticipant,
+} from "@/lib/d1/client-participant-admin";
 import {
   validateSegmentationValues,
   type SegmentationSchema,
@@ -128,6 +135,106 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json(
         { success: false, error: "A valid email address is required." },
         { status: 400 },
+      );
+    }
+
+    if (isD1ClientDiagnosticEnabled()) {
+      const project = await getD1AdminProject(projectId);
+      if (!project) {
+        return NextResponse.json(
+          { success: false, error: "Project not found." },
+          { status: 404 },
+        );
+      }
+      if (project.project_status !== "active") {
+        return NextResponse.json(
+          { success: false, error: "Project is not active." },
+          { status: 409 },
+        );
+      }
+
+      let validatedSegmentationValues: SegmentationValues | null = null;
+      if (isScoredQuestionnaireType(questionnaireType)) {
+        if (!project.segmentation_schema) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "Project segmentation schema is unavailable, so a scored participant cannot be added.",
+            },
+            { status: 400 },
+          );
+        }
+        validatedSegmentationValues = validateSegmentationValues(
+          project.segmentation_schema as SegmentationSchema,
+          body.segmentationValues,
+        );
+        if (!validatedSegmentationValues) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "Function, location, and level are required for scored participants.",
+            },
+            { status: 400 },
+          );
+        }
+      }
+
+      if ((await findD1ParticipantsByEmail(projectId, email)).length > 0) {
+        return NextResponse.json(
+          { success: false, error: "A participant with this email already exists." },
+          { status: 409 },
+        );
+      }
+
+      const now = new Date().toISOString();
+      const participant = await insertD1AdminParticipant({
+        participantId: randomUUID(),
+        projectId,
+        questionnaireType,
+        roleLabel,
+        name: name || null,
+        email,
+        segmentationValues: validatedSegmentationValues,
+        inviteToken: randomUUID(),
+        inviteExpiresAt: getDefaultInviteExpiresAt(),
+        now,
+      });
+      if (!participant) {
+        return NextResponse.json(
+          { success: false, error: "Unable to create participant." },
+          { status: 500 },
+        );
+      }
+
+      const emailResult = await sendParticipantEventEmail({
+        resend: new Resend(getEnv("RESEND_API_KEY")),
+        fromEmail: getEnv("CONTACT_FROM_EMAIL"),
+        replyToEmail: getEnv("CONTACT_TO_EMAIL"),
+        siteUrl: getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, ""),
+        projectName: project.project_name?.trim() || project.company_name,
+        companyName: project.company_name,
+        eventType: "invite",
+        participant: {
+          name: participant.name?.trim() || roleLabel,
+          email: participant.email ?? email,
+          questionnaireType,
+          inviteToken: participant.invite_token,
+          inviteExpiresAt: participant.invite_expires_at,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          success: emailResult.success,
+          participant,
+          emailResult,
+          ...(emailResult.success
+            ? {}
+            : { error: "Participant created, but the invitation email failed." }),
+        },
+        { status: emailResult.success ? 201 : 500 },
       );
     }
 

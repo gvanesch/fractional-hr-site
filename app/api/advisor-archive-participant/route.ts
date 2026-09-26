@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
+import {
+  getD1AdminParticipant,
+  updateD1AdminParticipant,
+} from "@/lib/d1/client-participant-admin";
 
 const ALLOWED_WITHDRAW_REASONS = [
   "wrong_details",
@@ -76,6 +81,65 @@ export async function PATCH(request: Request): Promise<Response> {
         },
         { status: 400 },
       );
+    }
+
+    if (isD1ClientDiagnosticEnabled()) {
+      const participant = await getD1AdminParticipant(participantId);
+
+      if (!participant) {
+        return NextResponse.json(
+          { success: false, error: "Participant not found." },
+          { status: 404 },
+        );
+      }
+
+      if (participant.participant_status === "archived") {
+        return NextResponse.json(
+          { success: false, error: "Participant is already archived." },
+          { status: 409 },
+        );
+      }
+
+      if (
+        participant.participant_status === "completed" ||
+        participant.completed_at !== null
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Completed participants cannot be archived. Completed participation must remain intact for reporting and future comparison.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const now = new Date().toISOString();
+      const updatedParticipant = await updateD1AdminParticipant(participantId, {
+        participantStatus: "archived",
+        inviteRevokedAt: participant.invite_revoked_at ?? now,
+        withdrawReason,
+        withdrawNote: withdrawNote || null,
+        withdrawnAt: now,
+        updatedAt: now,
+      });
+
+      if (!updatedParticipant) {
+        return NextResponse.json(
+          { success: false, error: "Unable to withdraw participant." },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        participant: {
+          participantId: updatedParticipant.participant_id,
+          projectId: updatedParticipant.project_id,
+          participantStatus: updatedParticipant.participant_status,
+          completedAt: updatedParticipant.completed_at,
+        },
+      });
     }
 
     const supabase = createSupabaseAdminClient();

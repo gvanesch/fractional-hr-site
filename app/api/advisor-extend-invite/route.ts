@@ -4,6 +4,11 @@ import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { shadowClientProjectAfterSupabaseMutation } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
+import {
+  getD1AdminParticipant,
+  updateD1AdminParticipant,
+} from "@/lib/d1/client-participant-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +140,103 @@ export async function POST(request: Request): Promise<Response> {
         },
         { status: 400 },
       );
+    }
+
+    if (isD1ClientDiagnosticEnabled()) {
+      const participant = await getD1AdminParticipant(participantId);
+      if (!participant) {
+        return NextResponse.json(
+          { success: false, error: "Participant not found." },
+          { status: 404 },
+        );
+      }
+      if (participant.project_status !== "active") {
+        return NextResponse.json(
+          { success: false, error: "Project is not active." },
+          { status: 409 },
+        );
+      }
+      if (!participant.invite_token) {
+        return NextResponse.json(
+          { success: false, error: "Participant does not have an active invite token." },
+          { status: 409 },
+        );
+      }
+      if (
+        participant.participant_status === "completed" ||
+        participant.completed_at
+      ) {
+        return NextResponse.json(
+          { success: false, error: "Completed participants cannot have invite expiry extended." },
+          { status: 409 },
+        );
+      }
+      if (participant.participant_status === "archived") {
+        return NextResponse.json(
+          { success: false, error: "Archived participants cannot have invite expiry extended." },
+          { status: 409 },
+        );
+      }
+
+      const previousInviteExpiresAt = participant.invite_expires_at;
+      const inviteExpiresAt = getExtendedInviteExpiry(previousInviteExpiresAt, days);
+      const updatedParticipant = await updateD1AdminParticipant(participantId, {
+        inviteExpiresAt,
+        inviteRevokedAt: null,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (!updatedParticipant) {
+        return NextResponse.json(
+          { success: false, error: "Unable to extend invite expiry." },
+          { status: 500 },
+        );
+      }
+
+      let emailWarning: string | null = null;
+      try {
+        const emailQuestionnaireType = updatedParticipant.questionnaire_type;
+        if (emailQuestionnaireType === "payroll") {
+          throw new Error("Payroll participant emails are not supported.");
+        }
+        const emailResult = await sendParticipantEventEmail({
+          resend: new Resend(getEnv("RESEND_API_KEY")),
+          fromEmail: getEnv("CONTACT_FROM_EMAIL"),
+          replyToEmail: getEnv("CONTACT_TO_EMAIL"),
+          siteUrl: getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, ""),
+          projectName:
+            participant.project_name?.trim() || participant.company_name,
+          companyName: participant.company_name,
+          eventType: "invite_extended",
+          participant: {
+            name: getParticipantDisplayName(
+              updatedParticipant.name,
+              updatedParticipant.email ?? "",
+            ),
+            email: updatedParticipant.email ?? "",
+            questionnaireType: emailQuestionnaireType,
+            inviteToken: updatedParticipant.invite_token,
+            inviteExpiresAt: updatedParticipant.invite_expires_at,
+          },
+          metadata: {
+            previousInviteExpiresAt,
+            updatedInviteExpiresAt: updatedParticipant.invite_expires_at,
+          },
+        });
+        if (!emailResult.success) {
+          emailWarning = "Invite expiry was updated, but the confirmation email could not be sent.";
+        }
+      } catch (emailError) {
+        emailWarning = "Invite expiry was updated, but the confirmation email could not be sent.";
+        console.error("Unexpected error sending D1 invite extension email", emailError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        participant: updatedParticipant,
+        extendedByDays: days,
+        emailWarning,
+      });
     }
 
     const supabase = createSupabaseAdminClient();
