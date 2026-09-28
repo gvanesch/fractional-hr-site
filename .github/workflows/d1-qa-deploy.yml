@@ -1,0 +1,43 @@
+name: D1 QA Worker deployment
+
+on:
+  push:
+    branches:
+      - migration/d1
+    paths:
+      - .github/workflows/d1-qa-deploy.yml
+      - scripts/d1/prepare-qa-deploy.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-qa-worker-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy isolated QA Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Verify D1 routes and security
+        run: npm run test:d1
+      - name: Resolve and validate the isolated QA target
+        run: node scripts/d1/prepare-qa-deploy.mjs
+      - name: Build OpenNext for QA
+        run: npx opennextjs-cloudflare build --env qa
+      - name: Deploy QA only
+        run: npx opennextjs-cloudflare deploy --env qa
+      - name: Inspect deployed QA bindings
+        run: node scripts/d1/qa-hosted-preflight.mjs
