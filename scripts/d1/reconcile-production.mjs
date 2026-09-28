@@ -37,6 +37,7 @@ const JSON_FIELDS = new Set([
 ]);
 const EXPECTED_SOURCE_HOST = "qxddddhhpfrrxbaunwfw.supabase.co";
 const EXPECTED_PROD_DB = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc";
+const EXPECTED_ACCOUNT_ID = "73221f18acc676e4992c89fcbf2b2a8f";
 const safeIdentifier = (name) => {
   if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new Error("Invalid identifier.");
   return `"${name}"`;
@@ -127,17 +128,29 @@ async function main() {
     dbId === config.env.qa.d1_databases[0].database_id
   )
     throw new Error("D1 target mismatch.");
-  const sourceUrl = new URL(process.env.BACKFILL_SUPABASE_URL ?? "");
+  const sourceUrl = new URL(
+    process.env.BACKFILL_SUPABASE_URL ??
+      process.env.NEXT_PUBLIC_SUPABASE_URL ??
+      `https://${EXPECTED_SOURCE_HOST}`,
+  );
   if (
     sourceUrl.hostname !== EXPECTED_SOURCE_HOST ||
     sourceUrl.protocol !== "https:"
   )
     throw new Error("Supabase production source mismatch.");
-  const supabaseKey = process.env.BACKFILL_SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const supabaseKey = (
+    process.env.BACKFILL_SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )?.trim();
   const cfToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
-  if (!supabaseKey || !cfToken || !accountId)
-    throw new Error("Configured source and D1 read credentials are required.");
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? EXPECTED_ACCOUNT_ID;
+  if (accountId !== EXPECTED_ACCOUNT_ID)
+    throw new Error("Cloudflare account ID does not match the production target.");
+  const missing = [];
+  if (!supabaseKey) missing.push("BACKFILL_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY)");
+  if (!cfToken) missing.push("CLOUDFLARE_API_TOKEN");
+  if (missing.length)
+    throw new Error(`Missing local read credentials: ${missing.join(", ")}. Configure them locally; do not paste their values into chat.`);
   const privateDir = await mkdtemp(join(tmpdir(), "vanesch-d1-delta-"));
   await chmod(privateDir, 0o700);
   async function sourceRows(name, key) {
