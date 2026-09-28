@@ -33,6 +33,24 @@ const response = await fetch(
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
   },
 );
+if (response.status === 404) {
+  // Confirm whether the QA script exists without printing account inventory or bindings.
+  const listing = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } },
+  );
+  if (!listing.ok)
+    throw new Error(`QA Worker settings returned HTTP 404; Worker inventory returned HTTP ${listing.status}.`);
+  const inventory = await listing.json();
+  if (!inventory.success || !Array.isArray(inventory.result))
+    throw new Error("QA Worker settings returned HTTP 404; Worker inventory was invalid.");
+  const deployed = inventory.result.some((script) => script.id === worker);
+  throw new Error(
+    deployed
+      ? "QA Worker is listed, but its settings returned HTTP 404."
+      : "QA Worker is not deployed in the configured Cloudflare account.",
+  );
+}
 if (!response.ok)
   throw new Error(
     `Unable to inspect QA Worker settings (HTTP ${response.status}).`,
