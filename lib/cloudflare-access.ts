@@ -38,14 +38,14 @@ let cachedKeys:
     }
   | undefined;
 
-function decodeBase64Url(value: string): Uint8Array {
+function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized.padEnd(
     normalized.length + ((4 - (normalized.length % 4)) % 4),
     "=",
   );
   const decoded = atob(padded);
-  const bytes = new Uint8Array(decoded.length);
+  const bytes = new Uint8Array(new ArrayBuffer(decoded.length));
 
   for (let index = 0; index < decoded.length; index += 1) {
     bytes[index] = decoded.charCodeAt(index);
@@ -170,11 +170,15 @@ export function isCloudflareAdvisorAuthEnabled(): boolean {
   return process.env.ADVISOR_AUTH_MODE === "cloudflare_access";
 }
 
-function parseToken(token: string): {
-  header: AccessJwtHeader;
-  parts: string[];
-  payload: AccessJwtPayload;
-} {
+export async function verifyCloudflareAdvisorAccess(
+  requestHeaders: Headers,
+): Promise<AdvisorAccessUser> {
+  const token = requestHeaders.get("cf-access-jwt-assertion")?.trim();
+
+  if (!token) {
+    throw new Error("Cloudflare Access token is missing.");
+  }
+
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new Error("Cloudflare Access token is malformed.");
@@ -187,24 +191,8 @@ function parseToken(token: string): {
     throw new Error("Cloudflare Access token header is invalid.");
   }
 
-  return { header, parts, payload };
-}
-
-export async function verifyCloudflareAdvisorAccessToken(params: {
-  allowedEmails?: readonly string[];
-  audience: string;
-  nowSeconds?: number;
-  signingKey: AccessJwk;
-  teamDomain: string;
-  token: string;
-}): Promise<AdvisorAccessUser> {
-  const { audience, signingKey, teamDomain, token } = params;
-  const { header, parts, payload } = parseToken(token);
-
-  if (signingKey.kid !== header.kid) {
-    throw new Error("Cloudflare Access signing key does not match token.");
-  }
-
+  const { audience, teamDomain } = getAccessConfiguration();
+  const signingKey = await getSigningKey(teamDomain, header.kid);
   const publicKey = await crypto.subtle.importKey(
     "jwk",
     signingKey,
@@ -217,15 +205,15 @@ export async function verifyCloudflareAdvisorAccessToken(params: {
   const signatureValid = await crypto.subtle.verify(
     "RSASSA-PKCS1-v1_5",
     publicKey,
-    Uint8Array.from(signature).buffer,
-    Uint8Array.from(signingInput).buffer,
+    signature,
+    signingInput,
   );
 
   if (!signatureValid) {
     throw new Error("Cloudflare Access token signature is invalid.");
   }
 
-  const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now() / 1000);
 
   if (
     payload.iss !== teamDomain ||
@@ -240,13 +228,7 @@ export async function verifyCloudflareAdvisorAccessToken(params: {
   const email =
     typeof payload.email === "string" ? payload.email.toLowerCase() : "";
 
-  const emailAllowed = params.allowedEmails
-    ? params.allowedEmails.some(
-        (allowedEmail) => allowedEmail.trim().toLowerCase() === email,
-      )
-    : isAllowedAdvisorEmail(email);
-
-  if (!email || !emailAllowed) {
+  if (!email || !isAllowedAdvisorEmail(email)) {
     throw new Error("Cloudflare Access user is not an allowed advisor.");
   }
 
@@ -254,25 +236,4 @@ export async function verifyCloudflareAdvisorAccessToken(params: {
     email,
     id: typeof payload.sub === "string" ? payload.sub : email,
   };
-}
-
-export async function verifyCloudflareAdvisorAccess(
-  requestHeaders: Headers,
-): Promise<AdvisorAccessUser> {
-  const token = requestHeaders.get("cf-access-jwt-assertion")?.trim();
-
-  if (!token) {
-    throw new Error("Cloudflare Access token is missing.");
-  }
-
-  const { header } = parseToken(token);
-  const { audience, teamDomain } = getAccessConfiguration();
-  const signingKey = await getSigningKey(teamDomain, header.kid as string);
-
-  return verifyCloudflareAdvisorAccessToken({
-    audience,
-    signingKey,
-    teamDomain,
-    token,
-  });
 }

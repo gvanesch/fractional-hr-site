@@ -7,7 +7,7 @@
 // If no external dependencies are confirmed, this route should be removed in a future cleanup.
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { authenticateAdvisorRequest } from "@/lib/advisor-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   calculateDiagnosticResult,
   type DiagnosticAnswers,
@@ -86,6 +86,37 @@ type SuccessResponse = {
   };
   advisorBrief: AdvisorBrief | null;
 };
+
+async function requireAdvisorSessionForApi() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  console.log("[api/advisor-submission] auth debug", {
+    hasSession: Boolean(session),
+    email: session?.user.email ?? null,
+    error: error?.message ?? null,
+  });
+
+  if (error || !session) {
+    return null;
+  }
+
+  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = session.user.email?.toLowerCase() ?? "";
+
+  if (!userEmail || !allowedEmails.includes(userEmail)) {
+    return null;
+  }
+
+  return session.user;
+}
 
 async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
   const supabase = createSupabaseAdminClient();
@@ -331,7 +362,7 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const advisorUser = await authenticateAdvisorRequest(request);
+    const advisorUser = await requireAdvisorSessionForApi();
 
     if (!advisorUser) {
       return NextResponse.json<ErrorResponse>(
