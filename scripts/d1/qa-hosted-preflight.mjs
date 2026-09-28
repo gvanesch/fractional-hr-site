@@ -81,6 +81,9 @@ const checks = {
     bindings.has("RESEND_API_KEY") &&
     bindings.has("CONTACT_FROM_EMAIL") &&
     bindings.has("CONTACT_TO_EMAIL"),
+  scheduledSummaryConfigured:
+    bindings.has("CRON_SECRET") &&
+    bindings.has("DAILY_SUMMARY_RECIPIENT"),
 };
 // Output names and booleans only; this cannot leak secret values or respondent data.
 for (const [name, passed] of Object.entries(checks))
