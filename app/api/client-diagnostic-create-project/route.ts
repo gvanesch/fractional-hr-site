@@ -159,7 +159,6 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
     const resend = new Resend(getEnv("RESEND_API_KEY"));
 
     const body = (await request.json()) as Partial<CreateProjectRequest>;
@@ -399,6 +398,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const primary = participants[0];
 
+    const supabase = createSupabaseAdminClient();
     const { data: project, error: projectError } = await supabase
       .from("client_projects")
       .insert({

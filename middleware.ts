@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import { checkClientDiagnosticInviteRateLimit } from "@/lib/security/client-diagnostic-invite-rate-limit";
+import { isD1DiagnosticSubmissionsEnabled } from "@/lib/d1/database";
 import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
 import {
   isCloudflareAdvisorAuthEnabled,
@@ -41,7 +42,8 @@ function getInviteTokenFromPath(pathname: string): string | null {
 
 function isAdvisorApiPath(pathname: string): boolean {
   return (
-    pathname.startsWith("/api/advisor-") ||
+    (pathname.startsWith("/api/advisor-") &&
+      pathname !== "/api/advisor-daily-action-digest") ||
     pathname === "/api/prospect-update" ||
     pathname === "/api/client-diagnostic-create-project" ||
     pathname === "/api/client-diagnostic-project-status" ||
@@ -120,7 +122,7 @@ async function protectClientDiagnosticInvite(
 }
 
 function protectPublicDatabaseWrite(): NextResponse {
-  if (process.env.D1_DIAGNOSTIC_SUBMISSIONS_MODE === "d1") {
+  if (isD1DiagnosticSubmissionsEnabled()) {
     return NextResponse.next();
   }
 

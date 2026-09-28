@@ -109,7 +109,6 @@ export async function issueParticipantOtp(params: {
 }): Promise<IssueOtpResult> {
   const { participantId, projectId, inviteToken } = params;
 
-  const supabase = createSupabaseAdminClient();
 
   const otpCode = generateOtpCode();
   const expiresAt = new Date(
@@ -148,6 +147,7 @@ export async function issueParticipantOtp(params: {
     otpCode,
   });
 
+  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc(
     "issue_client_participant_otp_challenge",
     {
@@ -245,7 +245,6 @@ export async function verifyParticipantOtp(params: {
     otpCode,
   } = params;
 
-  const supabase = createSupabaseAdminClient();
 
   const otpHash = await hashOtp({
     challengeContext: challengeId,
@@ -283,6 +282,7 @@ export async function verifyParticipantOtp(params: {
     };
   }
 
+  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc(
     "verify_client_participant_otp_challenge",
     {
@@ -347,7 +347,6 @@ export async function validateParticipantVerifiedSession(params: {
     sessionToken,
   } = params;
 
-  const supabase = createSupabaseAdminClient();
   const sessionTokenHash = await hashSessionToken(sessionToken);
 
   if (isD1ClientDiagnosticSecurityEnabled()) {
@@ -359,6 +358,7 @@ export async function validateParticipantVerifiedSession(params: {
     });
   }
 
+  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc(
     "validate_client_participant_verified_session",
     {

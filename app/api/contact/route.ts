@@ -9,6 +9,8 @@ import {
   type D1ContactSubmissionFields,
 } from "../../../lib/d1/diagnostic-submissions";
 import {
+  getD1Database,
+  isD1CrmProspectsEnabled,
   isD1CrmProspectsShadowWriteEnabled,
   isD1DiagnosticSubmissionsEnabled,
   isD1DiagnosticSubmissionsShadowWriteEnabled,
@@ -651,6 +653,20 @@ async function upsertProspect(params: {
   body: ContactRequestBody;
 }) {
   const { submissionId, body } = params;
+
+  if (isD1CrmProspectsEnabled()) {
+    await getD1Database().prepare(`
+      INSERT INTO health_check_prospects
+        (prospect_id, submission_id, name, company, source, status, relationship, updated_at)
+      VALUES (?, ?, ?, ?, 'website', 'not_contacted', 'weak', ?)
+      ON CONFLICT(submission_id) DO UPDATE SET
+        name = excluded.name, company = excluded.company, source = excluded.source,
+        status = excluded.status, relationship = excluded.relationship,
+        updated_at = excluded.updated_at
+    `).bind(crypto.randomUUID(), submissionId, body.name, body.company || null,
+      new Date().toISOString()).run();
+    return;
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
