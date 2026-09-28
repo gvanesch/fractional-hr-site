@@ -1,0 +1,24 @@
+name: D1 hosted QA HTTP smoke
+
+on:
+  push:
+    branches:
+      - migration/d1
+    paths:
+      - scripts/d1/qa-hosted-http-smoke.mjs
+      - .github/workflows/d1-qa-hosted-http-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Check QA health and fail-closed boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/d1/qa-hosted-http-smoke.mjs
