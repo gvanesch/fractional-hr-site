@@ -25,7 +25,11 @@ if (!settings.success || !Array.isArray(settings.result?.bindings))
 const bindings = new Map(settings.result.bindings.map((entry) => [entry.name, entry]));
 if ((bindings.get("DB")?.database_id ?? bindings.get("DB")?.id) !== database)
   throw new Error("QA Worker D1 binding does not match vanesch-qa.");
-for (const name of ["CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT"]) {
+for (const name of [
+  "CLIENT_DIAGNOSTIC_OTP_SECRET",
+  "INVITE_RATE_LIMIT_SALT",
+  "ADVISOR_ALLOWED_EMAILS",
+]) {
   if (bindings.has(name)) {
     console.log(`${name}: already configured`);
     continue;
@@ -35,7 +39,9 @@ for (const name of ["CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT"]) {
     headers,
     body: JSON.stringify({
       name,
-      text: randomBytes(32).toString("base64url"),
+      text: name === "ADVISOR_ALLOWED_EMAILS"
+        ? "greg@vanesch.uk"
+        : randomBytes(32).toString("base64url"),
       type: "secret_text",
     }),
   });
