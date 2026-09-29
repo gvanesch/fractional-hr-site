@@ -1,5 +1,7 @@
 # Supabase to Cloudflare D1 migration
 
+Current gate record: [29 September QA and production readiness](D1_QA_READINESS_2026-09-29.md).
+
 ## Current continuation — 28 September 2026
 
 See [D1_RUNTIME_AUDIT.md](D1_RUNTIME_AUDIT.md) for the source audit, corrected runtime gaps, regression coverage and remaining QA/cutover gates. The phase descriptions and 25 September snapshot below are historical and do not supersede that record. QA-only D1/Access flags are prepared in source; this is not a deployed QA or production cutover.
