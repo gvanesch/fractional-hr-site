@@ -48,7 +48,8 @@
         "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "d1",
         "ADVISOR_AUTH_MODE": "cloudflare_access",
         "CONTACT_FROM_EMAIL": "qa@vanesch.uk",
-        "CONTACT_TO_EMAIL": "greg@vanesch.uk"
+        "CONTACT_TO_EMAIL": "greg@vanesch.uk",
+        "DAILY_SUMMARY_RECIPIENT": "greg@vanesch.uk"
       },
       "assets": {
         "directory": ".open-next/assets",

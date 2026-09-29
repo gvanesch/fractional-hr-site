@@ -33,6 +33,7 @@ if ((bindings.get("DB")?.database_id ?? bindings.get("DB")?.id) !== database)
 for (const name of [
   "CLIENT_DIAGNOSTIC_OTP_SECRET",
   "INVITE_RATE_LIMIT_SALT",
+  "CRON_SECRET",
   "ADVISOR_ALLOWED_EMAILS",
   "CLOUDFLARE_ACCESS_AUD",
   "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
