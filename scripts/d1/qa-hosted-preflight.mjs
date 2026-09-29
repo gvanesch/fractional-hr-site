@@ -88,4 +88,11 @@ const checks = {
 // Output names and booleans only; this cannot leak secret values or respondent data.
 for (const [name, passed] of Object.entries(checks))
   console.log(`${name}: ${passed ? "ready" : "missing_or_mismatched"}`);
-if (Object.values(checks).some((value) => !value)) process.exitCode = 1;
+const requiredChecks = process.argv.includes("--deployment")
+  ? Object.entries(checks).filter(
+      ([name]) =>
+        name !== "emailTransportConfigured" &&
+        name !== "scheduledSummaryConfigured",
+    )
+  : Object.entries(checks);
+if (requiredChecks.some(([, passed]) => !passed)) process.exitCode = 1;
