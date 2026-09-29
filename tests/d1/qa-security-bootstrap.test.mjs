@@ -53,10 +53,17 @@ test("QA security bootstrap rejects wrong D1 and creates only missing bindings",
       };
     };
     await import(`${script.href}?missing-one`);
-    assert.deepEqual(created.map((item) => item.name), ["INVITE_RATE_LIMIT_SALT", "ADVISOR_ALLOWED_EMAILS"]);
+    assert.deepEqual(created.map((item) => item.name), [
+      "INVITE_RATE_LIMIT_SALT",
+      "ADVISOR_ALLOWED_EMAILS",
+      "CLOUDFLARE_ACCESS_AUD",
+      "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
+    ]);
     assert.ok(created.every((item) => item.type === "secret_text"));
     assert.ok(created[0].text.length >= 40);
     assert.equal(created[1].text, "greg@vanesch.uk");
+    assert.match(created[2].text, /^[a-f0-9]{64}$/);
+    assert.equal(created[3].text, "https://gregvanesch.cloudflareaccess.com");
   } finally {
     globalThis.fetch = originalFetch;
     console.log = originalLog;
