@@ -24,9 +24,15 @@ for (const [label, path, headers] of [
   ["advisor API with invalid JWT", "/api/client-diagnostic-projects", { "Cf-Access-Jwt-Assertion": "invalid" }],
 ]) {
   const response = await request(path, headers);
-  if (response.status !== 403)
-    throw new Error(`${label}: expected HTTP 403, got ${response.status}.`);
-  console.log(`${label}: rejected`);
+  const location = response.headers.get("location");
+  const redirect = location ? new URL(location, origin) : null;
+  if (
+    ![302, 303, 307].includes(response.status) ||
+    !redirect?.pathname.startsWith("/cdn-cgi/access/") ||
+    ![new URL(origin).hostname, "gregvanesch.cloudflareaccess.com"].includes(redirect.hostname)
+  )
+    throw new Error(`${label}: expected Access sign-in redirect, got HTTP ${response.status} at ${redirect?.hostname ?? "none"}${redirect?.pathname ?? ""}.`);
+  console.log(`${label}: Access sign-in required`);
 }
 
 const invitation = await request("/client-diagnostic/respond/invalid-qa-smoke-token");
