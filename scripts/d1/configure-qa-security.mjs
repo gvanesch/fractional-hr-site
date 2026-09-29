@@ -5,6 +5,11 @@ const account = process.env.CLOUDFLARE_ACCOUNT_ID;
 const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
 const worker = "fractional-hr-site-qa";
 const database = "b25d59da-5f93-4301-9996-7be0c9708789";
+const qaAccess = {
+  CLOUDFLARE_ACCESS_AUD:
+    "19bef4d23cdda972d6c46c5b3bf85f1758b9efdbf87758cc798ffbcd766af4e9",
+  CLOUDFLARE_ACCESS_TEAM_DOMAIN: "https://gregvanesch.cloudflareaccess.com",
+};
 if (
   account !== "73221f18acc676e4992c89fcbf2b2a8f" ||
   process.env.GITHUB_REF !== "refs/heads/migration/d1" ||
@@ -29,6 +34,8 @@ for (const name of [
   "CLIENT_DIAGNOSTIC_OTP_SECRET",
   "INVITE_RATE_LIMIT_SALT",
   "ADVISOR_ALLOWED_EMAILS",
+  "CLOUDFLARE_ACCESS_AUD",
+  "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
 ]) {
   if (bindings.has(name)) {
     console.log(`${name}: already configured`);
@@ -41,7 +48,7 @@ for (const name of [
       name,
       text: name === "ADVISOR_ALLOWED_EMAILS"
         ? "greg@vanesch.uk"
-        : randomBytes(32).toString("base64url"),
+        : qaAccess[name] ?? randomBytes(32).toString("base64url"),
       type: "secret_text",
     }),
   });
