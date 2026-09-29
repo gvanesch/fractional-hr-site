@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/d1-qa-deploy.yml
       - next.config.ts
+      - wrangler.jsonc
       - scripts/d1/prepare-qa-deploy.mjs
 
 permissions:
