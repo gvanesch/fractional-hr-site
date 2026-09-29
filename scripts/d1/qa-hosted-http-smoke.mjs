@@ -36,6 +36,9 @@ for (const [label, path, headers] of [
 }
 
 const invitation = await request("/client-diagnostic/respond/invalid-qa-smoke-token");
-if (invitation.status < 400 || invitation.status >= 500 && invitation.status !== 503)
-  throw new Error(`Invalid invitation did not fail closed: HTTP ${invitation.status}.`);
+if (
+  invitation.status !== 200 ||
+  !(await invitation.text()).includes("This diagnostic link is no longer active")
+)
+  throw new Error(`Invalid invitation did not show the inactive-link page: HTTP ${invitation.status}.`);
 console.log("Invalid invitation: rejected");
