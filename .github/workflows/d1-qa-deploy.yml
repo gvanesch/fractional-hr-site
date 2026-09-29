@@ -6,6 +6,7 @@ on:
       - migration/d1
     paths:
       - .github/workflows/d1-qa-deploy.yml
+      - 'app/advisor*/route.ts'
       - scripts/d1/prepare-qa-deploy.mjs
 
 permissions:
