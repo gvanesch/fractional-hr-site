@@ -46,7 +46,9 @@
         "D1_CRM_PROSPECTS_MODE": "d1",
         "D1_CLIENT_DIAGNOSTIC_MODE": "d1",
         "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "d1",
-        "ADVISOR_AUTH_MODE": "cloudflare_access"
+        "ADVISOR_AUTH_MODE": "cloudflare_access",
+        "CONTACT_FROM_EMAIL": "qa@vanesch.uk",
+        "CONTACT_TO_EMAIL": "greg@vanesch.uk"
       },
       "assets": {
         "directory": ".open-next/assets",
