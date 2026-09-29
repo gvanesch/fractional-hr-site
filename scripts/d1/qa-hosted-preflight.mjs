@@ -85,6 +85,14 @@ const checks = {
     bindings.has("CRON_SECRET") &&
     bindings.has("DAILY_SUMMARY_RECIPIENT"),
 };
+// Print binding names and presence only; never inspect or print secret values.
+for (const name of [
+  "RESEND_API_KEY",
+  "CONTACT_FROM_EMAIL",
+  "CONTACT_TO_EMAIL",
+  "CRON_SECRET",
+  "DAILY_SUMMARY_RECIPIENT",
+]) console.log(`${name}: ${bindings.has(name) ? "configured" : "missing"}`);
 // Output names and booleans only; this cannot leak secret values or respondent data.
 for (const [name, passed] of Object.entries(checks))
   console.log(`${name}: ${passed ? "ready" : "missing_or_mismatched"}`);
