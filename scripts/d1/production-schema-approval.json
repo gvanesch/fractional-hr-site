@@ -1,0 +1,12 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-schema-0004-0005-only",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "confirmedAt": "2026-10-02T11:17:11.000Z",
+  "reviewedCommit": "501fa5d1634977c7f178646512f3063fb553764e",
+  "sqlHashes": {
+    "0004_create_client_diagnostic_core.sql": "4fc8ace3c87aa5bf6a05fc7a8443412d713bdacbfa22a4607284cf54ad5bc029",
+    "0005_create_client_diagnostic_security.sql": "d956163a533cd947aee1477532749fc00ef1c0d4fb4a322bd2c73579d706027a"
+  }
+}
