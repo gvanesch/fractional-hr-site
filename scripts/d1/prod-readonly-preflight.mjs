@@ -79,11 +79,13 @@ const workerSettings = await workerSettingsResponse.json();
 if (!workerSettings.success || !Array.isArray(workerSettings.result?.bindings))
   throw new Error("Invalid production Worker settings result.");
 const prodBindings = new Map(workerSettings.result.bindings.map(row => [row.name, row]));
-if ((prodBindings.get("DB")?.database_id ?? prodBindings.get("DB")?.id) !== expectedDb)
+const deployedDb = prodBindings.get("DB")?.database_id ?? prodBindings.get("DB")?.id;
+console.log(`Production Worker DB binding: ${deployedDb ? deployedDb === expectedDb ? "matches vanesch-prod" : "unexpected database" : "absent; configure before cutover"}`);
+if (deployedDb && deployedDb !== expectedDb)
   throw new Error("Production Worker DB binding differs; no writes performed.");
 for (const name of ["SYSTEM_EVENTS", "DIAGNOSTIC_SUBMISSIONS", "CRM_PROSPECTS", "CLIENT_DIAGNOSTIC", "CLIENT_DIAGNOSTIC_SECURITY"]) {
   const mode = prodBindings.get(`D1_${name}_MODE`)?.text ?? "off";
   if (mode !== "off") throw new Error(`Production D1_${name}_MODE is not off; review before proceeding.`);
   console.log(`Production D1_${name}_MODE: off`);
 }
-console.log("Production Worker target verified; all D1 flags remain off. Settings were read only.");
+console.log("Production Worker inspected; all D1 flags remain off. Settings were read only.");
