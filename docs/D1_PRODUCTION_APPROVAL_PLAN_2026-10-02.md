@@ -1,6 +1,10 @@
 # Production approval plan — 2 October 2026
 
-This is a preparation record, not approval to run commands. Production remains on Supabase. No production schema, Worker, Access policy, scheduler, or feature flag has been changed by this continuation.
+Greg explicitly approved schema-only migrations 0004/0005 on 2 October at 12:17 BST. [The guarded production job succeeded](https://github.com/gvanesch/fractional-hr-site/actions/runs/37000420302), recording all five applied migrations. Production remains on Supabase. Only the additive D1 schema was changed; no Worker, Access policy, scheduler, feature flag, or data import changed.
+
+Pre-migration recovery bookmark: `00000010-00000000-000050f8-edb87cbfb989b87cc3a21d3aecc8faa5` (recorded at 11:20:42 UTC). This is a recovery identifier, not a credential. Restoring remains a separately approved destructive action.
+
+Post-application read-only schema/index/foreign-key and full-row checks are being run. The activation commit is `a5553c0f37e91fb83897392a92430972e1025dbf`. Approval B has not been granted.
 
 ## Evidence required before requesting approval
 
@@ -23,7 +27,7 @@ Review exact SQL in:
 
 0004 creates client projects, participants, responses, dimension scores, Fact Packs, functional signal requests and service-access context, with constraints and indexes. 0005 adds invite rate limits, OTP challenges and verified sessions. Both have passed QA migration/application tests. They add schema; they do not enable production D1 application paths.
 
-The reviewed executor is [`scripts/d1/apply-approved-production-schema.mjs`](../scripts/d1/apply-approved-production-schema.mjs), with the inert [`d1-prod-approved-schema.yml`](../.github/workflows/d1-prod-approved-schema.yml) workflow. No `production-schema-approval.json` exists and no production mutation job has run. Only after Greg explicitly approves scope A will a timestamped marker with the exact DB/account and both reviewed SQL hashes be committed. The executor rejects stale approval, changed SQL, wrong branch/account/DB, mismatched source hashes and a missing recovery bookmark. It copies only 0004/0005 to a private migration directory before the explicit remote apply, so future files cannot slip into this approval.
+The reviewed executor is [`scripts/d1/apply-approved-production-schema.mjs`](../scripts/d1/apply-approved-production-schema.mjs), with the inert [`d1-prod-approved-schema.yml`](../.github/workflows/d1-prod-approved-schema.yml) workflow. The timestamped `production-schema-approval.json` marker records Greg's granted approval for scope A and the exact DB/account and both reviewed SQL hashes. The production job has applied only those files. The executor rejects stale approval, changed SQL, wrong branch/account/DB, mismatched source hashes and a missing recovery bookmark. It copies only 0004/0005 to a private migration directory before the explicit remote apply, so future files cannot slip into this approval.
 
 Before execution: re-fetch the reviewed branch head, rerun read-only source/target reconciliation, confirm migration history is exactly 0001–0003, inspect pending migration list, and take/verify a current D1 recovery point. Apply only 0004 and 0005 to the explicit remote production DB through a narrowly scoped approved job. Never rely on Wrangler's local default. Capture applied migration names and schema checks, not row data or secret values.
 

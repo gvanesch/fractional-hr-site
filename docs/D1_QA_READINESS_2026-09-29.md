@@ -7,11 +7,11 @@
 - Shared-email Fact Pack fix `4dd1821`: create/edit checks permit one scored assignment plus a Fact Pack, retain distinct participant IDs/invites and reject duplicate assignments. D1 and Supabase fallback regression tests passed.
 - [QA scheduler dry runs passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/36995773332). Missing/wrong bearer rejected; authorized advisor digest and client diagnostic summary generate without email. The new advisor scheduler alias is outside the interactive Access wildcard and still uses the same cron-secret check. No QA recurring schedule enabled; QA cron secret rotated afterwards.
 - [Production read-only row reconciliation passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/36996025142): complete normalized rows in all six existing D1 tables match the fresh Supabase snapshot across two target reads. A repeat source read was unchanged. Counts: system events 33, diagnostic submissions 3, advisor prospects 4, Health Check prospects 1, advisor activity 31, Health Check activity 0.
-- Production migrations remain 0001–0003. New source client core tables are empty; two rate-limit rows are ephemeral. Production Worker DB binding is absent and all D1 flags are off or absent (default off). No production mutation was performed.
+- Greg approved schema-only production migrations 0004/0005; [the application job passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/37000420302) and migration history is now 0001–0005. New source client core tables are empty; two rate-limit rows are ephemeral. Production Worker DB binding is absent and all D1 flags are off or absent (default off). Only the approved additive schema was changed; no production deployment, flags, Access policy or data import changed.
 
 ## Remaining approvals and checks
 
-1. Explicit approval for additive production migrations 0004/0005 only, using the exact SQL, guarded executor and recovery steps in [the production approval plan](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md). The activation marker does not exist.
+1. Finish post-application read-only schema, index, foreign-key and full-row checks for the approved production schema. See [the production approval record](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md).
 2. Production Access/bindings/secrets, further targeted auth/lifecycle checks and coordinated deployment/cutover plan. Adding the missing production DB binding, changing scheduler URL, merging into main or enabling flags are not covered by schema-only approval.
 3. Fresh source reconciliation immediately before each production operation. Keep Supabase available during cutover and monitored soak. Reconcile any D1-only writes before rollback. Retirement requires separate approval.
 

@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/d1/prod-readonly-preflight.mjs
       - scripts/d1/production-source-manifest.json
+      - scripts/d1/production-schema-manifest.json
 
 permissions:
   contents: read
@@ -26,7 +27,7 @@ jobs:
         with:
           node-version: 24
       - id: inspect
-        run: node scripts/d1/prod-readonly-preflight.mjs
+        run: node scripts/d1/prod-readonly-preflight.mjs --after-schema
       - name: Publish sanitized result and run link
         if: always()
         env:

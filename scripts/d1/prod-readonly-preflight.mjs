@@ -47,8 +47,13 @@ for (const name of pendingTables) console.log(`${name}: ${names.has(name) ? "pre
 if (!names.has("d1_migrations")) throw new Error("Production migration history is unavailable.");
 const migrations = await select("SELECT name FROM d1_migrations ORDER BY name");
 for (const row of migrations) console.log(`applied: ${row.name}`);
-if (migrations.some((row) => /000[45]_/.test(row.name)))
-  throw new Error("Production migrations 0004 or 0005 were already applied; review state.");
+const afterSchema = process.argv.includes("--after-schema");
+const expectedMigrations = [
+  "0001_create_system_events.sql", "0002_create_diagnostic_submissions.sql", "0003_create_crm_prospects.sql",
+  ...(afterSchema ? ["0004_create_client_diagnostic_core.sql", "0005_create_client_diagnostic_security.sql"] : []),
+];
+if (JSON.stringify(migrations.map(row => row.name)) !== JSON.stringify(expectedMigrations))
+  throw new Error("Production migration history differs from the requested before/after schema checkpoint.");
 
 // Compare complete rows in memory; print only aggregate equality, never records.
 const manifest = JSON.parse(await readFile(new URL("./production-source-manifest.json", import.meta.url)));
@@ -99,3 +104,25 @@ const bookmarkResult = await bookmarkResponse.json();
 if (!bookmarkResult.success || typeof bookmarkResult.result?.bookmark !== "string" || !bookmarkResult.result.bookmark)
   throw new Error("Recovery bookmark is unavailable; schema approval executor must not run.");
 console.log("Production Time Travel recovery bookmark read verified. No restore performed.");
+
+if (afterSchema) {
+  const schema = JSON.parse(await readFile(new URL("./production-schema-manifest.json", import.meta.url)));
+  const indexes = new Set((await select("SELECT name FROM sqlite_master WHERE type='index'")).map(row => row.name));
+  for (const [name, expected] of Object.entries(schema.tables)) {
+    if (!names.has(name)) throw new Error(`New production table missing: ${name}.`);
+    const columns = await select(`PRAGMA table_info("${name}")`);
+    if (JSON.stringify(columns) !== JSON.stringify(expected.columns))
+      throw new Error(`New table column definition differs: ${name}.`);
+    const foreignKeys = await select(`PRAGMA foreign_key_list("${name}")`);
+    if (JSON.stringify(foreignKeys) !== JSON.stringify(expected.foreignKeys))
+      throw new Error(`New table foreign keys differ: ${name}.`);
+    if (expected.indexes.some(index => !indexes.has(index)))
+      throw new Error(`Expected new table index missing: ${name}.`);
+    const count = (await select(`SELECT count(*) AS row_count FROM "${name}"`))[0]?.row_count;
+    if (count !== 0) throw new Error(`New production table contains rows; review before proceeding: ${name}.`);
+    console.log(`${name}: schema/indexes/foreign keys verified; empty`);
+  }
+  const violations = await select("PRAGMA foreign_key_check");
+  if (violations.length !== 0) throw new Error("Production foreign-key consistency check failed.");
+  console.log("Post-migration schema and foreign-key consistency verified. No writes performed.");
+}
