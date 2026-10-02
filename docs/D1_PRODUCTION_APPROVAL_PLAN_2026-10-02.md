@@ -4,7 +4,7 @@ Greg explicitly approved schema-only migrations 0004/0005 on 2 October at 12:17 
 
 Pre-migration recovery bookmark: `00000010-00000000-000050f8-edb87cbfb989b87cc3a21d3aecc8faa5` (recorded at 11:20:42 UTC). This is a recovery identifier, not a credential. Restoring remains a separately approved destructive action.
 
-Post-application read-only schema/index/foreign-key and full-row checks are being run. The activation commit is `a5553c0f37e91fb83897392a92430972e1025dbf`. Approval B has not been granted.
+[Post-application read-only checks passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/37000809776): all ten new tables match the reviewed column, index and foreign-key definitions and are empty; the foreign-key consistency check is clean; all six existing table hashes still match the fresh source snapshot across two reads. Production Worker DB binding remains absent and all five flags remain off. A repeat Supabase snapshot after application was unchanged. The activation commit is `a5553c0f37e91fb83897392a92430972e1025dbf`. Approval B has not been granted.
 
 ## Evidence required before requesting approval
 

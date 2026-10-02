@@ -9,9 +9,9 @@
 - [Production read-only row reconciliation passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/36996025142): complete normalized rows in all six existing D1 tables match the fresh Supabase snapshot across two target reads. A repeat source read was unchanged. Counts: system events 33, diagnostic submissions 3, advisor prospects 4, Health Check prospects 1, advisor activity 31, Health Check activity 0.
 - Greg approved schema-only production migrations 0004/0005; [the application job passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/37000420302) and migration history is now 0001–0005. New source client core tables are empty; two rate-limit rows are ephemeral. Production Worker DB binding is absent and all D1 flags are off or absent (default off). Only the approved additive schema was changed; no production deployment, flags, Access policy or data import changed.
 
-## Remaining approvals and checks
+## Schema completion and remaining cutover gates
 
-1. Finish post-application read-only schema, index, foreign-key and full-row checks for the approved production schema. See [the production approval record](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md).
+1. Schema phase is complete: [post-application checks passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/37000809776), including all ten new empty tables, columns, indexes, foreign keys, consistency and existing full-row hash equality. See [the production approval record](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md).
 2. Production Access/bindings/secrets, further targeted auth/lifecycle checks and coordinated deployment/cutover plan. Adding the missing production DB binding, changing scheduler URL, merging into main or enabling flags are not covered by schema-only approval.
 3. Fresh source reconciliation immediately before each production operation. Keep Supabase available during cutover and monitored soak. Reconcile any D1-only writes before rollback. Retirement requires separate approval.
 
