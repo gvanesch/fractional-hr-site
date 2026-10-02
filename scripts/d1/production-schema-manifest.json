@@ -1,0 +1,1315 @@
+{
+  "tables": {
+    "client_projects": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "company_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "primary_contact_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "primary_contact_email",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "project_status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "notes",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "project_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'draft'",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "segmentation_schema",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "billing_contact_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "billing_contact_email",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "company_website",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "purchase_order_number",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "msa_status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "dpa_status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        "sqlite_autoindex_client_projects_1",
+        "client_projects_company_name_idx",
+        "client_projects_primary_contact_email_idx"
+      ]
+    },
+    "client_participants": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "questionnaire_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "role_label",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "invite_token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "participant_status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'invited'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "started_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "completed_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'invited'",
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "invited_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "segmentation_values",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "invite_expires_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "invite_revoked_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "invite_last_used_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 18,
+          "name": "withdraw_reason",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 19,
+          "name": "withdraw_note",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 20,
+          "name": "withdrawn_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 21,
+          "name": "reinstate_reason",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 22,
+          "name": "reinstate_note",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 23,
+          "name": "reinstated_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_participants_1",
+        "sqlite_autoindex_client_participants_2",
+        "client_participants_project_id_idx",
+        "client_participants_questionnaire_type_idx",
+        "client_participants_status_idx"
+      ]
+    },
+    "client_responses": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "response_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "questionnaire_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "dimension_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "question_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "answer_value",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "comment_text",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "responses",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "submitted_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_participants",
+          "from": "participant_id",
+          "to": "participant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_responses_1",
+        "sqlite_autoindex_client_responses_2",
+        "client_responses_project_id_idx",
+        "client_responses_participant_id_idx",
+        "client_responses_questionnaire_type_idx",
+        "client_responses_dimension_key_idx",
+        "client_responses_question_key_idx"
+      ]
+    },
+    "client_dimension_scores": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "score_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "questionnaire_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "dimension_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "average_score",
+          "type": "REAL",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "response_count",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "score",
+          "type": "REAL",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_dimension_scores_1",
+        "sqlite_autoindex_client_dimension_scores_2",
+        "client_dimension_scores_project_id_idx",
+        "client_dimension_scores_questionnaire_type_idx",
+        "client_dimension_scores_dimension_key_idx",
+        "client_dimension_scores_participant_idx"
+      ]
+    },
+    "client_fact_packs": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "fact_pack_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "invite_token",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "response_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{}'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'in_progress'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "submitted_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_participants",
+          "from": "participant_id",
+          "to": "participant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_fact_packs_1",
+        "sqlite_autoindex_client_fact_packs_2",
+        "client_fact_packs_project_id_idx"
+      ]
+    },
+    "client_functional_signal_requests": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "signal_request_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "module_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "module_label",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "recipient_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "recipient_email",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "invite_token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "signal_status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'invited'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "response_data",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "invited_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "invite_expires_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "invite_last_used_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "started_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "submitted_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "completed_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "archived_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "archive_reason",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "archive_note",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 18,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 19,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_functional_signal_requests_1",
+        "sqlite_autoindex_client_functional_signal_requests_2",
+        "client_functional_signal_requests_project_id_idx",
+        "client_functional_signal_requests_status_idx"
+      ]
+    },
+    "client_service_access_context": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "context_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "questionnaire_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "routes_used",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "usual_route",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "usual_route_effectiveness",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "intended_primary_route",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "specific_route_detail",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "intended_access_model",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_participants",
+          "from": "participant_id",
+          "to": "participant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_service_access_context_1",
+        "sqlite_autoindex_client_service_access_context_2",
+        "client_service_access_context_project_idx"
+      ]
+    },
+    "client_diagnostic_invite_rate_limits": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "ip_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "window_started_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "failed_attempts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "blocked_until",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        "sqlite_autoindex_client_diagnostic_invite_rate_limits_1"
+      ]
+    },
+    "client_participant_otp_challenges": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "challenge_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "invite_token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "otp_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "expires_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "failed_attempts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "max_attempts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "5",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "send_count",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "last_sent_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "consumed_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "invalidated_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "client_participants",
+          "from": "participant_id",
+          "to": "participant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_participant_otp_challenges_1",
+        "client_participant_otp_challenges_expiry_idx",
+        "client_participant_otp_challenges_participant_idx"
+      ]
+    },
+    "client_participant_verified_sessions": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "participant_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "invite_token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "session_token_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "verification_method",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'email_otp'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "verified_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "expires_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "last_used_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "revoked_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "client_projects",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "client_participants",
+          "from": "participant_id",
+          "to": "participant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        "sqlite_autoindex_client_participant_verified_sessions_1",
+        "sqlite_autoindex_client_participant_verified_sessions_2",
+        "client_participant_verified_sessions_expiry_idx",
+        "client_participant_verified_sessions_participant_idx"
+      ]
+    }
+  }
+}

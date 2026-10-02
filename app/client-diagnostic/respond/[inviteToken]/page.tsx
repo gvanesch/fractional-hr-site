@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getD1ParticipantInvite } from "@/lib/d1/client-diagnostic";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 import {
   getVerifiedSessionCookieName,
   validateParticipantVerifiedSession,
@@ -185,63 +187,82 @@ export default async function ClientDiagnosticRespondPage({
     return <LinkNoLongerActivePage />;
   }
 
-  const supabase = createSupabaseAdminClient();
+  let resolvedParticipant: ResolvedParticipantInvite | null = null;
 
-  const { data, error } = await supabase
-    .from("client_participants")
-    .select(
-      `
-        participant_id,
-        project_id,
-        questionnaire_type,
-        participant_status,
-        completed_at,
-        invite_expires_at,
-        invite_revoked_at,
-        client_projects!client_participants_project_fk!inner(project_status)
-      `,
-    )
-    .eq("invite_token", inviteToken)
-    .maybeSingle();
+  if (isD1ClientDiagnosticEnabled()) {
+    const participant = await getD1ParticipantInvite(inviteToken);
 
-  if (error || !data) {
+    if (
+      participant &&
+      isUuid(participant.participantId) &&
+      isUuid(participant.projectId) &&
+      isProjectQuestionnaireType(participant.questionnaireType)
+    ) {
+      resolvedParticipant = {
+        participant_id: participant.participantId,
+        project_id: participant.projectId,
+        questionnaire_type: participant.questionnaireType,
+        participant_status: participant.participantStatus,
+        completed_at: participant.completedAt,
+        invite_expires_at: participant.inviteExpiresAt,
+        invite_revoked_at: participant.inviteRevokedAt,
+        project_status: participant.projectStatus,
+      };
+    }
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("client_participants")
+      .select(
+        `
+          participant_id,
+          project_id,
+          questionnaire_type,
+          participant_status,
+          completed_at,
+          invite_expires_at,
+          invite_revoked_at,
+          client_projects!client_participants_project_fk!inner(project_status)
+        `,
+      )
+      .eq("invite_token", inviteToken)
+      .maybeSingle();
+
+    if (!error && data) {
+      const participant = data as ParticipantInviteLookupRow;
+      const projectStatus = getProjectStatus(participant.client_projects);
+
+      if (
+        isUuid(participant.participant_id) &&
+        isUuid(participant.project_id) &&
+        isProjectQuestionnaireType(participant.questionnaire_type) &&
+        projectStatus
+      ) {
+        resolvedParticipant = {
+          participant_id: participant.participant_id,
+          project_id: participant.project_id,
+          questionnaire_type: participant.questionnaire_type,
+          participant_status: participant.participant_status,
+          completed_at: participant.completed_at,
+          invite_expires_at: participant.invite_expires_at,
+          invite_revoked_at: participant.invite_revoked_at,
+          project_status: projectStatus,
+        };
+      }
+    }
+  }
+
+  if (!resolvedParticipant) {
     console.info(
       JSON.stringify({
         event: "client_diagnostic_respond_inactive_link",
         reason: "participant_lookup_failed",
         inviteToken,
-        error: error?.message ?? null,
       }),
     );
 
     return <LinkNoLongerActivePage />;
   }
-
-  const participant = data as ParticipantInviteLookupRow;
-  const projectStatus = getProjectStatus(participant.client_projects);
-
-  if (!isUuid(participant.participant_id) || !isUuid(participant.project_id)) {
-    return <LinkNoLongerActivePage />;
-  }
-
-  if (!isProjectQuestionnaireType(participant.questionnaire_type)) {
-    return <LinkNoLongerActivePage />;
-  }
-
-  if (!projectStatus) {
-    return <LinkNoLongerActivePage />;
-  }
-
-  const resolvedParticipant: ResolvedParticipantInvite = {
-    participant_id: participant.participant_id,
-    project_id: participant.project_id,
-    questionnaire_type: participant.questionnaire_type,
-    participant_status: participant.participant_status,
-    completed_at: participant.completed_at,
-    invite_expires_at: participant.invite_expires_at,
-    invite_revoked_at: participant.invite_revoked_at,
-    project_status: projectStatus,
-  };
 
   if (resolvedParticipant.project_status !== "active") {
     return <LinkNoLongerActivePage />;
