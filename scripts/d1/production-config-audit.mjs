@@ -19,7 +19,11 @@ async function get(path, optional = false) {
 const settings = (await get("workers/scripts/fractional-hr-site/settings")).result;
 if (!Array.isArray(settings?.bindings)) throw new Error("Invalid Worker settings response.");
 const bindings = new Map(settings.bindings.map(binding => [binding.name, binding]));
-for (const name of ["ASSETS", "WORKER_SELF_REFERENCE", "DB", "RESEND_API_KEY", "OTP_SECRET",
+const secretNames = (await get("workers/scripts/fractional-hr-site/secrets")).result;
+if (!Array.isArray(secretNames)) throw new Error("Invalid secret-name inventory response.");
+for (const secret of secretNames) if (!bindings.has(secret.name)) bindings.set(secret.name, { name: secret.name, type: "secret_text" });
+
+for (const name of ["ASSETS", "WORKER_SELF_REFERENCE", "DB", "RESEND_API_KEY", "CLIENT_DIAGNOSTIC_OTP_SECRET",
   "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "ADVISOR_ALLOWED_EMAILS", "CLOUDFLARE_ACCESS_AUD",
   "CLOUDFLARE_ACCESS_TEAM_DOMAIN", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"])
@@ -35,6 +39,8 @@ console.log("All five production D1 flags are off.");
 console.log(`Source URL verified: ${bindings.get("NEXT_PUBLIC_SUPABASE_URL")?.text === "https://qxddddhhpfrrxbaunwfw.supabase.co"}`);
 console.log(`Canonical site URL verified: ${bindings.get("NEXT_PUBLIC_SITE_URL")?.text?.replace(/\/$/, "") === "https://vanesch.uk"}`);
 console.log(`Production Access auth enabled: ${bindings.get("ADVISOR_AUTH_MODE")?.text === "cloudflare_access"}`);
+for (const name of ["RESEND_API_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "DAILY_SUMMARY_URL"])
+  console.log(`GitHub release credential/config ${name}: ${Boolean(process.env[name]?.trim()) ? "configured" : "missing"}`);
 console.log(`GitHub scheduler credential configured: ${Boolean(process.env.DAILY_SUMMARY_ENDPOINT_SECRET?.trim())}`);
 const cron = bindings.get("CRON_SECRET");
 console.log(`Worker cron credential type: ${cron?.type === "secret_text" ? "secret; equality cannot be read" : cron ? "non-secret binding; review storage" : "missing"}`);
