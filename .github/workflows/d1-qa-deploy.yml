@@ -6,6 +6,9 @@ on:
       - migration/d1
     paths:
       - .github/workflows/d1-qa-deploy.yml
+      - app/api/advisor-project-participants/**
+      - app/api/advisor-update-participant/**
+      - lib/client-diagnostic/participant-email-uniqueness.ts
       - next.config.ts
       - wrangler.jsonc
       - scripts/d1/prepare-qa-deploy.mjs

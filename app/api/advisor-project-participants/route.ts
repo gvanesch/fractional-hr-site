@@ -1,3 +1,4 @@
+import { hasParticipantEmailConflict } from "@/lib/client-diagnostic/participant-email-uniqueness";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
@@ -181,7 +182,12 @@ export async function POST(request: Request): Promise<Response> {
         }
       }
 
-      if ((await findD1ParticipantsByEmail(projectId, email)).length > 0) {
+      if (
+        hasParticipantEmailConflict(
+          questionnaireType,
+          await findD1ParticipantsByEmail(projectId, email),
+        )
+      ) {
         return NextResponse.json(
           { success: false, error: "A participant with this email already exists." },
           { status: 409 },
@@ -295,10 +301,9 @@ export async function POST(request: Request): Promise<Response> {
 
     const { data: existing, error: existingError } = await supabase
       .from("client_participants")
-      .select("participant_id")
+      .select("participant_id, questionnaire_type")
       .eq("project_id", projectId)
-      .eq("email", email)
-      .maybeSingle();
+      .eq("email", email);
 
     if (existingError) {
       return NextResponse.json(
@@ -310,7 +315,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (existing) {
+    if (hasParticipantEmailConflict(questionnaireType, existing ?? [])) {
       return NextResponse.json(
         {
           success: false,

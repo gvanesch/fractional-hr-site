@@ -82,7 +82,7 @@ function harness() {
   };
   const overrides = {
     "@opennextjs/cloudflare": { getCloudflareContext: () => ({ env }) },
-    "@/lib/supabase/admin": { createSupabaseAdminClient: denied },
+    "@/lib/supabase/admin": { createSupabaseAdminClient: () => state.supabaseClient ?? denied() },
     "@/lib/supabase/server": { createSupabaseServerClient: denied },
     "@/lib/advisor-auth": {
       requireAdvisorUser: async () =>
@@ -547,6 +547,7 @@ test("D1 project creation works without Supabase and records invite delivery", a
       projectName: "Synthetic project",
       companyName: "Synthetic Ltd",
       segmentationSchema: schema,
+      factPackRecipient: { name: "Test", email: "test@example.invalid" },
       participants: [
         {
           name: "Test",
@@ -563,9 +564,9 @@ test("D1 project creation works without Supabase and records invite delivery", a
     );
     assert.equal(
       h.sqlite.prepare("SELECT count(*) n FROM client_participants").get().n,
-      1,
+      2,
     );
-    assert.equal(h.state.messages.length, 1);
+    assert.equal(h.state.messages.length, 2);
     assert.equal(h.state.supabaseCalls, 0);
   } finally {
     h.sqlite.close();
@@ -611,6 +612,96 @@ test("Access middleware fails closed while cron retains its own authorization", 
         }),
       );
     assert.equal(probe.status, 200, JSON.stringify(await probe.json()));
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Fact Pack email sharing works in either order without allowing duplicate respondents", async () => {
+  const h = harness();
+  try {
+    const schema = h.load("lib/client-diagnostic/segmentation.ts").buildDefaultSegmentationSchema();
+    const segmentationValues = Object.fromEntries(schema.fields.map(field => [field.fieldKey, field.options[0].optionKey]));
+    for (const scoredType of ["hr", "manager", "leadership"]) {
+      for (const factPackFirst of [false, true]) {
+        const projectId = h.project();
+        h.sqlite.prepare("UPDATE client_projects SET segmentation_schema = ? WHERE project_id = ?").run(JSON.stringify(schema), projectId);
+        const input = { projectId, name: "Synthetic", roleLabel: "Test", email: "shared@example.invalid", segmentationValues };
+        const firstType = factPackFirst ? "client_fact_pack" : scoredType;
+        const secondType = factPackFirst ? scoredType : "client_fact_pack";
+        const first = await h.route("advisor-project-participants", { ...input, questionnaireType: firstType });
+        assert.equal(first.status, 201, JSON.stringify(first.body));
+        const second = await h.route("advisor-project-participants", { ...input, email: " SHARED@example.invalid ", questionnaireType: secondType });
+        assert.equal(second.status, 201, JSON.stringify(second.body));
+        const rows = h.sqlite.prepare("SELECT * FROM client_participants WHERE project_id = ?").all(projectId);
+        assert.equal(rows.length, 2);
+        assert.notEqual(rows[0].participant_id, rows[1].participant_id);
+        assert.notEqual(rows[0].invite_token, rows[1].invite_token);
+        assert.equal(rows.find(row => row.questionnaire_type === "client_fact_pack").segmentation_values, null);
+        for (const questionnaireType of ["hr", "manager", "leadership", "client_fact_pack"]) {
+          assert.equal((await h.route("advisor-project-participants", { ...input, questionnaireType })).status, 409);
+        }
+        // Edits must preserve an existing legal shared pair and reject type changes
+        // that would create a duplicate in either assignment category.
+        for (const row of rows) {
+          assert.equal((await h.route("advisor-update-participant", { ...input, participantId: row.participant_id, questionnaireType: row.questionnaire_type }, "PATCH")).status, 200);
+          const conflictingType = row.questionnaire_type === "client_fact_pack" ? scoredType : "client_fact_pack";
+          assert.equal((await h.route("advisor-update-participant", { ...input, participantId: row.participant_id, questionnaireType: conflictingType }, "PATCH")).status, 409);
+        }
+        const independent = await h.route("advisor-project-participants", { ...input, email: "other@example.invalid", questionnaireType: scoredType });
+        assert.equal(independent.status, 201);
+        assert.equal((await h.route("advisor-update-participant", { ...input, participantId: independent.body.participant.participant_id, questionnaireType: scoredType }, "PATCH")).status, 409);
+      }
+    }
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Supabase fallback adds a shared Fact Pack but rejects duplicate assignments", async () => {
+  const h = harness();
+  try {
+    h.env.D1_CLIENT_DIAGNOSTIC_MODE = "off";
+    const projectId = h.project();
+    const schema = h.load("lib/client-diagnostic/segmentation.ts").buildDefaultSegmentationSchema();
+    const segmentationValues = Object.fromEntries(schema.fields.map(field => [field.fieldKey, field.options[0].optionKey]));
+    const rows = [];
+    h.state.supabaseClient = {
+      from(table) {
+        const filters = [];
+        let inserted;
+        const query = {
+          select() { return this; },
+          eq(key, value) { filters.push([key, value]); return this; },
+          insert(values) { inserted = values; return this; },
+          async single() {
+            if (table === "client_projects") return { data: { project_id: projectId, company_name: "Synthetic", project_status: "active", segmentation_schema: schema }, error: null };
+            assert.ok(inserted, "participant insert expected");
+            const row = { ...inserted, participant_id: randomUUID(), invite_token: randomUUID() };
+            rows.push(row);
+            return { data: row, error: null };
+          },
+          then(resolve) {
+            assert.equal(table, "client_participants");
+            resolve({ data: rows.filter(row => filters.every(([key, value]) => row[key] === value)), error: null });
+          },
+        };
+        return query;
+      },
+    };
+    for (const factPackFirst of [false, true]) {
+      rows.length = 0;
+      const input = { projectId, name: "Synthetic", roleLabel: "Test", email: "same@example.invalid", segmentationValues };
+      for (const questionnaireType of factPackFirst ? ["client_fact_pack", "hr"] : ["hr", "client_fact_pack"]) {
+        const response = await h.route("advisor-project-participants", { ...input, questionnaireType });
+        assert.equal(response.status, 201, JSON.stringify(response.body));
+      }
+      for (const questionnaireType of ["hr", "manager", "leadership", "client_fact_pack"]) {
+        assert.equal((await h.route("advisor-project-participants", { ...input, email: " SAME@example.invalid ", questionnaireType })).status, 409);
+      }
+      assert.equal(rows.length, 2);
+    }
   } finally {
     h.sqlite.close();
   }

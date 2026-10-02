@@ -1,3 +1,4 @@
+import { hasParticipantEmailConflict } from "@/lib/client-diagnostic/participant-email-uniqueness";
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -216,20 +217,14 @@ export async function PATCH(request: Request): Promise<Response> {
           await findD1ParticipantsByEmail(existingParticipant.project_id, email)
         ).filter((row) => row.participant_id !== participantId);
 
-        if (
-          questionnaireType === "client_fact_pack"
-            ? conflicts.some(
-                (row) => row.questionnaire_type === "client_fact_pack",
-              )
-            : conflicts.length > 0
-        ) {
+        if (hasParticipantEmailConflict(questionnaireType, conflicts)) {
           return NextResponse.json(
             {
               success: false,
               error:
                 questionnaireType === "client_fact_pack"
-                  ? "Only one Client Fact Pack participant is allowed per project."
-                  : "This email address is already assigned to another participant in this project.",
+                  ? "This email address is already assigned to a Client Fact Pack participant in this project."
+                  : "This email address is already assigned to another scored participant in this project.",
             },
             { status: 409 },
           );
@@ -382,65 +377,14 @@ export async function PATCH(request: Request): Promise<Response> {
       (participant) => participant.participant_id !== participantId,
     );
 
-    if (questionnaireType === "client_fact_pack") {
-      const duplicateFactPack = otherParticipants.find(
-        (participant) => participant.questionnaire_type === "client_fact_pack",
+    if (hasParticipantEmailConflict(questionnaireType, otherParticipants)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This email address is already assigned to another participant of this kind in this project.",
+        },
+        { status: 409 },
       );
-
-      if (duplicateFactPack) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Only one Client Fact Pack participant is allowed per project.",
-          },
-          { status: 409 },
-        );
-      }
-    } else {
-      if (otherParticipants.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "This email address is already assigned to another participant in this project.",
-          },
-          { status: 409 },
-        );
-      }
-    }
-
-    if (questionnaireType !== "client_fact_pack") {
-      const {
-        data: duplicateQuestionnaireTypeRows,
-        error: duplicateQuestionnaireTypeError,
-      } = await supabase
-        .from("client_participants")
-        .select("participant_id")
-        .eq("project_id", existingParticipant.project_id)
-        .eq("email", email)
-        .neq("participant_id", participantId);
-
-      if (duplicateQuestionnaireTypeError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Unable to validate questionnaire assignment rules.",
-          },
-          { status: 500 },
-        );
-      }
-
-      if ((duplicateQuestionnaireTypeRows ?? []).length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "A participant email can only be used once per project for scored questionnaires.",
-          },
-          { status: 409 },
-        );
-      }
     }
 
     const { data: updatedParticipant, error: updateError } = await supabase
