@@ -69,4 +69,21 @@ if (complete) {
 }
 const deployments = await get("workers/scripts/fractional-hr-site/deployments", true);
 console.log(`Production deployment metadata readable: ${Boolean(deployments)}`);
+const inventory = await get("workers/scripts", true);
+const worker = inventory?.result?.find(script => script.id === "fractional-hr-site");
+if (worker?.tag) {
+  const triggers = await get(`builds/workers/${encodeURIComponent(worker.tag)}/triggers`, true);
+  console.log(`Production build integration readable: ${Boolean(triggers)}`);
+  if (triggers) {
+    if (!Array.isArray(triggers.result)) throw new Error("Invalid build trigger inventory.");
+    console.log(`Production build trigger count: ${triggers.result.length}`);
+    for (const trigger of triggers.result) {
+      console.log(`Build trigger includes main explicitly: ${trigger.branch_includes?.includes("main") === true}`);
+      console.log(`Build trigger has deployment command: ${Boolean(trigger.deploy_command)}`);
+      // Values may contain secrets. Only report known environment-variable names and presence.
+      for (const name of ["RESEND_API_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "CRON_SECRET", "DAILY_SUMMARY_RECIPIENT"])
+        console.log(`Build environment ${name}: ${Object.hasOwn(trigger.environment_variables ?? {}, name) ? "present" : "absent"}`);
+    }
+  }
+} else console.log("Production build integration: Worker tag unavailable; not verified.");
 console.log("Read-only configuration audit complete. No deployment, policy, secret or data was changed.");

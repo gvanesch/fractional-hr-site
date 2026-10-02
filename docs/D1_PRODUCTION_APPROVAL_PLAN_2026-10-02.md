@@ -48,3 +48,29 @@ Prepare and review separately after Approval A:
 Rollback: first contain writes and establish which system holds each new record. Reconcile D1-only writes back into Supabase before directing those paths to Supabase again. Do not simply toggle flags after new D1 records exist. Keep additive D1 schema and recovery points. Restores or destructive cleanup require separate approval.
 
 Supabase retirement, removal of fallback code, and final processing/privacy disclosure changes are a later, separate approval after the monitored soak and data reconciliation.
+
+## Release preparation and read-only configuration audit — 2 October, 16:17 UTC
+
+Draft release PR: https://github.com/gvanesch/fractional-hr-site/pull/10. Main `bef727f58cbe821094a6ea8ee8ec0521f81b665c` is an ancestor of the migration branch at this inspection; no concurrent main commits need merging. Re-fetch both heads immediately before any approved merge. The draft has no auto-merge enabled.
+
+The read-only audit https://github.com/gvanesch/fractional-hr-site/actions/runs/37032920113 independently checks Worker settings and the secret-name inventory. All five D1 flags remain off; DB is absent. Existing `CLIENT_DIAGNOSTIC_OTP_SECRET`, `INVITE_RATE_LIMIT_SALT`, and `SUPABASE_SERVICE_ROLE_KEY` are present and must be preserved. No production Access application matched the canonical or www hostname. Access auth is not enabled.
+
+The Worker has no bindings named `RESEND_API_KEY`, `CRON_SECRET`, `ADVISOR_ALLOWED_EMAILS`, `CLOUDFLARE_ACCESS_AUD`, `CLOUDFLARE_ACCESS_TEAM_DOMAIN`, `CONTACT_FROM_EMAIL`, `CONTACT_TO_EMAIL`, or `DAILY_SUMMARY_RECIPIENT`. The tested repository secret names contain the scheduler credential and summary URL, but not Resend or Supabase build credentials. This inventories bindings and configured repository secret names; it does not prove the currently deployed bundle cannot send email or lacks compiled build-time settings. Cloudflare build configuration still needs verification. Do not replace existing credentials or try extracting them from deployed code.
+
+Planned production configuration, subject to explicit approval:
+
+| Setting | Proposed release value / handling |
+| --- | --- |
+| DB | `vanesch-prod`, EU ID `b81b99d7-4b10-4f7e-a0c1-ada3adf596fc` |
+| Canonical site URL | `https://vanesch.uk` |
+| Advisor auth | `cloudflare_access`, enabled only with the matching deployed application and verified production AUD |
+| Advisor identity | `greg@vanesch.uk`; confirm any additional production advisors before changing the allowlist |
+| Access protected paths | `/advisor*`, `/api/advisor-*`, `/api/client-diagnostic-project*`, `/api/client-diagnostic-create-project`, `/api/client-diagnostic-report`, `/api/prospect-update` on the production hostnames; public respondent and cron routes remain outside the interactive app |
+| OTP and invite rate limiting | Preserve existing production secrets; do not copy QA secrets |
+| Cron secret | Use the existing GitHub scheduler credential securely; never print it |
+| Email transport | Verify existing production build source or securely configure the Worker secret through the provider dashboard; never chat |
+| Email recipient | Existing production recipient settings must be established before a new value is proposed |
+| D1 flags | Keep all five off through preparation; change together only during approved, reconciled cutover |
+| Advisor scheduler URL | `https://vanesch.uk/api/cron/advisor-daily-action-digest`, after the alias is deployed |
+
+No production Worker, Access policy, secret, schedule, data, or flag was changed by release preparation. No production deployment workflow has been introduced. First establish the existing Cloudflare deployment integration; then prepare the final deployment action against the exact reviewed release commit and request approval. The schema-only approval does not cover these actions.
