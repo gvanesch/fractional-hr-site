@@ -1,23 +1,18 @@
-> Updated 2 October: Greg completed the hosted invitation, participant access, questionnaire, report/evidence export and Fact Pack flow. The Fact Pack appears in the evidence pack without changing the score. Email-sharing fix `4dd1821` is deployed in QA. Scheduler dry-run and fresh full-row reconciliation verification are now in progress. See [the production approval plan](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md). Historical statements below describe the 29 September checkpoint, not current blockers.
+# D1 migration readiness — updated 2 October 2026
 
-# D1 migration readiness — 29 September 2026
+## Verified
 
-This is the current QA and production gate record. The earlier runtime audit documents code coverage and local tests, but its remote-blocker section is historical.
+- Hosted QA D1 flags and Cloudflare Access advisor login/logout against EU `vanesch-qa`.
+- Greg confirmed project creation, invitation receipt, participant access, questionnaire submission, Completed status, report/evidence export and Fact Pack submission. Fact Pack response appears in the evidence pack and the scored result remains 75. This does not separately prove OTP expiry/revocation or every participant-administration path in the hosted browser.
+- Shared-email Fact Pack fix `4dd1821`: create/edit checks permit one scored assignment plus a Fact Pack, retain distinct participant IDs/invites and reject duplicate assignments. D1 and Supabase fallback regression tests passed.
+- [QA scheduler dry runs passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/36995773332). Missing/wrong bearer rejected; authorized advisor digest and client diagnostic summary generate without email. The new advisor scheduler alias is outside the interactive Access wildcard and still uses the same cron-secret check. No QA recurring schedule enabled; QA cron secret rotated afterwards.
+- [Production read-only row reconciliation passed](https://github.com/gvanesch/fractional-hr-site/actions/runs/36996025142): complete normalized rows in all six existing D1 tables match the fresh Supabase snapshot across two target reads. A repeat source read was unchanged. Counts: system events 33, diagnostic submissions 3, advisor prospects 4, Health Check prospects 1, advisor activity 31, Health Check activity 0.
+- Production migrations remain 0001–0003. New source client core tables are empty; two rate-limit rows are ephemeral. Production Worker DB binding is absent and all D1 flags are off or absent (default off). No production mutation was performed.
 
-## Verified without production changes
+## Remaining approvals and checks
 
-- Isolated QA Worker `fractional-hr-site-qa` runs all five D1 flags and Cloudflare Access advisor auth against EU `vanesch-qa`. The QA build, migrations 0001–0005, security binding bootstrap, deployment and hosted binding preflight passed on `migration/d1`.
-- Greg signed in to the QA advisor page and confirmed logout returns to Cloudflare Access without the earlier wildcard 404. Unauthenticated hosted probes confirm Access challenges advisor pages and APIs.
-- QA contact submitted a synthetic Greg-only record to D1 and Resend acknowledged the email handoff in [the QA email smoke run](https://github.com/gvanesch/fractional-hr-site/actions/runs/36567363042). Inbox delivery and advisor invitation/OTP flows have **not** been confirmed end to end.
-- QA email and digest binding names are present. The digest was **not** sent or scheduled in QA. The current Cloudflare Access application includes `/api/advisor-*`, so it also intercepts `/api/advisor-daily-action-digest` before the route's own cron bearer check. Resolve this policy/route boundary before claiming scheduled QA digest coverage.
-- [Read-only production D1 inspection](https://github.com/gvanesch/fractional-hr-site/actions/runs/36588986106) confirms migrations 0001–0003 applied and 0004/0005 pending. Existing D1 table counts match current Supabase source counts: system events 33, diagnostic submissions 3, advisor prospects 4, Health Check prospects 1, advisor activity 31 and Health Check activity 0. These are counts, **not** a fresh row/hash reconciliation. Supabase has no client projects, participants, responses, scores, Fact Packs, functional signal requests or service access records at this check; it has two invite rate-limit rows (ephemeral security state).
+1. Explicit approval for additive production migrations 0004/0005 only, using the exact SQL, guarded executor and recovery steps in [the production approval plan](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md). The activation marker does not exist.
+2. Production Access/bindings/secrets, further targeted auth/lifecycle checks and coordinated deployment/cutover plan. Adding the missing production DB binding, changing scheduler URL, merging into main or enabling flags are not covered by schema-only approval.
+3. Fresh source reconciliation immediately before each production operation. Keep Supabase available during cutover and monitored soak. Reconcile any D1-only writes before rollback. Retirement requires separate approval.
 
-## Gates still open
-
-1. Hosted QA browser exercise for project creation and invitation to Greg only, email receipt, OTP, questionnaire/Fact Pack lifecycle and report. Avoid real client recipients and production data in QA. The existing source tests and contact email probe do not prove this whole flow.
-2. Fix or deliberately exclude the QA scheduled digest Access path, then test the cron bearer boundary without sending unapproved recurring messages.
-3. Fresh read-only Supabase→production D1 row/hash reconciliation for existing tables, plus a fresh source snapshot immediately before any import. Review schema and delta SQL privately. Do not put source records or credentials in CI logs or QA D1.
-4. Request explicit approval for production migrations 0004 and 0005, with the exact target, migration SQL, maintenance/rollback steps and current reconciliation attached. Do not apply them as part of QA.
-5. Separately configure and verify production Access/secrets and request cutover approval before enabling any production D1 flags. Keep Supabase available for rollback and reconcile any D1-only writes before a rollback.
-
-Production D1 flags remain off. Supabase remains production authority. No production migration or Worker deployment was performed in this QA continuation.
+Historical source/runtime coverage remains in D1_RUNTIME_AUDIT.md; use this file and the 2 October approval plan for current gates.

@@ -89,3 +89,13 @@ for (const name of ["SYSTEM_EVENTS", "DIAGNOSTIC_SUBMISSIONS", "CRM_PROSPECTS", 
   console.log(`Production D1_${name}_MODE: off`);
 }
 console.log("Production Worker inspected; all D1 flags remain off. Settings were read only.");
+
+const bookmarkResponse = await fetch(
+  `https://api.cloudflare.com/client/v4/accounts/${expectedAccount}/d1/database/${expectedDb}/time_travel/bookmark`,
+  { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) },
+);
+if (!bookmarkResponse.ok) throw new Error(`Recovery bookmark read HTTP ${bookmarkResponse.status}; schema approval executor must not run.`);
+const bookmarkResult = await bookmarkResponse.json();
+if (!bookmarkResult.success || typeof bookmarkResult.result?.bookmark !== "string" || !bookmarkResult.result.bookmark)
+  throw new Error("Recovery bookmark is unavailable; schema approval executor must not run.");
+console.log("Production Time Travel recovery bookmark read verified. No restore performed.");
