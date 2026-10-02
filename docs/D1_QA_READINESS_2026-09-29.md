@@ -1,3 +1,5 @@
+> Updated 2 October: Greg completed the hosted invitation, participant access, questionnaire, report/evidence export and Fact Pack flow. The Fact Pack appears in the evidence pack without changing the score. Email-sharing fix `4dd1821` is deployed in QA. Scheduler dry-run and fresh full-row reconciliation verification are now in progress. See [the production approval plan](D1_PRODUCTION_APPROVAL_PLAN_2026-10-02.md). Historical statements below describe the 29 September checkpoint, not current blockers.
+
 # D1 migration readiness — 29 September 2026
 
 This is the current QA and production gate record. The earlier runtime audit documents code coverage and local tests, but its remote-blocker section is historical.

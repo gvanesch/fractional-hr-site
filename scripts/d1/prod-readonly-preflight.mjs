@@ -1,5 +1,6 @@
 // Read-only production D1 inventory. Print schema names and counts only.
 import { readFile } from "node:fs/promises";
+import { hashRows } from "./reconcile-production.mjs";
 
 const expectedAccount = "73221f18acc676e4992c89fcbf2b2a8f";
 const expectedDb = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc";
@@ -48,3 +49,41 @@ const migrations = await select("SELECT name FROM d1_migrations ORDER BY name");
 for (const row of migrations) console.log(`applied: ${row.name}`);
 if (migrations.some((row) => /000[45]_/.test(row.name)))
   throw new Error("Production migrations 0004 or 0005 were already applied; review state.");
+
+// Compare complete rows in memory; print only aggregate equality, never records.
+const manifest = JSON.parse(await readFile(new URL("./production-source-manifest.json", import.meta.url)));
+if (manifest.source !== "qxddddhhpfrrxbaunwfw" ||
+    Date.now() - Date.parse(manifest.generatedAt) > 24 * 60 * 60 * 1000 ||
+    !Number.isFinite(Date.parse(manifest.generatedAt)))
+  throw new Error("Source manifest is invalid or stale; take a fresh source snapshot.");
+for (let pass = 0; pass < 2; pass++) {
+  for (const name of expectedTables) {
+    const expected = manifest.tables[name];
+    const columns = (await select(`PRAGMA table_info("${name}")`)).map(row => row.name);
+    if (!expected || JSON.stringify(columns) !== JSON.stringify(expected.columns))
+      throw new Error(`Schema mismatch: ${name}.`);
+    const rows = await select(`SELECT * FROM "${name}" ORDER BY "${expected.key}"`);
+    const match = rows.length === expected.count && hashRows(rows, columns, expected.key) === expected.hash;
+    console.log(`${name}: full-row hash ${match ? "matches" : "DIFFERS"} (pass ${pass + 1})`);
+    if (!match) throw new Error(`Production data differs for ${name}; no writes performed.`);
+  }
+}
+console.log("All six production tables match the source snapshot across two reads. No writes performed.");
+
+const workerSettingsResponse = await fetch(
+  `https://api.cloudflare.com/client/v4/accounts/${expectedAccount}/workers/scripts/fractional-hr-site/settings`,
+  { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) },
+);
+if (!workerSettingsResponse.ok) throw new Error(`Production Worker settings read HTTP ${workerSettingsResponse.status}.`);
+const workerSettings = await workerSettingsResponse.json();
+if (!workerSettings.success || !Array.isArray(workerSettings.result?.bindings))
+  throw new Error("Invalid production Worker settings result.");
+const prodBindings = new Map(workerSettings.result.bindings.map(row => [row.name, row]));
+if ((prodBindings.get("DB")?.database_id ?? prodBindings.get("DB")?.id) !== expectedDb)
+  throw new Error("Production Worker DB binding differs; no writes performed.");
+for (const name of ["SYSTEM_EVENTS", "DIAGNOSTIC_SUBMISSIONS", "CRM_PROSPECTS", "CLIENT_DIAGNOSTIC", "CLIENT_DIAGNOSTIC_SECURITY"]) {
+  const mode = prodBindings.get(`D1_${name}_MODE`)?.text ?? "off";
+  if (mode !== "off") throw new Error(`Production D1_${name}_MODE is not off; review before proceeding.`);
+  console.log(`Production D1_${name}_MODE: off`);
+}
+console.log("Production Worker target verified; all D1 flags remain off. Settings were read only.");

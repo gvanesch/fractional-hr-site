@@ -6,6 +6,7 @@ on:
       - migration/d1
     paths:
       - scripts/d1/prod-readonly-preflight.mjs
+      - scripts/d1/production-source-manifest.json
 
 permissions:
   contents: read
@@ -45,7 +46,7 @@ jobs:
             body: JSON.stringify({
               state,
               context: "D1 production read-only preflight",
-              description: state === "success" ? "Production D1 schema and counts inspected" : "Inspect production D1 read-only job",
+              description: state === "success" ? "Production D1 schema, counts and row hashes match" : "Inspect production D1 read-only job",
               target_url: `https://github.com/${repo}/actions/runs/${run}`,
             }),
           });

@@ -1,0 +1,163 @@
+{
+  "source": "qxddddhhpfrrxbaunwfw",
+  "generatedAt": "2026-10-02T10:23:08.972Z",
+  "tables": {
+    "system_events": {
+      "key": "event_id",
+      "columns": [
+        "event_id",
+        "event_type",
+        "status",
+        "submission_id",
+        "public_token",
+        "source",
+        "metadata",
+        "created_at"
+      ],
+      "count": 33,
+      "hash": "da61a8691729b37c93c2e57614954793190e52c3308318ca27e531e2bf2ceb57"
+    },
+    "diagnostic_submissions": {
+      "key": "id",
+      "columns": [
+        "id",
+        "created_at",
+        "company_size",
+        "industry",
+        "role",
+        "country_region",
+        "email",
+        "score",
+        "band",
+        "process_clarity_score",
+        "consistency_score",
+        "service_access_score",
+        "ownership_score",
+        "onboarding_score",
+        "technology_alignment_score",
+        "knowledge_self_service_score",
+        "operational_capacity_score",
+        "data_handoffs_score",
+        "change_resilience_score",
+        "answers",
+        "abuse_token",
+        "submission_id",
+        "contact_name",
+        "contact_email",
+        "contact_company",
+        "contact_topic",
+        "contact_message",
+        "contact_source",
+        "advisor_brief",
+        "contact_submitted_at",
+        "status",
+        "last_contacted_at",
+        "notes",
+        "completed_at",
+        "submission_source",
+        "completion_version",
+        "public_token"
+      ],
+      "count": 3,
+      "hash": "2ccce70510603db26479f58e52de3c5b695a79252db9ac6ce05f8e813a0080e4"
+    },
+    "advisor_prospects": {
+      "key": "prospect_id",
+      "columns": [
+        "prospect_id",
+        "name",
+        "company",
+        "role",
+        "source",
+        "segment",
+        "diagnostic_status",
+        "last_contact_date",
+        "next_action_date",
+        "observed_signals",
+        "notes",
+        "linked_submission_id",
+        "created_at",
+        "updated_at",
+        "relationship_strength",
+        "deal_stage",
+        "lead_temperature",
+        "next_step",
+        "lost_reason",
+        "contact_email",
+        "contact_phone",
+        "company_website",
+        "billing_contact_name",
+        "billing_contact_email",
+        "linkedin_url"
+      ],
+      "count": 4,
+      "hash": "83b76d6496b105d3cd7f2675ea55cd9f249e197ecf6ca2c6098a741d0db57bc1"
+    },
+    "health_check_prospects": {
+      "key": "prospect_id",
+      "columns": [
+        "prospect_id",
+        "submission_id",
+        "name",
+        "company",
+        "relationship",
+        "status",
+        "last_contact_date",
+        "next_action_date",
+        "source",
+        "notes",
+        "created_at",
+        "updated_at"
+      ],
+      "count": 1,
+      "hash": "c81b6f9eb4abc4b75192068212fede6c7a82e189eada06eb986c225deec66d44"
+    },
+    "advisor_prospect_activity": {
+      "key": "activity_id",
+      "columns": [
+        "activity_id",
+        "prospect_id",
+        "linked_submission_id",
+        "activity_type",
+        "field_name",
+        "old_value",
+        "new_value",
+        "note",
+        "changed_by",
+        "created_at",
+        "note_type"
+      ],
+      "count": 31,
+      "hash": "b5a0817b1876f19a1a17838f150def5e8e3a49485144b577fbeb5856bb54b2f3"
+    },
+    "health_check_prospect_activity": {
+      "key": "activity_id",
+      "columns": [
+        "activity_id",
+        "prospect_id",
+        "submission_id",
+        "activity_type",
+        "field_name",
+        "old_value",
+        "new_value",
+        "note",
+        "changed_by",
+        "created_at"
+      ],
+      "count": 0,
+      "hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "pendingSourceCounts": {
+    "client_projects": 0,
+    "client_responses": 0,
+    "client_fact_packs": 0,
+    "client_participants": 0,
+    "client_dimension_scores": 0,
+    "client_service_access_context": 0,
+    "client_functional_signal_requests": 0,
+    "client_participant_otp_challenges": 0,
+    "client_diagnostic_invite_rate_limits": 2,
+    "client_participant_verified_sessions": 0
+  }
+}

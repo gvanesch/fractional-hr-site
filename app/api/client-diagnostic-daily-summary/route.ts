@@ -326,7 +326,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const resend = getResendClient();
+    const dryRun = new URL(request.url).searchParams.get("dryRun") === "true";
     const activeProjects = await loadActiveProjects();
 
     if (activeProjects.length === 0) {
@@ -341,6 +341,7 @@ export async function POST(request: Request) {
         success: true,
         message: "No active projects.",
         projectCount: 0,
+        ...(dryRun ? { dryRun: true, emailGenerated: false } : {}),
       });
     }
 
@@ -350,6 +351,15 @@ export async function POST(request: Request) {
 
     const emailHtml = buildEmailHtml(projectResults);
 
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        emailGenerated: emailHtml.length > 0,
+        projectCount: projectResults.length,
+      });
+    }
+    const resend = getResendClient();
     const resendResponse = await resend.emails.send({
       from: "Van Esch Advisory <no-reply@vanesch.uk>",
       to: dailySummaryRecipient,

@@ -706,3 +706,33 @@ test("Supabase fallback adds a shared Fact Pack but rejects duplicate assignment
     h.sqlite.close();
   }
 });
+
+test("Scheduler alias keeps cron authorization and dry runs never send email", async () => {
+  const h = harness();
+  try {
+    h.project();
+    for (const name of ["cron/advisor-daily-action-digest", "client-diagnostic-daily-summary"]) {
+      const handler = h.load(`app/api/${name}/route.ts`);
+      for (const authorization of [null, "Bearer incorrect"]) {
+        const denied = await handler.POST(new Request(`https://qa.example.invalid/api/${name}?dryRun=true`, {
+          method: "POST", headers: authorization ? { authorization } : {},
+        }));
+        assert.equal(denied.status, 403);
+      }
+      assert.equal((await handler.GET()).status, 405);
+      const result = await h.route(name, {}, "POST", "?dryRun=true");
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      assert.equal(result.body.dryRun, true);
+      assert.equal(result.body.emailGenerated, true);
+      assert.equal(h.state.messages.length, 0);
+    }
+    const empty = harness();
+    try {
+      const result = await empty.route("client-diagnostic-daily-summary", {}, "POST", "?dryRun=true");
+      assert.equal(result.body.dryRun, true);
+      assert.equal(result.body.projectCount, 0);
+      assert.equal(empty.state.messages.length, 0);
+    } finally { empty.sqlite.close(); }
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});

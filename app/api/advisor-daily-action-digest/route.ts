@@ -747,9 +747,10 @@ export async function POST(request: Request) {
 
         const requestUrl = new URL(request.url);
         const forceSend = requestUrl.searchParams.get("force") === "true";
+        const dryRun = requestUrl.searchParams.get("dryRun") === "true";
         const londonHour = getLondonHour(new Date());
 
-        if (!forceSend && londonHour !== 8) {
+        if (!dryRun && !forceSend && londonHour !== 8) {
             return NextResponse.json({
                 success: true,
                 message: "Skipped outside 08:00 Europe/London.",
@@ -778,6 +779,19 @@ export async function POST(request: Request) {
         };
 
         const emailHtml = buildEmailHtml(data, appBaseUrl);
+        if (dryRun) {
+            return NextResponse.json({
+                success: true,
+                dryRun: true,
+                emailGenerated: emailHtml.length > 0,
+                overdueProspects: data.overdueProspects.length,
+                dueTodayProspects: data.dueTodayProspects.length,
+                nextSevenDaysProspects: data.nextSevenDaysProspects.length,
+                noNextActionProspects: data.noNextActionProspects.length,
+                contactFormDiagnostics: data.contactFormDiagnostics.length,
+                activeProjects: data.activeProjects.length,
+            });
+        }
         const resend = getResendClient();
 
         const resendResponse = await resend.emails.send({
