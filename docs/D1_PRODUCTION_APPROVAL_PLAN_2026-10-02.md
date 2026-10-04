@@ -84,3 +84,17 @@ Prepared an inert flags-off release workflow: `.github/workflows/d1-prod-approve
 This stage, if later approved, adds the already-reviewed production DB binding and deploys production code while preserving Supabase authority, all five disabled D1 flags, existing advisor auth, production secrets and routes. It does not apply migrations, import records, edit Access, change schedules, merge main, or switch D1 on. Live D1 flags or advisor auth that differ cause a stop. It rejects a QA DB, placeholder public build credentials, a Supabase service-role key in the public credential slot, missing secure production transport/security secrets, and existing Worker schedules that could be replaced. Deployment is followed by another binding/flag check.
 
 **Not ready to activate:** production mail/cron bindings and the production public Supabase build credential still need secure configuration and fresh inspection. Existing build-time configuration cannot be inferred from absent runtime bindings; never extract secrets from deployed bundles. Do not create the approval marker before prerequisites are complete and Greg approves the exact release. Access configuration and coordinated D1 activation remain a later, separately approved stage. The source snapshot from 2 October is now stale and must be refreshed for cutover reconciliation.
+
+## Approved production mail configuration — 4 October
+
+Greg approved creation of a new `vanesch-prod` Resend key, with Sending access restricted to `vanesch.uk`, and installation as the production Worker `RESEND_API_KEY` at 11:56:49 BST. He created it, saved it securely and deployed that binding directly through Cloudflare. A fresh read-only audit at 11:09:21 UTC confirmed the binding is present and all five D1 flags remain off. The credential value was not read or shared in chat, logs or source control. All earlier Resend keys remain unchanged.
+
+At 12:15:45 BST Greg explicitly approved exactly these three additional production settings:
+
+- `CONTACT_FROM_EMAIL`: `notifications@vanesch.uk`
+- `CONTACT_TO_EMAIL`: `info@vanesch.uk` (participant replies and website enquiries)
+- `DAILY_SUMMARY_RECIPIENT`: `greg@vanesch.uk`
+
+The approval marker is `scripts/d1/production-mail-approval.json`. The guarded mail-only Actions job uses individual secret-binding PUTs, preserving unrelated bindings and avoiding a whole-settings replacement. These non-confidential addresses are deliberately stored as secret-type bindings for that safe update mechanism; the application reads them as ordinary environment strings. The script pins the Worker/account and exact three names and values, refuses stale approval, checks all five D1 flags before every write and afterwards, and verifies other binding metadata is preserved. The job does not upload application code, enable D1, add DB, configure cron credentials, change Access or send an email. A binding change creates updated Worker configuration; it is a production mutation within this approval, not a production application release or cutover.
+
+Application email delivery and sender/reply headers still require separate verification after the coordinated release. Do not infer successful delivery merely from binding presence. The next release must refresh its expected deployment identifier after these configuration updates.

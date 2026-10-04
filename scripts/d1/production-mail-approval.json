@@ -1,0 +1,12 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-three-mail-settings-only",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "worker": "fractional-hr-site",
+  "confirmedAt": "2026-10-04T11:15:45Z",
+  "values": {
+    "CONTACT_FROM_EMAIL": "notifications@vanesch.uk",
+    "CONTACT_TO_EMAIL": "info@vanesch.uk",
+    "DAILY_SUMMARY_RECIPIENT": "greg@vanesch.uk"
+  }
+}
