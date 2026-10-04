@@ -1,0 +1,9 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-advisor-allowlist-only",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "worker": "fractional-hr-site",
+  "binding": "ADVISOR_ALLOWED_EMAILS",
+  "value": "greg@vanesch.uk",
+  "confirmedAt": "2026-10-04T14:23:27Z"
+}

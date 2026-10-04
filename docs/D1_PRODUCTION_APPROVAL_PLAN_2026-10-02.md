@@ -102,3 +102,9 @@ Application email delivery and sender/reply headers still require separate verif
 ## 4 October: approved scheduler credential configuration
 
 Greg approved at 11:23:38 UTC configuring only production `CRON_SECRET` from the existing GitHub `DAILY_SUMMARY_ENDPOINT_SECRET`. The guarded Actions job transfers the configured credential directly without logging its value. It refuses an existing cron binding, checks all five D1 flags remain off, and verifies other bindings are preserved. This approval does not authorize schedule changes, endpoint calls, email tests, application code deployment, main merge or D1 activation.
+
+## 4 October: approved production advisor allowlist
+
+At 14:23:27 UTC Greg approved configuring only `ADVISOR_ALLOWED_EMAILS=greg@vanesch.uk` on the production Worker. The new guarded job refuses an existing allowlist, requires the current Supabase login mode and all five disabled D1 flags, writes only this one binding, and checks other bindings are preserved. No Access policy, application code, scheduler, data or D1 activation is authorized. The flags-off release now requires this binding so a missing runtime allowlist cannot lock the advisor out after deployment.
+
+The production public Supabase build credential was saved directly through GitHub by Greg and independently verified against the production Auth settings endpoint in read-only audit job `111432990714`. Its value was not emitted or committed.

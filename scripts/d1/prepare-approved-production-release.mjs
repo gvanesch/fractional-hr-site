@@ -32,7 +32,7 @@ export function validateReleaseConfig(config, bindings, env) {
   const boundDb = bindings.get("DB");
   if (boundDb && (boundDb.id ?? boundDb.database_id) !== database)
     throw new Error("Existing production DB binding is unexpected.");
-  for (const name of ["RESEND_API_KEY", "CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "SUPABASE_SERVICE_ROLE_KEY"])
+  for (const name of ["RESEND_API_KEY", "CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "ADVISOR_ALLOWED_EMAILS"])
     if (bindings.get(name)?.type !== "secret_text") throw new Error(`Required production secret binding unavailable: ${name}.`);
   for (const name of ["CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"])
     if (!bindings.has(name)) throw new Error(`Required production mail configuration unavailable: ${name}.`);

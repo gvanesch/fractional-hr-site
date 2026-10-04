@@ -12,7 +12,7 @@ test("Production release refuses unapproved commits, cutover scope, stale approv
   for (const changed of [null, {...approval, scope: "cutover"}, {...approval, reviewedCommit: "b".repeat(40)}, {...approval, confirmedAt: new Date(now - 25 * 60 * 60 * 1000).toISOString()}, {...approval, worker: "fractional-hr-site-qa"}])
     assert.throws(() => validateReleaseApproval(changed, env, now));
   const config = JSON.parse(await readFile(new URL("../../wrangler.jsonc", import.meta.url)));
-  const names = ["RESEND_API_KEY", "CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "SUPABASE_SERVICE_ROLE_KEY"];
+  const names = ["RESEND_API_KEY", "CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "ADVISOR_ALLOWED_EMAILS"];
   const bindings = new Map(names.map(name => [name, {name, type: "secret_text"}]));
   for (const name of ["CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"]) bindings.set(name, {name, type: "plain_text", text: "fixture@example.com"});
   validateReleaseConfig(config, bindings, env);
