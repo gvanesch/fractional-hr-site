@@ -69,6 +69,13 @@ if (complete) {
 }
 const deployments = await get("workers/scripts/fractional-hr-site/deployments", true);
 console.log(`Production deployment metadata readable: ${Boolean(deployments)}`);
+const currentDeployment = deployments?.result?.deployments?.[0];
+if (currentDeployment && /^[a-f0-9-]{36}$/.test(currentDeployment.id ?? "")) {
+  console.log(`Current production deployment identifier: ${currentDeployment.id}`);
+  for (const version of currentDeployment.versions ?? [])
+    if (/^[a-f0-9-]{36}$/.test(version.version_id ?? "") && typeof version.percentage === "number")
+      console.log(`Current production version identifier: ${version.version_id}; traffic ${version.percentage}%`);
+}
 const inventory = await get("workers/scripts", true);
 const worker = inventory?.result?.find(script => script.id === "fractional-hr-site");
 if (worker?.tag) {
