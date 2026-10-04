@@ -1,4 +1,5 @@
 // GET-only production configuration audit. Never print binding values or API bodies.
+import { verifyProductionPublicKey } from "./verify-production-public-key.mjs";
 const account = "73221f18acc676e4992c89fcbf2b2a8f";
 const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
 if (process.env.GITHUB_REF !== "refs/heads/migration/d1" ||
@@ -41,6 +42,10 @@ console.log(`Canonical site URL verified: ${bindings.get("NEXT_PUBLIC_SITE_URL")
 console.log(`Production Access auth enabled: ${bindings.get("ADVISOR_AUTH_MODE")?.text === "cloudflare_access"}`);
 for (const name of ["RESEND_API_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "DAILY_SUMMARY_URL"])
   console.log(`GitHub release credential/config ${name}: ${Boolean(process.env[name]?.trim()) ? "configured" : "missing"}`);
+if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) {
+  await verifyProductionPublicKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  console.log("Production public build credential verified against the production Auth endpoint.");
+}
 console.log(`GitHub scheduler credential configured: ${Boolean(process.env.DAILY_SUMMARY_ENDPOINT_SECRET?.trim())}`);
 const cron = bindings.get("CRON_SECRET");
 console.log(`Worker cron credential type: ${cron?.type === "secret_text" ? "secret; equality cannot be read" : cron ? "non-secret binding; review storage" : "missing"}`);

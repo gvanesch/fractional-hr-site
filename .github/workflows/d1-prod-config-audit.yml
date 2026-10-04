@@ -6,6 +6,7 @@ on:
       - migration/d1
     paths:
       - scripts/d1/production-config-audit.mjs
+      - scripts/d1/verify-production-public-key.mjs
       - .github/workflows/d1-prod-config-audit.yml
 
 permissions:
