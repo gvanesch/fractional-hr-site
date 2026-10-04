@@ -100,20 +100,25 @@ if (worker?.tag) {
 } else console.log("Production build integration: Worker tag unavailable; not verified.");
 if (process.env.PRODUCTION_PAGE_SMOKE === "true") {
   for (const path of ["/", "/advisor/login", "/advisor"]) {
-    const response = await fetch("https://vanesch.uk" + path, {redirect: "manual", signal: AbortSignal.timeout(15000)});
-    console.log(`Production page response ${path}: HTTP ${response.status}; HTML ${response.headers.get("content-type")?.includes("text/html") === true}; challenge ${response.headers.get("cf-mitigated") === "challenge"}`);
-    if (path === "/advisor") {
-      const destination = new URL(response.headers.get("location") ?? "", "https://vanesch.uk");
-      if (![302, 303, 307, 308].includes(response.status) || destination.origin !== "https://vanesch.uk" || destination.pathname !== "/advisor/login")
-        throw new Error("Unauthenticated advisor page did not redirect to the production login page.");
-    } else {
-      if (response.status !== 200 || !response.headers.get("content-type")?.includes("text/html"))
-        throw new Error("Production public page did not return HTML successfully.");
-      const body = await response.text();
-      if (/Application error: a server-side exception|Internal Server Error/.test(body))
-        throw new Error("Production public page reported a server error.");
+    let url = new URL(path, "https://vanesch.uk"), response, advisorRedirect = false;
+    for (let hop = 0; hop < 6; hop++) {
+      response = await fetch(url, {redirect: "manual", signal: AbortSignal.timeout(15000)});
+      console.log(`Production page response ${path}: HTTP ${response.status}; host ${url.hostname}; challenge ${response.headers.get("cf-mitigated") === "challenge"}`);
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+      const destination = new URL(response.headers.get("location") ?? "", url);
+      if (!["vanesch.uk", "www.vanesch.uk"].includes(destination.hostname) || destination.protocol !== "https:")
+        throw new Error("Production page redirected outside the approved site hostnames.");
+      if (path === "/advisor" && destination.pathname === "/advisor/login") advisorRedirect = true;
+      await response.body?.cancel();
+      url = destination;
     }
-    await response.body?.cancel().catch(() => {});
+    if (response.status !== 200 || !response.headers.get("content-type")?.includes("text/html"))
+      throw new Error("Production public page did not return HTML successfully.");
+    if (path === "/advisor" && (!advisorRedirect || url.pathname !== "/advisor/login"))
+      throw new Error("Unauthenticated advisor page did not redirect to the production login page.");
+    const body = await response.text();
+    if (/Application error: a server-side exception|Internal Server Error/.test(body))
+      throw new Error("Production public page reported a server error.");
     console.log(`Production read-only page check ${path}: passed`);
   }
 }

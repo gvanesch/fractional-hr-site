@@ -8,6 +8,11 @@ test("Production configuration audit uses GET only and never emits secret values
   const fixture = `
     globalThis.fetch = async (url, options) => {
       if (options.method && options.method !== 'GET') throw new Error('Mutation attempted');
+      url = String(url);
+      if (url.startsWith('https://vanesch.uk') || url.startsWith('https://www.vanesch.uk')) {
+        const redirect = url === 'https://vanesch.uk/' ? 'https://www.vanesch.uk/' : url.endsWith('/advisor') ? 'https://vanesch.uk/advisor/login' : null;
+        return {status:redirect ? 301 : 200, headers:{get:name=>name === 'location' ? redirect : name === 'content-type' ? 'text/html' : null},body:{cancel:async()=>{}},text:async()=>'<html>Public fixture</html>'};
+      }
       let result = [];
       if (url.endsWith('/settings')) result = {bindings: [{name:'RESEND_API_KEY',type:'secret_text',text:${JSON.stringify(secret)}}]};
       if (url.includes('/deployments')) result = {};
@@ -21,6 +26,10 @@ test("Production configuration audit uses GET only and never emits secret values
   assert.match(run.stdout, /Binding RESEND_API_KEY: present/);
   assert.match(run.stdout, /Production Access applications matching site: 0/);
   assert.doesNotMatch(run.stdout + run.stderr, new RegExp(secret));
+  const pages = spawnSync(process.execPath, ["--input-type=module", "-e", fixture], {env:{...env,PRODUCTION_PAGE_SMOKE:"true"},encoding:"utf8"});
+  assert.equal(pages.status, 0, pages.stderr);
+  assert.match(pages.stdout, /Production read-only page check \/advisor: passed/);
+  assert.doesNotMatch(pages.stdout + pages.stderr, new RegExp(secret));
   const refused = spawnSync(process.execPath, ["--input-type=module", "-e", fixture], { env: { ...env, GITHUB_REF: "refs/heads/main" }, encoding: "utf8" });
   assert.notEqual(refused.status, 0);
   assert.match(refused.stderr, /target is not verified/);
