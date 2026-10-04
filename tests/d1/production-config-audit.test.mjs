@@ -15,7 +15,7 @@ test("Production configuration audit uses GET only and never emits secret values
     };
     await import(${JSON.stringify(script)});
   `;
-  const env = { ...process.env, GITHUB_REF: "refs/heads/migration/d1", CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f", CLOUDFLARE_API_TOKEN: secret, NEXT_PUBLIC_SUPABASE_ANON_KEY: "" };
+  const env = { ...process.env, GITHUB_REF: "refs/heads/migration/d1", CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f", CLOUDFLARE_API_TOKEN: secret, NEXT_PUBLIC_SUPABASE_ANON_KEY: "", PRODUCTION_PAGE_SMOKE: "false" };
   const run = spawnSync(process.execPath, ["--input-type=module", "-e", fixture], { env, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /Binding RESEND_API_KEY: present/);

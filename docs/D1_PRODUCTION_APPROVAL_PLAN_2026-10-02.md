@@ -108,3 +108,11 @@ Greg approved at 11:23:38 UTC configuring only production `CRON_SECRET` from the
 At 14:23:27 UTC Greg approved configuring only `ADVISOR_ALLOWED_EMAILS=greg@vanesch.uk` on the production Worker. The new guarded job refuses an existing allowlist, requires the current Supabase login mode and all five disabled D1 flags, writes only this one binding, and checks other bindings are preserved. No Access policy, application code, scheduler, data or D1 activation is authorized. The flags-off release now requires this binding so a missing runtime allowlist cannot lock the advisor out after deployment.
 
 The production public Supabase build credential was saved directly through GitHub by Greg and independently verified against the production Auth settings endpoint in read-only audit job `111432990714`. Its value was not emitted or committed.
+
+## Approved flags-off production release — 4 October
+
+Greg approved deployment at 14:28:43 UTC of reviewed commit `7e75267ced1d3904fb461e8758e70f7c8b21b838`. Marker commit `833b843011c85548bb5f3b63a5a3c683683ad3d4` changed only the exact release approval. The guarded release run https://github.com/gvanesch/fractional-hr-site/actions/runs/37209551247 succeeded, including both production prechecks, OpenNext build, deployment and post-deployment metadata verification. Both migration build and QA migration workflows passed.
+
+Production now has the intended `vanesch-prod` DB binding, verified production source and canonical URLs, and all five D1 flags off. Supabase remains the production data source and advisor login method. Existing security, mail and advisor settings were preserved. No main merge, Access change, scheduler change, import or D1 activation occurred. Independent read-only audit job `111458112732` confirmed these settings.
+
+Active production version: `fa1640da-e492-440d-b5f2-b863a6502a73`, deployment `d7f9a678-a787-48b6-8d29-c0bd74cba241`. Previous version: `8126e98c-6112-40e1-86f3-638702ee038a`, deployment `c4de9d9b-39db-4b72-8ef7-002f1a7a1d13`; the release Actions artifact retains sanitized recovery identifiers. Reconcile writes before any later D1 cutover rollback. Production login and public flow checks remain necessary; metadata success alone does not establish authenticated login or email delivery.
