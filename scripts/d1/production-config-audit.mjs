@@ -101,6 +101,7 @@ if (worker?.tag) {
 if (process.env.PRODUCTION_PAGE_SMOKE === "true") {
   for (const path of ["/", "/advisor/login", "/advisor"]) {
     const response = await fetch("https://vanesch.uk" + path, {redirect: "manual", signal: AbortSignal.timeout(15000)});
+    console.log(`Production page response ${path}: HTTP ${response.status}; HTML ${response.headers.get("content-type")?.includes("text/html") === true}; challenge ${response.headers.get("cf-mitigated") === "challenge"}`);
     if (path === "/advisor") {
       const destination = new URL(response.headers.get("location") ?? "", "https://vanesch.uk");
       if (![302, 303, 307, 308].includes(response.status) || destination.origin !== "https://vanesch.uk" || destination.pathname !== "/advisor/login")
