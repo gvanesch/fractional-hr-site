@@ -10,8 +10,9 @@ test("Production configuration audit uses GET only and never emits secret values
       if (options.method && options.method !== 'GET') throw new Error('Mutation attempted');
       url = String(url);
       if (url.startsWith('https://vanesch.uk') || url.startsWith('https://www.vanesch.uk')) {
+        if (url.endsWith('/_next/login.js')) return {status:200,headers:{get:()=> 'application/javascript'},text:async()=> 'signInWithPassword qxddddhhpfrrxbaunwfw.supabase.co'};
         const redirect = url === 'https://vanesch.uk/' ? 'https://www.vanesch.uk/' : url.endsWith('/advisor') ? 'https://vanesch.uk/advisor/login' : null;
-        return {status:redirect ? 301 : 200, headers:{get:name=>name === 'location' ? redirect : name === 'content-type' ? 'text/html' : null},body:{cancel:async()=>{}},text:async()=>'<html>Public fixture</html>'};
+        return {status:redirect ? 301 : 200, headers:{get:name=>name === 'location' ? redirect : name === 'content-type' ? 'text/html' : null},body:{cancel:async()=>{}},text:async()=>'<html><script src="/_next/login.js"></script>Public fixture</html>'};
       }
       let result = [];
       if (url.endsWith('/settings')) result = {bindings: [{name:'RESEND_API_KEY',type:'secret_text',text:${JSON.stringify(secret)}}]};

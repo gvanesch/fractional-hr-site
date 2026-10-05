@@ -72,6 +72,11 @@ if (complete) {
     if (policies) console.log(`Production Access allow policy count: ${policies.result.filter(policy => policy.decision === "allow").length}`);
   }
 }
+const domains = await get("workers/domains", true);
+if (domains && Array.isArray(domains.result)) {
+  for (const host of ["vanesch.uk", "www.vanesch.uk"])
+    console.log(`Production custom domain ${host}: ${domains.result.find(item => item.hostname === host)?.service === "fractional-hr-site" ? "production Worker" : "not matched to production Worker"}`);
+}
 const deployments = await get("workers/scripts/fractional-hr-site/deployments", true);
 console.log(`Production deployment metadata readable: ${Boolean(deployments)}`);
 const currentDeployment = deployments?.result?.deployments?.[0];
@@ -119,6 +124,25 @@ if (process.env.PRODUCTION_PAGE_SMOKE === "true") {
     const body = await response.text();
     if (/Application error: a server-side exception|Internal Server Error/.test(body))
       throw new Error("Production public page reported a server error.");
+    if (path === "/advisor/login") {
+      const scriptPaths = [...new Set([...body.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]))];
+      let loaded = 0, failed = 0, productionSource = false, qaSource = false, passwordHandler = false;
+      for (const scriptPath of scriptPaths) {
+        const assetUrl = new URL(scriptPath.replaceAll("&amp;", "&"), url);
+        if (!["vanesch.uk", "www.vanesch.uk"].includes(assetUrl.hostname)) continue;
+        const asset = await fetch(assetUrl, {signal: AbortSignal.timeout(15000)});
+        const javascript = asset.status === 200 && /javascript/.test(asset.headers.get("content-type") ?? "");
+        if (!javascript) { failed++; console.log(`Production login script failed: HTTP ${asset.status}; path ${assetUrl.pathname}`); await asset.body?.cancel(); continue; }
+        loaded++;
+        const code = await asset.text();
+        productionSource ||= code.includes("qxddddhhpfrrxbaunwfw.supabase.co");
+        qaSource ||= code.includes("lrlapaiyejvbckqpbrwa.supabase.co");
+        passwordHandler ||= code.includes("signInWithPassword");
+      }
+      console.log(`Production login JavaScript: ${loaded} loaded; ${failed} failed; password handler present ${passwordHandler}; production source present ${productionSource}; QA source present ${qaSource}`);
+      if (!loaded || failed || !passwordHandler || !productionSource || qaSource)
+        throw new Error("Production login JavaScript checks failed.");
+    }
     console.log(`Production read-only page check ${path}: passed`);
   }
 }
