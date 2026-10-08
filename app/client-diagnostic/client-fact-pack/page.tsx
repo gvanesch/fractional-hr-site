@@ -8,6 +8,8 @@ export const metadata = {
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getD1ParticipantInvite } from "@/lib/d1/client-diagnostic";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 import {
   getVerifiedSessionCookieName,
   validateParticipantVerifiedSession,
@@ -152,29 +154,56 @@ export default async function ClientFactPackPage({
     notFound();
   }
 
-  const supabase = createSupabaseAdminClient();
+  let participant: ParticipantLookupRow | null = null;
 
-  const { data: participant, error } = await supabase
-    .from("client_participants")
-    .select(
-      `
-        participant_id,
-        project_id,
-        questionnaire_type,
-        participant_status,
-        completed_at,
-        invite_token,
-        invite_expires_at,
-        invite_revoked_at,
-        name,
-        client_projects!client_participants_project_fk!inner(project_status)
-      `,
-    )
-    .eq("participant_id", participantId)
-    .eq("project_id", projectId)
-    .single<ParticipantLookupRow>();
+  if (isD1ClientDiagnosticEnabled()) {
+    const d1Participant = await getD1ParticipantInvite(inviteToken);
 
-  if (error || !participant) {
+    if (
+      d1Participant?.participantId === participantId &&
+      d1Participant.projectId === projectId
+    ) {
+      participant = {
+        participant_id: d1Participant.participantId,
+        project_id: d1Participant.projectId,
+        questionnaire_type: d1Participant.questionnaireType,
+        participant_status: d1Participant.participantStatus,
+        completed_at: d1Participant.completedAt,
+        invite_token: inviteToken,
+        invite_expires_at: d1Participant.inviteExpiresAt,
+        invite_revoked_at: d1Participant.inviteRevokedAt,
+        name: d1Participant.name,
+        client_projects: { project_status: d1Participant.projectStatus },
+      };
+    }
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const response = await supabase
+      .from("client_participants")
+      .select(
+        `
+          participant_id,
+          project_id,
+          questionnaire_type,
+          participant_status,
+          completed_at,
+          invite_token,
+          invite_expires_at,
+          invite_revoked_at,
+          name,
+          client_projects!client_participants_project_fk!inner(project_status)
+        `,
+      )
+      .eq("participant_id", participantId)
+      .eq("project_id", projectId)
+      .single<ParticipantLookupRow>();
+
+    if (!response.error) {
+      participant = response.data;
+    }
+  }
+
+  if (!participant) {
     notFound();
   }
 

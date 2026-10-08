@@ -7,8 +7,13 @@ export const metadata = {
 import Link from "next/link";
 import UnlinkHealthCheckButton from "@/app/components/advisor/UnlinkHealthCheckButton";
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdvisorUser } from "@/lib/advisor-auth";
+import {
+  getD1Database,
+  isD1CrmProspectsEnabled,
+  isD1DiagnosticSubmissionsEnabled,
+} from "@/lib/d1/database";
 import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
@@ -495,32 +500,60 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 }
 
 async function requireAdvisorSession(submissionId: string) {
-  const supabase = await createSupabaseServerClient();
+  const user = await requireAdvisorUser();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!user) {
     redirect(`/advisor/login?next=/advisor/${submissionId}`);
-  }
-
-  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  const userEmail = user.email?.toLowerCase() ?? "";
-
-  if (!userEmail || !allowedEmails.includes(userEmail)) {
-    redirect("/advisor/login?error=forbidden");
   }
 
   return user;
 }
 
 async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const row = await getD1Database()
+      .prepare(
+        `SELECT
+          submission_id,
+          contact_name,
+          contact_email,
+          contact_company,
+          contact_topic,
+          contact_message,
+          contact_source,
+          email,
+          company_size,
+          industry,
+          role,
+          country_region,
+          answers,
+          score,
+          band,
+          advisor_brief,
+          contact_submitted_at
+        FROM diagnostic_submissions
+        WHERE submission_id = ?
+        LIMIT 1`,
+      )
+      .bind(submissionId)
+      .first<Omit<SubmissionRow, "answers" | "advisor_brief"> & {
+        answers: string | null;
+        advisor_brief: string | null;
+      }>();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      ...row,
+      answers: row.answers ? JSON.parse(row.answers) as JsonValue : null,
+      advisor_brief: row.advisor_brief
+        ? JSON.parse(row.advisor_brief) as JsonValue
+        : null,
+    };
+  }
+
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -563,6 +596,40 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
 async function getLinkedAdvisorProspect(
   submissionId: string,
 ): Promise<AdvisorProspectRecord | null> {
+  if (isD1CrmProspectsEnabled()) {
+    return await getD1Database()
+      .prepare(
+        `SELECT
+          prospect_id,
+          name,
+          company,
+          role,
+          contact_email,
+          contact_phone,
+          company_website,
+          source,
+          segment,
+          relationship_strength,
+          deal_stage,
+          lead_temperature,
+          diagnostic_status,
+          last_contact_date,
+          next_action_date,
+          next_step,
+          lost_reason,
+          notes,
+          observed_signals,
+          linked_submission_id,
+          created_at,
+          updated_at
+        FROM advisor_prospects
+        WHERE linked_submission_id = ?
+        LIMIT 1`,
+      )
+      .bind(submissionId)
+      .first<AdvisorProspectRecord>();
+  }
+
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase

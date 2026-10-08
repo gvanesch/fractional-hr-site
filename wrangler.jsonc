@@ -8,6 +8,13 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "vars": {
+    "D1_SYSTEM_EVENTS_MODE": "off",
+    "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "off",
+    "D1_CRM_PROSPECTS_MODE": "off",
+    "D1_CLIENT_DIAGNOSTIC_MODE": "off",
+    "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "off"
+  },
   "observability": {
     "logs": {
       "enabled": true,
@@ -23,5 +30,44 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "fractional-hr-site"
     }
-  ]
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vanesch-prod",
+      "database_id": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc"
+    }
+  ],
+  "env": {
+    "qa": {
+      "vars": {
+        "D1_SYSTEM_EVENTS_MODE": "d1",
+        "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "d1",
+        "D1_CRM_PROSPECTS_MODE": "d1",
+        "D1_CLIENT_DIAGNOSTIC_MODE": "d1",
+        "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "d1",
+        "ADVISOR_AUTH_MODE": "cloudflare_access",
+        "CONTACT_FROM_EMAIL": "qa@vanesch.uk",
+        "CONTACT_TO_EMAIL": "greg@vanesch.uk",
+        "DAILY_SUMMARY_RECIPIENT": "greg@vanesch.uk"
+      },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "fractional-hr-site-qa"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "vanesch-qa",
+          "database_id": "b25d59da-5f93-4301-9996-7be0c9708789"
+        }
+      ]
+    }
+  }
 }

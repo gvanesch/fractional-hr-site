@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { listD1ClientProjects } from "@/lib/d1/client-projects";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 
 export const metadata = {
   title: "Diagnostic Explorers | Van Esch Advisory",
@@ -132,13 +134,26 @@ export default async function AdvisorExplorersPage({ searchParams }: PageProps) 
   const to = resolvedSearchParams?.to?.trim() ?? "";
   const sort = getSafeSort(resolvedSearchParams?.sort);
 
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("client_projects")
-    .select("project_id, project_name, company_name, project_status, created_at")
-    .order("created_at", { ascending: sort === "oldest" });
+  let projects: Project[] = [];
+  let loadError = false;
 
-  const projects: Project[] = !error && data ? data : [];
+  if (isD1ClientDiagnosticEnabled()) {
+    try {
+      projects = await listD1ClientProjects(sort === "oldest");
+    } catch (error) {
+      console.error("Unable to load D1 explorer projects", error);
+      loadError = true;
+    }
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("client_projects")
+      .select("project_id, project_name, company_name, project_status, created_at")
+      .order("created_at", { ascending: sort === "oldest" });
+
+    projects = !error && data ? data : [];
+    loadError = Boolean(error);
+  }
   const filteredProjects = projects.filter((project) => {
     const matchesStatus = status === "all" || project.project_status === status;
 
@@ -251,7 +266,7 @@ export default async function AdvisorExplorersPage({ searchParams }: PageProps) 
           </p>
         </section>
 
-        {error ? (
+        {loadError ? (
           <section className="brand-surface-card p-6">
             <h2 className="text-lg font-semibold text-slate-900">
               Unable to load Explorers

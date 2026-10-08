@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { listD1ClientProjects } from "@/lib/d1/client-projects";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +17,14 @@ export async function GET() {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
+    if (isD1ClientDiagnosticEnabled()) {
+      return NextResponse.json({
+        success: true,
+        projects: await listD1ClientProjects(),
+      });
+    }
 
+    const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("client_projects")
       .select(

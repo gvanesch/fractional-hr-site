@@ -3,7 +3,12 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdvisorEmail } from "@/lib/advisor-access";
 import { checkClientDiagnosticInviteRateLimit } from "@/lib/security/client-diagnostic-invite-rate-limit";
+import { isD1DiagnosticSubmissionsEnabled } from "@/lib/d1/database";
 import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
+import {
+  isCloudflareAdvisorAuthEnabled,
+  verifyCloudflareAdvisorAccess,
+} from "@/lib/cloudflare-access";
 
 function applyProtectedHeaders(response: NextResponse) {
   response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -33,6 +38,20 @@ function getInviteTokenFromPath(pathname: string): string | null {
   } catch {
     return encodedToken;
   }
+}
+
+function isAdvisorApiPath(pathname: string): boolean {
+  return (
+    (pathname.startsWith("/api/advisor-") &&
+      pathname !== "/api/advisor-daily-action-digest") ||
+    pathname === "/api/prospect-update" ||
+    pathname === "/api/client-diagnostic-create-project" ||
+    pathname === "/api/client-diagnostic-project-status" ||
+    pathname === "/api/client-diagnostic-project-summary" ||
+    pathname === "/api/client-diagnostic-project-update" ||
+    pathname === "/api/client-diagnostic-projects" ||
+    pathname === "/api/client-diagnostic-report"
+  );
 }
 
 async function protectClientDiagnosticInvite(
@@ -102,7 +121,11 @@ async function protectClientDiagnosticInvite(
   }
 }
 
-function protectPublicSupabaseWrite(): NextResponse {
+function protectPublicDatabaseWrite(): NextResponse {
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    return NextResponse.next();
+  }
+
   try {
     getValidatedSupabaseUrl();
     return NextResponse.next();
@@ -132,6 +155,20 @@ async function protectAdvisorRoute(
 ): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
   const response = NextResponse.next();
+
+  if (isCloudflareAdvisorAuthEnabled()) {
+    try {
+      await verifyCloudflareAdvisorAccess(request.headers);
+      return applyProtectedHeaders(response);
+    } catch (error) {
+      console.error("[advisor-auth] Cloudflare Access middleware rejected request", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      return applyProtectedHeaders(
+        NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      );
+    }
+  }
 
   const supabase = createServerClient(
     getValidatedSupabaseUrl(),
@@ -190,14 +227,18 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/diagnostic-complete" ||
     pathname === "/api/contact"
   ) {
-    return protectPublicSupabaseWrite();
+    return protectPublicDatabaseWrite();
   }
 
   if (pathname.startsWith("/client-diagnostic/respond/")) {
     return protectClientDiagnosticInvite(request);
   }
 
-  if (pathname === "/advisor/login") {
+  if (isAdvisorApiPath(pathname) && isCloudflareAdvisorAuthEnabled()) {
+    return protectAdvisorRoute(request);
+  }
+
+  if (pathname === "/advisor/login" && !isCloudflareAdvisorAuthEnabled()) {
     return NextResponse.next();
   }
 
@@ -214,5 +255,6 @@ export const config = {
     "/client-diagnostic/respond/:path*",
     "/api/diagnostic-complete",
     "/api/contact",
+    "/api/:path*",
   ],
 };

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getD1ParticipantInvite } from "@/lib/d1/client-diagnostic";
+import { isD1ClientDiagnosticSecurityEnabled } from "@/lib/d1/database";
 import { issueParticipantOtp } from "@/lib/security/client-participant-otp";
 import { sendParticipantOtpEmail } from "@/lib/client-diagnostic/participant-email";
 
@@ -45,29 +47,44 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
+    let participant: ParticipantRow | null = null;
 
-    const { data, error } = await supabase
-      .from("client_participants")
-      .select("participant_id, project_id, invite_token")
-      .eq("invite_token", inviteToken)
-      .maybeSingle();
+    if (isD1ClientDiagnosticSecurityEnabled()) {
+      const d1Participant = await getD1ParticipantInvite(inviteToken);
+      participant = d1Participant
+        ? {
+            participant_id: d1Participant.participantId,
+            project_id: d1Participant.projectId,
+            invite_token: inviteToken,
+          }
+        : null;
+    } else {
+      const supabase = createSupabaseAdminClient();
 
-    if (error) {
-      console.error("Participant OTP lookup failed", {
-        error: error.message,
-      });
+      const { data, error } = await supabase
+        .from("client_participants")
+        .select("participant_id, project_id, invite_token")
+        .eq("invite_token", inviteToken)
+        .maybeSingle();
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to issue verification code.",
-        },
-        { status: 500 },
-      );
+      if (error) {
+        console.error("Participant OTP lookup failed", {
+          error: error.message,
+        });
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unable to issue verification code.",
+          },
+          { status: 500 },
+        );
+      }
+
+      participant = data as ParticipantRow | null;
     }
 
-    if (!data) {
+    if (!participant) {
       return NextResponse.json(
         {
           success: false,
@@ -76,8 +93,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 400 },
       );
     }
-
-    const participant = data as ParticipantRow;
 
     const issueResult = await issueParticipantOtp({
       participantId: participant.participant_id,

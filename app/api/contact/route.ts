@@ -1,5 +1,21 @@
 import { NextResponse } from "next/server";
 import {
+  upsertD1HealthCheckProspect,
+  type D1HealthCheckProspectRow,
+} from "../../../lib/d1/crm-prospects";
+import {
+  insertD1ContactSubmission,
+  updateD1ContactSubmission,
+  type D1ContactSubmissionFields,
+} from "../../../lib/d1/diagnostic-submissions";
+import {
+  getD1Database,
+  isD1CrmProspectsEnabled,
+  isD1CrmProspectsShadowWriteEnabled,
+  isD1DiagnosticSubmissionsEnabled,
+  isD1DiagnosticSubmissionsShadowWriteEnabled,
+} from "../../../lib/d1/database";
+import {
   buildAdvisorBrief,
   calculateDiagnosticResult,
   type DiagnosticAnswers,
@@ -62,6 +78,87 @@ function escapeHtml(value: string): string {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function parseD1HealthCheckProspectRow(
+  input: unknown,
+  expectedSubmissionId: string,
+): D1HealthCheckProspectRow {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Supabase prospect upsert returned an invalid row.");
+  }
+
+  const row = input as Record<string, unknown>;
+
+  if (
+    !isNonEmptyString(row.prospect_id) ||
+    row.submission_id !== expectedSubmissionId ||
+    !isNullableString(row.name) ||
+    !isNullableString(row.company) ||
+    !isNullableString(row.last_contact_date) ||
+    !isNullableString(row.next_action_date) ||
+    !isNullableString(row.notes) ||
+    !isNonEmptyString(row.created_at) ||
+    !isNonEmptyString(row.updated_at)
+  ) {
+    throw new Error(
+      "Supabase prospect upsert did not return the required D1 fields.",
+    );
+  }
+
+  const relationship = row.relationship;
+
+  if (
+    relationship !== "weak" &&
+    relationship !== "medium" &&
+    relationship !== "strong"
+  ) {
+    throw new Error("Supabase prospect returned an invalid relationship.");
+  }
+
+  const status = row.status;
+
+  if (
+    status !== "not_contacted" &&
+    status !== "contacted" &&
+    status !== "replied" &&
+    status !== "call_booked" &&
+    status !== "opportunity" &&
+    status !== "won" &&
+    status !== "lost"
+  ) {
+    throw new Error("Supabase prospect returned an invalid status.");
+  }
+
+  const source = row.source;
+
+  if (
+    source !== "network" &&
+    source !== "referral" &&
+    source !== "website" &&
+    source !== "other"
+  ) {
+    throw new Error("Supabase prospect returned an invalid source.");
+  }
+
+  return {
+    prospectId: row.prospect_id,
+    submissionId: expectedSubmissionId,
+    name: row.name,
+    company: row.company,
+    relationship,
+    status,
+    lastContactDate: row.last_contact_date,
+    nextActionDate: row.next_action_date,
+    source,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function normaliseOptionalString(
@@ -244,6 +341,33 @@ function parseRequestBody(input: unknown): ContactRequestBody {
   };
 }
 
+function buildD1ContactSubmissionFields(params: {
+  body: ContactRequestBody;
+  result: DiagnosticResult | null;
+  advisorBrief: AdvisorBrief | null;
+  contactSubmittedAt: string;
+}): D1ContactSubmissionFields {
+  const { body, result, advisorBrief, contactSubmittedAt } = params;
+
+  return {
+    contactName: body.name,
+    contactEmail: body.email,
+    contactCompany: body.company || null,
+    contactTopic: body.topic || null,
+    contactMessage: body.message,
+    contactSource: body.source || "website",
+    companySize: body.companySize || null,
+    industry: body.industry || null,
+    role: body.role || null,
+    countryRegion: body.countryRegion || null,
+    answers: body.diagnosticAnswers || null,
+    score: result?.score ?? null,
+    band: result?.band.label ?? null,
+    advisorBrief: advisorBrief ?? null,
+    contactSubmittedAt,
+  };
+}
+
 async function createLeadSubmission(params: {
   body: ContactRequestBody;
   result: DiagnosticResult | null;
@@ -251,17 +375,7 @@ async function createLeadSubmission(params: {
 }) {
   const { body, result, advisorBrief } = params;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
+  const contactSubmittedAt = new Date().toISOString();
   const rowToInsert = {
     contact_name: body.name,
     contact_email: body.email,
@@ -278,8 +392,39 @@ async function createLeadSubmission(params: {
     score: result?.score ?? null,
     band: result?.band.label ?? null,
     advisor_brief: advisorBrief ?? null,
-    contact_submitted_at: new Date().toISOString(),
+    contact_submitted_at: contactSubmittedAt,
   };
+
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const submissionId = crypto.randomUUID();
+
+    await insertD1ContactSubmission({
+      ...buildD1ContactSubmissionFields({
+        body,
+        result,
+        advisorBrief,
+        contactSubmittedAt,
+      }),
+      id: crypto.randomUUID(),
+      createdAt: contactSubmittedAt,
+      submissionId,
+      submissionSource: rowToInsert.submission_source,
+    });
+
+    console.log("CONTACT_D1_INSERT_SUCCESS", { submissionId });
+    return submissionId;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
 
   const response = await fetch(`${supabaseUrl}/rest/v1/diagnostic_submissions`, {
     method: "POST",
@@ -303,9 +448,16 @@ async function createLeadSubmission(params: {
     throw new Error(`Supabase insert failed: ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as unknown;
+  const returnedRow =
+    Array.isArray(data) &&
+    data[0] &&
+    typeof data[0] === "object" &&
+    !Array.isArray(data[0])
+      ? (data[0] as Record<string, unknown>)
+      : null;
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (!returnedRow || !isNonEmptyString(returnedRow.submission_id)) {
     console.error("CONTACT_DB_INSERT_FAILED", {
       error: "Supabase insert succeeded but no submission_id returned.",
     });
@@ -313,11 +465,46 @@ async function createLeadSubmission(params: {
     throw new Error("Supabase insert succeeded but no submission_id returned.");
   }
 
-  const submissionId = data[0].submission_id as string;
+  const submissionId = returnedRow.submission_id;
 
   console.log("CONTACT_DB_INSERT_SUCCESS", {
     submissionId,
   });
+
+  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+    try {
+      if (
+        !isNonEmptyString(returnedRow.id) ||
+        !isNonEmptyString(returnedRow.created_at)
+      ) {
+        throw new Error(
+          "Supabase insert did not return the D1 identity fields.",
+        );
+      }
+
+      await insertD1ContactSubmission({
+        ...buildD1ContactSubmissionFields({
+          body,
+          result,
+          advisorBrief,
+          contactSubmittedAt,
+        }),
+        id: returnedRow.id,
+        createdAt: returnedRow.created_at,
+        submissionId,
+        submissionSource: rowToInsert.submission_source,
+      });
+
+      console.log("CONTACT_D1_SHADOW_INSERT_SUCCESS", {
+        submissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_D1_SHADOW_INSERT_FAILED", {
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 
   return submissionId;
 }
@@ -330,17 +517,7 @@ async function updateExistingLeadSubmission(params: {
 }) {
   const { submissionId, body, result, advisorBrief } = params;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
+  const contactSubmittedAt = new Date().toISOString();
   const rowToUpdate = {
     contact_name: body.name,
     contact_email: body.email,
@@ -356,8 +533,38 @@ async function updateExistingLeadSubmission(params: {
     score: result?.score ?? null,
     band: result?.band.label ?? null,
     advisor_brief: advisorBrief ?? null,
-    contact_submitted_at: new Date().toISOString(),
+    contact_submitted_at: contactSubmittedAt,
   };
+
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const updated = await updateD1ContactSubmission({
+      ...buildD1ContactSubmissionFields({
+        body,
+        result,
+        advisorBrief,
+        contactSubmittedAt,
+      }),
+      submissionId,
+    });
+
+    if (!updated) {
+      throw new Error("No matching D1 submission was found.");
+    }
+
+    console.log("CONTACT_D1_UPDATE_SUCCESS", { submissionId });
+    return submissionId;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
 
   const response = await fetch(
     `${supabaseUrl}/rest/v1/diagnostic_submissions?submission_id=eq.${encodeURIComponent(
@@ -387,9 +594,16 @@ async function updateExistingLeadSubmission(params: {
     throw new Error(`Supabase update failed: ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as unknown;
+  const returnedRow =
+    Array.isArray(data) &&
+    data[0] &&
+    typeof data[0] === "object" &&
+    !Array.isArray(data[0])
+      ? (data[0] as Record<string, unknown>)
+      : null;
 
-  if (!Array.isArray(data) || !data[0]?.submission_id) {
+  if (!returnedRow || !isNonEmptyString(returnedRow.submission_id)) {
     console.error("CONTACT_DB_UPDATE_FAILED", {
       submissionId,
       error: "Supabase update succeeded but no submission_id returned.",
@@ -398,11 +612,40 @@ async function updateExistingLeadSubmission(params: {
     throw new Error("Supabase update succeeded but no submission_id returned.");
   }
 
+  const returnedSubmissionId = returnedRow.submission_id;
+
   console.log("CONTACT_DB_UPDATE_SUCCESS", {
-    submissionId: data[0].submission_id,
+    submissionId: returnedSubmissionId,
   });
 
-  return data[0].submission_id as string;
+  if (isD1DiagnosticSubmissionsShadowWriteEnabled()) {
+    try {
+      const updated = await updateD1ContactSubmission({
+        ...buildD1ContactSubmissionFields({
+          body,
+          result,
+          advisorBrief,
+          contactSubmittedAt,
+        }),
+        submissionId: returnedSubmissionId,
+      });
+
+      if (!updated) {
+        throw new Error("No matching D1 submission was found.");
+      }
+
+      console.log("CONTACT_D1_SHADOW_UPDATE_SUCCESS", {
+        submissionId: returnedSubmissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_D1_SHADOW_UPDATE_FAILED", {
+        submissionId: returnedSubmissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  return returnedSubmissionId;
 }
 
 async function upsertProspect(params: {
@@ -410,6 +653,20 @@ async function upsertProspect(params: {
   body: ContactRequestBody;
 }) {
   const { submissionId, body } = params;
+
+  if (isD1CrmProspectsEnabled()) {
+    await getD1Database().prepare(`
+      INSERT INTO health_check_prospects
+        (prospect_id, submission_id, name, company, source, status, relationship, updated_at)
+      VALUES (?, ?, ?, ?, 'website', 'not_contacted', 'weak', ?)
+      ON CONFLICT(submission_id) DO UPDATE SET
+        name = excluded.name, company = excluded.company, source = excluded.source,
+        status = excluded.status, relationship = excluded.relationship,
+        updated_at = excluded.updated_at
+    `).bind(crypto.randomUUID(), submissionId, body.name, body.company || null,
+      new Date().toISOString()).run();
+    return;
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -461,6 +718,27 @@ async function upsertProspect(params: {
   console.log("CONTACT_CRM_UPSERT_SUCCESS", {
     submissionId,
   });
+
+  if (isD1CrmProspectsShadowWriteEnabled()) {
+    try {
+      const data = (await response.json()) as unknown;
+      const returnedRow =
+        Array.isArray(data) && data.length === 1 ? data[0] : null;
+
+      await upsertD1HealthCheckProspect(
+        parseD1HealthCheckProspectRow(returnedRow, submissionId),
+      );
+
+      console.log("CONTACT_CRM_D1_SHADOW_UPSERT_SUCCESS", {
+        submissionId,
+      });
+    } catch (error) {
+      console.error("CONTACT_CRM_D1_SHADOW_UPSERT_FAILED", {
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 }
 
 function buildListHtml(items: string[]): string {
