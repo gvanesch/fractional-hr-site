@@ -1,5 +1,6 @@
 // GET-only production configuration audit. Never print binding values or API bodies.
 import { verifyProductionPublicKey } from "./verify-production-public-key.mjs";
+import { readFile } from "node:fs/promises";
 const account = "73221f18acc676e4992c89fcbf2b2a8f";
 const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
 if (process.env.GITHUB_REF !== "refs/heads/migration/d1" ||
@@ -29,7 +30,8 @@ for (const name of ["ASSETS", "WORKER_SELF_REFERENCE", "DB", "RESEND_API_KEY", "
   "CLOUDFLARE_ACCESS_TEAM_DOMAIN", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"])
   console.log(`Binding ${name}: ${bindings.has(name) ? "present" : "MISSING"}`);
-const expectedMode = process.env.PRODUCTION_EXPECTED_D1_MODE ?? "off";
+const rootConfig = JSON.parse(await readFile(new URL("../../wrangler.jsonc", import.meta.url)));
+const expectedMode = process.env.PRODUCTION_EXPECTED_D1_MODE ?? rootConfig.vars?.D1_SYSTEM_EVENTS_MODE;
 if (!["off", "d1"].includes(expectedMode)) throw new Error("Invalid expected production D1 mode.");
 for (const name of ["SYSTEM_EVENTS", "DIAGNOSTIC_SUBMISSIONS", "CRM_PROSPECTS", "CLIENT_DIAGNOSTIC", "CLIENT_DIAGNOSTIC_SECURITY"]) {
   const mode = bindings.get(`D1_${name}_MODE`)?.text ?? "off";

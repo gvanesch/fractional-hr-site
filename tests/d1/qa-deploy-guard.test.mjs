@@ -42,12 +42,16 @@ test("QA deploy guard pins the database, Worker, flags, and site URL", async () 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(config.env.qa.vars.NEXT_PUBLIC_APP_ENV, "qa");
   assert.equal(config.env.qa.vars.NEXT_PUBLIC_SITE_URL, "https://fractional-hr-site-qa.qa-test.workers.dev");
-  assert.equal(config.vars.D1_CLIENT_DIAGNOSTIC_MODE, "off");
+  const original = JSON.parse(await readFile(configSource, "utf8"));
+  assert.deepEqual(config.vars, original.vars);
+  const activated = await run(c => { for (const name of Object.keys(c.vars).filter(name => /^D1_.*_MODE$/.test(name))) c.vars[name] = "d1"; });
+  assert.equal(activated.result.status, 0, activated.result.stderr);
+  assert.equal(activated.config.vars.D1_CLIENT_DIAGNOSTIC_MODE, "d1");
   assert.match(env, /NEXT_PUBLIC_SITE_URL=https:\/\/fractional-hr-site-qa\.qa-test\.workers\.dev/);
   for (const change of [
     (c) => { c.env.qa.d1_databases[0].database_id = c.d1_databases[0].database_id; },
     (c) => { c.env.qa.services[0].service = c.name; },
-    (c) => { c.vars.D1_CLIENT_DIAGNOSTIC_MODE = "d1"; },
+    (c) => { c.vars.D1_CLIENT_DIAGNOSTIC_MODE = c.vars.D1_SYSTEM_EVENTS_MODE === "d1" ? "off" : "d1"; },
     (c) => { c.env.qa.routes = [{ pattern: "vanesch.uk/*" }]; },
   ]) {
     const rejected = await run(change);

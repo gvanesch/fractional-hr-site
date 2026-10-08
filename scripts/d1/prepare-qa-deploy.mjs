@@ -33,10 +33,11 @@ const flags = [
   "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
 ];
 if (
-  flags.some((name) => config.vars?.[name] !== "off" || qa.vars?.[name] !== "d1") ||
+  flags.some((name) => !["off", "d1"].includes(config.vars?.[name]) || qa.vars?.[name] !== "d1") ||
+  new Set(flags.map(name => config.vars[name])).size !== 1 ||
   qa.vars?.ADVISOR_AUTH_MODE !== "cloudflare_access"
 )
-  throw new Error("QA D1/Access flags or production-off flags are unexpected.");
+  throw new Error("QA D1/Access flags or production flag consistency is unexpected.");
 
 const response = await fetch(
   `https://api.cloudflare.com/client/v4/accounts/${account}/workers/subdomain`,
@@ -59,4 +60,4 @@ await writeFile(
   `NEXT_PUBLIC_APP_ENV=qa\nNEXT_PUBLIC_SUPABASE_URL=${qa.vars.NEXT_PUBLIC_SUPABASE_URL}\nNEXT_PUBLIC_SITE_URL=${siteUrl}\n`,
   { flag: "a" },
 );
-console.log("QA deployment target verified; production flags remain off.");
+console.log("QA deployment target verified; production flags are preserved.");

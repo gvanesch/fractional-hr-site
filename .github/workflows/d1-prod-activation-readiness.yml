@@ -6,7 +6,12 @@ on:
     paths:
       - scripts/d1/prepare-approved-production-activation.mjs
       - scripts/d1/production-client-source-manifest.json
+      - scripts/d1/production-config-audit.mjs
+      - scripts/d1/prepare-qa-deploy.mjs
       - tests/d1/production-activation.test.mjs
+      - tests/d1/production-config-audit.test.mjs
+      - tests/d1/production-release.test.mjs
+      - tests/d1/qa-deploy-guard.test.mjs
       - .github/workflows/d1-prod-activation-readiness.yml
       - .github/workflows/d1-prod-approved-activation.yml
 
