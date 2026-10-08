@@ -4,7 +4,7 @@
   "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
   "worker": "fractional-hr-site",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
-  "reviewedCommit": "7e75267ced1d3904fb461e8758e70f7c8b21b838",
-  "expectedDeploymentId": "c4de9d9b-39db-4b72-8ef7-002f1a7a1d13",
-  "confirmedAt": "2026-10-04T14:28:43Z"
+  "reviewedCommit": "81ab20a2e71ec379f22c0333918ae9160b4fdda0",
+  "expectedDeploymentId": "d7f9a678-a787-48b6-8d29-c0bd74cba241",
+  "confirmedAt": "2026-10-08T13:19:30Z"
 }
