@@ -29,14 +29,16 @@ for (const name of ["ASSETS", "WORKER_SELF_REFERENCE", "DB", "RESEND_API_KEY", "
   "CLOUDFLARE_ACCESS_TEAM_DOMAIN", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"])
   console.log(`Binding ${name}: ${bindings.has(name) ? "present" : "MISSING"}`);
+const expectedMode = process.env.PRODUCTION_EXPECTED_D1_MODE ?? "off";
+if (!["off", "d1"].includes(expectedMode)) throw new Error("Invalid expected production D1 mode.");
 for (const name of ["SYSTEM_EVENTS", "DIAGNOSTIC_SUBMISSIONS", "CRM_PROSPECTS", "CLIENT_DIAGNOSTIC", "CLIENT_DIAGNOSTIC_SECURITY"]) {
   const mode = bindings.get(`D1_${name}_MODE`)?.text ?? "off";
-  if (mode !== "off") throw new Error("Production flags changed; review before release preparation.");
+  if (mode !== expectedMode) throw new Error("Production flags changed; review before release preparation.");
 }
 const db = bindings.get("DB");
 if (db && (db.id ?? db.database_id) !== "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc")
   throw new Error("Unexpected production DB binding.");
-console.log("All five production D1 flags are off.");
+console.log(`All five production D1 flags are ${expectedMode}.`);
 console.log(`Source URL verified: ${bindings.get("NEXT_PUBLIC_SUPABASE_URL")?.text === "https://qxddddhhpfrrxbaunwfw.supabase.co"}`);
 console.log(`Canonical site URL verified: ${bindings.get("NEXT_PUBLIC_SITE_URL")?.text?.replace(/\/$/, "") === "https://vanesch.uk"}`);
 console.log(`Production Access auth enabled: ${bindings.get("ADVISOR_AUTH_MODE")?.text === "cloudflare_access"}`);
