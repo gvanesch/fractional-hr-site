@@ -1,0 +1,66 @@
+.tb-prototype-note {
+  padding: 12px 16px;
+  background: #fff5bf;
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+.tb-prototype .tb-process {
+  border: 1px solid #d6e2e7;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 18px 0;
+  background: #fff;
+}
+.tb-prototype .tb-process summary {
+  padding: 6px 0;
+}
+.tb-prototype .tb-process h2 {
+  margin-top: 10px;
+}
+.tb-prototype .tb-activity {
+  border-top: 1px solid #d6e2e7;
+  padding: 12px 0;
+}
+.tb-prototype .tb-answer-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.tb-prototype .tb-answer-pair .tb-field {
+  margin: 8px 0;
+}
+.tb-prototype .tb-definition {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.tb-prototype .tb-bulk {
+  background: #edf7fa;
+  padding: 16px;
+  border-radius: 10px;
+  margin: 14px 0;
+}
+.tb-prototype .tb-activity-help {
+  display: block;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.tb-prototype .tb-compact-text {
+  font-size: 0.88rem;
+}
+.tb-prototype .tb-review-activity {
+  padding: 10px 0;
+  border-top: 1px solid #d6e2e7;
+}
+.tb-prototype .tb-review-activity p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+@media (max-width: 600px) {
+  .tb-prototype .tb-answer-pair {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .tb-prototype .tb-process {
+    padding: 12px;
+  }
+}

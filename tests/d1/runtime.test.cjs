@@ -584,6 +584,7 @@ test("Access middleware fails closed while cron retains its own authorization", 
     });
     for (const path of [
       "/advisor",
+      "/advisor/baseline/api/campaigns",
       "/api/advisor-project-participants",
       "/api/client-diagnostic-create-project",
     ]) {

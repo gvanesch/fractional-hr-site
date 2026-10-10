@@ -41,6 +41,9 @@
   "env": {
     "qa": {
       "vars": {
+        "BASELINE_ENABLED": "true",
+        "BASELINE_MAIL_MODE": "preview",
+        "NEXT_PUBLIC_APP_ENV": "qa",
         "D1_SYSTEM_EVENTS_MODE": "d1",
         "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "d1",
         "D1_CRM_PROSPECTS_MODE": "d1",
