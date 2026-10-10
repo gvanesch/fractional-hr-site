@@ -1,4 +1,5 @@
 import { AREAS, FREQUENCIES, ROLES } from "./model";
+import { ACTION_LABELS } from "./prototype-actions";
 
 // Prototype-only process groupings. They do not alter the deployed questionnaire.
 export const PROCESSES = [
@@ -67,18 +68,73 @@ export type ActivityAnswer = {
 };
 export type PrototypeDraft = {
   selected: string[];
+  customActivities: { code: string; label: string; processCode: string }[];
   time: Record<string, number>;
   answers: Record<string, ActivityAnswer>;
   notes: Record<string, string>;
 };
 export const emptyPrototype = (): PrototypeDraft => ({
   selected: [],
+  customActivities: [],
   time: {},
   answers: {},
   notes: {},
 });
+export const activityChoices = (d: PrototypeDraft) => [
+  ...AREAS.map((a) => ({ ...a, label: ACTION_LABELS[a.code] ?? a.label })),
+  ...(d.customActivities ?? []).map((a) => ({
+    ...a,
+    example: "An activity you added.",
+  })),
+];
+export function processesFor(d: PrototypeDraft) {
+  const custom = d.customActivities ?? [];
+  return [
+    ...PROCESSES.map((p) => ({
+      ...p,
+      codes: [
+        ...p.codes,
+        ...custom.filter((a) => a.processCode === p.code).map((a) => a.code),
+      ],
+    })),
+    {
+      code: "other_work",
+      label: "Other work / not sure where it fits",
+      codes: custom
+        .filter((a) => a.processCode === "other_work")
+        .map((a) => a.code),
+    },
+  ];
+}
 export const activeProcesses = (d: PrototypeDraft) =>
-  PROCESSES.filter((p) => p.codes.some((c) => d.selected.includes(c)));
+  processesFor(d).filter((p) => p.codes.some((c) => d.selected.includes(c)));
+export function addActivity(
+  d: PrototypeDraft,
+  label: string,
+  processCode: string,
+  code: string,
+): PrototypeDraft {
+  const text = label.trim();
+  if (
+    !text ||
+    text.length > 120 ||
+    (d.customActivities ?? []).length >= 20 ||
+    activityChoices(d).some(
+      (a) => a.label.toLowerCase() === text.toLowerCase(),
+    ) ||
+    ![...PROCESSES.map((p) => p.code), "other_work"].includes(processCode) ||
+    !/^added_[a-f0-9-]{36}$/.test(code)
+  )
+    throw new Error("Add a short, unique activity and choose its group.");
+  return {
+    ...d,
+    customActivities: [
+      ...(d.customActivities ?? []),
+      { code, label: text, processCode },
+    ],
+    selected: [...d.selected, code],
+  };
+}
 export const processTotal = (d: PrototypeDraft) =>
   Math.round(
     activeProcesses(d).reduce((sum, p) => sum + (d.time[p.code] ?? 0), 0) * 100,
@@ -115,7 +171,7 @@ export function applyAnswers(
 ): PrototypeDraft {
   if (!FREQUENCIES.includes(frequency) || !ROLES.includes(role))
     throw new Error("Choose a frequency and your part in the work.");
-  const process = PROCESSES.find((p) => p.code === processCode);
+  const process = processesFor(d).find((p) => p.code === processCode);
   if (!process) throw new Error("Choose a process group.");
   const answers = { ...d.answers };
   for (const code of process.codes.filter((c) => d.selected.includes(c))) {
@@ -156,8 +212,8 @@ export function prototypeEvidence(d: PrototypeDraft) {
     })),
     activities: d.selected.map((code) => ({
       code,
-      label: AREAS.find((a) => a.code === code)?.label,
-      processCode: PROCESSES.find((p) => p.codes.includes(code))?.code,
+      label: activityChoices(d).find((a) => a.code === code)?.label,
+      processCode: processesFor(d).find((p) => p.codes.includes(code))?.code,
       frequency: d.answers[code]?.frequency ?? null,
       role: d.answers[code]?.role ?? null,
       importantOccasionalWork: d.answers[code]?.important ?? false,

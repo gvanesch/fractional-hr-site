@@ -6,6 +6,61 @@ const fs = require("node:fs"),
   vm = require("node:vm"),
   ts = require("typescript");
 const root = path.resolve(__dirname, "../..");
+test("Prototype custom work remains comparable and unclassified work is explicit", () => {
+  const h = harness(),
+    p = h.prototype;
+  let d = p.addActivity(
+    p.emptyPrototype(),
+    "Coordinate welcome gifts",
+    "employee_admin",
+    "added_11111111-1111-1111-1111-111111111111",
+  );
+  assert.equal(p.activeProcesses(d).length, 1);
+  d = p.applyAnswers(d, "employee_admin", "most_weeks", "lead_part");
+  assert.equal(
+    p.prototypeEvidence(d).activities[0].label,
+    "Coordinate welcome gifts",
+  );
+  assert.equal(p.prototypeEvidence(d).activities[0].role, "lead_part");
+  d = p.addActivity(
+    d,
+    "A different local process",
+    "other_work",
+    "added_22222222-2222-2222-2222-222222222222",
+  );
+  assert.equal(p.activeProcesses(d).length, 2);
+  const e = p
+    .prototypeEvidence(d)
+    .activities.find((a) => a.label === "A different local process");
+  assert.equal(e.processCode, "other_work");
+  assert.equal(e.role, null);
+  assert.throws(() =>
+    p.addActivity(
+      d,
+      "coordinate welcome gifts",
+      "office",
+      "added_33333333-3333-3333-3333-333333333333",
+    ),
+  );
+  assert.throws(() =>
+    p.addActivity(
+      d,
+      "Some task",
+      "guessed-group",
+      "added_33333333-3333-3333-3333-333333333333",
+    ),
+  );
+  const choices = p.activityChoices(d);
+  assert.ok(
+    choices
+      .find((a) => a.code === "ops_07")
+      .label.includes("payroll information"),
+  );
+  assert.ok(
+    choices.find((a) => a.code === "office_01").label.includes("front desk"),
+  );
+  h.sqlite.close();
+});
 test("Process prototype bounds time entry while retaining every activity", () => {
   const h = harness(),
     p = h.prototype,

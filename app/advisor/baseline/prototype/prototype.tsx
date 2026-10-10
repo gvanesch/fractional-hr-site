@@ -11,6 +11,9 @@ import { OPTION_HELP } from "@/lib/baseline/help";
 import {
   PROCESSES,
   emptyPrototype,
+  activityChoices,
+  processesFor,
+  addActivity,
   activeProcesses,
   processTotal,
   completeAnswer,
@@ -22,6 +25,7 @@ import {
   type ActivityAnswer,
 } from "@/lib/baseline/prototype";
 import "@/app/baseline/start/style.css";
+import { PROCESS_EXAMPLES } from "@/lib/baseline/prototype-actions";
 import "./prototype.css";
 const STEPS = [
   "Your activities",
@@ -70,6 +74,47 @@ function Choice({
     </label>
   );
 }
+function AddBox({
+  processCode,
+  onAdd,
+}: {
+  processCode: string;
+  onAdd: (label: string, group: string) => boolean;
+}) {
+  const [label, setLabel] = useState(""),
+    [group, setGroup] = useState(processCode);
+  const title =
+    PROCESSES.find((p) => p.code === processCode)?.label ?? "other work";
+  return (
+    <div className="tb-add-box">
+      <label className="tb-field">
+        <span>Another activity: {title}</span>
+        <input
+          maxLength={120}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </label>
+      {processCode === "other_work" && (
+        <Choice
+          label="Where does this added activity fit?"
+          value={group}
+          codes={[...PROCESSES.map((p) => p.code), "other_work"]}
+          labels={[...PROCESSES.map((p) => p.label), "Not sure where it fits"]}
+          change={setGroup}
+        />
+      )}
+      <button
+        disabled={!label.trim()}
+        onClick={() => {
+          if (onAdd(label, group)) setLabel("");
+        }}
+      >
+        Add activity
+      </button>
+    </div>
+  );
+}
 export default function Prototype() {
   const [draft, setDraft] = useState<PrototypeDraft>(emptyPrototype),
     [started, setStarted] = useState(false),
@@ -77,6 +122,9 @@ export default function Prototype() {
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false),
     [search, setSearch] = useState(""),
+    [groups, setGroups] = useState<string[]>([]),
+    [coverage, setCoverage] = useState(false),
+    [addError, setAddError] = useState(""),
     [bulk, setBulk] = useState<
       Record<string, { frequency: string; role: string }>
     >({});
@@ -84,10 +132,22 @@ export default function Prototype() {
   useEffect(() => {
     heading.current?.focus();
     window.scrollTo({ top: 0 });
-  }, [stage, started]);
+  }, [stage, started, coverage]);
+  const choices = activityChoices(draft);
+  const processes = processesFor(draft);
   const active = activeProcesses(draft),
     issues = checked ? prototypeIssues(draft, stage) : [];
   function go(next: number) {
+    if (stage === 0 && next > 0 && !coverage) {
+      if (prototypeIssues(draft, 0).length) setChecked(true);
+      else {
+        setCoverage(true);
+        setChecked(false);
+        setSearch("");
+      }
+      return;
+    }
+
     if (next === 3) {
       const incomplete = [0, 1, 2].find(
         (s) => prototypeIssues(draft, s).length > 0,
@@ -106,6 +166,7 @@ export default function Prototype() {
     }
     setChecked(false);
     setStage(next);
+    setCoverage(false);
     if (next === 3) setReviewVisited(true);
   }
   function answer(
@@ -127,6 +188,19 @@ export default function Prototype() {
         },
       },
     });
+  }
+  function add(label: string, group: string) {
+    try {
+      setDraft(
+        addActivity(draft, label, group, "added_" + crypto.randomUUID()),
+      );
+      setGroups([...new Set([...groups, group])]);
+      setAddError("");
+      return true;
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : "Check the activity name.");
+      return false;
+    }
   }
   const completed = draft.selected.filter((c) =>
     completeAnswer(draft.answers[c]),
@@ -168,6 +242,7 @@ export default function Prototype() {
                 ...emptyPrototype(),
                 selected: AREAS.map((a) => a.code),
               });
+              setGroups(PROCESSES.map((p) => p.code));
               setStarted(true);
             }}
           >
@@ -184,6 +259,11 @@ export default function Prototype() {
               groups
             </span>
           </nav>
+          {addError && (
+            <div role="alert" className="tb-error">
+              {addError}
+            </div>
+          )}
           {issues.length > 0 && (
             <div role="alert" className="tb-error">
               {stage === 0
@@ -195,77 +275,167 @@ export default function Prototype() {
           )}
           <section className="tb-card">
             <h1 ref={heading} tabIndex={-1}>
-              {STEPS[stage]}
+              {stage === 0 && coverage
+                ? "Check for missing work"
+                : STEPS[stage]}
             </h1>
             {stage === 0 && (
               <>
-                <p>
-                  Choose the work you actually do. Small or occasional
-                  activities are welcome. The groups help you find activities;
-                  they do not describe your job title.
-                </p>
-                <label className="tb-field">
-                  <span>Find an activity</span>
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </label>
-                {PROCESSES.map((p) => {
-                  const areas = AREAS.filter(
-                    (a) =>
-                      p.codes.includes(a.code) &&
-                      a.label.toLowerCase().includes(search.toLowerCase()),
-                  );
-                  return areas.length ? (
-                    <details
-                      key={p.code}
-                      className="tb-process"
-                      open={!!search || undefined}
-                    >
-                      <summary>
-                        {p.label}{" "}
-                        <small>
-                          (
-                          {
-                            p.codes.filter((c) => draft.selected.includes(c))
-                              .length
-                          }{" "}
-                          selected)
-                        </small>
-                      </summary>
-                      <div className="tb-options">
-                        {areas.map((a) => (
-                          <label key={a.code}>
-                            <input
-                              type="checkbox"
-                              checked={draft.selected.includes(a.code)}
-                              onChange={() =>
-                                setDraft(
-                                  selectActivities(
-                                    draft,
-                                    draft.selected.includes(a.code)
-                                      ? draft.selected.filter(
-                                          (c) => c !== a.code,
-                                        )
-                                      : [...draft.selected, a.code],
-                                  ),
-                                )
-                              }
-                            />
-                            <span>
-                              {a.label}
+                {coverage ? (
+                  <>
+                    <p>
+                      Before continuing, check these groups. Do you also do work
+                      here, even occasionally?
+                    </p>
+                    {processes
+                      .filter((p) => !active.some((a) => a.code === p.code))
+                      .map((p) => (
+                        <section className="tb-process" key={p.code}>
+                          <h2>{p.label}</h2>
+                          <p>{PROCESS_EXAMPLES[p.code]}</p>
+                          <button
+                            onClick={() => {
+                              setGroups([...new Set([...groups, p.code])]);
+                              setCoverage(false);
+                            }}
+                          >
+                            Add work from {p.label.toLowerCase()}
+                          </button>
+                        </section>
+                      ))}
+                    {active.length === processes.length && (
+                      <p>You have included work from every group.</p>
+                    )}
+                    <p>
+                      Is there work you do that is still missing? Add it below.
+                      You can also go back and change your activity selections.
+                    </p>
+                    <AddBox processCode="other_work" onAdd={add} />
+                    <button onClick={() => setCoverage(false)}>
+                      Back to group and activity choices
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Choose all the groups that include work you do. You can
+                      select several. These groups describe work, rather than
+                      job titles.
+                    </p>
+                    <div className="tb-options tb-group-options">
+                      {processes.map((p) => (
+                        <label key={p.code}>
+                          <input
+                            aria-label={"Choose group: " + p.label}
+                            type="checkbox"
+                            checked={
+                              groups.includes(p.code) ||
+                              active.some((a) => a.code === p.code)
+                            }
+                            disabled={active.some((a) => a.code === p.code)}
+                            onChange={() =>
+                              setGroups(
+                                groups.includes(p.code)
+                                  ? groups.filter((c) => c !== p.code)
+                                  : [...groups, p.code],
+                              )
+                            }
+                          />
+                          <span>
+                            <strong>{p.label}</strong>
+                            <small className="tb-activity-help">
+                              {PROCESS_EXAMPLES[p.code]}
+                            </small>
+                            {active.some((a) => a.code === p.code) && (
                               <small className="tb-activity-help">
-                                {a.example}
+                                Included. Uncheck individual activities below to
+                                remove this group.
                               </small>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <details>
+                      <summary>
+                        Optional search within your chosen groups
+                      </summary>
+                      <label className="tb-field">
+                        <span>Optional activity search</span>
+                        <input
+                          type="search"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </label>
+                      <p>
+                        You can browse every action below without using search.
+                      </p>
                     </details>
-                  ) : null;
-                })}
+                    {processes
+                      .filter(
+                        (p) =>
+                          groups.includes(p.code) ||
+                          active.some((a) => a.code === p.code),
+                      )
+                      .map((p) => (
+                        <section className="tb-process" key={p.code}>
+                          <h2>{p.label}</h2>
+                          <p>
+                            Select actions you do, including small or occasional
+                            tasks. Similar words can describe the same work.
+                            Count it once.
+                          </p>
+                          <div className="tb-options">
+                            {choices
+                              .filter(
+                                (a) =>
+                                  p.codes.includes(a.code) &&
+                                  (!search ||
+                                    draft.selected.includes(a.code) ||
+                                    (a.label + " " + a.example)
+                                      .toLowerCase()
+                                      .includes(search.toLowerCase())),
+                              )
+                              .map((a) => (
+                                <label key={a.code}>
+                                  <input
+                                    aria-label={"Select activity: " + a.label}
+                                    type="checkbox"
+                                    checked={draft.selected.includes(a.code)}
+                                    onChange={() =>
+                                      setDraft(
+                                        selectActivities(
+                                          draft,
+                                          draft.selected.includes(a.code)
+                                            ? draft.selected.filter(
+                                                (c) => c !== a.code,
+                                              )
+                                            : [...draft.selected, a.code],
+                                        ),
+                                      )
+                                    }
+                                  />
+                                  <span>
+                                    {a.label}
+                                    <small className="tb-activity-help">
+                                      {a.example}
+                                    </small>
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
+                          <AddBox processCode={p.code} onAdd={add} />
+                        </section>
+                      ))}
+                    <h2>Something else, or not sure where it fits?</h2>
+                    <p>
+                      Add work using your own words. You do not need to know its
+                      formal name.
+                    </p>
+                    <AddBox processCode="other_work" onAdd={add} />
+                  </>
+                )}
               </>
             )}
             {stage === 1 && (
@@ -295,11 +465,12 @@ export default function Prototype() {
                   <section key={p.code} className="tb-process">
                     <h2>{p.label}</h2>
                     <p className="tb-compact-text">
-                      {AREAS.filter(
-                        (a) =>
-                          p.codes.includes(a.code) &&
-                          draft.selected.includes(a.code),
-                      )
+                      {choices
+                        .filter(
+                          (a) =>
+                            p.codes.includes(a.code) &&
+                            draft.selected.includes(a.code),
+                        )
                         .map((a) => a.label)
                         .join("; ")}
                     </p>
@@ -414,7 +585,7 @@ export default function Prototype() {
                         </button>
                       </div>
                       {codes.map((code) => {
-                        const area = AREAS.find((a) => a.code === code)!,
+                        const area = choices.find((a) => a.code === code)!,
                           a = draft.answers[code] ?? {
                             frequency: "",
                             role: "",
@@ -511,6 +682,7 @@ export default function Prototype() {
                       onClick={() => {
                         setChecked(false);
                         setStage(i);
+                        setCoverage(false);
                       }}
                     >
                       Edit {label.toLowerCase()}
@@ -568,6 +740,10 @@ export default function Prototype() {
                     setChecked(false);
                     setReviewVisited(false);
                     setStage(0);
+                    setGroups([]);
+                    setCoverage(false);
+                    setSearch("");
+                    setAddError("");
                     setStarted(false);
                   }}
                 >

@@ -78,6 +78,10 @@ const root = path.resolve(__dirname, "../..");
         })
         .click();
       await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page
+        .getByRole("heading", { name: "Check for missing work", exact: true })
+        .waitFor();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
       assert.equal(await page.locator('input[type="number"]').count(), 9);
       await page.locator('input[type="number"]').first().fill("70");
       await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -121,10 +125,14 @@ const root = path.resolve(__dirname, "../..");
         .nth(m.PROCESSES.findIndex((p) => p.code === "advice_cases"));
       await cases.locator("summary").click();
       await page
-        .getByLabel("Your part: Employee relations", { exact: true })
+        .getByLabel("Your part: Handle employee cases and give advice", {
+          exact: true,
+        })
         .selectOption("final_result");
       await page
-        .getByLabel("How often? Employee relations", { exact: true })
+        .getByLabel("How often? Handle employee cases and give advice", {
+          exact: true,
+        })
         .selectOption("few_times_year");
       await page
         .locator('[data-activity="bp_02"]')
@@ -168,6 +176,65 @@ const root = path.resolve(__dirname, "../..");
         .getByRole("alert")
         .filter({ hasText: "Choose at least one activity" })
         .waitFor();
+      await page
+        .getByLabel("Choose group: Employee support, documents and records", {
+          exact: true,
+        })
+        .check();
+      await page
+        .getByLabel("Choose group: Reception, facilities and office services", {
+          exact: true,
+        })
+        .check();
+      await page
+        .getByLabel("Select activity: Prepare contracts and employee letters", {
+          exact: true,
+        })
+        .check();
+      await page
+        .getByLabel("Select activity: Run reception and the front desk", {
+          exact: true,
+        })
+        .check();
+      await page
+        .getByLabel(
+          "Another activity: Employee support, documents and records",
+          { exact: true },
+        )
+        .fill("Coordinate welcome gifts");
+      await page
+        .locator(".tb-add-box")
+        .filter({
+          has: page.getByLabel(
+            "Another activity: Employee support, documents and records",
+            { exact: true },
+          ),
+        })
+        .getByRole("button", { name: "Add activity", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page
+        .getByRole("heading", { name: "Check for missing work", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", {
+          name: "Add work from payroll, benefits and pay support",
+          exact: true,
+        })
+        .waitFor();
+      await page
+        .getByLabel("Another activity: other work", { exact: true })
+        .fill("Coordinate an unusual local process");
+      await page
+        .locator(".tb-add-box")
+        .getByRole("button", { name: "Add activity", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      assert.equal(await page.locator('input[type="number"]').count(), 3);
+      await page
+        .getByText("Coordinate welcome gifts", { exact: false })
+        .waitFor();
+      assert.equal(apiRequests, 0);
       await page.close();
     }
     console.log(
