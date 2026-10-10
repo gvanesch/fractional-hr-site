@@ -149,7 +149,8 @@ function harness() {
   }
   const service = load("lib/baseline/server.ts"),
     model = load("lib/baseline/model.ts"),
-    route = load("app/api/baseline/[...path]/route.ts");
+    route = load("app/api/baseline/[...path]/route.ts"),
+    adminRoute = load("app/advisor/baseline/api/[...path]/route.ts");
   const request = (body) =>
     new Request("https://qa.example.invalid/api/baseline/save", {
       method: "POST",
@@ -219,6 +220,7 @@ function harness() {
     service,
     model,
     route,
+    adminRoute,
     request,
     setup,
     access,
@@ -570,6 +572,38 @@ test("Baseline exports operational BP work as Operations and preserves captured 
       exported.questionnaire.areas.find((a) => a.code === "bp_13").label,
       "Operational People administration",
     );
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Baseline administration stays under the page's Access path and still requires an advisor", async () => {
+  const h = harness();
+  try {
+    await h.setup();
+    const request = new Request(
+      "https://qa.example.invalid/advisor/baseline/api/campaigns",
+    );
+    const allowed = await h.adminRoute.GET(request, {
+      params: Promise.resolve({ path: ["campaigns"] }),
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal((await allowed.json()).campaigns.length, 1);
+    h.state.admin = false;
+    const blocked = await h.adminRoute.GET(request, {
+      params: Promise.resolve({ path: ["campaigns"] }),
+    });
+    assert.equal(blocked.status, 403);
+    const create = await h.adminRoute.POST(
+      h.request({ name: "Unauthorised" }),
+      { params: Promise.resolve({ path: ["create"] }) },
+    );
+    assert.equal(create.status, 403);
+    const panel = fs.readFileSync(
+      path.join(root, "app/advisor/baseline/panel.tsx"),
+      "utf8",
+    );
+    assert.ok(!panel.includes("/api/baseline/admin/"));
+    assert.ok(panel.includes("/advisor/baseline/api/"));
   } finally {
     h.sqlite.close();
   }

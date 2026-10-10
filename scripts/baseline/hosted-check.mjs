@@ -8,6 +8,7 @@ for (const path of [
   "/baseline/start",
   "/api/baseline/response",
   "/api/baseline/admin/campaigns",
+  "/advisor/baseline/api/campaigns",
 ]) {
   const response = await fetch(site + path, { redirect: "manual" });
   if (path === "/baseline/start") {

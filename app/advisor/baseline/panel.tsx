@@ -38,7 +38,7 @@ type Result = {
   error?: string;
 };
 async function api(path: string, body?: unknown): Promise<Result> {
-  const response = await fetch("/api/baseline/admin/" + path, {
+  const response = await fetch("/advisor/baseline/api/" + path, {
     method: body ? "POST" : "GET",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -481,7 +481,7 @@ export default function AdminPanel() {
                   textDecoration: "underline",
                 }}
                 key={format}
-                href={`/api/baseline/admin/export?campaign=${encodeURIComponent(id)}&format=${format}`}
+                href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=${format}`}
               >
                 {format === "respondents"
                   ? "Respondent-level CSV"
