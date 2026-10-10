@@ -8,19 +8,6 @@ const esbuild = require("esbuild"),
   path = require("node:path");
 const root = path.resolve(__dirname, "../..");
 (async () => {
-  const logic = await esbuild.build({
-    entryPoints: [root + "/lib/baseline/prototype.ts"],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    write: false,
-  });
-  const mod = { exports: {} };
-  new Function("module", "exports", logic.outputFiles[0].text)(
-    mod,
-    mod.exports,
-  );
-  const m = mod.exports;
   const built = await esbuild.build({
     stdin: {
       contents:
@@ -72,21 +59,75 @@ const root = path.resolve(__dirname, "../..");
       );
       await mount();
       await page
-        .getByRole("button", {
-          name: "Try a broad example (all activities)",
-          exact: true,
-        })
+        .getByRole("button", { name: "Start with empty answers", exact: true })
         .click();
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       await page
-        .getByRole("heading", { name: "Check for missing work", exact: true })
+        .getByRole("alert")
+        .filter({ hasText: "Choose at least one work area" })
         .waitFor();
+      // A single broad selection is enough; examples never become individual answers.
+      await page
+        .getByRole("checkbox", {
+          name: "Employee lifecycle support",
+          exact: true,
+        })
+        .check();
+      assert.equal(await page.getByRole("checkbox").count(), 10);
+      assert.equal(await page.getByRole("combobox").count(), 0);
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      assert.equal(await page.locator('input[type="number"]').count(), 1);
+      await page.locator('input[type="number"]').fill("100");
+      await page
+        .getByRole("button", { name: "Review answers", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Review", exact: true })
+        .waitFor();
+      assert.equal(await page.locator(".tb-review-area").count(), 1);
+      await page
+        .getByRole("button", { name: "Edit work areas", exact: true })
+        .click();
+      await page
+        .getByRole("checkbox", {
+          name: "Reception, facilities and office support",
+          exact: true,
+        })
+        .check();
+      await page
+        .getByRole("button", { name: "Return to review", exact: true })
+        .click();
+      await page.getByRole("alert").waitFor();
+      assert.equal(await page.locator('input[aria-invalid="true"]').count(), 1);
+      await page
+        .getByLabel("Time spent: Employee lifecycle support", { exact: true })
+        .fill("70");
+      await page
+        .getByLabel("Time spent: Reception, facilities and office support", {
+          exact: true,
+        })
+        .fill("30");
+      await page
+        .getByRole("button", { name: "Return to review", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Review", exact: true })
+        .waitFor();
+      assert.equal(await page.locator(".tb-review-area").count(), 2);
+      assert.equal(apiRequests, 0);
+      // Full breadth still produces just nine percentages and no task-detail page.
+      await page.reload();
+      await mount();
+      await page
+        .getByRole("button", { name: "Try a broad example", exact: true })
+        .click();
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       assert.equal(await page.locator('input[type="number"]').count(), 9);
       await page.locator('input[type="number"]').first().fill("70");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Review answers", exact: true })
+        .click();
       await page.getByRole("alert").waitFor();
-      assert.equal(await page.locator('input[aria-invalid="true"]').count(), 9);
       for (let i = 0; i < 9; i++)
         await page
           .locator('input[type="number"]')
@@ -98,147 +139,36 @@ const root = path.resolve(__dirname, "../..");
           .evaluate((el) => getComputedStyle(el).position),
         "sticky",
       );
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.locator('input[type="number"]').first().fill("");
       await page
         .getByRole("button", { name: "Review answers", exact: true })
         .click();
-      await page.getByRole("alert").waitFor();
-      for (let i = 0; i < m.PROCESSES.length; i++) {
-        const p = m.PROCESSES[i],
-          details = page.locator("details").nth(i);
-        if (!(await details.evaluate((el) => el.open)))
-          await details.locator("summary").click();
-        await page
-          .getByLabel("Group frequency: " + p.label, { exact: true })
-          .selectOption("most_days");
-        await page
-          .getByLabel("Group part in the work: " + p.label, { exact: true })
-          .selectOption("administration_support");
-        await details
-          .getByRole("button", {
-            name: /Apply to .* activities with empty answers/,
-          })
-          .click();
-      }
-      const cases = page
-        .locator("details")
-        .nth(m.PROCESSES.findIndex((p) => p.code === "advice_cases"));
-      await cases.locator("summary").click();
+      assert.equal(await page.locator('input[aria-invalid="true"]').count(), 1);
+      await page.locator('input[type="number"]').first().fill("11");
       await page
-        .getByLabel("Your part: Handle employee cases and give advice", {
-          exact: true,
-        })
-        .selectOption("final_result");
-      await page
-        .getByLabel("How often? Handle employee cases and give advice", {
-          exact: true,
-        })
-        .selectOption("few_times_year");
-      await page
-        .locator('[data-activity="bp_02"]')
-        .getByLabel("Important occasional responsibility")
-        .check();
-      await page
-        .getByRole("button", { name: "Review answers", exact: true })
-        .click();
-      await page
-        .getByRole("heading", { name: "Review", exact: true })
-        .waitFor();
-      assert.equal(await page.locator(".tb-review-activity").count(), 60);
-      await page
-        .getByText(
-          /A few times each year · I am responsible for the final result · Important occasional responsibility/,
+        .getByLabel(
+          "Any important work that this typical month misses? (optional)",
+          { exact: true },
         )
-        .waitFor();
-      assert.equal(await page.locator('input[type="number"]').count(), 0);
+        .fill("Annual audit");
       await page
-        .getByRole("button", { name: "Edit time by process", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Return to review", exact: true })
+        .getByRole("button", { name: "Review answers", exact: true })
         .click();
       await page
         .getByRole("heading", { name: "Review", exact: true })
         .waitFor();
+      assert.equal(await page.locator(".tb-review-area").count(), 9);
+      await page.getByText("Annual audit", { exact: true }).waitFor();
       assert.ok(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       );
       assert.equal(apiRequests, 0);
-      await page.reload();
-      await mount();
-      await page
-        .getByRole("button", { name: "Start with empty answers", exact: true })
-        .click();
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      await page
-        .getByRole("alert")
-        .filter({ hasText: "Choose at least one activity" })
-        .waitFor();
-      await page
-        .getByLabel("Choose group: Employee support, documents and records", {
-          exact: true,
-        })
-        .check();
-      await page
-        .getByLabel("Choose group: Reception, facilities and office services", {
-          exact: true,
-        })
-        .check();
-      await page
-        .getByLabel("Select activity: Prepare contracts and employee letters", {
-          exact: true,
-        })
-        .check();
-      await page
-        .getByLabel("Select activity: Run reception and the front desk", {
-          exact: true,
-        })
-        .check();
-      await page
-        .getByLabel(
-          "Another activity: Employee support, documents and records",
-          { exact: true },
-        )
-        .fill("Coordinate welcome gifts");
-      await page
-        .locator(".tb-add-box")
-        .filter({
-          has: page.getByLabel(
-            "Another activity: Employee support, documents and records",
-            { exact: true },
-          ),
-        })
-        .getByRole("button", { name: "Add activity", exact: true })
-        .click();
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      await page
-        .getByRole("heading", { name: "Check for missing work", exact: true })
-        .waitFor();
-      await page
-        .getByRole("button", {
-          name: "Add work from payroll, benefits and pay support",
-          exact: true,
-        })
-        .waitFor();
-      await page
-        .getByLabel("Another activity: other work", { exact: true })
-        .fill("Coordinate an unusual local process");
-      await page
-        .locator(".tb-add-box")
-        .getByRole("button", { name: "Add activity", exact: true })
-        .click();
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      assert.equal(await page.locator('input[type="number"]').count(), 3);
-      await page
-        .getByText("Coordinate welcome gifts", { exact: false })
-        .waitFor();
-      assert.equal(apiRequests, 0);
       await page.close();
     }
     console.log(
-      "Prototype: 60 activities, nine time entries, all-activity coverage, explicit bulk answers, exceptions, occasional responsibility, review and zero API writes passed on desktop/mobile.",
+      "Broad-work prototype: group-only selection, bounded percentages, yellow validation, sticky total, review edits, occasional work and zero API writes passed on desktop/mobile.",
     );
   } finally {
     await browser.close();

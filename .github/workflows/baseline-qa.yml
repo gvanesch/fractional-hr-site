@@ -37,7 +37,7 @@ jobs:
           echo "BASELINE_PLAYWRIGHT_PATH=$RUNNER_TEMP/baseline-browser/node_modules/playwright" >> "$GITHUB_ENV"
       - name: Test desktop and mobile assessment journey
         run: node scripts/baseline/ui-check.cjs
-      - name: Test broad-role prototype on desktop and mobile
+      - name: Test broad-work prototype on desktop and mobile
         run: node scripts/baseline/prototype-check.cjs
       - name: Apply dedicated baseline schema to QA only
         run: npx wrangler d1 migrations apply DB --env qa --remote
