@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/baseline/:path*", headers },
       { source: "/api/baseline/:path*", headers },
+      { source: "/advisor/baseline/prototype/:path*", headers },
     ];
   },
   async redirects() {

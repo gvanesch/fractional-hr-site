@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   PRIVACY,
   WORK_TYPES,
@@ -143,6 +144,9 @@ export default function AdminPanel() {
   return (
     <main className="tb-shell" style={{ maxWidth: 1100 }}>
       <header className="tb-header">
+        <Link href="/advisor/baseline/prototype">
+          Try the shorter process-based prototype
+        </Link>
         <span>team.blue · Baseline administration</span>
         <p>
           QA only: synthetic roster data. No production collection is

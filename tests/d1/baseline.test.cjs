@@ -6,6 +6,64 @@ const fs = require("node:fs"),
   vm = require("node:vm"),
   ts = require("typescript");
 const root = path.resolve(__dirname, "../..");
+test("Process prototype bounds time entry while retaining every activity", () => {
+  const h = harness(),
+    p = h.prototype,
+    m = h.model;
+  const codes = p.PROCESSES.flatMap((x) => x.codes);
+  assert.equal(new Set(codes).size, m.AREAS.length);
+  assert.equal(codes.length, m.AREAS.length);
+  const d = { ...p.emptyPrototype(), selected: m.AREAS.map((a) => a.code) };
+  assert.equal(p.activeProcesses(d).length, 9);
+  assert.equal(p.prototypeIssues(d, 2).length, m.AREAS.length);
+  d.time = Object.fromEntries(
+    p.PROCESSES.map((x, i) => [x.code, i === 8 ? 12 : 11]),
+  );
+  assert.equal(p.processTotal(d), 100);
+  assert.equal(p.prototypeIssues(d, 1).length, 0);
+  const e = p.prototypeEvidence(d);
+  assert.equal(e.activities.length, m.AREAS.length);
+  assert.ok(e.activities.every((a) => !("percentage" in a)));
+  h.sqlite.close();
+});
+test("Prototype bulk answers are explicit, preserve exceptions and never infer unselected work", () => {
+  const h = harness(),
+    p = h.prototype;
+  let d = p.selectActivities(p.emptyPrototype(), [
+    "ops_01",
+    "ops_02",
+    "ops_05",
+  ]);
+  assert.equal(Object.keys(d.answers).length, 0);
+  d.answers.ops_01 = {
+    frequency: "few_times_year",
+    role: "final_result",
+    important: true,
+  };
+  d.answers.ops_02 = { frequency: "", role: "lead_part", important: false };
+  assert.throws(() => p.applyAnswers(d, "employee_admin", "", "contribute"));
+  d = p.applyAnswers(
+    d,
+    "employee_admin",
+    "most_days",
+    "administration_support",
+  );
+  assert.equal(d.answers.ops_01.frequency, "few_times_year");
+  assert.equal(d.answers.ops_01.role, "final_result");
+  assert.equal(d.answers.ops_01.important, true);
+  assert.equal(d.answers.ops_02.role, "lead_part");
+  assert.equal(d.answers.ops_02.frequency, "most_days");
+  assert.equal(d.answers.ops_05.role, "administration_support");
+  assert.equal(d.answers.ops_06, undefined);
+  assert.equal(p.prototypeIssues(d, 2).length, 0);
+  d.time.employee_admin = 100;
+  d.notes.employee_admin = "Synthetic note";
+  const removed = p.selectActivities(d, []);
+  assert.equal(Object.keys(removed.time).length, 0);
+  assert.equal(Object.keys(removed.answers).length, 0);
+  assert.equal(Object.keys(removed.notes).length, 0);
+  h.sqlite.close();
+});
 test("Baseline incoming routes accept five and identify percentage fields that need attention", () => {
   const h = harness(),
     m = h.model,
@@ -294,6 +352,7 @@ function harness() {
   }
   const service = load("lib/baseline/server.ts"),
     model = load("lib/baseline/model.ts"),
+    prototype = load("lib/baseline/prototype.ts"),
     route = load("app/api/baseline/[...path]/route.ts"),
     adminRoute = load("app/advisor/baseline/api/[...path]/route.ts");
   const request = (body) =>
@@ -365,6 +424,7 @@ function harness() {
     state,
     service,
     model,
+    prototype,
     route,
     adminRoute,
     request,

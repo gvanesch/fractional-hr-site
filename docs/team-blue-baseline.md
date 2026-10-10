@@ -1,5 +1,17 @@
 # team.blue current-work baseline — QA implementation
 
+## Process-based design prototype (10 October review)
+
+The existing v2 questionnaire and responses remain unchanged. `/advisor/baseline/prototype` is a separate QA-only, authenticated-advisor route for synthetic usability testing. It makes no assessment API requests, sends no invitations, writes no database records, and keeps answers only in component memory. Refreshing resets the prototype; save-and-return is deliberately outside this small design test. The baseline admin page links to it. It is not a participant campaign or an approved replacement questionnaire.
+
+The prototype covers activity selection, process-level time, frequency/responsibility for all selected activities, occasional-accountability markers and review. All 60 existing activity codes map exactly once into nine provisional process groups. These groupings are navigation/time-estimation units, not organisational pillars. Even a role selecting every activity has only nine percentage inputs. Percentages are not apportioned to individual tasks or pillars; any fine-grained capacity estimate requires additional evidence.
+
+Frequency and responsibility start unanswered. Respondents can explicitly apply a pair of answers to empty fields within a group. Already populated fields and occasional-responsibility markers are preserved. Each activity can be edited individually. Only the first unfinished process opens initially; completed processes remain expandable for exceptions. Review contains every selected activity rather than the three largest. Optional process-level notes capture unusual work and difficult hand-offs without repeated task descriptions or team matrices.
+
+Use the broad-example button to stress-test all activities. Test nine percentages totalling 100%, bulk answers, different responsibility/frequency for employee relations and manual payroll, occasional responsibility, missing-answer highlighting and direct return to review. Test on desktop and a phone. Automated checks verify reduction and complete coverage, not human comprehension or completion time.
+
+Before extending the live assessment, use an initial small, varied group of reviewers: broad hybrid roles, office/reception roles, systems roles and non-native English speakers. Walk through the prototype using synthetic examples; do not grant employee reviewers administrator access solely for testing. Observe on an authorised administrator's shared screen where needed. Record elapsed time, where terminology/grouping is unclear, whether shared answers hide exceptions, and whether respondents can accurately explain the distinction between process time and activity frequency. Repeat after revisions. The 20–25 minute target remains unvalidated. Existing systems/scope/intake/strength questions are outside this prototype and must be included in a later full-journey timing test.
+
 ## Database decision and production boundary
 
 Verified 10 October 2026 against migration/d1 `79590faa4a38db1107f0ebd58e55c493ed5dd7c1`, PR #10 and read-only production audit run 37789481684. The production DB binding exists, migrations 0001–0005 are applied, all five application-data switches remain off, and production uses Supabase data and password authentication. The new assessment uses QA D1: introducing new Supabase tables would create another near-term migration.
