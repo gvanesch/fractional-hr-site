@@ -6,12 +6,157 @@ const fs = require("node:fs"),
   vm = require("node:vm"),
   ts = require("typescript");
 const root = path.resolve(__dirname, "../..");
+test("Baseline incoming routes accept five and identify percentage fields that need attention", () => {
+  const h = harness(),
+    m = h.model,
+    d = h.complete(m.initialDraft());
+  d.channels = ["ticket", "email", "chat", "employees", "planned"];
+  d.channelAllocation = {
+    ticket: 20,
+    email: 20,
+    chat: 20,
+    employees: 20,
+    planned: 20,
+  };
+  assert.equal(m.stepError(d, 6), null);
+  assert.equal(m.parseDraft(d).channels.length, 5);
+  d.channelAllocation.email = 5;
+  assert.ok(
+    m.validationIssues(d, 6).some((i) => i.key === "channelAllocation:email"),
+  );
+  d.channelAllocation.email = 20;
+  delete d.channelAllocation.chat;
+  assert.ok(
+    m.validationIssues(d, 6).some((i) => i.key === "channelAllocation:chat"),
+  );
+  d.channels.push("project");
+  assert.throws(() => m.parseDraft(d));
+  assert.ok(
+    m.QUESTIONNAIRE.roles.every((r) => m.QUESTIONNAIRE.descriptions[r.code]),
+  );
+  for (const code of ["slack", "claude", "blueai"])
+    assert.ok(m.SYSTEMS.includes(code));
+  assert.doesNotMatch(m.PRIVACY, /future role|restructur|job loss/i);
+  h.sqlite.close();
+});
+test("Baseline roster management is imported and cannot be changed or disclosed by participants", async () => {
+  const h = harness();
+  try {
+    const { campaign, a, token } = await h.setup();
+    const p = await h.access(token),
+      response = await h.service.readResponse(p);
+    assert.equal(response.draft.profile.name, "");
+    assert.equal(response.draft.profile.email, "");
+    assert.equal(response.draft.profile.country, "");
+    const d = h.complete(response.draft);
+    d.profile.name = "Changed";
+    d.profile.job_title = "Changed";
+    d.profile.manages_people = "yes";
+    d.profile.direct_reports = "999";
+    await h.service.saveResponse(p, d, 0, 1);
+    const stored = JSON.parse(
+      h.sqlite
+        .prepare(
+          "SELECT draft_json FROM tb_baseline_responses WHERE participant_id=?",
+        )
+        .get(a.participant_id).draft_json,
+    );
+    assert.equal(stored.profile.name, "Person A");
+    assert.equal(stored.profile.email, "a@example.invalid");
+    assert.equal(stored.profile.manages_people, "");
+    const parsed = h.model.parseRoster(
+      "name,email,manages_people,direct_reports\nTest,t@example.invalid,yes,3",
+    );
+    assert.equal(parsed[0].manages_people, "yes");
+    assert.equal(parsed[0].direct_reports, "3");
+    assert.throws(() =>
+      h.model.parseRoster(
+        "name,email,manages_people\nTest,t@example.invalid,sometimes",
+      ),
+    );
+    assert.equal(
+      (await h.service.campaignRows(campaign)).participants.find(
+        (x) => x.participant_id === a.participant_id,
+      ).draft.profile.name,
+      "Person A",
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Baseline approved entity choices validate scope and freeze after invitation", async () => {
+  const h = harness();
+  try {
+    const { campaign, token } = await h.setup(),
+      p = await h.access(token),
+      draft = h.complete((await h.service.readResponse(p)).draft);
+    draft.scope = {
+      reach: "one_entity",
+      entities: ["entity_0000000000000000"],
+    };
+    await assert.rejects(
+      h.service.saveResponse(p, draft, 0, 1),
+      /campaign's list/,
+    );
+    await assert.rejects(
+      h.service.configureCampaign("admin@example.invalid", campaign, {
+        entityList: "Approved A\nApproved B",
+      }),
+      (e) => e.status === 409,
+    );
+    const next = await h.service.createCampaign("admin@example.invalid", {
+      name: "Revised test",
+      closesAt: new Date(Date.now() + 86400000).toISOString(),
+      entityList: "Approved A\nApproved B",
+      copyRosterFrom: campaign,
+    });
+    const rows = await h.service.campaignRows(next.campaignId);
+    assert.equal(rows.participants.length, 2);
+    assert.equal(rows.participants[0].status, "not_started");
+    assert.equal(rows.participants[0].invited, 0);
+    assert.equal(rows.campaign.entities.length, 2);
+    assert.match(rows.campaign.entities[0].code, /^entity_[a-f0-9]{16}$/);
+    draft.scope = { reach: "one_entity", entities: [] };
+    assert.ok(h.model.stepError(draft, 0, rows.campaign.entities));
+    draft.scope.entities = [rows.campaign.entities[0].code];
+    assert.equal(h.model.stepError(draft, 0, rows.campaign.entities), null);
+    draft.scope.reach = "multiple_entities";
+    assert.ok(h.model.stepError(draft, 0, rows.campaign.entities));
+    draft.scope.entities.push(rows.campaign.entities[1].code);
+    assert.equal(h.model.stepError(draft, 0, rows.campaign.entities), null);
+    const old = h.sqlite
+      .prepare(
+        "SELECT draft_json FROM tb_baseline_responses WHERE participant_id=?",
+      )
+      .get(p.participant_id).draft_json;
+    await assert.rejects(
+      h.service.readResponse({ ...p, version: "team-blue-baseline-v1" }),
+      /earlier questionnaire/,
+    );
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT draft_json FROM tb_baseline_responses WHERE participant_id=?",
+        )
+        .get(p.participant_id).draft_json,
+      old,
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
 function harness() {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec("PRAGMA foreign_keys=ON");
   sqlite.exec(
     fs.readFileSync(
       path.join(root, "baseline-migrations/0001_baseline.sql"),
+      "utf8",
+    ),
+  );
+  sqlite.exec(
+    fs.readFileSync(
+      path.join(root, "baseline-migrations/0002_campaign_entities.sql"),
       "utf8",
     ),
   );
@@ -194,7 +339,7 @@ function harness() {
   function complete(draft) {
     draft.privacyAcknowledged = true;
     draft.profile.manages_people = "no";
-    draft.profile.support_levels = ["group"];
+    draft.scope = { reach: "all_group", entities: [] };
     draft.areas = ["office_01"];
     draft.allocation = { office_01: 100 };
     draft.details = {
@@ -210,6 +355,7 @@ function harness() {
     draft.systems = ["Excel"];
     draft.knowledge = ["office_facilities"];
     draft.channels = ["in_person_phone"];
+    draft.channelAllocation = { in_person_phone: 100 };
     return draft;
   }
   return {
@@ -227,19 +373,23 @@ function harness() {
     complete,
   };
 }
-test("Baseline branching keeps one model and maps reception/facilities to Operations", () => {
+test("Baseline activity choices cover hybrid roles and map reception/facilities to Operations", () => {
   const h = harness(),
     m = h.model;
   assert.equal(m.pillar("reception"), "people_operations");
   assert.equal(m.pillar("facilities"), "people_operations");
   assert.equal(m.pillar("mixed"), null);
+  assert.ok(m.availableAreas("reception").some((a) => a.category === "bp"));
   assert.ok(
-    m.availableAreas("reception").every((a) => a.category === "office"),
-  );
-  assert.ok(
-    m.availableAreas("business_partnering").every((a) => a.category === "bp"),
+    m
+      .availableAreas("business_partnering")
+      .some((a) => a.category === "office"),
   );
   assert.equal(m.availableAreas("mixed").length, m.AREAS.length);
+  for (const [type] of m.WORK_TYPES)
+    assert.equal(m.availableAreas(type).length, m.AREAS.length);
+  for (const code of ["bp_02", "ops_07", "ops_18", "office_01"])
+    assert.ok(m.availableAreas("reception").some((a) => a.code === code));
   assert.ok(
     m
       .availableAreas("reception", false, "integrations")
@@ -248,7 +398,7 @@ test("Baseline branching keeps one model and maps reception/facilities to Operat
   assert.equal(new Set(m.AREAS.map((a) => a.code)).size, m.AREAS.length);
   h.sqlite.close();
 });
-test("Baseline validates approximate percentages, detail limits, version and three channels", () => {
+test("Baseline validates approximate percentages, detail limits, version and five channels", () => {
   const h = harness(),
     m = h.model;
   const draft = h.complete(
@@ -268,7 +418,7 @@ test("Baseline validates approximate percentages, detail limits, version and thr
   assert.throws(() =>
     m.parseDraft({
       ...draft,
-      channels: ["email", "chat", "project", "ticket"],
+      channels: ["email", "chat", "project", "ticket", "planned", "employees"],
     }),
   );
   assert.throws(() => m.parseDraft({ ...draft, version: "other-version" }));
@@ -312,10 +462,7 @@ test("Baseline private invitations are hashed, scope sessions, expire, revoke an
     assert.equal(stored.token_hash, h.service.hashToken(token));
     const p = await h.access(token);
     assert.equal(p.participant_id, a.participant_id);
-    assert.equal(
-      (await h.service.readResponse(p)).draft.profile.email,
-      "a@example.invalid",
-    );
+    assert.equal((await h.service.readResponse(p)).draft.profile.email, "");
     await assert.rejects(h.service.redeem(h.request({}), "0".repeat(64)));
     await h.service.revoke("admin@example.invalid", campaign, a.participant_id);
     await assert.rejects(h.service.participant(h.request({})));
@@ -377,10 +524,7 @@ test("Baseline enforces identity on save, revocation during save, admin authoriz
     const draft = h.complete((await h.service.readResponse(p)).draft);
     draft.profile.email = "b@example.invalid";
     await h.service.saveResponse(p, draft, 0, 1);
-    assert.equal(
-      (await h.service.readResponse(p)).draft.profile.email,
-      "a@example.invalid",
-    );
+    assert.equal((await h.service.readResponse(p)).draft.profile.email, "");
     assert.equal(
       h.sqlite
         .prepare(
@@ -552,6 +696,9 @@ test("Baseline exports operational BP work as Operations and preserves captured 
     const { campaign, token } = await h.setup(),
       p = await h.access(token),
       draft = h.complete((await h.service.readResponse(p)).draft);
+    const roster = JSON.parse(p.profile_json);
+    roster.work_type = "business_partnering";
+    p.profile_json = JSON.stringify(roster);
     draft.profile.work_type = "business_partnering";
     draft.areas = ["bp_13"];
     draft.allocation = { bp_13: 100 };

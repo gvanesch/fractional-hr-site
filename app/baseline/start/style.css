@@ -132,6 +132,10 @@
   accent-color: #147691;
 }
 .tb-total {
+  position: sticky;
+  top: 44px;
+  z-index: 10;
+  box-shadow: 0 4px 12px #173b4826;
   padding: 18px;
   background: #edf7fa;
   border-radius: 10px;
@@ -149,6 +153,22 @@
   align-items: center;
   gap: 12px;
   max-width: 180px;
+}
+.tb-definition {
+  display: block;
+  padding: 10px;
+  margin-top: 8px;
+  background: #edf7fa;
+  border-left: 3px solid #147691;
+}
+.tb-invalid,
+.tb-shell [aria-invalid="true"] {
+  background: #fff5bf !important;
+  border-color: #b78613 !important;
+  border-radius: 8px;
+}
+.tb-field.tb-invalid {
+  padding: 10px;
 }
 .tb-detail {
   padding: 0 0 25px;

@@ -98,16 +98,19 @@ try {
     JSON.stringify(m.QUESTIONNAIRE),
     stamp,
   ]);
-  await query("INSERT INTO tb_baseline_campaigns VALUES(?,?,?,?,?,?,?,?)", [
-    campaign,
-    "Synthetic hosted smoke — " + process.env.GITHUB_RUN_ID,
-    m.VERSION,
-    "open",
-    expires,
-    m.PRIVACY,
-    30,
-    stamp,
-  ]);
+  await query(
+    "INSERT INTO tb_baseline_campaigns(campaign_id,name,version,status,closes_at,privacy_notice,retention_days,created_at) VALUES(?,?,?,?,?,?,?,?)",
+    [
+      campaign,
+      "Synthetic hosted smoke — " + process.env.GITHUB_RUN_ID,
+      m.VERSION,
+      "open",
+      expires,
+      m.PRIVACY,
+      30,
+      stamp,
+    ],
+  );
   created = true;
   await query("INSERT INTO tb_baseline_participants VALUES(?,?,?,?,1,?)", [
     participant,
@@ -145,14 +148,11 @@ try {
   ]);
   await api("access", { token });
   const initial = await api("response");
-  if (
-    initial.draft.profile.email !== draft.profile.email ||
-    initial.revision !== 0
-  )
-    throw new Error("Hosted identity/prefill failed.");
+  if (initial.draft.profile.email !== "" || initial.revision !== 0)
+    throw new Error("Hosted participant metadata privacy failed.");
   draft.privacyAcknowledged = true;
   draft.profile.manages_people = "no";
-  draft.profile.support_levels = ["group"];
+  draft.scope = { reach: "all_group", entities: [] };
   draft.areas = ["office_01"];
   draft.allocation = { office_01: 100 };
   draft.details = {
@@ -168,6 +168,7 @@ try {
   draft.systems = ["excel"];
   draft.knowledge = ["office_facilities"];
   draft.channels = ["email"];
+  draft.channelAllocation = { email: 100 };
   draft.strengths = "Synthetic local knowledge.";
   await api("save", { draft, revision: 0, progress: 7 });
   await api("save", { draft, revision: 0, progress: 7 }, 409);

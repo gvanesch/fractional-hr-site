@@ -17,6 +17,7 @@ import {
   toCsv,
   type Draft,
   type Profile,
+  type EntityOption,
 } from "./model";
 
 type Env = CloudflareEnv & {
@@ -219,6 +220,7 @@ export type Identity = {
   status: string;
   closes_at: string;
   session_hash: string;
+  entities_json: string;
 };
 export async function endSession() {
   const token = (await cookies()).get(COOKIE)?.value ?? "";
@@ -241,7 +243,7 @@ export async function participant(request: Request): Promise<Identity> {
   const stamp = now();
   const p = await db()
     .prepare(
-      "SELECT p.participant_id,p.campaign_id,p.email,p.profile_json,c.name,c.version,c.privacy_notice,c.status,c.closes_at,s.session_hash FROM tb_baseline_sessions s JOIN tb_baseline_participants p ON p.participant_id=s.participant_id JOIN tb_baseline_invites i ON i.invite_id=s.invite_id JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE s.session_hash=? AND s.expires_at>? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1",
+      "SELECT p.participant_id,p.campaign_id,p.email,p.profile_json,c.name,c.version,c.privacy_notice,c.status,c.closes_at,c.entities_json,s.session_hash FROM tb_baseline_sessions s JOIN tb_baseline_participants p ON p.participant_id=s.participant_id JOIN tb_baseline_invites i ON i.invite_id=s.invite_id JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE s.session_hash=? AND s.expires_at>? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1",
     )
     .bind(hashToken(token), stamp, stamp)
     .first<Identity>();
@@ -268,7 +270,7 @@ type ResponseRow = {
 export async function readResponse(p: Identity) {
   if (p.version !== VERSION)
     throw new BaselineError(
-      "This questionnaire version is not available.",
+      "This invitation belongs to an earlier questionnaire. Ask the organiser for the updated invitation. Your earlier answers are retained.",
       409,
     );
   const row = await db()
@@ -281,9 +283,14 @@ export async function readResponse(p: Identity) {
       name: p.name,
       privacy: p.privacy_notice,
       version: p.version,
+      entities: JSON.parse(p.entities_json) as EntityOption[],
       closed: p.status !== "open" || p.closes_at <= now(),
     },
-    draft: JSON.parse(row.draft_json) as Draft,
+    // Roster information is for administration/analysis; never echo it to participants.
+    draft: {
+      ...JSON.parse(row.draft_json),
+      profile: initialDraft().profile,
+    } as Draft,
     revision: row.revision,
     progress: row.progress,
     status: row.status,
@@ -312,17 +319,29 @@ export async function saveResponse(
     throw new BaselineError("Please reload your saved response.");
   let draft: Draft;
   try {
-    draft = parseDraft(input);
+    if (!input || typeof input !== "object" || Array.isArray(input))
+      throw new Error("Please check your answers.");
+    draft = parseDraft({
+      ...input,
+      profile: initialDraft(JSON.parse(p.profile_json)).profile,
+    });
+    const choices = JSON.parse(p.entities_json) as EntityOption[];
+    if (
+      !draft.scope.entities.every((code) =>
+        choices.some((choice) => choice.code === code),
+      )
+    )
+      throw new Error("Choose entities from this campaign's list.");
   } catch (error) {
     throw new BaselineError(
       error instanceof Error ? error.message : "Please check your answers.",
     );
   }
-  draft.profile.email = p.email; // Identity cannot be reassigned through a draft.
+  draft.profile.email = p.email; // All roster metadata remains authoritative on the server.
   if (draft.version !== p.version)
     throw new BaselineError("The questionnaire version has changed.", 409);
   if (submit) {
-    const error = completionError(draft);
+    const error = completionError(draft, JSON.parse(p.entities_json));
     if (error) throw new BaselineError(error);
   }
   const mutation = randomUUID(),
@@ -412,6 +431,27 @@ export async function campaigns() {
       .all()
   ).results;
 }
+function entityChoices(input: unknown): EntityOption[] {
+  const text = String(input ?? "");
+  if (text.length > 60000)
+    throw new BaselineError("Please shorten the entity list.");
+  const labels = text
+    .split(/\r?\n/)
+    .map((label) => label.trim())
+    .filter(Boolean);
+  if (
+    labels.length > 300 ||
+    labels.some((label) => label.length > 200) ||
+    new Set(labels.map((label) => label.toLowerCase())).size !== labels.length
+  )
+    throw new BaselineError(
+      "Use up to 300 unique entity or brand names, one per line.",
+    );
+  return labels.map((label) => ({
+    code: "entity_" + hashToken(label.toLowerCase()).slice(0, 16),
+    label,
+  }));
+}
 export async function campaignRows(campaign: string) {
   const c = await db()
     .prepare("SELECT * FROM tb_baseline_campaigns WHERE campaign_id=?")
@@ -427,7 +467,11 @@ export async function campaignRows(campaign: string) {
       .all<Record<string, unknown>>()
   ).results;
   return {
-    campaign: c,
+    campaign: {
+      ...c,
+      version: String(c.version),
+      entities: JSON.parse(String(c.entities_json)) as EntityOption[],
+    },
     participants: rows.map((row) => ({
       ...row,
       participant_id: String(row.participant_id),
@@ -467,6 +511,47 @@ export async function createCampaign(
     stamp = now(),
     definition = JSON.stringify(QUESTIONNAIRE),
     database = db();
+  const entities = entityChoices(body.entityList);
+  let copiedProfiles: Record<string, string>[] = [];
+  if (body.copyRosterFrom) {
+    const source = await database
+      .prepare(
+        "SELECT campaign_id FROM tb_baseline_campaigns WHERE campaign_id=?",
+      )
+      .bind(String(body.copyRosterFrom))
+      .first();
+    if (!source)
+      throw new BaselineError("The source campaign is not available.", 404);
+    const roster = (
+      await database
+        .prepare(
+          "SELECT profile_json FROM tb_baseline_participants WHERE campaign_id=? AND active=1",
+        )
+        .bind(String(body.copyRosterFrom))
+        .all<{ profile_json: string }>()
+    ).results;
+    if (roster.length > 200)
+      throw new BaselineError(
+        "Create the revised campaign and import this larger roster in batches of 200.",
+      );
+    const fields = [
+      "name",
+      "email",
+      "job_title",
+      "country",
+      "region",
+      "entity",
+      "work_type",
+      "manages_people",
+      "direct_reports",
+    ];
+    copiedProfiles = roster.map((row) => {
+      const profile = JSON.parse(row.profile_json);
+      return Object.fromEntries(
+        fields.map((field) => [field, String(profile[field] ?? "")]),
+      );
+    });
+  }
   await database
     .prepare("INSERT OR IGNORE INTO tb_baseline_versions VALUES(?,?,?)")
     .bind(VERSION, definition, stamp)
@@ -482,7 +567,9 @@ export async function createCampaign(
     );
   await database.batch([
     database
-      .prepare("INSERT INTO tb_baseline_campaigns VALUES(?,?,?,?,?,?,?,?)")
+      .prepare(
+        "INSERT INTO tb_baseline_campaigns(campaign_id,name,version,status,closes_at,privacy_notice,retention_days,created_at,entities_json) VALUES(?,?,?,?,?,?,?,?,?)",
+      )
       .bind(
         id,
         name,
@@ -492,11 +579,14 @@ export async function createCampaign(
         notice,
         retention,
         stamp,
+        JSON.stringify(entities),
       ),
     database
       .prepare("INSERT INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
       .bind(randomUUID(), id, actor, "campaign_created", id, "{}", stamp),
   ]);
+  if (copiedProfiles.length)
+    await importRoster(actor, id, toCsv(copiedProfiles));
   return { campaignId: id };
 }
 export async function configureCampaign(
@@ -513,6 +603,10 @@ export async function configureCampaign(
     privacy = String(body.privacy ?? c.privacy_notice),
     closes = new Date(String(body.closesAt ?? c.closes_at)),
     retention = Number(body.retentionDays ?? c.retention_days);
+  const entities =
+    body.entityList === undefined
+      ? JSON.parse(String(c.entities_json))
+      : entityChoices(body.entityList);
   if (
     !["draft", "open", "closed"].includes(status) ||
     privacy.length < 50 ||
@@ -524,7 +618,8 @@ export async function configureCampaign(
   )
     throw new BaselineError("Check the campaign settings.");
   if (
-    privacy !== c.privacy_notice &&
+    (privacy !== c.privacy_notice ||
+      JSON.stringify(entities) !== c.entities_json) &&
     (await db()
       .prepare(
         "SELECT 1 FROM tb_baseline_invites i JOIN tb_baseline_participants p ON p.participant_id=i.participant_id WHERE p.campaign_id=? LIMIT 1",
@@ -533,15 +628,22 @@ export async function configureCampaign(
       .first())
   )
     throw new BaselineError(
-      "Create a new campaign to change the data-use statement after invitations have been generated.",
+      "Create a new campaign to change the data-use statement or entity choices after invitations have been generated.",
       409,
     );
   await db().batch([
     db()
       .prepare(
-        "UPDATE tb_baseline_campaigns SET status=?,privacy_notice=?,closes_at=?,retention_days=? WHERE campaign_id=?",
+        "UPDATE tb_baseline_campaigns SET status=?,privacy_notice=?,closes_at=?,retention_days=?,entities_json=? WHERE campaign_id=?",
       )
-      .bind(status, privacy, closes.toISOString(), retention, campaign),
+      .bind(
+        status,
+        privacy,
+        closes.toISOString(),
+        retention,
+        JSON.stringify(entities),
+        campaign,
+      ),
     db()
       .prepare("INSERT INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
       .bind(
@@ -554,6 +656,7 @@ export async function configureCampaign(
           status,
           retentionDays: retention,
           privacyHash: hashToken(privacy),
+          entityChoicesHash: hashToken(JSON.stringify(entities)),
         }),
         now(),
       ),
@@ -772,7 +875,7 @@ export async function exportDataset(
     work.map((row) => [row.participant_id + ":" + row.area_code, row]),
   );
   for (const p of data.participants) {
-    const draft = p.draft as Draft;
+    const draft = p.draft as Draft & { friction?: string };
     const base = {
       participant_id: p.participant_id,
       campaign_id: campaign,
@@ -787,13 +890,47 @@ export async function exportDataset(
       ...base,
       areas: draft.areas,
       allocation: draft.allocation,
+      support_scope: draft.scope ?? null,
+      supported_entities: (draft.scope?.entities ?? []).map(
+        (code) =>
+          (data.campaign.entities as EntityOption[]).find(
+            (entity) => entity.code === code,
+          )?.label ?? code,
+      ),
+      activity_group_allocation: Object.fromEntries(
+        ["ops", "bp", "tech", "office"].map((category) => [
+          category,
+          work
+            .filter(
+              (row) =>
+                row.participant_id === p.participant_id &&
+                row.category === category,
+            )
+            .reduce((sum, row) => sum + (row.percentage ?? 0), 0),
+        ]),
+      ),
+      activity_pillar_allocation: Object.fromEntries(
+        ["people_operations", "business_partnering", "people_technology"].map(
+          (category) => [
+            category,
+            work
+              .filter(
+                (row) =>
+                  row.participant_id === p.participant_id &&
+                  row.pillar === category,
+              )
+              .reduce((sum, row) => sum + (row.percentage ?? 0), 0),
+          ],
+        ),
+      ),
       systems: draft.systems,
       knowledge: draft.knowledge,
       knowledge_detail: draft.knowledgeOther,
       channels: draft.channels,
       channel_detail: draft.channelOther,
+      incoming_work_allocation: draft.channelAllocation ?? null,
       cyclical: draft.cyclical,
-      friction: draft.friction,
+      extra_effort: draft.extraEffort ?? draft.friction ?? "",
       strengths: draft.strengths,
       anything: draft.anything,
     });

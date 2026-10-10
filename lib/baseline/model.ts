@@ -1,4 +1,5 @@
-export const VERSION = "team-blue-baseline-v1";
+import { AREA_HELP, OPTION_HELP, GROUP_LABELS } from "./help";
+export const VERSION = "team-blue-baseline-v2";
 export const WORK_TYPES = [
   ["people_operations", "People Operations"],
   ["business_partnering", "People Business Partnering"],
@@ -36,6 +37,7 @@ const groups: [Category, string[]][] = [
       "People support tickets / service desk",
       "Supplier or vendor coordination",
       "Other People Operations work",
+      "Employee events and activities",
     ],
   ],
   [
@@ -43,7 +45,7 @@ const groups: [Category, string[]][] = [
     [
       "Manager advice and coaching",
       "Employee relations",
-      "Organisation and role changes",
+      "Organisation change support",
       "Workforce planning",
       "Performance",
       "Talent and succession",
@@ -101,13 +103,15 @@ export const AREAS: Area[] = groups.flatMap(([category, labels]) =>
     code: `${category}_${String(i + 1).padStart(2, "0")}`,
     label,
     category,
-    example: {
-      ops: "For example: answer employee questions, prepare documents or update records.",
-      bp: "For example: advise managers, coordinate a people process or work with local teams.",
-      tech: "For example: change system settings, support users or connect two systems.",
-      office:
-        "For example: welcome visitors, arrange repairs or coordinate office services.",
-    }[category],
+    example:
+      AREA_HELP[`${category}_${String(i + 1).padStart(2, "0")}`] ??
+      {
+        ops: "For example: answer employee questions, prepare documents or update records.",
+        bp: "For example: advise managers, coordinate a people process or work with local teams.",
+        tech: "For example: change system settings, support users or connect two systems.",
+        office:
+          "For example: welcome visitors, arrange repairs or coordinate office services.",
+      }[category],
   })),
 );
 export const FREQUENCIES = [
@@ -182,6 +186,9 @@ export const SYSTEMS = [
   "culture_amp",
   "navan",
   "payroll_system",
+  "slack",
+  "claude",
+  "blueai",
   "none",
   "not_sure",
 ];
@@ -195,6 +202,9 @@ export const SYSTEM_LABELS = [
   "Culture Amp",
   "Navan",
   "Payroll system",
+  "Slack",
+  "Claude",
+  "BlueAI",
   "No regular system",
   "Not sure",
 ];
@@ -252,10 +262,6 @@ export const CHANNEL_LABELS = [
   "Other",
   "Not sure",
 ];
-export const COUNTRY_CODES =
-  "AL AT BE BG HR CY CZ DK EE FI FR DE GR HU IS IE IT LV LT LU MT MD ME NL MK NO PL PT RO RS SK SI ES SE CH TR UA GB US CA IN AU ZA OTHER NOT_SURE".split(
-    " ",
-  );
 export const countryLabel = (code: string) =>
   code === "OTHER"
     ? "Another country"
@@ -263,30 +269,20 @@ export const countryLabel = (code: string) =>
       ? "Not sure"
       : (new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code);
 export const STEP_LABELS = [
-  "About you",
+  "Who your work supports",
   "Your work areas",
   "Time allocation",
   "Main activities",
   "Occasional work",
   "Systems and knowledge",
   "How work reaches you",
-  "Friction and strengths",
+  "Extra effort and strengths",
 ];
 export const PRIVACY =
-  "This assessment describes your current work. It is not a performance assessment, a job evaluation or a decision about your future role. Your answers are identifiable, not anonymous. Authorised programme administrators can view and export them to understand current work and support the People Operating Model. Do not include employee names, individual cases, health information or other sensitive personal details. Keep your invitation link private. A secure cookie lets you save and return before submitting. Ask the campaign organiser if you have questions about access or how long the information is kept.";
+  "This baseline helps us understand current work, protect what works well and identify opportunities to strengthen and improve how we work. Your answers describe work and processes rather than rating people. Your answers are identifiable, not anonymous. Authorised programme administrators can view and export them for this purpose. Do not include employee names, individual cases, health information or other sensitive personal details. Keep your invitation link private. A secure cookie lets you save and return before submitting. Ask the campaign organiser if you have questions about access or how long the information is kept.";
 export const QUESTIONS = {
-  profile: [
-    "Name",
-    "Email from your invitation",
-    "Current job title",
-    "Country where you are primarily based",
-    "Region (if used)",
-    "Employing business / entity (if known)",
-    "Which area best describes your current work?",
-    "Do you manage people?",
-    "About how many people report directly to you?",
-    "Which countries or areas do you regularly support?",
-  ],
+  scope:
+    "Does your regular work support one brand or entity, more than one, or the Group?",
   work: "Choose the areas where you currently spend meaningful time.",
   time: "In a typical month, about how much of your working time is spent on each area?",
   activity: "What do you normally do in this area?",
@@ -298,8 +294,8 @@ export const QUESTIONS = {
   systems: "Which systems or tools do you use regularly for your work?",
   knowledge: "What knowledge or experience do colleagues rely on you for?",
   channels:
-    "Choose the main three ways work reaches you. Fewer than three is fine.",
-  friction:
+    "Choose up to five main ways work reaches you. Estimate the share of incoming work through each route.",
+  extraEffort:
     "Which parts of your work take more time or manual effort than they should? (optional)",
   strengths:
     "What works particularly well today and should we make sure we keep? (optional)",
@@ -309,7 +305,12 @@ export const QUESTIONS = {
 export const QUESTIONNAIRE = {
   version: VERSION,
   questions: QUESTIONS,
-  workTypes: WORK_TYPES,
+  rosterWorkTypes: WORK_TYPES,
+  scopeChoices: ["one_entity", "multiple_entities", "all_group", "not_sure"],
+  groups: GROUP_LABELS,
+  descriptions: OPTION_HELP,
+  activityDescriptions: AREA_HELP,
+  intakeLimit: 5,
   areas: AREAS,
   frequencies: FREQUENCIES.map((code, i) => ({
     code,
@@ -346,10 +347,13 @@ export type Detail = {
   handoffs: string[];
   other: string;
 };
+export type EntityOption = { code: string; label: string };
+export type Scope = { reach: string; entities: string[] };
 export type Draft = {
   version: string;
   privacyAcknowledged: boolean;
   profile: Profile;
+  scope: Scope;
   areas: string[];
   customAreas: Area[];
   allocation: Record<string, number>;
@@ -361,7 +365,8 @@ export type Draft = {
   knowledgeOther: string;
   channels: string[];
   channelOther: string;
-  friction: string;
+  channelAllocation: Record<string, number>;
+  extraEffort: string;
   strengths: string;
   anything: string;
 };
@@ -384,6 +389,7 @@ export function initialDraft(profile: Partial<Profile> = {}): Draft {
       support_other: "",
       ...profile,
     },
+    scope: { reach: "", entities: [] },
     areas: [],
     customAreas: [],
     allocation: {},
@@ -395,7 +401,8 @@ export function initialDraft(profile: Partial<Profile> = {}): Draft {
     knowledgeOther: "",
     channels: [],
     channelOther: "",
-    friction: "",
+    channelAllocation: {},
+    extraEffort: "",
     strengths: "",
     anything: "",
   };
@@ -421,20 +428,10 @@ export const areaPillar = (category: Category, code?: string) =>
       : category === "tech"
         ? "people_technology"
         : "people_operations";
-export function availableAreas(type: string, all = false, search = "") {
-  const category = (
-    {
-      people_operations: "ops",
-      business_partnering: "bp",
-      people_technology: "tech",
-      reception: "office",
-      facilities: "office",
-    } as Record<string, string>
-  )[type];
-  return AREAS.filter(
-    (area) =>
-      (!category || all || search || area.category === category) &&
-      area.label.toLowerCase().includes(search.toLowerCase()),
+export function availableAreas(_type: string, _all = true, search = "") {
+  void _all; // Retained argument for compatibility; all respondents see the same activities.
+  return AREAS.filter((area) =>
+    area.label.toLowerCase().includes(search.toLowerCase()),
   );
 }
 export const allocationTotal = (draft: Draft) =>
@@ -498,10 +495,15 @@ export function parseDraft(input: unknown): Draft {
     !WORK_TYPES.some(([code]) => code === d.profile.work_type)
   )
     throw new Error("Choose a current work type.");
-  if (d.profile.country && !COUNTRY_CODES.includes(d.profile.country))
+  if (
+    d.profile.country &&
+    !/^(?:[A-Z]{2}|OTHER|NOT_SURE)$/.test(d.profile.country)
+  )
     throw new Error("Choose your country.");
   if (
-    !d.profile.support_countries.every((x) => COUNTRY_CODES.includes(x)) ||
+    !d.profile.support_countries.every((x) =>
+      /^(?:[A-Z]{2}|OTHER|NOT_SURE)$/.test(x),
+    ) ||
     !d.profile.support_levels.every((x) =>
       [
         "countries",
@@ -514,6 +516,15 @@ export function parseDraft(input: unknown): Draft {
     )
   )
     throw new Error("Check your support areas.");
+  if (
+    !d.scope ||
+    !["", "one_entity", "multiple_entities", "all_group", "not_sure"].includes(
+      d.scope.reach,
+    ) ||
+    !strings(d.scope.entities, 300) ||
+    !d.scope.entities.every((code) => /^entity_[a-f0-9]{16}$/.test(code))
+  )
+    throw new Error("Check the brands or entities you support.");
   if (
     d.customAreas.some(
       (a) =>
@@ -571,14 +582,14 @@ export function parseDraft(input: unknown): Draft {
     !strings(d.systems, 30) ||
     !strings(d.knowledge) ||
     !d.knowledge.every((x) => KNOWLEDGE.includes(x)) ||
-    !strings(d.channels, 3) ||
+    !strings(d.channels, 5) ||
     !d.channels.every((x) => CHANNELS.includes(x))
   )
-    throw new Error("Choose up to three ways work reaches you.");
+    throw new Error("Choose up to five ways work reaches you.");
   for (const key of [
     "knowledgeOther",
     "channelOther",
-    "friction",
+    "extraEffort",
     "strengths",
     "anything",
   ] as const)
@@ -586,6 +597,21 @@ export function parseDraft(input: unknown): Draft {
       throw new Error(
         "Please keep each written answer under 1,500 characters.",
       );
+  if (
+    !d.channelAllocation ||
+    typeof d.channelAllocation !== "object" ||
+    Array.isArray(d.channelAllocation)
+  )
+    throw new Error("Check your incoming-work percentages.");
+  for (const [code, value] of Object.entries(d.channelAllocation))
+    if (
+      !d.channels.includes(code) ||
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > 100
+    )
+      throw new Error("Enter an incoming-work percentage between 0 and 100.");
   // Rebuild a whitelisted object: unknown fields are never persisted or exported.
   return {
     version: VERSION,
@@ -596,6 +622,7 @@ export function parseDraft(input: unknown): Draft {
         d.profile[k as keyof Profile],
       ]),
     ) as Profile,
+    scope: { reach: d.scope.reach, entities: d.scope.entities },
     areas: d.areas,
     customAreas: d.customAreas.map(({ code, label, category, example }) => ({
       code,
@@ -625,70 +652,135 @@ export function parseDraft(input: unknown): Draft {
     knowledgeOther: d.knowledgeOther,
     channels: d.channels,
     channelOther: d.channelOther,
-    friction: d.friction,
+    channelAllocation: Object.fromEntries(
+      d.channels
+        .filter((code) => Object.hasOwn(d.channelAllocation, code))
+        .map((code) => [code, d.channelAllocation[code]]),
+    ),
+    extraEffort: d.extraEffort,
     strengths: d.strengths,
     anything: d.anything,
   };
 }
-export function stepError(d: Draft, step: number): string | null {
+
+export type ValidationIssue = { step: number; key: string; message: string };
+export const intakeTotal = (draft: Draft) =>
+  Math.round(
+    draft.channels.reduce(
+      (sum, code) => sum + (draft.channelAllocation[code] ?? 0),
+      0,
+    ) * 100,
+  ) / 100;
+export function validationIssues(
+  d: Draft,
+  step: number,
+  entities: EntityOption[] = [],
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const add = (key: string, message: string) =>
+    issues.push({ step, key, message });
   if (!d.privacyAcknowledged)
-    return "Please read and acknowledge the data-use statement.";
+    add("privacy", "Please read how your answers will be used.");
   if (step === 0) {
+    if (!d.scope.reach)
+      add(
+        "scope",
+        "Choose whether you support one entity, several entities or the Group.",
+      );
     if (
-      !d.profile.name.trim() ||
-      !d.profile.job_title.trim() ||
-      !d.profile.country ||
-      !d.profile.work_type ||
-      !["yes", "no", "not_sure"].includes(d.profile.manages_people)
-    )
-      return "Please confirm your name, job title, country, work type and whether you manage people.";
-    if (
-      d.profile.manages_people === "yes" &&
-      (!/^\d{1,4}$/.test(d.profile.direct_reports) ||
-        Number(d.profile.direct_reports) > 1000)
-    )
-      return "Enter an approximate number of direct reports.";
-    if (
-      !d.profile.support_levels.length ||
-      (d.profile.support_levels.includes("countries") &&
-        !d.profile.support_countries.length)
-    )
-      return "Choose the countries or areas you regularly support.";
+      entities.length &&
+      ["one_entity", "multiple_entities"].includes(d.scope.reach)
+    ) {
+      if (d.scope.reach === "one_entity" && d.scope.entities.length !== 1)
+        add(
+          "entities",
+          "Choose the one brand or entity you regularly support.",
+        );
+      if (d.scope.reach === "multiple_entities" && d.scope.entities.length < 2)
+        add("entities", "Choose the brands or entities you regularly support.");
+    }
   }
   if (step === 1 && !d.areas.length)
-    return "Choose at least one area where you spend meaningful time.";
-  if (
-    step === 2 &&
-    (allocationTotal(d) < 98 ||
-      allocationTotal(d) > 102 ||
-      d.areas.some((x) => !Object.hasOwn(d.allocation, x)))
-  )
-    return "Aim for 100% in total. Between 98% and 102% is accepted.";
-  if (
-    step === 3 &&
-    detailCodes(d).some(
-      (code) =>
-        !d.details[code]?.description.trim() ||
-        !d.details[code]?.frequency ||
-        !d.details[code]?.role,
-    )
-  )
-    return "Please add a short description, frequency and your role for each main activity.";
-  if (
-    step === 4 &&
-    (!d.cyclical.answer ||
-      (d.cyclical.answer === "yes" && !d.cyclical.text.trim()))
-  )
-    return "Choose an answer and briefly describe any important occasional work.";
-  if (step === 5 && (!d.systems.length || !d.knowledge.length))
-    return "Choose your systems and knowledge areas, or select Not sure.";
-  if (step === 6 && !d.channels.length)
-    return "Choose up to three main ways work reaches you.";
-  return null;
+    add("areas", "Choose at least one area where you spend meaningful time.");
+  if (step === 2) {
+    const badTotal = allocationTotal(d) < 98 || allocationTotal(d) > 102;
+    for (const code of d.areas)
+      if (
+        badTotal ||
+        !Object.hasOwn(d.allocation, code) ||
+        d.allocation[code] < 0 ||
+        d.allocation[code] > 100
+      )
+        add(
+          "allocation:" + code,
+          "Aim for 100% in total. Between 98% and 102% is accepted.",
+        );
+  }
+  if (step === 3)
+    for (const code of detailCodes(d)) {
+      const detail = d.details[code];
+      if (!detail?.description.trim())
+        add(
+          "detail:" + code + ":description",
+          "Briefly describe what you normally do in this area.",
+        );
+      if (!detail?.frequency)
+        add(
+          "detail:" + code + ":frequency",
+          "Choose how often you normally do this work.",
+        );
+      if (!detail?.role)
+        add(
+          "detail:" + code + ":role",
+          "Choose the answer that describes your part in this work.",
+        );
+    }
+  if (step === 4) {
+    if (!d.cyclical.answer)
+      add("cyclical", "Choose an answer about important occasional work.");
+    else if (d.cyclical.answer === "yes" && !d.cyclical.text.trim())
+      add("cyclicalText", "Briefly describe your important occasional work.");
+  }
+  if (step === 5) {
+    if (!d.systems.length)
+      add(
+        "systems",
+        "Choose your systems or select No regular system / Not sure.",
+      );
+    if (!d.knowledge.length)
+      add(
+        "knowledge",
+        "Choose the knowledge colleagues rely on, or select Not sure.",
+      );
+  }
+  if (step === 6) {
+    if (!d.channels.length)
+      add("channels", "Choose up to five main ways work reaches you.");
+    const badTotal = intakeTotal(d) < 98 || intakeTotal(d) > 102;
+    for (const code of d.channels)
+      if (
+        badTotal ||
+        !Object.hasOwn(d.channelAllocation, code) ||
+        d.channelAllocation[code] < 0 ||
+        d.channelAllocation[code] > 100
+      )
+        add(
+          "channelAllocation:" + code,
+          "Aim for 100% of incoming work in total. Between 98% and 102% is accepted.",
+        );
+  }
+  return issues;
 }
-export function completionError(d: Draft) {
+export function stepError(
+  d: Draft,
+  step: number,
+  entities: EntityOption[] = [],
+) {
+  return validationIssues(d, step, entities)[0]?.message ?? null;
+}
+export function completionError(d: Draft, entities: EntityOption[] = []) {
   for (let step = 0; step < 8; step++) {
-    const error = stepError(d, step);
+    const error = stepError(d, step, entities);
     if (error) return error;
   }
   return null;
@@ -745,6 +837,8 @@ export function parseRoster(csv: string): Partial<Profile>[] {
     "region",
     "entity",
     "work_type",
+    "manages_people",
+    "direct_reports",
   ];
   return rows
     .filter((r) => r.some((x) => x.trim()))
@@ -767,10 +861,22 @@ export function parseRoster(csv: string): Partial<Profile>[] {
         throw new Error(
           `Check the name or email on row ${i + 2}. Emails must be unique.`,
         );
-      if (p.country && !COUNTRY_CODES.includes(p.country))
+      if (p.country && !/^(?:[A-Z]{2}|OTHER|NOT_SURE)$/.test(p.country))
         throw new Error(`Use a country code such as GB on row ${i + 2}.`);
       if (p.work_type && !WORK_TYPES.some(([code]) => code === p.work_type))
         throw new Error(`Check the work_type code on row ${i + 2}.`);
+      if (
+        p.manages_people &&
+        !["yes", "no", "not_sure"].includes(p.manages_people)
+      )
+        throw new Error(
+          `Use yes, no or not_sure for manages_people on row ${i + 2}.`,
+        );
+      if (
+        p.direct_reports &&
+        (!/^\d{1,4}$/.test(p.direct_reports) || Number(p.direct_reports) > 1000)
+      )
+        throw new Error(`Check direct_reports on row ${i + 2}.`);
       if (Object.values(p).some((v) => v.length > 250))
         throw new Error(`Please shorten row ${i + 2}.`);
       emails.add(p.email);

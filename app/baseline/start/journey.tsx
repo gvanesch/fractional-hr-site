@@ -2,9 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AREAS,
-  WORK_TYPES,
-  COUNTRY_CODES,
-  countryLabel,
   STEP_LABELS,
   SYSTEMS,
   systemLabel,
@@ -24,14 +21,22 @@ import {
   stepError,
   completionError,
   type Draft,
-  type Profile,
+  type EntityOption,
+  validationIssues,
+  intakeTotal,
   type Detail,
   type Area,
 } from "@/lib/baseline/model";
+import { GROUP_LABELS, OPTION_HELP } from "@/lib/baseline/help";
 import "./style.css";
 type Saved = {
   draft: Draft;
-  campaign: { name: string; privacy: string; closed: boolean };
+  campaign: {
+    name: string;
+    privacy: string;
+    closed: boolean;
+    entities: EntityOption[];
+  };
   revision: number;
   progress: number;
   status: string;
@@ -58,16 +63,23 @@ function Checks({
   values,
   change,
   max,
+  invalid = false,
+  descriptions = OPTION_HELP,
 }: {
   codes: readonly string[];
   labels?: readonly string[];
   values: string[];
   change: (values: string[]) => void;
   max?: number;
+  invalid?: boolean;
+  descriptions?: Record<string, string>;
 }) {
   const visible = values.filter((x) => codes.includes(x));
   return (
-    <div className="tb-options">
+    <div
+      className={"tb-options " + (invalid ? "tb-invalid" : "")}
+      aria-invalid={invalid}
+    >
       {codes.map((code, i) => (
         <label key={code}>
           <input
@@ -82,7 +94,12 @@ function Checks({
               )
             }
           />
-          <span>{labels?.[i] ?? code}</span>
+          <span>
+            {labels?.[i] ?? code}
+            {values.includes(code) && descriptions[code] && (
+              <small className="tb-definition">{descriptions[code]}</small>
+            )}
+          </span>
         </label>
       ))}
     </div>
@@ -94,18 +111,21 @@ function Text({
   change,
   help,
   max = 1500,
+  invalid = false,
 }: {
   label: string;
   value: string;
   change: (value: string) => void;
   help?: string;
   max?: number;
+  invalid?: boolean;
 }) {
   return (
-    <label className="tb-field">
+    <label className={"tb-field " + (invalid ? "tb-invalid" : "")}>
       <span>{label}</span>
       {help && <small>{help}</small>}
       <textarea
+        aria-invalid={invalid}
         rows={3}
         value={value}
         maxLength={max}
@@ -118,12 +138,14 @@ function Text({
   );
 }
 function Select({
+  invalid = false,
   label,
   value,
   codes,
   labels,
   change,
 }: {
+  invalid?: boolean;
   label: string;
   value: string;
   codes: readonly string[];
@@ -133,7 +155,12 @@ function Select({
   return (
     <label className="tb-field">
       <span>{label}</span>
-      <select value={value} onChange={(e) => change(e.target.value)}>
+      <select
+        className={invalid ? "tb-invalid" : ""}
+        aria-invalid={invalid}
+        value={value}
+        onChange={(e) => change(e.target.value)}
+      >
         <option value="">Choose an answer</option>
         {codes.map((code, i) => (
           <option key={code} value={code}>
@@ -141,6 +168,9 @@ function Select({
           </option>
         ))}
       </select>
+      {OPTION_HELP[value] && (
+        <small className="tb-definition">{OPTION_HELP[value]}</small>
+      )}
     </label>
   );
 }
@@ -154,7 +184,8 @@ export default function BaselineJourney() {
     [status, setStatus] = useState("Opening your saved response…"),
     [busy, setBusy] = useState(false),
     [search, setSearch] = useState(""),
-    [all, setAll] = useState(false),
+    [checked, setChecked] = useState(false),
+    [reviewVisited, setReviewVisited] = useState(false),
     [custom, setCustom] = useState(""),
     [customCategory, setCustomCategory] = useState<Area["category"]>("ops"),
     [systemSearch, setSystemSearch] = useState(""),
@@ -238,6 +269,8 @@ export default function BaselineJourney() {
         progress.current = response.progress;
         lastSaved.current = JSON.stringify(response.draft);
         setStep(Math.min(response.progress, 7));
+        setReview(response.progress === 8);
+        setReviewVisited(response.progress === 8);
         setStarted(response.draft.privacyAcknowledged);
         setStatus("Saved securely");
       } catch (e) {
@@ -299,8 +332,11 @@ export default function BaselineJourney() {
   }, [step, review]);
   async function move(forward: boolean) {
     if (!draft) return;
-    const message = forward ? stepError(draft, step) : null;
+    const message = forward
+      ? stepError(draft, step, saved?.campaign.entities ?? [])
+      : null;
     if (message) {
+      setChecked(true);
       setError(message);
       return;
     }
@@ -310,10 +346,13 @@ export default function BaselineJourney() {
         draft,
         forward ? Math.min(step + 1, 8) : Math.max(step - 1, 0),
       );
-      if (forward && step === 7) setReview(true);
-      else setStep((s) => (forward ? s + 1 : s - 1));
+      if (forward && step === 7) {
+        setReview(true);
+        setReviewVisited(true);
+      } else setStep((s) => (forward ? s + 1 : s - 1));
       setError("");
       setSearch("");
+      setChecked(false);
     } catch {
     } finally {
       setBusy(false);
@@ -321,8 +360,18 @@ export default function BaselineJourney() {
   }
   async function finish() {
     if (!draft) return;
-    const message = completionError(draft);
+    const message = completionError(draft, saved?.campaign.entities ?? []);
     if (message) {
+      const first = Array.from({ length: 8 }, (_, i) => i).find((i) =>
+        stepError(draft, i, saved?.campaign.entities ?? []),
+      );
+      if (first !== undefined) {
+        setStep(first);
+        setReview(false);
+      }
+    }
+    if (message) {
+      setChecked(true);
       setError(message);
       return;
     }
@@ -356,8 +405,29 @@ export default function BaselineJourney() {
       setBusy(false);
     }
   }
-  const updateProfile = (key: keyof Profile, value: Profile[keyof Profile]) =>
-    draft && change({ ...draft, profile: { ...draft.profile, [key]: value } });
+  const entities = saved?.campaign.entities ?? [];
+  const issues =
+    draft && checked ? validationIssues(draft, step, entities) : [];
+  const invalid = (key: string) => issues.some((x) => x.key === key);
+  async function returnToReview() {
+    if (!draft) return;
+    const message = stepError(draft, step, entities);
+    if (message) {
+      setChecked(true);
+      setError(message);
+      return;
+    }
+    setBusy(true);
+    try {
+      await save(draft, 8);
+      setReview(true);
+      setChecked(false);
+      setError("");
+    } catch {
+    } finally {
+      setBusy(false);
+    }
+  }
   const updateDetail = (
     code: string,
     key: keyof Detail,
@@ -407,9 +477,9 @@ export default function BaselineJourney() {
         <span>team.blue · Current work baseline</span>
         <p>Describe what you do today. Help us understand the work.</p>
       </header>
-      {error && (
+      {(error || issues.length > 0) && (
         <div role="alert" className="tb-error">
-          {error}
+          {error || issues[0]?.message}
           {conflict.current && (
             <button onClick={() => window.location.reload()}>
               Reload saved response
@@ -458,7 +528,7 @@ export default function BaselineJourney() {
                     change({ ...draft, privacyAcknowledged: e.target.checked })
                   }
                 />
-                I have read and understand this data-use statement.
+                I have read how my answers will be used.
               </label>
               <button
                 disabled={!draft.privacyAcknowledged || saved.campaign.closed}
@@ -502,9 +572,23 @@ export default function BaselineJourney() {
                         back to any step.
                       </p>
                       <dl>
-                        <dt>Current role</dt>
+                        <dt>Support scope</dt>
                         <dd>
-                          {draft.profile.name} · {draft.profile.job_title}
+                          {OPTION_HELP[draft.scope.reach]}{" "}
+                          {draft.scope.entities
+                            .map(
+                              (c) => entities.find((e) => e.code === c)?.label,
+                            )
+                            .join(", ")}
+                        </dd>
+                        <dt>Incoming work</dt>
+                        <dd>
+                          {draft.channels
+                            .map(
+                              (c) =>
+                                `${CHANNEL_LABELS[CHANNELS.indexOf(c)]}: ${draft.channelAllocation[c]}%`,
+                            )
+                            .join("; ")}
                         </dd>
                         <dt>Time allocation</dt>
                         <dd>{allocationTotal(draft)}% in total</dd>
@@ -517,6 +601,8 @@ export default function BaselineJourney() {
                             key={label}
                             onClick={() => {
                               setReview(false);
+                              setReviewVisited(true);
+                              setChecked(false);
                               setStep(i);
                             }}
                           >
@@ -525,8 +611,9 @@ export default function BaselineJourney() {
                         ))}
                       </div>
                       <p>
-                        Submitting finishes your response. These answers
-                        describe current work, not your future role.
+                        Submitting finishes your response. Your answers help us
+                        understand the baseline, protect strengths and improve
+                        how we work.
                       </p>
                     </>
                   ) : (
@@ -534,136 +621,86 @@ export default function BaselineJourney() {
                       {step === 0 && (
                         <>
                           <p>
-                            Please confirm your current details. Do not use a
-                            proposed future title.
+                            Does your regular work support one brand or entity,
+                            more than one, or the Group?
                           </p>
-                          {(
-                            ["name", "job_title", "region", "entity"] as const
-                          ).map((key) => (
-                            <label className="tb-field" key={key}>
-                              <span>
-                                {
-                                  {
-                                    name: "Name",
-                                    job_title: "Current job title",
-                                    region: "Region (if used)",
-                                    entity:
-                                      "Employing business / entity (if known)",
-                                  }[key]
-                                }
-                              </span>
-                              <input
-                                value={draft.profile[key]}
-                                maxLength={250}
-                                onChange={(e) =>
-                                  updateProfile(key, e.target.value)
-                                }
-                              />
-                            </label>
-                          ))}
-                          <label className="tb-field">
-                            <span>Email from your invitation</span>
-                            <input value={draft.profile.email} readOnly />
-                            <small>
-                              Ask the organiser if this needs changing.
-                            </small>
-                          </label>
                           <Select
-                            label="Country where you are primarily based"
-                            value={draft.profile.country}
-                            codes={COUNTRY_CODES}
-                            labels={COUNTRY_CODES.map(countryLabel)}
-                            change={(v) => updateProfile("country", v)}
-                          />
-                          <Select
-                            label="Which area best describes your current work?"
-                            value={draft.profile.work_type}
-                            codes={WORK_TYPES.map((x) => x[0])}
-                            labels={WORK_TYPES.map((x) => x[1])}
-                            change={(v) => updateProfile("work_type", v)}
-                          />
-                          <Select
-                            label="Do you manage people?"
-                            value={draft.profile.manages_people}
-                            codes={["yes", "no", "not_sure"]}
-                            labels={["Yes", "No", "Not sure"]}
-                            change={(v) => updateProfile("manages_people", v)}
-                          />
-                          {draft.profile.manages_people === "yes" && (
-                            <label className="tb-field">
-                              <span>
-                                About how many people report directly to you?
-                              </span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={1000}
-                                value={draft.profile.direct_reports}
-                                onChange={(e) =>
-                                  updateProfile(
-                                    "direct_reports",
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </label>
-                          )}
-                          <h2>
-                            Which countries or areas do you regularly support?
-                          </h2>
-                          <p>
-                            Support means people or businesses your work serves.
-                            You can choose more than one.
-                          </p>
-                          <Checks
+                            label="Who does your regular work support?"
+                            value={draft.scope.reach}
                             codes={[
-                              "countries",
-                              "regional",
-                              "group",
-                              "business",
-                              "other",
+                              "one_entity",
+                              "multiple_entities",
+                              "all_group",
                               "not_sure",
                             ]}
                             labels={[
-                              "One or more countries",
-                              "Regional",
+                              "One brand or entity",
+                              "More than one brand or entity",
                               "Group / all team.blue",
-                              "A specific business or division",
-                              "Other",
                               "Not sure",
                             ]}
-                            values={draft.profile.support_levels}
-                            change={(v) => updateProfile("support_levels", v)}
+                            invalid={invalid("scope")}
+                            change={(reach) =>
+                              change({
+                                ...draft,
+                                scope: { reach, entities: [] },
+                              })
+                            }
                           />
-                          {draft.profile.support_levels.includes(
-                            "countries",
-                          ) && (
-                            <details open>
-                              <summary>Choose supported countries</summary>
-                              <Checks
-                                codes={COUNTRY_CODES}
-                                labels={COUNTRY_CODES.map(countryLabel)}
-                                values={draft.profile.support_countries}
-                                change={(v) =>
-                                  updateProfile("support_countries", v)
-                                }
-                              />
-                            </details>
-                          )}
-                          <Text
-                            label="Region, business or other support area (if relevant)"
-                            value={draft.profile.support_other}
-                            change={(v) => updateProfile("support_other", v)}
-                            max={500}
-                          />
+                          {["one_entity", "multiple_entities"].includes(
+                            draft.scope.reach,
+                          ) &&
+                            (entities.length ? (
+                              <>
+                                <h2>
+                                  Which brands or entities do you support
+                                  regularly?
+                                </h2>
+                                <p>
+                                  A legal entity is the company that employs
+                                  people. Choose{" "}
+                                  {draft.scope.reach === "one_entity"
+                                    ? "one"
+                                    : "all that apply"}
+                                  .
+                                </p>
+                                <Checks
+                                  codes={entities.map((e) => e.code)}
+                                  labels={entities.map((e) => e.label)}
+                                  values={draft.scope.entities}
+                                  max={
+                                    draft.scope.reach === "one_entity"
+                                      ? 1
+                                      : undefined
+                                  }
+                                  invalid={invalid("entities")}
+                                  change={(values) =>
+                                    change({
+                                      ...draft,
+                                      scope: {
+                                        ...draft.scope,
+                                        entities: values,
+                                      },
+                                    })
+                                  }
+                                />
+                              </>
+                            ) : (
+                              <p>
+                                The organiser has not added the approved entity
+                                list yet. For this test, your answer above
+                                records the scope of your support.
+                              </p>
+                            ))}
                         </>
                       )}
                       {step === 1 && (
                         <>
                           <p>
                             Choose the areas where you currently spend
-                            meaningful time. Your title does not limit your
-                            choices.
+                            meaningful time. Choose across any group. Your work
+                            may combine employee cases, payroll, events, office
+                            services and systems.
                           </p>
                           <label className="tb-field">
                             <span>Search all work areas</span>
@@ -673,69 +710,61 @@ export default function BaselineJourney() {
                               onChange={(e) => setSearch(e.target.value)}
                             />
                           </label>
-                          <label className="tb-check">
-                            <input
-                              type="checkbox"
-                              checked={all}
-                              onChange={(e) => setAll(e.target.checked)}
-                            />
-                            Show work across all categories
-                          </label>
-                          <Checks
-                            codes={[
-                              ...availableAreas(
-                                draft.profile.work_type,
-                                all,
+                          <p>
+                            {draft.areas.length} areas selected. Avoid counting
+                            the same work in two areas.
+                          </p>
+                          <div className={invalid("areas") ? "tb-invalid" : ""}>
+                            {(
+                              Object.keys(GROUP_LABELS) as Area["category"][]
+                            ).map((group) => {
+                              const areas = availableAreas(
+                                "mixed",
+                                true,
                                 search,
-                              ),
-                              ...draft.customAreas,
-                            ].map((a) => a.code)}
-                            labels={[
-                              ...availableAreas(
-                                draft.profile.work_type,
-                                all,
-                                search,
-                              ),
-                              ...draft.customAreas,
-                            ].map((a) => a.label)}
-                            values={draft.areas}
-                            max={40}
-                            change={(values) => {
-                              const visible = new Set(
-                                [
-                                  ...availableAreas(
-                                    draft.profile.work_type,
-                                    all,
-                                    search,
-                                  ),
-                                  ...draft.customAreas,
-                                ].map((a) => a.code),
-                              );
-                              const keep = draft.areas.filter(
-                                (x) => !visible.has(x),
-                              );
-                              const next = [...keep, ...values];
-                              const allocation = Object.fromEntries(
-                                  Object.entries(draft.allocation).filter(
-                                    ([code]) => next.includes(code),
-                                  ),
-                                ),
-                                details = Object.fromEntries(
-                                  Object.entries(draft.details).filter(
-                                    ([code]) => next.includes(code),
-                                  ),
-                                );
-                              change({
-                                ...draft,
-                                areas: next,
-                                allocation,
-                                details,
-                                important: draft.important.filter((x) =>
-                                  next.includes(x),
-                                ),
-                              });
-                            }}
-                          />
+                              ).filter((a) => a.category === group);
+                              return areas.length ? (
+                                <section key={group}>
+                                  <h2>{GROUP_LABELS[group]}</h2>
+                                  <Checks
+                                    codes={areas.map((a) => a.code)}
+                                    labels={areas.map((a) => a.label)}
+                                    descriptions={Object.fromEntries(
+                                      areas.map((a) => [a.code, a.example]),
+                                    )}
+                                    values={draft.areas}
+                                    max={40}
+                                    change={(values) => {
+                                      const code = areas.find(
+                                        (a) =>
+                                          values.includes(a.code) !==
+                                          draft.areas.includes(a.code),
+                                      )?.code;
+                                      if (code) chooseArea(code);
+                                    }}
+                                  />
+                                </section>
+                              ) : null;
+                            })}
+                          </div>
+                          {draft.customAreas.length > 0 && (
+                            <>
+                              <h2>Added activities</h2>
+                              <Checks
+                                codes={draft.customAreas.map((a) => a.code)}
+                                labels={draft.customAreas.map((a) => a.label)}
+                                values={draft.areas}
+                                change={(values) => {
+                                  const code = draft.customAreas.find(
+                                    (a) =>
+                                      values.includes(a.code) !==
+                                      draft.areas.includes(a.code),
+                                  )?.code;
+                                  if (code) chooseArea(code);
+                                }}
+                              />
+                            </>
+                          )}
                           <label className="tb-field">
                             <span>Add another work area (up to six)</span>
                             <input
@@ -745,14 +774,9 @@ export default function BaselineJourney() {
                             />
                           </label>
                           <Select
-                            label="Category for your added work area"
-                            codes={["ops", "bp", "tech", "office"]}
-                            labels={[
-                              "People Operations",
-                              "People Business Partnering",
-                              "People Technology",
-                              "Reception / facilities / office operations",
-                            ]}
+                            label="Where does this added activity fit best?"
+                            codes={Object.keys(GROUP_LABELS)}
+                            labels={Object.values(GROUP_LABELS)}
                             value={customCategory}
                             change={(v) =>
                               setCustomCategory(v as Area["category"])
@@ -765,11 +789,10 @@ export default function BaselineJourney() {
                               draft.areas.length >= 40
                             }
                             onClick={() => {
-                              const category = customCategory;
                               const area: Area = {
                                 code: "custom_" + crypto.randomUUID(),
                                 label: custom.trim(),
-                                category,
+                                category: customCategory,
                                 example: "Briefly describe your current work.",
                               };
                               change({
@@ -782,18 +805,6 @@ export default function BaselineJourney() {
                           >
                             Add work area
                           </button>
-                          <p>{draft.areas.length} areas selected</p>
-                          <div className="tb-tags">
-                            {selected.map((a) => (
-                              <button
-                                key={a.code}
-                                onClick={() => chooseArea(a.code)}
-                                aria-label={`Remove ${a.label}`}
-                              >
-                                {a.label} ×
-                              </button>
-                            ))}
-                          </div>
                         </>
                       )}
                       {step === 2 && (
@@ -818,10 +829,19 @@ export default function BaselineJourney() {
                             </small>
                           </div>
                           {selected.map((a) => (
-                            <label className="tb-field" key={a.code}>
+                            <label
+                              className={
+                                "tb-field " +
+                                (invalid("allocation:" + a.code)
+                                  ? "tb-invalid"
+                                  : "")
+                              }
+                              key={a.code}
+                            >
                               <span>{a.label}</span>
                               <div className="tb-percentage">
                                 <input
+                                  aria-invalid={invalid("allocation:" + a.code)}
                                   aria-label={`${a.label} percentage`}
                                   type="number"
                                   inputMode="decimal"
@@ -899,6 +919,9 @@ export default function BaselineJourney() {
                                     a.example +
                                     " Do not include individual employee cases."
                                   }
+                                  invalid={invalid(
+                                    `detail:${code}:description`,
+                                  )}
                                   value={d.description}
                                   max={700}
                                   change={(v) =>
@@ -909,6 +932,7 @@ export default function BaselineJourney() {
                                   label="How often do you normally do this work?"
                                   codes={FREQUENCIES}
                                   labels={FREQUENCY_LABELS}
+                                  invalid={invalid(`detail:${code}:frequency`)}
                                   value={d.frequency}
                                   change={(v) =>
                                     updateDetail(code, "frequency", v)
@@ -918,21 +942,10 @@ export default function BaselineJourney() {
                                   label="Which best describes your role in this work?"
                                   codes={ROLES}
                                   labels={ROLE_LABELS}
+                                  invalid={invalid(`detail:${code}:role`)}
                                   value={d.role}
                                   change={(v) => updateDetail(code, "role", v)}
                                 />
-                                <details>
-                                  <summary>
-                                    What does responsibility for the final
-                                    result mean?
-                                  </summary>
-                                  <p>
-                                    You are the person expected to make sure
-                                    this work is finished correctly. A process
-                                    owner is responsible for how a whole process
-                                    works; this may be a different person.
-                                  </p>
-                                </details>
                                 <h3>
                                   Who do you normally work with or hand this
                                   work to/from?
@@ -968,14 +981,14 @@ export default function BaselineJourney() {
                           </p>
                           <p>
                             For example: annual pay activity, audits, office
-                            moves, restructures, major employee cases, annual
-                            reporting or system projects. Describe the type of
-                            work, not individual cases.
+                            moves, annual reporting or system projects. Describe
+                            the type of work, not individual cases.
                           </p>
                           <Select
                             label="Do you have important occasional work?"
                             codes={["yes", "no", "not_sure"]}
                             labels={["Yes", "No", "Not sure"]}
+                            invalid={invalid("cyclical")}
                             value={draft.cyclical.answer}
                             change={(v) =>
                               change({
@@ -990,6 +1003,7 @@ export default function BaselineJourney() {
                           {draft.cyclical.answer === "yes" && (
                             <Text
                               label="Briefly describe this work"
+                              invalid={invalid("cyclicalText")}
                               value={draft.cyclical.text}
                               max={1000}
                               change={(v) =>
@@ -1031,11 +1045,12 @@ export default function BaselineJourney() {
                                   .includes(systemSearch.toLowerCase()),
                               )
                               .map(systemLabel)}
+                            invalid={invalid("systems")}
                             values={draft.systems}
                             change={(v) => {
                               const visible = new Set(
                                 [...SYSTEMS, ...draft.systems].filter((s) =>
-                                  s
+                                  systemLabel(s)
                                     .toLowerCase()
                                     .includes(systemSearch.toLowerCase()),
                                 ),
@@ -1087,6 +1102,7 @@ export default function BaselineJourney() {
                           <Checks
                             codes={KNOWLEDGE}
                             labels={KNOWLEDGE_LABELS}
+                            invalid={invalid("knowledge")}
                             values={draft.knowledge}
                             change={(v) => change({ ...draft, knowledge: v })}
                           />
@@ -1101,22 +1117,93 @@ export default function BaselineJourney() {
                       )}
                       {step === 6 && (
                         <>
+                          <div
+                            className="tb-total"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            Incoming work total: {intakeTotal(draft)}%
+                            <progress
+                              max={100}
+                              value={Math.min(100, intakeTotal(draft))}
+                            />
+                            <small>
+                              Aim for 100%. Between 98% and 102% is accepted.
+                            </small>
+                          </div>
                           <p>
-                            Choose the main three ways work reaches you. Fewer
-                            than three is fine.
+                            Choose up to five main ways work reaches you.
+                            Estimate the share of incoming work through each
+                            route.
+                          </p>
+                          <p>
+                            Count each piece of work once, using the route
+                            through which it first reaches you. These
+                            percentages describe incoming work, rather than time
+                            spent on activities.
                           </p>
                           <Checks
                             codes={CHANNELS}
                             labels={CHANNEL_LABELS}
                             values={draft.channels}
-                            max={3}
-                            change={(v) => change({ ...draft, channels: v })}
+                            max={5}
+                            invalid={invalid("channels")}
+                            change={(channels) =>
+                              change({
+                                ...draft,
+                                channels,
+                                channelAllocation: Object.fromEntries(
+                                  Object.entries(
+                                    draft.channelAllocation,
+                                  ).filter(([c]) => channels.includes(c)),
+                                ),
+                              })
+                            }
                           />
+                          {draft.channels.map((c) => (
+                            <label
+                              className={
+                                "tb-field " +
+                                (invalid("channelAllocation:" + c)
+                                  ? "tb-invalid"
+                                  : "")
+                              }
+                              key={c}
+                            >
+                              <span>{CHANNEL_LABELS[CHANNELS.indexOf(c)]}</span>
+                              <div className="tb-percentage">
+                                <input
+                                  aria-label={`${CHANNEL_LABELS[CHANNELS.indexOf(c)]} percentage`}
+                                  aria-invalid={invalid(
+                                    "channelAllocation:" + c,
+                                  )}
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.5}
+                                  value={draft.channelAllocation[c] ?? ""}
+                                  onChange={(e) => {
+                                    const allocation = {
+                                      ...draft.channelAllocation,
+                                    };
+                                    if (e.target.value === "")
+                                      delete allocation[c];
+                                    else allocation[c] = Number(e.target.value);
+                                    change({
+                                      ...draft,
+                                      channelAllocation: allocation,
+                                    });
+                                  }}
+                                />
+                                <span>%</span>
+                              </div>
+                            </label>
+                          ))}
                           <Text
                             label="Other way work reaches you (optional)"
                             value={draft.channelOther}
-                            change={(v) =>
-                              change({ ...draft, channelOther: v })
+                            change={(channelOther) =>
+                              change({ ...draft, channelOther })
                             }
                           />
                         </>
@@ -1126,8 +1213,8 @@ export default function BaselineJourney() {
                           <Text
                             label="Which parts of your work take more time or manual effort than they should? (optional)"
                             help="For example: re-entering information, spreadsheets, repeated checking, waiting for information, chasing approvals or doing the same task in more than one system."
-                            value={draft.friction}
-                            change={(v) => change({ ...draft, friction: v })}
+                            value={draft.extraEffort}
+                            change={(v) => change({ ...draft, extraEffort: v })}
                           />
                           <Text
                             label="What works particularly well today and should we make sure we keep? (optional)"
@@ -1158,6 +1245,11 @@ export default function BaselineJourney() {
                         {step > 0 && (
                           <button onClick={() => void move(false)}>Back</button>
                         )}
+                        {reviewVisited && (
+                          <button onClick={() => void returnToReview()}>
+                            Save and return to review
+                          </button>
+                        )}
                         <button
                           className="tb-primary"
                           onClick={() => void move(true)}
@@ -1170,7 +1262,7 @@ export default function BaselineJourney() {
                 </fieldset>
               </section>
               <button disabled={busy} className="tb-leave" onClick={leave}>
-                Save and leave — return using your invitation email
+                Save and close secure session — return using your private link
               </button>
             </>
           )}

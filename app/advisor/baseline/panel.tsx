@@ -6,6 +6,7 @@ import {
   countryLabel,
   VERSION,
   type Draft,
+  type EntityOption,
 } from "@/lib/baseline/model";
 import "@/app/baseline/start/style.css";
 type Campaign = {
@@ -17,6 +18,7 @@ type Campaign = {
   retention_days: number;
   version: string;
   participants: number;
+  entities: EntityOption[];
 };
 type Person = {
   participant_id: string;
@@ -79,6 +81,7 @@ export default function AdminPanel() {
     [date, setDate] = useState(""),
     [notice, setNotice] = useState(PRIVACY),
     [retention, setRetention] = useState(90),
+    [entityList, setEntityList] = useState(""),
     [csv, setCsv] = useState(""),
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
@@ -98,6 +101,9 @@ export default function AdminPanel() {
       setDate(data.campaign.closes_at.slice(0, 10));
       setNotice(data.campaign.privacy_notice);
       setRetention(data.campaign.retention_days);
+      setEntityList(
+        (data.campaign.entities ?? []).map((e) => e.label).join("\n"),
+      );
     }
   }
   useEffect(() => {
@@ -123,7 +129,7 @@ export default function AdminPanel() {
   const template = () => {
     const blob = new Blob(
       [
-        "name,email,job_title,country,region,entity,work_type\nQA Respondent,respondent@example.invalid,Current title,GB,Test region,Test business,people_operations\n",
+        "name,email,job_title,country,region,entity,work_type,manages_people,direct_reports\nQA Respondent,respondent@example.invalid,Current title,GB,Test region,Test business,people_operations,no,0\n",
       ],
       { type: "text/csv" },
     );
@@ -163,6 +169,10 @@ export default function AdminPanel() {
               setCurrent(null);
               setPeople([]);
               if (value) void action(() => refresh(value));
+              else {
+                setNotice(PRIVACY);
+                setEntityList("");
+              }
             }}
           >
             <option value="">Create a campaign</option>
@@ -185,7 +195,8 @@ export default function AdminPanel() {
             </label>
           )}
           <p>
-            Questionnaire: {VERSION}. The version is fixed for this campaign.
+            Questionnaire: {current?.version ?? VERSION}. The version is fixed
+            for this campaign.
           </p>
           <label className="tb-field">
             <span>Closing date (end of day, UTC)</span>
@@ -219,6 +230,51 @@ export default function AdminPanel() {
               onChange={(e) => setNotice(e.target.value)}
             />
           </label>
+          <label className="tb-field">
+            <span>Approved brands / legal entities (one per line)</span>
+            <textarea
+              rows={5}
+              value={entityList}
+              maxLength={60000}
+              onChange={(e) => setEntityList(e.target.value)}
+            />
+            <small>
+              Use the supplied team.blue list. Choices are fixed once
+              invitations are created. Leave blank for the initial QA test.
+            </small>
+          </label>
+          {current && current.version !== VERSION && (
+            <>
+              <p>
+                This campaign uses the earlier questionnaire. Its responses and
+                exports are retained. Create a revised campaign for the updated
+                questionnaire.
+              </p>
+              <button
+                onClick={() =>
+                  void action(async () => {
+                    const result = await api("create", {
+                      name: (current.name + " — revised").slice(0, 150),
+                      closesAt: date + "T23:59:59.000Z",
+                      privacy: PRIVACY,
+                      retentionDays: retention,
+                      entityList,
+                      copyRosterFrom: id,
+                    });
+                    setId(result.campaignId);
+                    setLink("");
+                    setView(null);
+                    await refresh(result.campaignId);
+                    setMessage(
+                      "Revised draft created. Roster copied; earlier responses retained. Open this campaign and create a new private test link.",
+                    );
+                  })
+                }
+              >
+                Create revised campaign (copy roster)
+              </button>
+            </>
+          )}
           {!id ? (
             <button
               className="tb-primary"
@@ -229,6 +285,7 @@ export default function AdminPanel() {
                     closesAt: date + "T23:59:59.000Z",
                     privacy: notice,
                     retentionDays: retention,
+                    entityList,
                   });
                   setId(result.campaignId);
                   await refresh(result.campaignId);
@@ -250,6 +307,7 @@ export default function AdminPanel() {
                       privacy: notice,
                       closesAt: date + "T23:59:59.000Z",
                       retentionDays: retention,
+                      entityList,
                     });
                     await refresh();
                     setMessage("Campaign settings saved.");
@@ -259,6 +317,7 @@ export default function AdminPanel() {
                 Save settings
               </button>
               <button
+                disabled={current?.version !== VERSION}
                 className="tb-primary"
                 onClick={() =>
                   void action(async () => {
@@ -293,8 +352,11 @@ export default function AdminPanel() {
             <h2>Roster and invitations</h2>
             <p>
               Import a CSV with name and email. Optional columns: job_title,
-              country, region, entity, work_type. Use country codes such as GB.
-              Work type codes: {WORK_TYPES.map(([code]) => code).join(", ")}.
+              country, region, entity, work_type, manages_people,
+              direct_reports. Management refers to formal direct reports; use
+              yes, no or not_sure. These roster fields are not shown or asked in
+              the questionnaire. Use supplied country codes. Work type codes:{" "}
+              {WORK_TYPES.map(([code]) => code).join(", ")}.
             </p>
             <button onClick={template}>Download CSV template</button>
             <label className="tb-field">
