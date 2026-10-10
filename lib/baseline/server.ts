@@ -167,7 +167,8 @@ export async function rateLimit(
 }
 export async function redeem(request: Request, token: string) {
   const ip = request.headers.get("cf-connecting-ip") ?? "local";
-  await rateLimit(request, "redeem-ip:" + ip);
+  // Shared office networks need a larger budget than a single private invitation.
+  await rateLimit(request, "redeem-ip:" + ip, 120);
   if (!/^[a-f0-9]{64}$/.test(token))
     throw new BaselineError(
       "This invitation is not available. Ask the organiser for a new link.",
@@ -364,7 +365,7 @@ export async function saveResponse(
           code,
           area.label,
           area.category,
-          areaPillar(area.category),
+          areaPillar(area.category, area.code),
           draft.allocation[code] ?? null,
           JSON.stringify(draft.details[code] ?? {}),
           p.participant_id,
@@ -751,6 +752,25 @@ export async function exportDataset(
   const data = await campaignRows(campaign),
     respondents: Record<string, unknown>[] = [],
     activities: Record<string, unknown>[] = [];
+  const work = (
+    await db()
+      .prepare(
+        "SELECT w.* FROM tb_baseline_work w JOIN tb_baseline_participants p USING(participant_id) WHERE p.campaign_id=?",
+      )
+      .bind(campaign)
+      .all<{
+        participant_id: string;
+        area_code: string;
+        label: string;
+        category: string;
+        pillar: string;
+        percentage: number | null;
+        detail_json: string;
+      }>()
+  ).results;
+  const capturedWork = new Map(
+    work.map((row) => [row.participant_id + ":" + row.area_code, row]),
+  );
   for (const p of data.participants) {
     const draft = p.draft as Draft;
     const base = {
@@ -778,15 +798,20 @@ export async function exportDataset(
       anything: draft.anything,
     });
     for (const code of draft.areas) {
-      const a = [...AREAS, ...draft.customAreas].find((a) => a.code === code)!;
+      const a = capturedWork.get(p.participant_id + ":" + code);
+      if (!a)
+        throw new BaselineError(
+          "A saved activity is missing. Please contact the administrator before analysing this export.",
+          503,
+        );
       activities.push({
         ...base,
         area_code: code,
         area_label: a.label,
         work_category: a.category,
-        activity_pillar: areaPillar(a.category),
-        percentage: draft.allocation[code] ?? null,
-        ...draft.details[code],
+        activity_pillar: a.pillar,
+        percentage: a.percentage,
+        ...JSON.parse(a.detail_json),
       });
     }
   }

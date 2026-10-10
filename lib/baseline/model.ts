@@ -413,12 +413,14 @@ export function pillar(workType: string): string | null {
     )[workType] ?? null
   );
 }
-export const areaPillar = (category: Category) =>
-  category === "bp"
-    ? "business_partnering"
-    : category === "tech"
-      ? "people_technology"
-      : "people_operations";
+export const areaPillar = (category: Category, code?: string) =>
+  code === "bp_13"
+    ? "people_operations"
+    : category === "bp"
+      ? "business_partnering"
+      : category === "tech"
+        ? "people_technology"
+        : "people_operations";
 export function availableAreas(type: string, all = false, search = "") {
   const category = (
     {

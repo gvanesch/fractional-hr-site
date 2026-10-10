@@ -317,7 +317,7 @@ test("Baseline private invitations are hashed, scope sessions, expire, revoke an
     await assert.rejects(h.service.redeem(h.request({}), "0".repeat(64)));
     await h.service.revoke("admin@example.invalid", campaign, a.participant_id);
     await assert.rejects(h.service.participant(h.request({})));
-    for (let i = 0; i < 30; i++)
+    for (let i = 0; i < 150; i++)
       try {
         await h.service.redeem(h.request({}), "bad");
       } catch (e) {
@@ -539,6 +539,36 @@ test("Baseline duplicate roster import is atomic and privacy/version cannot sile
     await assert.rejects(
       h.service.readBody(oversized),
       (e) => e.status === 413,
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Baseline exports operational BP work as Operations and preserves captured labels", async () => {
+  const h = harness();
+  try {
+    const { campaign, token } = await h.setup(),
+      p = await h.access(token),
+      draft = h.complete((await h.service.readResponse(p)).draft);
+    draft.profile.work_type = "business_partnering";
+    draft.areas = ["bp_13"];
+    draft.allocation = { bp_13: 100 };
+    draft.details = { bp_13: draft.details.office_01 };
+    await h.service.saveResponse(p, draft, 0, 8, true);
+    h.model.AREAS.find((a) => a.code === "bp_13").label =
+      "A later display label";
+    const exported = JSON.parse(
+      await h.service.exportDataset("admin@example.invalid", campaign, "json"),
+    );
+    assert.equal(exported.activities[0].primary_pillar, "business_partnering");
+    assert.equal(exported.activities[0].activity_pillar, "people_operations");
+    assert.equal(
+      exported.activities[0].area_label,
+      "Operational People administration",
+    );
+    assert.equal(
+      exported.questionnaire.areas.find((a) => a.code === "bp_13").label,
+      "Operational People administration",
     );
   } finally {
     h.sqlite.close();
