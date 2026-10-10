@@ -21,6 +21,39 @@ new Function(
   ).outputText,
 )(mod, mod.exports);
 const m = mod.exports;
+test("Required context captures explicit answers without requiring written text", () => {
+  const d = m.emptyRichDraft();
+  d.scope = "one";
+  assert.deepEqual(m.richIssues(d, "context", ["office", "lifecycle"]), [
+    "contribution_office",
+    "contribution_lifecycle",
+    "dependencies",
+    "knowledge",
+    "systems",
+    "manual",
+  ]);
+  d.contributions = {
+    office: ["coordination"],
+    lifecycle: ["admin", "advice"],
+  };
+  d.dependencies = ["none"];
+  d.knowledge = ["unknown"];
+  d.systems = ["none"];
+  d.manual = ["unknown"];
+  assert.deepEqual(m.richIssues(d, "context", ["office", "lifecycle"]), []);
+  assert.equal(d.strengths, "");
+  d.knowledge = ["unknown", "office"];
+  assert.deepEqual(m.richIssues(d, "context", ["office", "lifecycle"]), [
+    "knowledge",
+  ]);
+  d.knowledge = ["office"];
+  assert.ok(
+    m
+      .richIssues(d, "context", ["office", "lifecycle", "pay_benefits"])
+      .includes("contribution_pay_benefits"),
+  );
+  assert.deepEqual(m.richIssues(d, "context", ["office"]), []);
+});
 test("Contact percentages describe requests, cap routes and require differing employee/manager routes", () => {
   const d = m.emptyRichDraft();
   Object.assign(d, {

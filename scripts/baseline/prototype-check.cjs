@@ -74,6 +74,23 @@ const root = path.resolve(__dirname, "../..");
           })
           .fill("Local knowledge");
         await button("Review answers").click();
+        await page.getByRole("alert").waitFor();
+        assert.ok((await page.locator("fieldset.tb-invalid").count()) >= 5);
+        const contributions = page.getByRole("checkbox", {
+          name: /^Contribution: .*: Not sure$/,
+        });
+        const count = await contributions.count();
+        assert.ok(count > 0);
+        for (let i = 0; i < count; i++) await contributions.nth(i).check();
+        await check(
+          "Who do you mainly depend on to complete your work?: Finance",
+        );
+        await check(
+          "What knowledge do colleagues rely on you for?: Office / facilities",
+        );
+        await check("Systems and tools you use regularly: Slack");
+        await check("What creates extra manual work?: Waiting for information");
+        await button("Review answers").click();
         await page
           .getByRole("heading", { name: "Review", exact: true })
           .waitFor();
@@ -139,6 +156,16 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .fill("30");
+      await button("Return to review").click();
+      await page
+        .getByRole("heading", {
+          name: "Scope and working context",
+          exact: true,
+        })
+        .waitFor();
+      await check(
+        "Contribution: Reception, facilities and office support: Coordinating or leading work",
+      );
       await button("Return to review").click();
       await page
         .getByRole("heading", { name: "Review", exact: true })
@@ -235,7 +262,7 @@ const root = path.resolve(__dirname, "../..");
       await page.close();
     }
     console.log(
-      "Focused baseline prototype: broad time groups, contact routes/percentages, employee-manager differences, conditional payroll, provider/Finance contributions, review edits and zero API writes passed on desktop/mobile.",
+      "Focused baseline prototype: broad time groups, contact routes/percentages, employee-manager differences, conditional payroll, provider/Finance contributions, required structured context, review edits and zero API writes passed on desktop/mobile.",
     );
   } finally {
     await browser.close();

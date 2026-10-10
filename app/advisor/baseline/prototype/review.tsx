@@ -23,7 +23,7 @@ export default function ContextReview({
   return (
     <>
       <section className="tb-process">
-        <h2>How people contact HR</h2>
+        <h2>How people contact you or your team</h2>
         {e.contact.receives !== "yes" ? (
           <p>
             {e.contact.receives === "no"

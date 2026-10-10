@@ -21,7 +21,7 @@ import {
 const LABELS: Record<string, string> = {
   areas: "Your work areas",
   time: "Time across your work",
-  contact: "How people contact HR",
+  contact: "How people contact you or your team",
   payroll: "Payroll responsibilities",
   context: "Scope and working context",
   review: "Review",
@@ -56,7 +56,7 @@ export default function Prototype() {
       ? broadIssues(draft, 0)
       : i === 1
         ? broadIssues(draft, 1)
-        : richIssues(rich, steps[i]);
+        : richIssues(rich, steps[i], draft.selected);
   const issues = checked ? validate(stage) : [];
   function go(next: number) {
     const invalid =

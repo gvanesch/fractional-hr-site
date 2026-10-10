@@ -165,8 +165,9 @@ export default function Context({
     return (
       <>
         <p>
-          Tell us about requests you or your team receive from employees and
-          managers. Use your own experience; an estimate is enough.
+          Tell us how employees and managers ask you or your team for help with
+          people, workplace or office matters. Use your own experience; an
+          estimate is enough.
         </p>
         <Pick
           label="Do you or your team receive employee or manager requests?"
@@ -418,8 +419,9 @@ export default function Context({
   return (
     <>
       <p>
-        These short questions help us understand the scope and context of your
-        work. Please avoid names or details of individual employee cases.
+        Please answer the selection questions below. You can choose None or Not
+        sure where appropriate. Written notes are optional. Avoid names or
+        details of individual employee cases.
       </p>
       <Pick
         label="Do you regularly support one business or more than one?"
@@ -436,14 +438,19 @@ export default function Context({
       <h2>Your main contribution</h2>
       <p>
         Select what applies within each work area. More than one can apply. This
-        describes the work you do today. These answers are optional.
+        describes the work you do today. Please select at least one answer for
+        each work area. Not sure is a valid answer.
       </p>
-      <details className="tb-process">
-        <summary>Main contribution within work areas (optional)</summary>
+      <details
+        className="tb-process"
+        open={issues.some((i) => i.startsWith("contribution_"))}
+      >
+        <summary>Main contribution within work areas (required)</summary>
         {areas.map((a) => (
           <Checks
             key={a.code}
             label={"Contribution: " + a.label}
+            invalid={bad("contribution_" + a.code)}
             values={d.contributions[a.code] ?? []}
             options={CONTRIBUTIONS}
             exclusive={["unknown"]}
@@ -456,17 +463,20 @@ export default function Context({
         ))}
       </details>
       <Checks
-        label="Who do you mainly depend on to complete your work? (optional)"
+        label="Who do you mainly depend on to complete your work?"
         values={d.dependencies}
         options={DEPENDENCIES}
         max={5}
-        exclusive={["unknown"]}
+        invalid={bad("dependencies")}
+        exclusive={["none", "unknown"]}
         change={(dependencies) => change({ dependencies })}
       />
-      <details className="tb-process">
-        <summary>Systems and local or specialist knowledge (optional)</summary>
+      <details className="tb-process" open={bad("knowledge") || bad("systems")}>
+        <summary>Systems and local or specialist knowledge (required)</summary>
         <Checks
-          label="What knowledge do colleagues rely on you for? (optional)"
+          label="What knowledge do colleagues rely on you for?"
+          invalid={bad("knowledge")}
+          exclusive={["none", "unknown"]}
           values={d.knowledge}
           options={KNOWLEDGE}
           change={(knowledge) => change({ knowledge })}
@@ -478,7 +488,9 @@ export default function Context({
           help="For example, a local process, language or business requirement. No personal employee information is needed."
         />
         <Checks
-          label="Systems and tools you use regularly (optional)"
+          label="Systems and tools you use regularly"
+          invalid={bad("systems")}
+          exclusive={["none", "unknown"]}
           values={d.systems}
           options={SYSTEMS}
           change={(systems) => change({ systems })}
@@ -490,10 +502,11 @@ export default function Context({
         />
       </details>
       <Checks
-        label="What creates extra manual work? (optional)"
+        label="What creates extra manual work?"
+        invalid={bad("manual")}
         values={d.manual}
         options={MANUAL}
-        exclusive={["none"]}
+        exclusive={["none", "unknown"]}
         change={(manual) => change({ manual })}
       />
       <Text

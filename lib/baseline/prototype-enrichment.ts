@@ -1,7 +1,7 @@
 // QA-only structured context. Unknown answers remain unknown in evidence.
 export const CONTACT_ROUTES = [
   ["personal_email", "Personal email"],
-  ["shared_mailbox", "Shared HR mailbox"],
+  ["shared_mailbox", "Shared team mailbox"],
   ["direct_message", "Direct Slack / Teams message"],
   ["shared_channel", "Shared Slack / Teams channel"],
   ["ticket", "Ticket / service portal"],
@@ -20,7 +20,7 @@ export const PAYROLL_STAGES = [
   ["queries", "Answer employee payroll questions"],
 ];
 export const PAYROLL_PARTIES = [
-  ["other_hr", "Other HR colleagues"],
+  ["other_hr", "HR colleagues"],
   ["internal_payroll", "Internal payroll team"],
   ["partner", "External payroll partner"],
   ["finance", "Finance"],
@@ -44,7 +44,7 @@ export const CONTRIBUTIONS = [
   ["unknown", "Not sure"],
 ];
 export const DEPENDENCIES = [
-  ["hr", "Other HR colleagues"],
+  ["hr", "HR colleagues"],
   ["payroll", "Payroll / payroll partner"],
   ["finance", "Finance"],
   ["it", "IT"],
@@ -55,6 +55,7 @@ export const DEPENDENCIES = [
   ["vendor", "External suppliers"],
   ["other", "Other"],
   ["unknown", "Not sure"],
+  ["none", "No regular dependencies"],
 ];
 export const KNOWLEDGE = [
   ["local_requirements", "Local employment requirements"],
@@ -68,6 +69,8 @@ export const KNOWLEDGE = [
   ["office", "Office / facilities"],
   ["process", "A specialist process"],
   ["other", "Other"],
+  ["none", "No specific area to add"],
+  ["unknown", "Not sure"],
 ];
 export const SYSTEMS = [
   ["hibob", "HiBob"],
@@ -83,6 +86,9 @@ export const SYSTEMS = [
   ["claude", "Claude"],
   ["blueai", "BlueAI"],
   ["payroll", "Payroll system"],
+  ["other", "Other tools"],
+  ["none", "No systems or tools used regularly"],
+  ["unknown", "Not sure"],
 ];
 export const MANUAL = [
   ["reenter", "Entering the same information again"],
@@ -93,6 +99,7 @@ export const MANUAL = [
   ["duplicate", "Doing the same work in more than one place"],
   ["other", "Other"],
   ["none", "None of these"],
+  ["unknown", "Not sure"],
 ];
 export type RichDraft = {
   receives: string;
@@ -165,7 +172,11 @@ export const routeTotal = (d: RichDraft) =>
       0,
     ) * 100,
   ) / 100;
-export function richIssues(d: RichDraft, step: string): string[] {
+export function richIssues(
+  d: RichDraft,
+  step: string,
+  selectedAreas: string[] = [],
+): string[] {
   const issues: string[] = [];
   if (step === "contact") {
     if (!["yes", "no", "unknown"].includes(d.receives)) return ["receives"];
@@ -233,11 +244,31 @@ export function richIssues(d: RichDraft, step: string): string[] {
     )
       issues.push("days");
   }
-  if (
-    step === "context" &&
-    !["one", "several", "group", "unknown"].includes(d.scope)
-  )
-    issues.push("scope");
+  if (step === "context") {
+    if (!["one", "several", "group", "unknown"].includes(d.scope))
+      issues.push("scope");
+    const valid = (
+      values: string[],
+      options: string[][],
+      max = Infinity,
+      exclusive = ["none", "unknown"],
+    ) =>
+      values.length > 0 &&
+      values.length <= max &&
+      values.every((c) => options.some((o) => o[0] === c)) &&
+      !(values.length > 1 && values.some((c) => exclusive.includes(c)));
+    for (const code of selectedAreas)
+      if (
+        !valid(d.contributions[code] ?? [], CONTRIBUTIONS, Infinity, [
+          "unknown",
+        ])
+      )
+        issues.push("contribution_" + code);
+    if (!valid(d.dependencies, DEPENDENCIES, 5)) issues.push("dependencies");
+    if (!valid(d.knowledge, KNOWLEDGE)) issues.push("knowledge");
+    if (!valid(d.systems, SYSTEMS)) issues.push("systems");
+    if (!valid(d.manual, MANUAL)) issues.push("manual");
+  }
   return issues;
 }
 export function richEvidence(
@@ -246,7 +277,7 @@ export function richEvidence(
   payrollVisible: boolean,
 ) {
   return {
-    designVersion: "broad-work-context-prototype-v2",
+    designVersion: "broad-work-context-prototype-v3",
     contact: {
       receives: d.receives,
       ...(d.receives === "yes"
