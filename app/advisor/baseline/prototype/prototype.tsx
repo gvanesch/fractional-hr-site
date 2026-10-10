@@ -11,32 +11,71 @@ import {
 } from "@/lib/baseline/broad-prototype";
 import "@/app/baseline/start/style.css";
 import "./prototype.css";
-const STEPS = ["Your work areas", "Time across your work", "Review"];
+import Context from "./context";
+import ContextReview from "./review";
+import {
+  emptyRichDraft,
+  richIssues,
+  richEvidence,
+} from "@/lib/baseline/prototype-enrichment";
+const LABELS: Record<string, string> = {
+  areas: "Your work areas",
+  time: "Time across your work",
+  contact: "How people contact HR",
+  payroll: "Payroll responsibilities",
+  context: "Scope and working context",
+  review: "Review",
+};
 export default function Prototype() {
   const [draft, setDraft] = useState(emptyBroadDraft),
     [started, setStarted] = useState(false),
     [stage, setStage] = useState(0),
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false);
+  const [rich, setRich] = useState(emptyRichDraft);
+  const payrollVisible = draft.selected.includes("pay_benefits");
+  const steps = [
+    "areas",
+    "time",
+    "contact",
+    ...(payrollVisible ? ["payroll"] : []),
+    "context",
+    "review",
+  ];
+  const reviewStage = steps.length - 1;
+  const key = steps[stage];
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
     window.scrollTo({ top: 0 });
   }, [stage, started]);
   const active = broadSelected(draft),
-    total = broadTotal(draft),
-    issues = checked ? broadIssues(draft, stage) : [];
+    total = broadTotal(draft);
+  const validate = (i: number) =>
+    i === 0
+      ? broadIssues(draft, 0)
+      : i === 1
+        ? broadIssues(draft, 1)
+        : richIssues(rich, steps[i]);
+  const issues = checked ? validate(stage) : [];
   function go(next: number) {
-    if (next > stage && broadIssues(draft, next === 2 ? 1 : stage).length) {
+    const invalid =
+      next === reviewStage
+        ? steps
+            .slice(0, reviewStage)
+            .findIndex((_, i) => validate(i).length > 0)
+        : next > stage && validate(stage).length
+          ? stage
+          : -1;
+    if (invalid >= 0) {
+      setStage(invalid);
       setChecked(true);
-      if (!active.length) setStage(0);
-      else if (next === 2) setStage(1);
       window.scrollTo({ top: 0 });
       return;
     }
     setStage(next);
     setChecked(false);
-    if (next === 2) setReviewVisited(true);
+    if (next === reviewStage) setReviewVisited(true);
   }
   return (
     <main className="tb-shell tb-prototype">
@@ -63,8 +102,8 @@ export default function Prototype() {
             every task.
           </p>
           <p>
-            This design test covers work areas and time. It does not collect a
-            campaign response.
+            This design test adds contact routes, payroll responsibilities and
+            working context. It does not collect a campaign response.
           </p>
           <button className="tb-primary" onClick={() => setStarted(true)}>
             Start with empty answers
@@ -86,20 +125,24 @@ export default function Prototype() {
       ) : (
         <>
           <nav className="tb-progress" aria-label="Prototype progress">
-            <span>Step {stage + 1} of 3</span>
-            <progress max={3} value={stage + 1} />
+            <span>
+              Step {stage + 1} of {steps.length}
+            </span>
+            <progress max={steps.length} value={stage + 1} />
             <span>{active.length} work areas</span>
           </nav>
           {issues.length > 0 && (
             <div role="alert" className="tb-error">
               {!active.length
                 ? "Choose at least one work area."
-                : "Check the highlighted percentages. Aim for 100% in total."}
+                : stage === 1
+                  ? "Check the highlighted percentages. Aim for 100% in total."
+                  : "Please check the highlighted answers. Percentage totals should be about 100%."}
             </div>
           )}
           <section className="tb-card">
             <h1 ref={heading} tabIndex={-1}>
-              {STEPS[stage]}
+              {LABELS[key]}
             </h1>
             {stage === 0 && (
               <>
@@ -247,15 +290,27 @@ export default function Prototype() {
                 </label>
               </>
             )}
-            {stage === 2 && (
+            {["contact", "payroll", "context"].includes(key) && (
+              <Context
+                step={key}
+                draft={rich}
+                change={(patch) => setRich({ ...rich, ...patch })}
+                issues={issues}
+                areas={active}
+              />
+            )}
+            {key === "review" && (
               <>
                 <p>
                   This is the broad picture of your work. Selecting an area does
                   not mean you do every example listed within it.
                 </p>
                 <div className="tb-review">
-                  <button onClick={() => go(0)}>Edit work areas</button>
-                  <button onClick={() => go(1)}>Edit time estimates</button>
+                  {steps.slice(0, reviewStage).map((step, i) => (
+                    <button key={step} onClick={() => go(i)}>
+                      Edit {LABELS[step].toLowerCase()}
+                    </button>
+                  ))}
                 </div>
                 {broadEvidence(draft).workAreas.map((a) => (
                   <section className="tb-process tb-review-area" key={a.code}>
@@ -271,6 +326,9 @@ export default function Prototype() {
                     <p>{draft.occasional}</p>
                   </section>
                 )}
+                <ContextReview
+                  evidence={richEvidence(rich, draft.selected, payrollVisible)}
+                />
                 <p>
                   This completes the prototype. No campaign response has been
                   submitted.
@@ -278,19 +336,24 @@ export default function Prototype() {
               </>
             )}
             <footer className="tb-actions">
-              {stage === 1 && <button onClick={() => go(0)}>Back</button>}
-              {stage < 2 && (
+              {stage > 0 && stage < reviewStage && (
+                <button onClick={() => go(stage - 1)}>Back</button>
+              )}
+              {stage < reviewStage && (
                 <button className="tb-primary" onClick={() => go(stage + 1)}>
-                  {stage === 1 ? "Review answers" : "Continue"}
+                  {stage === reviewStage - 1 ? "Review answers" : "Continue"}
                 </button>
               )}
-              {reviewVisited && stage < 2 && (
-                <button onClick={() => go(2)}>Return to review</button>
+              {reviewVisited && stage < reviewStage && (
+                <button onClick={() => go(reviewStage)}>
+                  Return to review
+                </button>
               )}
-              {stage === 2 && (
+              {key === "review" && (
                 <button
                   onClick={() => {
                     setDraft(emptyBroadDraft());
+                    setRich(emptyRichDraft());
                     setStage(0);
                     setStarted(false);
                     setChecked(false);
