@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useId } from "react";
 import {
   AREAS,
   FREQUENCIES,
@@ -44,10 +44,13 @@ function Choice({
   change: (value: string) => void;
   invalid?: boolean;
 }) {
+  const helpId = useId();
   return (
     <label className="tb-field">
       <span>{label}</span>
       <select
+        aria-label={label}
+        aria-describedby={value ? helpId : undefined}
         aria-invalid={invalid}
         value={value}
         onChange={(e) => change(e.target.value)}
@@ -59,7 +62,11 @@ function Choice({
           </option>
         ))}
       </select>
-      {value && <small className="tb-definition">{OPTION_HELP[value]}</small>}
+      {value && (
+        <small id={helpId} className="tb-definition">
+          {OPTION_HELP[value]}
+        </small>
+      )}
     </label>
   );
 }
