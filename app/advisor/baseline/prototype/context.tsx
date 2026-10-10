@@ -113,9 +113,10 @@ export function Checks({
             />
             <span>
               {text}
-              {values.includes(code) && HELP[code] && (
-                <small className="tb-activity-help">{HELP[code]}</small>
-              )}
+              {values.includes(code) &&
+                ["admin", "advice", "improvement", "coordination"].includes(
+                  code,
+                ) && <small className="tb-activity-help">{HELP[code]}</small>}
             </span>
           </label>
         ))}
