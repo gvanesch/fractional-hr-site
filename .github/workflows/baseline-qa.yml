@@ -1,0 +1,48 @@
+name: Baseline QA build and deployment
+on:
+  push:
+    branches: [feature/team-blue-baseline]
+permissions:
+  contents: read
+concurrency:
+  group: d1-qa-worker-deployment
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Test database, branching, autosave and invitation security
+        run: npm run test:d1
+      - name: Check types and baseline lint
+        run: |
+          npx tsc --noEmit
+          npx eslint lib/baseline app/baseline app/advisor/baseline app/api/baseline app/components/CookieBanner.tsx next.config.ts
+      - name: Guard the QA-only target
+        run: node scripts/baseline/prepare-qa.mjs
+      - name: Install isolated browser test tooling
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Test desktop and mobile assessment journey
+        run: node scripts/baseline/ui-check.cjs
+      - name: Apply dedicated baseline schema to QA only
+        run: npx wrangler d1 migrations apply DB --env qa --remote
+      - name: Build QA Worker
+        run: npx opennextjs-cloudflare build --env qa
+      - name: Deploy QA only
+        run: npx opennextjs-cloudflare deploy --env qa
+      - name: Verify deployed QA configuration
+        run: node scripts/d1/qa-hosted-preflight.mjs --deployment
+      - name: Verify anonymous baseline boundary
+        run: node scripts/baseline/hosted-check.mjs
