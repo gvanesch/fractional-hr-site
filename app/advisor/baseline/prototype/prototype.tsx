@@ -234,6 +234,7 @@ export default function Prototype() {
                   </span>
                   <textarea
                     maxLength={1000}
+                    aria-label="Any important work that this typical month misses? (optional)"
                     value={draft.occasional}
                     onChange={(e) =>
                       setDraft({ ...draft, occasional: e.target.value })
