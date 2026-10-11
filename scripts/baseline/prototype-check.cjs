@@ -83,8 +83,35 @@ const root = path.resolve(__dirname, "../..");
           "Are these requests recorded so others can see their status?",
           "some",
         );
+        for (const answer of ["none", "unknown"]) {
+          await pick(
+            "Are these requests recorded so others can see their status?",
+            answer,
+          );
+          assert.equal(
+            await page
+              .getByLabel("How are requests tracked and followed up?", {
+                exact: true,
+              })
+              .count(),
+            0,
+          );
+        }
+        await pick(
+          "Are these requests recorded so others can see their status?",
+          "most",
+        );
+        await button("Continue").click();
+        assert.equal(
+          await page
+            .getByLabel("How are requests tracked and followed up?", {
+              exact: true,
+            })
+            .getAttribute("aria-invalid"),
+          "true",
+        );
         await page
-          .getByLabel("How are requests tracked and followed up? (optional)", {
+          .getByLabel("How are requests tracked and followed up?", {
             exact: true,
           })
           .fill("Shared spreadsheet with next-day response target");
@@ -108,7 +135,7 @@ const root = path.resolve(__dirname, "../..");
         assert.ok(
           !(await page.getByRole("alert").innerText()).includes("100%"),
         );
-        assert.equal(await page.locator("fieldset.tb-invalid").count(), 1);
+        assert.equal(await page.locator("fieldset.tb-invalid").count(), 2);
         assert.equal(
           await page
             .getByText("Main contribution within work areas (required)", {
@@ -120,6 +147,7 @@ const root = path.resolve(__dirname, "../..");
         await check(
           "Does any of your work need the following?: Being physically present at an office or site",
         );
+        await check("Systems and tools you use regularly: Excel");
         await page
           .getByLabel("What works well and should we keep? (optional)", {
             exact: true,
@@ -166,7 +194,7 @@ const root = path.resolve(__dirname, "../..");
         "some",
       );
       await page
-        .getByLabel("How are requests tracked and followed up? (optional)", {
+        .getByLabel("How are requests tracked and followed up?", {
           exact: true,
         })
         .fill("Jira; agreed next-day response target");

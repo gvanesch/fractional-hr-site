@@ -165,6 +165,11 @@ export function richIssues(
       issues.push(...d.routes.map((c) => "route_" + c));
     if (!["all", "most", "some", "none", "unknown"].includes(d.recording))
       issues.push("recording");
+    if (
+      ["all", "most", "some"].includes(d.recording) &&
+      !d.recordingNote.trim()
+    )
+      issues.push("recordingNote");
     if (!["often", "sometimes", "rarely", "unknown"].includes(d.duplicates))
       issues.push("duplicates");
     if (!["same", "different", "unknown"].includes(d.sameRoutes))
@@ -216,6 +221,9 @@ export function richIssues(
     if (!["one", "several", "group", "unknown"].includes(d.scope))
       issues.push("scope");
     if (!validChoices(d.localNeeds, LOCAL_NEEDS)) issues.push("localNeeds");
+    if (!validChoices(d.systems, SYSTEMS)) issues.push("systems");
+    if (d.systems.includes("other") && !d.otherSystems.trim())
+      issues.push("otherSystems");
   }
   return issues;
 }
@@ -226,7 +234,7 @@ export function richError(step: string, issues: string[]) {
     return issues.some((i) => i.startsWith("route_"))
       ? "Check the highlighted request percentages. Aim for 100% in total, and answer any other highlighted questions."
       : "Please select your contact routes and answer the highlighted questions.";
-  return "Please answer the highlighted questions about support scope and local requirements.";
+  return "Please answer the highlighted questions about support scope, local requirements, and systems or tools.";
 }
 export function richEvidence(
   d: RichDraft,
@@ -241,7 +249,9 @@ export function richEvidence(
         shareOfRequests: d.routeTime[code],
       })),
       recording: d.recording,
-      recordingNote: d.recordingNote,
+      ...(["all", "most", "some"].includes(d.recording)
+        ? { recordingNote: d.recordingNote }
+        : {}),
       duplicateRequests: d.duplicates,
       sameEmployeeManagerRoutes: d.sameRoutes,
       ...(d.sameRoutes === "different"

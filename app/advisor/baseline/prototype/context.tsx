@@ -130,17 +130,20 @@ function Text({
   value,
   change,
   help,
+  invalid = false,
 }: {
   label: string;
   value: string;
   change: (s: string) => void;
   help?: string;
+  invalid?: boolean;
 }) {
   return (
     <label className="tb-field">
       <span>{label}</span>
       <textarea
         aria-label={label}
+        aria-invalid={invalid}
         maxLength={1000}
         value={value}
         onChange={(e) => change(e.target.value)}
@@ -236,12 +239,15 @@ export default function Context({
           invalid={bad("recording")}
           change={(recording) => change({ recording })}
         />
-        <Text
-          label="How are requests tracked and followed up? (optional)"
-          value={d.recordingNote}
-          change={(recordingNote) => change({ recordingNote })}
-          help="For example: a ticket tool, a shared mailbox or spreadsheet, who follows up, and any agreed response times or service level agreements. If requests are not recorded, explain how you manage them."
-        />
+        {["all", "most", "some"].includes(d.recording) && (
+          <Text
+            label="How are requests tracked and followed up?"
+            value={d.recordingNote}
+            invalid={bad("recordingNote")}
+            change={(recordingNote) => change({ recordingNote })}
+            help="For example: We record requests in Jira. The team can see who is handling each request. We aim to reply within two working days. Tell us which system or process you use. Explain how people with shared access know who is handling a request. Include any agreed response times, also called service level agreements."
+          />
+        )}
         <Pick
           label="How often does the same request reach more than one person or arrive through more than one route?"
           value={d.duplicates}
@@ -460,21 +466,27 @@ export default function Context({
         value={d.localNote}
         change={(localNote) => change({ localNote })}
       />
-      <details className="tb-process">
-        <summary>Systems and tools (optional)</summary>
+      <section className="tb-process">
+        <h3>Systems and tools</h3>
         <Checks
           label="Systems and tools you use regularly"
           values={d.systems}
           options={SYSTEMS}
+          invalid={bad("systems")}
           exclusive={["none", "unknown"]}
           change={(systems) => change({ systems })}
         />
         <Text
-          label="Other systems or tools (optional)"
+          label={
+            d.systems.includes("other")
+              ? "Other systems or tools"
+              : "Other systems or tools (optional)"
+          }
+          invalid={bad("otherSystems")}
           value={d.otherSystems}
           change={(otherSystems) => change({ otherSystems })}
         />
-      </details>
+      </section>
       <Text
         label="Which work takes more time or manual effort than it should? (optional)"
         value={d.manualNote}

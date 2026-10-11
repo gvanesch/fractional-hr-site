@@ -184,7 +184,7 @@ export default function Prototype() {
                 </div>
                 <p>
                   Do not count the same work twice. For example, entering a new
-                  starter’s record belongs in lifecycle support; configuring a
+                  starter’s record belongs in lifecycle support. Configuring a
                   system belongs in systems, data and improvement.
                 </p>
               </>

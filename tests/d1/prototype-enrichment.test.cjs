@@ -26,8 +26,10 @@ test("Focused final questions require scope and local needs without contribution
   assert.deepEqual(m.richIssues(d, "context", ["office", "lifecycle"]), [
     "scope",
     "localNeeds",
+    "systems",
   ]);
   d.scope = "one";
+  d.systems = ["excel"];
   d.localNeeds = ["none"];
   assert.deepEqual(m.richIssues(d, "context", ["office", "lifecycle"]), []);
   d.localNeeds = ["none", "language"];
@@ -124,4 +126,29 @@ test("Only mixed broad areas get a work-nature question; hidden detail is exclud
     m.toggleOption(["finance"], "unknown", Infinity, ["unknown", "none"]),
     ["unknown"],
   );
+});
+
+test("Tracking explanation is required only for recorded requests; systems require a valid answer", () => {
+  const d = m.emptyRichDraft();
+  for (const recording of ["all", "most", "some"]) {
+    d.recording = recording;
+    d.recordingNote = "   ";
+    assert.ok(m.richIssues(d, "contact").includes("recordingNote"));
+    d.recordingNote =
+      "Shared mailbox. We assign each request. Replies within two days.";
+    assert.ok(!m.richIssues(d, "contact").includes("recordingNote"));
+  }
+  for (const recording of ["none", "unknown"]) {
+    d.recording = recording;
+    d.recordingNote = "";
+    assert.ok(!m.richIssues(d, "contact").includes("recordingNote"));
+  }
+  for (const systems of [["none"], ["unknown"], ["excel"]]) {
+    d.systems = systems;
+    assert.ok(!m.richIssues(d, "context").includes("systems"));
+  }
+  d.systems = ["other"];
+  assert.ok(m.richIssues(d, "context").includes("otherSystems"));
+  d.otherSystems = "Local payroll tool";
+  assert.ok(!m.richIssues(d, "context").includes("otherSystems"));
 });
