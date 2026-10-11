@@ -22,6 +22,20 @@ const root = path.resolve(__dirname, "../..");
     loader: { ".css": "empty" },
     define: { "process.env.NODE_ENV": '"production"' },
   });
+  const accessBuilt = await esbuild.build({
+    stdin: {
+      contents:
+        'import React from "react";import {createRoot} from "react-dom/client";import TestAccess from "./app/baseline/test/test-access";createRoot(document.getElementById("root")).render(<TestAccess/>);',
+      resolveDir: root,
+      loader: "tsx",
+    },
+    bundle: true,
+    write: false,
+    format: "iife",
+    jsx: "automatic",
+    loader: { ".css": "empty" },
+    define: { "process.env.NODE_ENV": '"production"' },
+  });
   const browser = await chromium.launch({
     channel: "chromium",
     headless: true,
@@ -341,6 +355,71 @@ const root = path.resolve(__dirname, "../..");
       );
       assert.equal(apiRequests, 0);
       await page.close();
+      const testerPage = await browser.newPage({
+        viewport: mobile
+          ? { width: 390, height: 844 }
+          : { width: 1280, height: 900 },
+      });
+      let accessCalls = 0;
+      await testerPage.route(
+        "https://tester.example.invalid/**",
+        async (route) => {
+          if (
+            new URL(route.request().url()).pathname ===
+            "/api/baseline/design-access"
+          ) {
+            accessCalls++;
+            assert.equal(route.request().postDataJSON().token, "a".repeat(64));
+            return route.fulfill({
+              contentType: "application/json",
+              body: JSON.stringify({ tester: "Tester 1" }),
+            });
+          }
+          return route.fulfill({
+            contentType: "text/html",
+            body: '<!doctype html><html><body><div id="root"></div></body></html>',
+          });
+        },
+      );
+      await testerPage.goto("https://tester.example.invalid/baseline/test");
+      await testerPage.addScriptTag({
+        content: accessBuilt.outputFiles[0].text,
+      });
+      await testerPage.getByRole("alert").waitFor();
+      assert.equal(accessCalls, 0);
+      assert.equal(
+        await testerPage
+          .getByRole("button", { name: "Start with empty answers" })
+          .count(),
+        0,
+      );
+      await testerPage.goto(
+        "https://tester.example.invalid/baseline/test#" + "a".repeat(64),
+      );
+      await testerPage.addScriptTag({
+        content: accessBuilt.outputFiles[0].text,
+      });
+      await testerPage
+        .getByRole("button", { name: "Start with empty answers", exact: true })
+        .waitFor();
+      assert.equal(accessCalls, 1);
+      assert.equal(await testerPage.evaluate(() => location.hash), "");
+      assert.ok(
+        (await testerPage.locator("aside").innerText()).includes("Tester 1"),
+      );
+      await testerPage
+        .getByRole("button", { name: "Start with empty answers", exact: true })
+        .click();
+      await testerPage
+        .getByRole("heading", { name: "Your work areas", exact: true })
+        .waitFor();
+      assert.equal(
+        await testerPage
+          .getByRole("link", { name: "Advisor", exact: true })
+          .count(),
+        0,
+      );
+      await testerPage.close();
     }
     console.log(
       "Focused baseline prototype: unconditional work contact, tracking explanation, four payroll areas, uninvolved/unknown actor handling, contextual errors, targeted work nature, lean final questions and zero API writes passed on desktop/mobile.",

@@ -29,7 +29,7 @@ const LABELS: Record<string, string> = {
   context: "A few final questions",
   review: "Review",
 };
-export default function Prototype() {
+export default function Prototype({ tester }: { tester?: string } = {}) {
   const [draft, setDraft] = useState(emptyBroadDraft),
     [started, setStarted] = useState(false),
     [stage, setStage] = useState(0),
@@ -86,8 +86,8 @@ export default function Prototype() {
   return (
     <main className="tb-shell tb-prototype">
       <aside className="tb-prototype-note">
-        QA design test · Use synthetic examples only. Answers stay in this page
-        and reset on refresh.
+        {tester ? `${tester} · Private design test` : "QA design test"} · Use
+        example answers only. Answers stay in this page and reset on refresh.
       </aside>
       <header className="tb-header">
         <span>team.blue · Current work baseline</span>
