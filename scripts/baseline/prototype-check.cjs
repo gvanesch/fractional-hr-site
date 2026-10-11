@@ -63,33 +63,68 @@ const root = path.resolve(__dirname, "../..");
         page.getByLabel(label, { exact: true }).selectOption(value);
       const check = (label) =>
         page.getByRole("checkbox", { name: label, exact: true }).check();
+      async function contactOneRoute() {
+        assert.equal(
+          await page
+            .getByLabel(
+              "Do you or your team receive employee or manager requests?",
+              { exact: true },
+            )
+            .count(),
+          0,
+        );
+        await check("Main contact routes: Work email (your own work address)");
+        await page
+          .getByLabel("Request share: Work email (your own work address)", {
+            exact: true,
+          })
+          .fill("100");
+        await pick(
+          "Are these requests recorded so others can see their status?",
+          "some",
+        );
+        await page
+          .getByLabel("How are requests tracked and followed up? (optional)", {
+            exact: true,
+          })
+          .fill("Shared spreadsheet with next-day response target");
+        await pick(
+          "How often does the same request reach more than one person or arrive through more than one route?",
+          "sometimes",
+        );
+        await pick(
+          "Do employees and managers generally use the same routes?",
+          "same",
+        );
+        await button("Continue").click();
+      }
       async function finishContext() {
         await pick(
           "Do you regularly support one business or more than one?",
           "several",
+        );
+        await button("Review answers").click();
+        await page.getByRole("alert").waitFor();
+        assert.ok(
+          !(await page.getByRole("alert").innerText()).includes("100%"),
+        );
+        assert.equal(await page.locator("fieldset.tb-invalid").count(), 1);
+        assert.equal(
+          await page
+            .getByText("Main contribution within work areas (required)", {
+              exact: true,
+            })
+            .count(),
+          0,
+        );
+        await check(
+          "Does any of your work need the following?: Being physically present at an office or site",
         );
         await page
           .getByLabel("What works well and should we keep? (optional)", {
             exact: true,
           })
           .fill("Local knowledge");
-        await button("Review answers").click();
-        await page.getByRole("alert").waitFor();
-        assert.ok((await page.locator("fieldset.tb-invalid").count()) >= 5);
-        const contributions = page.getByRole("checkbox", {
-          name: /^Contribution: .*: Not sure$/,
-        });
-        const count = await contributions.count();
-        assert.ok(count > 0);
-        for (let i = 0; i < count; i++) await contributions.nth(i).check();
-        await check(
-          "Who do you mainly depend on to complete your work?: Finance",
-        );
-        await check(
-          "What knowledge do colleagues rely on you for?: Office / facilities",
-        );
-        await check("Systems and tools you use regularly: Slack");
-        await check("What creates extra manual work?: Waiting for information");
         await button("Review answers").click();
         await page
           .getByRole("heading", { name: "Review", exact: true })
@@ -102,19 +137,26 @@ const root = path.resolve(__dirname, "../..");
         .filter({ hasText: "Choose at least one work area" })
         .waitFor();
       await check("Employee lifecycle support");
-      assert.equal(await page.getByRole("checkbox").count(), 10);
       await button("Continue").click();
       assert.equal(await page.locator('input[type="number"]').count(), 1);
+      assert.equal(await page.getByRole("combobox").count(), 0);
       await page.locator('input[type="number"]').fill("100");
       await button("Continue").click();
-      await pick(
-        "Do you or your team receive employee or manager requests?",
-        "yes",
+      assert.equal(
+        await page
+          .getByLabel(
+            "Do you or your team receive employee or manager requests?",
+            { exact: true },
+          )
+          .count(),
+        0,
       );
-      await check("Main contact routes: Personal email");
+      await check("Main contact routes: Work email (your own work address)");
       await check("Main contact routes: Ticket / service portal");
       await page
-        .getByLabel("Request share: Personal email", { exact: true })
+        .getByLabel("Request share: Work email (your own work address)", {
+          exact: true,
+        })
         .fill("60");
       await page
         .getByLabel("Request share: Ticket / service portal", { exact: true })
@@ -123,6 +165,11 @@ const root = path.resolve(__dirname, "../..");
         "Are these requests recorded so others can see their status?",
         "some",
       );
+      await page
+        .getByLabel("How are requests tracked and followed up? (optional)", {
+          exact: true,
+        })
+        .fill("Jira; agreed next-day response target");
       await pick(
         "How often does the same request reach more than one person or arrive through more than one route?",
         "often",
@@ -137,12 +184,19 @@ const root = path.resolve(__dirname, "../..");
         .getByLabel("Request share: Ticket / service portal", { exact: true })
         .fill("40");
       await check("Main employee routes: Ticket / service portal");
-      await check("Main manager routes: Personal email");
+      await check("Main manager routes: Work email (your own work address)");
       await button("Continue").click();
       await finishContext();
       assert.equal(await page.locator(".tb-review-area").count(), 1);
       await page
-        .getByText("Personal email: 60% of requests", { exact: true })
+        .getByText("Work email (your own work address): 60% of requests", {
+          exact: true,
+        })
+        .waitFor();
+      await page
+        .getByText(
+          /Tracking and follow-up: Jira; agreed next-day response target/,
+        )
         .waitFor();
       await button("Edit your work areas").click();
       await check("Reception, facilities and office support");
@@ -158,21 +212,10 @@ const root = path.resolve(__dirname, "../..");
         .fill("30");
       await button("Return to review").click();
       await page
-        .getByRole("heading", {
-          name: "Scope and working context",
-          exact: true,
-        })
-        .waitFor();
-      await check(
-        "Contribution: Reception, facilities and office support: Coordinating or leading work",
-      );
-      await button("Return to review").click();
-      await page
         .getByRole("heading", { name: "Review", exact: true })
         .waitFor();
       assert.equal(await page.locator(".tb-review-area").count(), 2);
       assert.equal(apiRequests, 0);
-      // Broad roles still get nine percentages; benefits-only work skips payroll detail.
       await page.reload();
       await mount();
       await button("Try a broad example").click();
@@ -190,13 +233,19 @@ const root = path.resolve(__dirname, "../..");
         "sticky",
       );
       await button("Continue").click();
+      assert.ok(!(await page.getByRole("alert").innerText()).includes("100%"));
+      assert.equal(await page.getByRole("combobox").count(), 2);
       await pick(
-        "Do you or your team receive employee or manager requests?",
-        "no",
+        "Main type of work: Manager advice and employee cases",
+        "mixed",
       );
-      assert.equal(await page.locator('input[type="number"]').count(), 0);
+      await pick(
+        "Main type of work: People planning, performance and development",
+        "routine",
+      );
       await button("Continue").click();
-      await pick("Are you personally involved in payroll?", "no");
+      await contactOneRoute();
+      await pick("Do you do any payroll-related work?", "no");
       assert.equal(
         await page
           .getByLabel("Personal payroll days per cycle", { exact: true })
@@ -206,38 +255,37 @@ const root = path.resolve(__dirname, "../..");
       await button("Continue").click();
       await finishContext();
       assert.equal(await page.locator(".tb-review-area").count(), 9);
-      // Edit payroll only; other completed steps should not need repeating.
       await button("Edit payroll responsibilities").click();
-      await pick("Are you personally involved in payroll?", "yes");
+      await pick("Do you do any payroll-related work?", "yes");
+      await button("Return to review").click();
+      assert.ok(!(await page.getByRole("alert").innerText()).includes("100%"));
       const stages = [
-        "Collect employee changes and other inputs",
-        "Prepare and enter payroll information",
-        "Calculate payroll",
-        "Check results and resolve errors",
-        "Approve payroll",
-        "Release payments",
-        "Reconcile payroll and accounting records",
+        "Collect employee changes and payroll inputs",
+        "Prepare or enter payroll information",
+        "Check payroll results and resolve corrections",
         "Answer employee payroll questions",
       ];
-      for (const label of stages) {
-        const card = page
-          .locator("details")
-          .filter({ has: page.locator("summary").filter({ hasText: label }) });
-        if (!(await card.evaluate((el) => el.open)))
-          await card.locator("summary").click();
-        await pick(
-          "Your part: " + label,
-          label === "Calculate payroll" ? "none" : "coordinate",
-        );
-        await check(
-          "Who else does this stage? " +
-            label +
-            ": " +
-            (label === "Calculate payroll"
-              ? "External payroll partner"
-              : "Finance"),
-        );
-      }
+      assert.equal(await page.getByRole("combobox").count(), 6);
+      await pick("Your part: " + stages[0], "do");
+      await pick("Your part: " + stages[1], "none");
+      await check(
+        "Who handles this work? " + stages[1] + ": External payroll partner",
+      );
+      await check("Who handles this work? " + stages[1] + ": Finance");
+      await pick("Your part: " + stages[2], "unknown");
+      assert.equal(
+        await page
+          .getByRole("checkbox", { name: new RegExp(stages[2]) })
+          .count(),
+        0,
+      );
+      await pick("Your part: " + stages[3], "coordinate");
+      await page
+        .getByLabel(
+          "Any other payroll work or important responsibilities? (optional)",
+          { exact: true },
+        )
+        .fill("Finance coordinates with our payroll partner");
       await pick(
         "How often does the payroll cycle you support run?",
         "monthly",
@@ -251,7 +299,12 @@ const root = path.resolve(__dirname, "../..");
         .waitFor();
       await page.getByText(/Personal payroll days: 3.5/).waitFor();
       await page
-        .getByText(/I am not involved. Others: External payroll partner/)
+        .getByText(
+          /I am not involved. Handled by: External payroll partner, Finance/,
+        )
+        .waitFor();
+      await page
+        .getByText(/Additional payroll work: Finance coordinates/)
         .waitFor();
       assert.ok(
         await page.evaluate(
@@ -262,7 +315,7 @@ const root = path.resolve(__dirname, "../..");
       await page.close();
     }
     console.log(
-      "Focused baseline prototype: broad time groups, contact routes/percentages, employee-manager differences, conditional payroll, provider/Finance contributions, required structured context, review edits and zero API writes passed on desktop/mobile.",
+      "Focused baseline prototype: unconditional work contact, tracking explanation, four payroll areas, uninvolved/unknown actor handling, contextual errors, targeted work nature, lean final questions and zero API writes passed on desktop/mobile.",
     );
   } finally {
     await browser.close();

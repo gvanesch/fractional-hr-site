@@ -1,6 +1,6 @@
-// QA-only structured context. Unknown answers remain unknown in evidence.
+// QA-only evidence. No capability, future role or individual example task is inferred.
 export const CONTACT_ROUTES = [
-  ["personal_email", "Personal email"],
+  ["work_email", "Work email (your own work address)"],
   ["shared_mailbox", "Shared team mailbox"],
   ["direct_message", "Direct Slack / Teams message"],
   ["shared_channel", "Shared Slack / Teams channel"],
@@ -10,13 +10,9 @@ export const CONTACT_ROUTES = [
   ["other", "Other routes"],
 ];
 export const PAYROLL_STAGES = [
-  ["collect", "Collect employee changes and other inputs"],
-  ["prepare", "Prepare and enter payroll information"],
-  ["calculate", "Calculate payroll"],
-  ["check", "Check results and resolve errors"],
-  ["approve", "Approve payroll"],
-  ["pay", "Release payments"],
-  ["reconcile", "Reconcile payroll and accounting records"],
+  ["collect", "Collect employee changes and payroll inputs"],
+  ["prepare", "Prepare or enter payroll information"],
+  ["check", "Check payroll results and resolve corrections"],
   ["queries", "Answer employee payroll questions"],
 ];
 export const PAYROLL_PARTIES = [
@@ -31,45 +27,23 @@ export const PAYROLL_PARTIES = [
 ];
 export const MY_PAYROLL_PART = [
   ["do", "I do this work"],
-  ["check", "I check or approve this work"],
+  ["check", "I check this work"],
   ["coordinate", "I coordinate or support this work"],
   ["none", "I am not involved"],
   ["unknown", "I am not sure"],
 ];
-export const CONTRIBUTIONS = [
-  ["admin", "Administration and processing"],
-  ["advice", "Advice and employee cases"],
-  ["improvement", "Designing or improving how work is done"],
-  ["coordination", "Coordinating or leading work"],
+export const NATURE_AREAS = ["advice_cases", "planning_development"];
+export const WORK_NATURE = [
+  ["routine", "Mainly administration or routine coordination"],
+  ["advisory", "Mainly advice or leading people decisions"],
+  ["mixed", "A mix of both"],
   ["unknown", "Not sure"],
 ];
-export const DEPENDENCIES = [
-  ["hr", "HR colleagues"],
-  ["payroll", "Payroll / payroll partner"],
-  ["finance", "Finance"],
-  ["it", "IT"],
-  ["legal", "Legal"],
-  ["managers", "Managers / business leaders"],
-  ["procurement", "Procurement"],
-  ["office", "Local office / facilities"],
-  ["vendor", "External suppliers"],
-  ["other", "Other"],
-  ["unknown", "Not sure"],
-  ["none", "No regular dependencies"],
-];
-export const KNOWLEDGE = [
-  ["local_requirements", "Local employment requirements"],
+export const LOCAL_NEEDS = [
   ["language", "Local language"],
-  ["business", "A particular business or entity"],
-  ["payroll", "Payroll"],
-  ["benefits", "Benefits"],
-  ["cases", "Employee cases"],
-  ["systems", "People systems"],
-  ["data", "Data and reporting"],
-  ["office", "Office / facilities"],
-  ["process", "A specialist process"],
-  ["other", "Other"],
-  ["none", "No specific area to add"],
+  ["employment", "Local employment requirements"],
+  ["onsite", "Being physically present at an office or site"],
+  ["none", "None of these"],
   ["unknown", "Not sure"],
 ];
 export const SYSTEMS = [
@@ -90,22 +64,11 @@ export const SYSTEMS = [
   ["none", "No systems or tools used regularly"],
   ["unknown", "Not sure"],
 ];
-export const MANUAL = [
-  ["reenter", "Entering the same information again"],
-  ["spreadsheets", "Using spreadsheets to connect processes"],
-  ["checking", "Repeated checking or correcting information"],
-  ["waiting", "Waiting for information"],
-  ["approvals", "Chasing approvals"],
-  ["duplicate", "Doing the same work in more than one place"],
-  ["other", "Other"],
-  ["none", "None of these"],
-  ["unknown", "Not sure"],
-];
 export type RichDraft = {
-  receives: string;
   routes: string[];
   routeTime: Record<string, number>;
   recording: string;
+  recordingNote: string;
   duplicates: string;
   sameRoutes: string;
   employeeRoutes: string[];
@@ -115,23 +78,22 @@ export type RichDraft = {
   cycle: string;
   days: number | null;
   daysUnknown: boolean;
+  otherPayroll: string;
+  workNature: Record<string, string>;
   scope: string;
-  contributions: Record<string, string[]>;
-  dependencies: string[];
-  knowledge: string[];
-  knowledgeNote: string;
+  localNeeds: string[];
+  localNote: string;
   systems: string[];
   otherSystems: string;
-  manual: string[];
   manualNote: string;
   strengths: string;
   missing: string;
 };
 export const emptyRichDraft = (): RichDraft => ({
-  receives: "",
   routes: [],
   routeTime: {},
   recording: "",
+  recordingNote: "",
   duplicates: "",
   sameRoutes: "",
   employeeRoutes: [],
@@ -141,14 +103,13 @@ export const emptyRichDraft = (): RichDraft => ({
   cycle: "",
   days: null,
   daysUnknown: false,
+  otherPayroll: "",
+  workNature: {},
   scope: "",
-  contributions: {},
-  dependencies: [],
-  knowledge: [],
-  knowledgeNote: "",
+  localNeeds: [],
+  localNote: "",
   systems: [],
   otherSystems: "",
-  manual: [],
   manualNote: "",
   strengths: "",
   missing: "",
@@ -164,11 +125,20 @@ export function toggleOption(
   const next = values.filter((c) => !exclusive.includes(c));
   return next.length < max ? [...next, code] : next;
 }
+const validChoices = (
+  values: string[],
+  options: string[][],
+  max = Infinity,
+  exclusive = ["none", "unknown"],
+) =>
+  values.length > 0 &&
+  values.length <= max &&
+  values.every((c) => options.some((o) => o[0] === c)) &&
+  !(values.length > 1 && values.some((c) => exclusive.includes(c)));
 export const routeTotal = (d: RichDraft) =>
   Math.round(
     d.routes.reduce(
-      (n, code) =>
-        n + (Number.isFinite(d.routeTime[code]) ? d.routeTime[code] : 0),
+      (n, c) => n + (Number.isFinite(d.routeTime[c]) ? d.routeTime[c] : 0),
       0,
     ) * 100,
   ) / 100;
@@ -178,15 +148,12 @@ export function richIssues(
   selectedAreas: string[] = [],
 ): string[] {
   const issues: string[] = [];
+  if (step === "time_nature")
+    for (const code of selectedAreas.filter((c) => NATURE_AREAS.includes(c)))
+      if (!WORK_NATURE.some((o) => o[0] === d.workNature[code]))
+        issues.push("nature_" + code);
   if (step === "contact") {
-    if (!["yes", "no", "unknown"].includes(d.receives)) return ["receives"];
-    if (d.receives !== "yes") return [];
-    if (
-      !d.routes.length ||
-      d.routes.length > 5 ||
-      d.routes.some((c) => !CONTACT_ROUTES.some((r) => r[0] === c))
-    )
-      issues.push("routes");
+    if (!validChoices(d.routes, CONTACT_ROUTES, 5, [])) issues.push("routes");
     const bad = d.routes.filter(
       (c) =>
         !Number.isFinite(d.routeTime[c]) ||
@@ -204,25 +171,26 @@ export function richIssues(
       issues.push("sameRoutes");
     if (d.sameRoutes === "different")
       for (const key of ["employeeRoutes", "managerRoutes"] as const)
-        if (
-          !d[key].length ||
-          d[key].length > 5 ||
-          d[key].some((c) => !CONTACT_ROUTES.some((r) => r[0] === c))
-        )
-          issues.push(key);
+        if (!validChoices(d[key], CONTACT_ROUTES, 5, [])) issues.push(key);
   }
   if (step === "payroll") {
     if (!["yes", "no", "unknown"].includes(d.payroll)) return ["payroll"];
     if (d.payroll !== "yes") return [];
     for (const [code] of PAYROLL_STAGES) {
       const a = d.payrollStages[code];
+      if (!a || !MY_PAYROLL_PART.some((o) => o[0] === a.mine)) {
+        issues.push("payroll_" + code);
+        continue;
+      }
+      // Uncertain involvement needs no invented actor answer. No involvement asks who handles it.
+      if (a.mine === "unknown") continue;
+      const options =
+        a.mine === "none"
+          ? PAYROLL_PARTIES.filter((o) => o[0] !== "none")
+          : PAYROLL_PARTIES;
       if (
-        !a ||
-        !MY_PAYROLL_PART.some((r) => r[0] === a.mine) ||
-        !a.others.length ||
-        a.others.some((c) => !PAYROLL_PARTIES.some((r) => r[0] === c)) ||
-        (a.others.some((c) => ["unknown", "none"].includes(c)) &&
-          a.others.length > 1)
+        (a.mine === "none" && !validChoices(a.others, options)) ||
+        (a.others.length > 0 && !validChoices(a.others, options))
       )
         issues.push("payroll_" + code);
     }
@@ -247,29 +215,18 @@ export function richIssues(
   if (step === "context") {
     if (!["one", "several", "group", "unknown"].includes(d.scope))
       issues.push("scope");
-    const valid = (
-      values: string[],
-      options: string[][],
-      max = Infinity,
-      exclusive = ["none", "unknown"],
-    ) =>
-      values.length > 0 &&
-      values.length <= max &&
-      values.every((c) => options.some((o) => o[0] === c)) &&
-      !(values.length > 1 && values.some((c) => exclusive.includes(c)));
-    for (const code of selectedAreas)
-      if (
-        !valid(d.contributions[code] ?? [], CONTRIBUTIONS, Infinity, [
-          "unknown",
-        ])
-      )
-        issues.push("contribution_" + code);
-    if (!valid(d.dependencies, DEPENDENCIES, 5)) issues.push("dependencies");
-    if (!valid(d.knowledge, KNOWLEDGE)) issues.push("knowledge");
-    if (!valid(d.systems, SYSTEMS)) issues.push("systems");
-    if (!valid(d.manual, MANUAL)) issues.push("manual");
+    if (!validChoices(d.localNeeds, LOCAL_NEEDS)) issues.push("localNeeds");
   }
   return issues;
+}
+export function richError(step: string, issues: string[]) {
+  if (step === "payroll")
+    return "Please answer the highlighted payroll questions. Choose Not sure where you do not know.";
+  if (step === "contact")
+    return issues.some((i) => i.startsWith("route_"))
+      ? "Check the highlighted request percentages. Aim for 100% in total, and answer any other highlighted questions."
+      : "Please select your contact routes and answer the highlighted questions.";
+  return "Please answer the highlighted questions about support scope and local requirements.";
 }
 export function richEvidence(
   d: RichDraft,
@@ -277,25 +234,18 @@ export function richEvidence(
   payrollVisible: boolean,
 ) {
   return {
-    designVersion: "broad-work-context-prototype-v3",
+    designVersion: "focused-work-prototype-v4",
     contact: {
-      receives: d.receives,
-      ...(d.receives === "yes"
-        ? {
-            routes: d.routes.map((code) => ({
-              code,
-              shareOfRequests: d.routeTime[code],
-            })),
-            recording: d.recording,
-            duplicateRequests: d.duplicates,
-            sameEmployeeManagerRoutes: d.sameRoutes,
-            ...(d.sameRoutes === "different"
-              ? {
-                  employeeRoutes: d.employeeRoutes,
-                  managerRoutes: d.managerRoutes,
-                }
-              : {}),
-          }
+      routes: d.routes.map((code) => ({
+        code,
+        shareOfRequests: d.routeTime[code],
+      })),
+      recording: d.recording,
+      recordingNote: d.recordingNote,
+      duplicateRequests: d.duplicates,
+      sameEmployeeManagerRoutes: d.sameRoutes,
+      ...(d.sameRoutes === "different"
+        ? { employeeRoutes: d.employeeRoutes, managerRoutes: d.managerRoutes }
         : {}),
     },
     payroll: !payrollVisible
@@ -306,26 +256,29 @@ export function richEvidence(
             ? {
                 stages: PAYROLL_STAGES.map(([code]) => ({
                   code,
-                  ...d.payrollStages[code],
+                  mine: d.payrollStages[code]?.mine ?? null,
+                  others:
+                    d.payrollStages[code]?.mine === "unknown"
+                      ? []
+                      : (d.payrollStages[code]?.others ?? []),
                 })),
                 cycle: d.cycle,
                 estimatedPersonalDays: d.daysUnknown ? null : d.days,
                 daysUnknown: d.daysUnknown,
+                otherPayroll: d.otherPayroll,
               }
             : {}),
         },
-    scope: d.scope,
-    contributions: Object.fromEntries(
-      Object.entries(d.contributions).filter(([code]) =>
-        selectedAreas.includes(code),
+    workNature: Object.fromEntries(
+      Object.entries(d.workNature).filter(
+        ([code]) => selectedAreas.includes(code) && NATURE_AREAS.includes(code),
       ),
     ),
-    dependencies: d.dependencies,
-    knowledge: d.knowledge,
-    knowledgeNote: d.knowledgeNote,
+    scope: d.scope,
+    localNeeds: d.localNeeds,
+    localNote: d.localNote,
     systems: d.systems,
     otherSystems: d.otherSystems,
-    manualWork: d.manual,
     manualNote: d.manualNote,
     strengths: d.strengths,
     missing: d.missing,

@@ -3,18 +3,14 @@ import {
   PAYROLL_STAGES,
   PAYROLL_PARTIES,
   MY_PAYROLL_PART,
-  CONTRIBUTIONS,
-  DEPENDENCIES,
-  KNOWLEDGE,
+  WORK_NATURE,
+  LOCAL_NEEDS,
   SYSTEMS,
-  MANUAL,
   richEvidence,
 } from "@/lib/baseline/prototype-enrichment";
 import { BROAD_AREAS } from "@/lib/baseline/broad-prototype";
 const labels = (codes: string[], options: string[][]) =>
-  codes
-    .map((code) => options.find((o) => o[0] === code)?.[1] ?? code)
-    .join(", ");
+  codes.map((c) => options.find((o) => o[0] === c)?.[1] ?? c).join(", ");
 export default function ContextReview({
   evidence: e,
 }: {
@@ -22,54 +18,50 @@ export default function ContextReview({
 }) {
   return (
     <>
+      {Object.entries(e.workNature).map(([code, value]) => (
+        <p key={code}>
+          Type of work in {BROAD_AREAS.find((a) => a.code === code)?.label}:{" "}
+          {labels([value], WORK_NATURE)}
+        </p>
+      ))}
       <section className="tb-process">
         <h2>How people contact you or your team</h2>
-        {e.contact.receives !== "yes" ? (
-          <p>
-            {e.contact.receives === "no"
-              ? "No employee or manager requests received"
-              : "Not sure whether requests are received"}
+        {e.contact.routes.map((r) => (
+          <p key={r.code}>
+            {labels([r.code], CONTACT_ROUTES)}: {r.shareOfRequests}% of requests
           </p>
-        ) : (
+        ))}
+        <p>
+          Requests recorded:{" "}
+          {e.contact.recording === "unknown" ? "Not sure" : e.contact.recording}
+          . Duplicate requests:{" "}
+          {e.contact.duplicateRequests === "unknown"
+            ? "Not sure"
+            : e.contact.duplicateRequests}
+          .
+        </p>
+        {e.contact.recordingNote && (
+          <p>Tracking and follow-up: {e.contact.recordingNote}</p>
+        )}
+        <p>
+          Employee and manager routes:{" "}
+          {e.contact.sameEmployeeManagerRoutes === "same"
+            ? "Broadly the same"
+            : e.contact.sameEmployeeManagerRoutes === "different"
+              ? "Different"
+              : "Not sure"}
+          .
+        </p>
+        {e.contact.employeeRoutes && (
           <>
-            {e.contact.routes?.map((r) => (
-              <p key={r.code}>
-                {labels([r.code], CONTACT_ROUTES)}: {r.shareOfRequests}% of
-                requests
-              </p>
-            ))}
             <p>
-              Requests recorded:{" "}
-              {e.contact.recording === "unknown"
-                ? "Not sure"
-                : e.contact.recording}
-              . Duplicate requests:{" "}
-              {e.contact.duplicateRequests === "unknown"
-                ? "Not sure"
-                : e.contact.duplicateRequests}
-              .
+              Employee routes:{" "}
+              {labels(e.contact.employeeRoutes, CONTACT_ROUTES)}
             </p>
             <p>
-              Employee and manager routes:{" "}
-              {e.contact.sameEmployeeManagerRoutes === "same"
-                ? "Broadly the same"
-                : e.contact.sameEmployeeManagerRoutes === "different"
-                  ? "Different"
-                  : "Not sure"}
-              .
+              Manager routes:{" "}
+              {labels(e.contact.managerRoutes ?? [], CONTACT_ROUTES)}
             </p>
-            {e.contact.employeeRoutes && (
-              <>
-                <p>
-                  Employee routes:{" "}
-                  {labels(e.contact.employeeRoutes, CONTACT_ROUTES)}
-                </p>
-                <p>
-                  Manager routes:{" "}
-                  {labels(e.contact.managerRoutes ?? [], CONTACT_ROUTES)}
-                </p>
-              </>
-            )}
           </>
         )}
       </section>
@@ -79,7 +71,7 @@ export default function ContextReview({
           {e.payroll.involvement !== "yes" ? (
             <p>
               {e.payroll.involvement === "no"
-                ? "Not personally involved in payroll"
+                ? "No payroll-related work"
                 : "Payroll involvement not sure"}
             </p>
           ) : (
@@ -88,8 +80,14 @@ export default function ContextReview({
                 <p key={s.code}>
                   <strong>{labels([s.code], PAYROLL_STAGES)}</strong>
                   <br />
-                  {labels([s.mine], MY_PAYROLL_PART)}. Others:{" "}
-                  {labels(s.others, PAYROLL_PARTIES)}.
+                  {labels([s.mine ?? "unknown"], MY_PAYROLL_PART)}
+                  {s.others.length > 0 && (
+                    <>
+                      . {s.mine === "none" ? "Handled by" : "Others involved"}:{" "}
+                      {labels(s.others, PAYROLL_PARTIES)}
+                    </>
+                  )}
+                  .
                 </p>
               ))}
               <p>
@@ -100,12 +98,15 @@ export default function ContextReview({
                   : e.payroll.estimatedPersonalDays}
                 .
               </p>
+              {e.payroll.otherPayroll && (
+                <p>Additional payroll work: {e.payroll.otherPayroll}</p>
+              )}
             </>
           )}
         </section>
       )}
       <section className="tb-process">
-        <h2>Scope and working context</h2>
+        <h2>A few final questions</h2>
         <p>
           Support scope:{" "}
           {
@@ -117,27 +118,11 @@ export default function ContextReview({
             }[e.scope]
           }
         </p>
-        {Object.entries(e.contributions)
-          .filter(([, v]) => v.length)
-          .map(([code, values]) => (
-            <p key={code}>
-              Contribution in {BROAD_AREAS.find((a) => a.code === code)?.label}:{" "}
-              {labels(values, CONTRIBUTIONS)}
-            </p>
-          ))}
-        {e.dependencies.length > 0 && (
-          <p>Main dependencies: {labels(e.dependencies, DEPENDENCIES)}</p>
-        )}
-        {e.knowledge.length > 0 && (
-          <p>Knowledge: {labels(e.knowledge, KNOWLEDGE)}</p>
-        )}
-        {e.knowledgeNote && <p>{e.knowledgeNote}</p>}
+        <p>Local requirements: {labels(e.localNeeds, LOCAL_NEEDS)}</p>
+        {e.localNote && <p>{e.localNote}</p>}
         {e.systems.length > 0 && <p>Systems: {labels(e.systems, SYSTEMS)}</p>}
         {e.otherSystems && <p>Other tools: {e.otherSystems}</p>}
-        {e.manualWork.length > 0 && (
-          <p>Extra manual work: {labels(e.manualWork, MANUAL)}</p>
-        )}
-        {e.manualNote && <p>{e.manualNote}</p>}
+        {e.manualNote && <p>Extra manual effort: {e.manualNote}</p>}
         {e.strengths && <p>Keep: {e.strengths}</p>}
         {e.missing && <p>Additional context: {e.missing}</p>}
       </section>

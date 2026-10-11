@@ -11,19 +11,22 @@ import {
 } from "@/lib/baseline/broad-prototype";
 import "@/app/baseline/start/style.css";
 import "./prototype.css";
-import Context from "./context";
+import Context, { Pick } from "./context";
 import ContextReview from "./review";
 import {
   emptyRichDraft,
   richIssues,
   richEvidence,
+  richError,
+  NATURE_AREAS,
+  WORK_NATURE,
 } from "@/lib/baseline/prototype-enrichment";
 const LABELS: Record<string, string> = {
   areas: "Your work areas",
   time: "Time across your work",
   contact: "How people contact you or your team",
   payroll: "Payroll responsibilities",
-  context: "Scope and working context",
+  context: "A few final questions",
   review: "Review",
 };
 export default function Prototype() {
@@ -55,7 +58,10 @@ export default function Prototype() {
     i === 0
       ? broadIssues(draft, 0)
       : i === 1
-        ? broadIssues(draft, 1)
+        ? [
+            ...broadIssues(draft, 1),
+            ...richIssues(rich, "time_nature", draft.selected),
+          ]
         : richIssues(rich, steps[i], draft.selected);
   const issues = checked ? validate(stage) : [];
   function go(next: number) {
@@ -136,8 +142,10 @@ export default function Prototype() {
               {!active.length
                 ? "Choose at least one work area."
                 : stage === 1
-                  ? "Check the highlighted percentages. Aim for 100% in total."
-                  : "Please check the highlighted answers. Percentage totals should be about 100%."}
+                  ? issues.some((i) => !i.startsWith("nature_"))
+                    ? "Check the highlighted time estimates and answers. Aim for 100% in total."
+                    : "Choose the type of work in the highlighted areas."
+                  : richError(key, issues)}
             </div>
           )}
           <section className="tb-card">
@@ -241,6 +249,20 @@ export default function Prototype() {
                         <span>%</span>
                       </div>
                     </label>
+                    {NATURE_AREAS.includes(a.code) && (
+                      <Pick
+                        label={"Main type of work: " + a.label}
+                        value={rich.workNature[a.code] ?? ""}
+                        options={WORK_NATURE}
+                        invalid={issues.includes("nature_" + a.code)}
+                        change={(value) =>
+                          setRich({
+                            ...rich,
+                            workNature: { ...rich.workNature, [a.code]: value },
+                          })
+                        }
+                      />
+                    )}
                     <details>
                       <summary>Add a short note (optional)</summary>
                       <label className="tb-field">
@@ -296,7 +318,6 @@ export default function Prototype() {
                 draft={rich}
                 change={(patch) => setRich({ ...rich, ...patch })}
                 issues={issues}
-                areas={active}
               />
             )}
             {key === "review" && (
