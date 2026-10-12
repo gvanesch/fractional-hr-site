@@ -27,6 +27,14 @@ import {
   technologyVisible,
   technologyIssues,
 } from "@/lib/baseline/technology-prototype";
+import Management, { ManagementReview } from "./management";
+import {
+  MANAGEMENT_AREA,
+  emptyManagement,
+  managementVisible,
+  managementIssues,
+  type ManagerRecord,
+} from "@/lib/baseline/management-prototype";
 const LABELS: Record<string, string> = {
   areas: "Your work areas",
   time: "Time across your work",
@@ -34,17 +42,32 @@ const LABELS: Record<string, string> = {
   payroll: "Payroll responsibilities",
   context: "A few final questions",
   technology: "Your technology work",
+  management: "Managing your team",
   review: "Review",
 };
 export default function Prototype({
   tester,
   technologyPreview = false,
-}: { tester?: string; technologyPreview?: boolean } = {}) {
+  managerRecord,
+}: {
+  tester?: string;
+  technologyPreview?: boolean;
+  managerRecord?: ManagerRecord;
+} = {}) {
   const [draft, setDraft] = useState(emptyBroadDraft),
     [started, setStarted] = useState(false),
     [stage, setStage] = useState(0),
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false);
+  const areas = managerRecord?.isPeopleManager
+    ? [
+        ...BROAD_AREAS.filter((a) => a.code !== "other"),
+        MANAGEMENT_AREA,
+        ...BROAD_AREAS.filter((a) => a.code === "other"),
+      ]
+    : BROAD_AREAS;
+  const [management, setManagement] = useState(emptyManagement);
+  const showManagement = managementVisible(managerRecord, draft.selected);
   const [rich, setRich] = useState(emptyRichDraft);
   const [technology, setTechnology] = useState(emptyTechnology);
   const showTechnology = technologyVisible(technologyPreview, draft.selected);
@@ -54,6 +77,7 @@ export default function Prototype({
     "time",
     "contact",
     ...(payrollVisible ? ["payroll"] : []),
+    ...(showManagement ? ["management"] : []),
     "context",
     ...(showTechnology ? ["technology"] : []),
     "review",
@@ -65,19 +89,21 @@ export default function Prototype({
     heading.current?.focus();
     window.scrollTo({ top: 0 });
   }, [stage, started]);
-  const active = broadSelected(draft),
-    total = broadTotal(draft);
+  const active = broadSelected(draft, areas),
+    total = broadTotal(draft, areas);
   const validate = (i: number) =>
     i === 0
-      ? broadIssues(draft, 0)
+      ? broadIssues(draft, 0, areas)
       : i === 1
         ? [
-            ...broadIssues(draft, 1),
+            ...broadIssues(draft, 1, areas),
             ...richIssues(rich, "time_nature", draft.selected),
           ]
-        : steps[i] === "technology"
-          ? technologyIssues(technology)
-          : richIssues(rich, steps[i], draft.selected);
+        : steps[i] === "management"
+          ? managementIssues(management)
+          : steps[i] === "technology"
+            ? technologyIssues(technology)
+            : richIssues(rich, steps[i], draft.selected);
   const issues = checked ? validate(stage) : [];
   function go(next: number) {
     const invalid =
@@ -133,9 +159,9 @@ export default function Prototype({
             onClick={() => {
               setDraft({
                 ...emptyBroadDraft(),
-                selected: BROAD_AREAS.filter((a) => a.code !== "other").map(
-                  (a) => a.code,
-                ),
+                selected: areas
+                  .filter((a) => a.code !== "other")
+                  .map((a) => a.code),
               });
               setStarted(true);
             }}
@@ -160,11 +186,13 @@ export default function Prototype({
                   ? issues.some((i) => !i.startsWith("nature_"))
                     ? "Check the highlighted time estimates and answers. Aim for 100% in total."
                     : "Choose the type of work in the highlighted areas."
-                  : key === "technology"
-                    ? issues.some((i) => i.startsWith("time_"))
-                      ? "Check the highlighted technology time estimates. Aim for 100% of your technology time. Answer any other highlighted questions."
-                      : "Please answer the highlighted technology questions. Choose Not sure where needed."
-                    : richError(key, issues)}
+                  : key === "management"
+                    ? "Please answer the highlighted questions about managing your team."
+                    : key === "technology"
+                      ? issues.some((i) => i.startsWith("time_"))
+                        ? "Check the highlighted technology time estimates. Aim for 100% of your technology time. Answer any other highlighted questions."
+                        : "Please answer the highlighted technology questions. Choose Not sure where needed."
+                      : richError(key, issues)}
             </div>
           )}
           <section className="tb-card">
@@ -186,13 +214,15 @@ export default function Prototype({
                     issues.length ? "tb-options tb-invalid" : "tb-options"
                   }
                 >
-                  {BROAD_AREAS.map((a) => (
+                  {areas.map((a) => (
                     <label key={a.code}>
                       <input
                         type="checkbox"
                         aria-label={a.label}
                         checked={draft.selected.includes(a.code)}
-                        onChange={() => setDraft(toggleBroad(draft, a.code))}
+                        onChange={() =>
+                          setDraft(toggleBroad(draft, a.code, areas))
+                        }
                       />
                       <span>
                         <strong>{a.label}</strong>
@@ -339,6 +369,13 @@ export default function Prototype({
                 issues={issues}
               />
             )}
+            {key === "management" && (
+              <Management
+                draft={management}
+                change={(patch) => setManagement({ ...management, ...patch })}
+                issues={issues}
+              />
+            )}
             {key === "technology" && (
               <Technology
                 draft={technology}
@@ -360,7 +397,7 @@ export default function Prototype({
                     </button>
                   ))}
                 </div>
-                {broadEvidence(draft).workAreas.map((a) => (
+                {broadEvidence(draft, areas).workAreas.map((a) => (
                   <section className="tb-process tb-review-area" key={a.code}>
                     <h2>
                       {a.label}: {a.percentage}%
@@ -377,6 +414,7 @@ export default function Prototype({
                 <ContextReview
                   evidence={richEvidence(rich, draft.selected, payrollVisible)}
                 />
+                {showManagement && <ManagementReview draft={management} />}
                 {showTechnology && <TechnologyReview draft={technology} />}
                 <p>
                   This completes the prototype. No campaign response has been
@@ -404,6 +442,7 @@ export default function Prototype({
                     setDraft(emptyBroadDraft());
                     setRich(emptyRichDraft());
                     setTechnology(emptyTechnology());
+                    setManagement(emptyManagement());
                     setStage(0);
                     setStarted(false);
                     setChecked(false);

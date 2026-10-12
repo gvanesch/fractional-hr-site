@@ -73,17 +73,21 @@ export const emptyBroadDraft = (): BroadDraft => ({
   notes: {},
   occasional: "",
 });
-export const broadSelected = (d: BroadDraft) =>
-  BROAD_AREAS.filter((a) => d.selected.includes(a.code));
-export const broadTotal = (d: BroadDraft) =>
+export const broadSelected = (d: BroadDraft, areas = BROAD_AREAS) =>
+  areas.filter((a) => d.selected.includes(a.code));
+export const broadTotal = (d: BroadDraft, areas = BROAD_AREAS) =>
   Math.round(
-    broadSelected(d).reduce(
+    broadSelected(d, areas).reduce(
       (n, a) => n + (Number.isFinite(d.time[a.code]) ? d.time[a.code] : 0),
       0,
     ) * 100,
   ) / 100;
-export function toggleBroad(d: BroadDraft, code: string): BroadDraft {
-  if (!BROAD_AREAS.some((a) => a.code === code)) return d;
+export function toggleBroad(
+  d: BroadDraft,
+  code: string,
+  areas = BROAD_AREAS,
+): BroadDraft {
+  if (!areas.some((a) => a.code === code)) return d;
   return {
     ...d,
     selected: d.selected.includes(code)
@@ -91,10 +95,14 @@ export function toggleBroad(d: BroadDraft, code: string): BroadDraft {
       : [...d.selected, code],
   };
 }
-export function broadIssues(d: BroadDraft, stage: number): string[] {
-  if (!broadSelected(d).length) return ["selection"];
+export function broadIssues(
+  d: BroadDraft,
+  stage: number,
+  areas = BROAD_AREAS,
+): string[] {
+  if (!broadSelected(d, areas).length) return ["selection"];
   if (stage === 0) return [];
-  const invalid = broadSelected(d)
+  const invalid = broadSelected(d, areas)
     .filter(
       (a) =>
         !Object.hasOwn(d.time, a.code) ||
@@ -104,11 +112,13 @@ export function broadIssues(d: BroadDraft, stage: number): string[] {
     )
     .map((a) => a.code);
   if (invalid.length) return invalid;
-  return broadTotal(d) < 98 || broadTotal(d) > 102 ? d.selected : [];
+  return broadTotal(d, areas) < 98 || broadTotal(d, areas) > 102
+    ? d.selected
+    : [];
 }
-export const broadEvidence = (d: BroadDraft) => ({
+export const broadEvidence = (d: BroadDraft, areas = BROAD_AREAS) => ({
   designVersion: "broad-work-prototype-v1",
-  workAreas: broadSelected(d).map((a) => ({
+  workAreas: broadSelected(d, areas).map((a) => ({
     code: a.code,
     label: a.label,
     percentage: d.time[a.code] ?? null,
