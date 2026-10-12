@@ -21,21 +21,33 @@ import {
   NATURE_AREAS,
   WORK_NATURE,
 } from "@/lib/baseline/prototype-enrichment";
+import Technology, { TechnologyReview } from "./technology";
+import {
+  emptyTechnology,
+  technologyVisible,
+  technologyIssues,
+} from "@/lib/baseline/technology-prototype";
 const LABELS: Record<string, string> = {
   areas: "Your work areas",
   time: "Time across your work",
   contact: "How people contact you or your team",
   payroll: "Payroll responsibilities",
   context: "A few final questions",
+  technology: "Your technology work",
   review: "Review",
 };
-export default function Prototype({ tester }: { tester?: string } = {}) {
+export default function Prototype({
+  tester,
+  technologyPreview = false,
+}: { tester?: string; technologyPreview?: boolean } = {}) {
   const [draft, setDraft] = useState(emptyBroadDraft),
     [started, setStarted] = useState(false),
     [stage, setStage] = useState(0),
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false);
   const [rich, setRich] = useState(emptyRichDraft);
+  const [technology, setTechnology] = useState(emptyTechnology);
+  const showTechnology = technologyVisible(technologyPreview, draft.selected);
   const payrollVisible = draft.selected.includes("pay_benefits");
   const steps = [
     "areas",
@@ -43,6 +55,7 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
     "contact",
     ...(payrollVisible ? ["payroll"] : []),
     "context",
+    ...(showTechnology ? ["technology"] : []),
     "review",
   ];
   const reviewStage = steps.length - 1;
@@ -62,7 +75,9 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
             ...broadIssues(draft, 1),
             ...richIssues(rich, "time_nature", draft.selected),
           ]
-        : richIssues(rich, steps[i], draft.selected);
+        : steps[i] === "technology"
+          ? technologyIssues(technology)
+          : richIssues(rich, steps[i], draft.selected);
   const issues = checked ? validate(stage) : [];
   function go(next: number) {
     const invalid =
@@ -145,7 +160,11 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
                   ? issues.some((i) => !i.startsWith("nature_"))
                     ? "Check the highlighted time estimates and answers. Aim for 100% in total."
                     : "Choose the type of work in the highlighted areas."
-                  : richError(key, issues)}
+                  : key === "technology"
+                    ? issues.some((i) => i.startsWith("time_"))
+                      ? "Check the highlighted technology time estimates. Aim for 100% of your technology time. Answer any other highlighted questions."
+                      : "Please answer the highlighted technology questions. Choose Not sure where needed."
+                    : richError(key, issues)}
             </div>
           )}
           <section className="tb-card">
@@ -320,6 +339,14 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
                 issues={issues}
               />
             )}
+            {key === "technology" && (
+              <Technology
+                draft={technology}
+                change={(patch) => setTechnology({ ...technology, ...patch })}
+                issues={issues}
+                regularSystems={rich.systems}
+              />
+            )}
             {key === "review" && (
               <>
                 <p>
@@ -350,6 +377,7 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
                 <ContextReview
                   evidence={richEvidence(rich, draft.selected, payrollVisible)}
                 />
+                {showTechnology && <TechnologyReview draft={technology} />}
                 <p>
                   This completes the prototype. No campaign response has been
                   submitted.
@@ -375,6 +403,7 @@ export default function Prototype({ tester }: { tester?: string } = {}) {
                   onClick={() => {
                     setDraft(emptyBroadDraft());
                     setRich(emptyRichDraft());
+                    setTechnology(emptyTechnology());
                     setStage(0);
                     setStarted(false);
                     setChecked(false);

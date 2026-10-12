@@ -14,5 +14,5 @@ export default async function Page() {
     notFound();
   }
   if (!(await requireAdvisorUser())) redirect("/advisor/login");
-  return <Prototype />;
+  return <Prototype technologyPreview />;
 }
