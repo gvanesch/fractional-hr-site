@@ -67,7 +67,7 @@ const root = path.resolve(__dirname, "../..");
         .check();
       await button("Continue").click();
       await page
-        .getByLabel("Time spent: Systems, data and improvement", {
+        .getByLabel("Time spent: People systems, data and improvement", {
           exact: true,
         })
         .fill("100");
