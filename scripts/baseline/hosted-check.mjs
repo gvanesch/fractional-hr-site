@@ -24,7 +24,9 @@ for (const path of [
       !(response.headers.get("x-robots-tag") ?? "").includes("noindex") ||
       response.headers.get("referrer-policy") !== "no-referrer"
     )
-      throw new Error("Participant entry point or privacy headers failed.");
+      throw new Error(
+        `Entry failed: ${path}; status=${response.status}; robots=${response.headers.get("x-robots-tag")}; referrer=${response.headers.get("referrer-policy")}.`,
+      );
   } else if (![401, 403, 302, 307].includes(response.status))
     throw new Error(`Anonymous access not blocked: ${path}`);
 }
