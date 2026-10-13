@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ROSTER_FIELDS, FIELD_LABELS } from "@/lib/baseline/roster-fields";
+import {
+  ROSTER_FIELDS,
+  FIELD_LABELS,
+  validateRosterExtras,
+} from "@/lib/baseline/roster-fields";
 import { WORK_TYPES, toCsv } from "@/lib/baseline/model";
 import type { LaunchReadiness } from "@/lib/baseline/admin-types";
 type Person = {
@@ -57,6 +61,7 @@ export default function Administration({
     [fields, setFields] = useState<Record<string, string>>({}),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [errorAttempt, setErrorAttempt] = useState(0),
     [message, setMessage] = useState(""),
     [label, setLabel] = useState(""),
     [days, setDays] = useState(14),
@@ -70,6 +75,23 @@ export default function Administration({
     [confirmation, setConfirmation] = useState(""),
     [selected, setSelected] = useState<string[]>([]);
   const editor = useRef<HTMLDialogElement>(null);
+  const editorError = useRef<HTMLParagraphElement>(null);
+  const hoursMismatch = Boolean(
+    fields.contracted_hours &&
+    fields.full_time_hours &&
+    fields.working_fraction &&
+    Number(fields.full_time_hours) > 0 &&
+    Math.abs(
+      Number(fields.contracted_hours) / Number(fields.full_time_hours) -
+        Number(fields.working_fraction),
+    ) > 0.02,
+  );
+  useEffect(() => {
+    if (editing && error) {
+      editorError.current?.focus();
+      editorError.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [editing, error, errorAttempt]);
   useEffect(() => {
     if (editing) {
       editor.current?.showModal();
@@ -109,6 +131,7 @@ export default function Administration({
       await action();
       await refresh();
     } catch (e) {
+      setErrorAttempt((n) => n + 1);
       setError(
         e instanceof Error ? e.message : "Unable to complete this request.",
       );
@@ -117,6 +140,7 @@ export default function Administration({
     }
   }
   function edit(p: Person | null) {
+    setError("");
     setPerson(p);
     setFields(
       Object.fromEntries(
@@ -647,6 +671,7 @@ export default function Administration({
             onSubmit={(e) => {
               e.preventDefault();
               void run(async () => {
+                validateRosterExtras(fields, 1);
                 const csv = toCsv([
                   Object.fromEntries(
                     ROSTER_FIELDS.map((k) => [k, fields[k] ?? ""]),
@@ -671,7 +696,13 @@ export default function Administration({
             }}
           >
             {error && (
-              <p className="tb-error" role="alert">
+              <p
+                ref={editorError}
+                tabIndex={-1}
+                className="tb-error"
+                role="alert"
+                id="participant-editor-error"
+              >
                 {error}
               </p>
             )}
@@ -726,6 +757,28 @@ export default function Administration({
                     </select>
                   ) : (
                     <input
+                      aria-invalid={
+                        error &&
+                        hoursMismatch &&
+                        [
+                          "contracted_hours",
+                          "full_time_hours",
+                          "working_fraction",
+                        ].includes(k)
+                          ? true
+                          : undefined
+                      }
+                      aria-describedby={
+                        error &&
+                        hoursMismatch &&
+                        [
+                          "contracted_hours",
+                          "full_time_hours",
+                          "working_fraction",
+                        ].includes(k)
+                          ? "participant-editor-error"
+                          : undefined
+                      }
                       required={["name", "email"].includes(k)}
                       type={k.includes("email") ? "email" : "text"}
                       maxLength={250}
@@ -739,9 +792,10 @@ export default function Administration({
               ))}
             </div>
             <p>
-              Hours use the same weekly basis. Working fraction is 0–1, for
-              example 0.8. Record formal direct reports only. Do not upload
-              salary, performance ratings or sensitive personal data.
+              Hours use the same weekly basis. Working fraction is contracted
+              hours divided by full-time hours. For example, 20 hours out of a
+              40-hour week gives 0.5. Record formal direct reports only. Do not
+              upload salary, performance ratings or sensitive personal data.
             </p>
             <button disabled={busy} className="tb-primary" type="submit">
               Save respondent

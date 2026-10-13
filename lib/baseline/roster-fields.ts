@@ -83,5 +83,7 @@ export function validateRosterExtras(p: Record<string, string>, row: number) {
         Number(p.working_fraction),
     ) > 0.02
   )
-    throw new Error(`Working fraction does not match the hours on row ${row}.`);
+    throw new Error(
+      `Working fraction does not match the hours on row ${row}. Divide contracted hours by full-time hours. For example, 20 hours divided by 40 hours gives 0.5. Check these three values.`,
+    );
 }

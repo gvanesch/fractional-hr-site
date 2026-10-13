@@ -385,9 +385,50 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("button", { name: "Edit participant data", exact: true })
         .click();
+      const editsBefore = requests.filter(
+        (r) => r.op === "participant" && r.body.action === "edit",
+      ).length;
+      await page
+        .getByLabel("Working fraction (0 to 1)", { exact: true })
+        .fill("0.5");
+      await page
+        .getByRole("button", { name: "Save respondent", exact: true })
+        .click();
+      const validationAlert = page.getByRole("dialog").getByRole("alert");
+      await validationAlert.waitFor();
+      assert.ok(
+        (await validationAlert.textContent()).includes(
+          "20 hours divided by 40 hours gives 0.5",
+        ),
+      );
+      assert.ok(
+        await validationAlert.evaluate((el) => document.activeElement === el),
+      );
+      const alertBox = await validationAlert.boundingBox(),
+        dialogBox = await page.getByRole("dialog").boundingBox();
+      assert.ok(
+        alertBox.y >= dialogBox.y &&
+          alertBox.y + alertBox.height <= dialogBox.y + dialogBox.height,
+      );
+      assert.equal(
+        requests.filter(
+          (r) => r.op === "participant" && r.body.action === "edit",
+        ).length,
+        editsBefore,
+      );
+      assert.equal(
+        await page
+          .getByLabel("Working fraction (0 to 1)", { exact: true })
+          .inputValue(),
+        "0.5",
+      );
+      assert.equal(
+        await page.getByRole("dialog").locator('[aria-invalid="true"]').count(),
+        3,
+      );
       await page
         .getByLabel("Contracted hours per week", { exact: true })
-        .fill("30");
+        .fill("20");
       await page
         .getByRole("button", { name: "Save respondent", exact: true })
         .click();
@@ -402,7 +443,7 @@ const root = path.resolve(__dirname, "../..");
           (r) =>
             r.op === "participant" &&
             r.body.action === "edit" &&
-            r.body.csv.includes("30"),
+            r.body.csv.includes("20"),
         ),
       );
       page.on("dialog", (d) => d.accept());
