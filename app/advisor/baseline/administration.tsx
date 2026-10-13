@@ -410,6 +410,7 @@ export default function Administration({
             <span>{title} (leave unselected for all)</span>
             <select
               multiple
+              aria-label={title + " (leave unselected for all)"}
               value={scope[key]}
               onChange={(e) =>
                 setScope({
