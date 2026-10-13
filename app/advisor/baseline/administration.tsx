@@ -14,6 +14,9 @@ type Person = {
   invited: number;
   status: string;
   revision: number;
+  progress: number;
+  updated_at: string;
+  invite_expires_at: string | null;
   profile: Record<string, string>;
   roster: Record<string, string>;
 };
@@ -56,11 +59,12 @@ export default function Administration({
     [message, setMessage] = useState(""),
     [label, setLabel] = useState(""),
     [days, setDays] = useState(14),
-    [scope, setScope] = useState({
-      regions: [] as string[],
-      countries: [] as string[],
-      entities: [] as string[],
-    }),
+    [search, setSearch] = useState(""),
+    [statusFilter, setStatusFilter] = useState("all"),
+    [leaderFilter, setLeaderFilter] = useState(""),
+    [shareRole, setShareRole] = useState("regional_lead"),
+    [regionalLeaderEmail, setRegionalLeaderEmail] = useState(""),
+    [extensionDays, setExtensionDays] = useState<Record<string, number>>({}),
     [shareLink, setShareLink] = useState(""),
     [confirmation, setConfirmation] = useState(""),
     [selected, setSelected] = useState<string[]>([]);
@@ -191,62 +195,215 @@ export default function Administration({
           Removing a respondent withdraws access. Changing their email
           invalidates their old invitation and session.
         </p>
+        <label className="tb-field">
+          <span>Search participant list</span>
+          <input
+            aria-label="Search participant list"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, email, role, region, entity or team"
+          />
+        </label>
+        <label className="tb-field">
+          <span>Participant status</span>
+          <select
+            aria-label="Participant status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            {[
+              ["all", "All"],
+              ["not_started", "Not started"],
+              ["in_progress", "In progress"],
+              ["completed", "Completed"],
+              ["withdrawn", "Withdrawn"],
+            ].map(([c, l]) => (
+              <option key={c} value={c}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="tb-field">
+          <span>Filter by regional leader</span>
+          <select
+            aria-label="Filter by regional leader"
+            value={leaderFilter}
+            onChange={(e) => setLeaderFilter(e.target.value)}
+          >
+            <option value="">All regional leaders</option>
+            {[
+              ...new Set(
+                people
+                  .map((p) => p.roster.regional_leader_email)
+                  .filter(Boolean),
+              ),
+            ]
+              .sort()
+              .map((email) => (
+                <option key={email} value={email}>
+                  {people.find((p) => p.roster.regional_leader_email === email)
+                    ?.roster.regional_leader_name || email}
+                </option>
+              ))}
+          </select>
+        </label>
         <div className="tb-roster">
-          {people.map((p) => (
-            <article className="tb-detail" key={p.participant_id}>
-              <h3>{p.profile.name}</h3>
-              <p>
-                {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
-                {p.active ? "Active" : "Removed"}
-              </p>
-              <p>
-                {p.profile.job_title} · {p.roster.team || p.profile.entity} ·{" "}
-                {p.roster.contracted_hours
-                  ? `${p.roster.contracted_hours} hours/week`
-                  : p.roster.working_fraction
-                    ? `Working fraction ${p.roster.working_fraction}`
-                    : "Capacity not recorded"}
-              </p>
-              <label>
-                <input
-                  type="checkbox"
-                  aria-label={"Select respondent: " + p.email}
-                  disabled={!p.active || p.status === "completed" || busy}
-                  checked={selected.includes(p.participant_id)}
-                  onChange={() =>
-                    setSelected(
-                      selected.includes(p.participant_id)
-                        ? selected.filter((id) => id !== p.participant_id)
-                        : [...selected, p.participant_id],
-                    )
-                  }
-                />{" "}
-                Select for invitation / reminder
-              </label>
-              <div>
-                <button disabled={busy} onClick={() => edit(p)}>
-                  Edit respondent
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        p.active
-                          ? "Remove this respondent? Their answers will be retained and access withdrawn."
-                          : "Reinstate this respondent? A fresh invitation will be needed.",
+          {people
+            .filter((p) =>
+              [
+                p.profile.name,
+                p.email,
+                p.profile.job_title,
+                p.profile.country,
+                p.profile.region,
+                p.profile.entity,
+                p.roster.team,
+                p.roster.regional_leader_name,
+              ]
+                .join(" ")
+                .toLowerCase()
+                .includes(search.toLowerCase()),
+            )
+            .filter(
+              (p) =>
+                statusFilter === "all" ||
+                (statusFilter === "withdrawn"
+                  ? !p.active
+                  : p.active && p.status === statusFilter),
+            )
+            .filter(
+              (p) =>
+                !leaderFilter ||
+                p.roster.regional_leader_email === leaderFilter,
+            )
+            .map((p) => (
+              <article className="tb-detail" key={p.participant_id}>
+                <h3>{p.profile.name}</h3>
+                <p>
+                  {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
+                  {p.active ? "Active" : "Removed"}
+                </p>
+                <p>
+                  {p.profile.job_title} · {p.roster.team || p.profile.entity} ·{" "}
+                  {p.roster.contracted_hours
+                    ? `${p.roster.contracted_hours} hours/week`
+                    : p.roster.working_fraction
+                      ? `Working fraction ${p.roster.working_fraction}`
+                      : "Capacity not recorded"}
+                </p>
+                <p>
+                  Regional leader:{" "}
+                  {p.roster.regional_leader_name ||
+                    p.roster.regional_leader_email ||
+                    "Not recorded"}
+                </p>
+                <p>
+                  Step {p.progress} · Invitation expires{" "}
+                  {p.invite_expires_at
+                    ? new Date(p.invite_expires_at).toLocaleDateString("en-GB")
+                    : "Not issued"}
+                </p>
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label={"Select respondent: " + p.email}
+                    disabled={!p.active || p.status === "completed" || busy}
+                    checked={selected.includes(p.participant_id)}
+                    onChange={() =>
+                      setSelected(
+                        selected.includes(p.participant_id)
+                          ? selected.filter((id) => id !== p.participant_id)
+                          : [...selected, p.participant_id],
                       )
-                    )
-                      void run(() =>
-                        change(p, p.active ? "remove" : "reinstate"),
-                      );
-                  }}
-                >
-                  {p.active ? "Remove respondent" : "Reinstate respondent"}
-                </button>
-              </div>
-            </article>
-          ))}
+                    }
+                  />{" "}
+                  Select for invitation / reminder
+                </label>
+                <div>
+                  <button
+                    disabled={
+                      busy ||
+                      !readiness?.ready ||
+                      !p.active ||
+                      p.status === "completed"
+                    }
+                    onClick={() =>
+                      void run(async () => {
+                        await call("invite", {
+                          campaign,
+                          participantId: p.participant_id,
+                          send: true,
+                        });
+                        setMessage("Invitation sent again.");
+                      })
+                    }
+                  >
+                    Resend invitation
+                  </button>
+                  <label className="tb-field">
+                    <span>Extra invitation days</span>
+                    <input
+                      aria-label={"Extra invitation days: " + p.email}
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={extensionDays[p.participant_id] ?? 21}
+                      onChange={(e) =>
+                        setExtensionDays({
+                          ...extensionDays,
+                          [p.participant_id]: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <button
+                    disabled={
+                      busy ||
+                      !p.active ||
+                      p.status === "completed" ||
+                      !p.invite_expires_at
+                    }
+                    onClick={() =>
+                      void run(async () => {
+                        await call("extend", {
+                          campaign,
+                          participantId: p.participant_id,
+                          revision: p.revision,
+                          days: extensionDays[p.participant_id] ?? 21,
+                        });
+                        setMessage(
+                          "Invitation extended. The same private link continues to work.",
+                        );
+                      })
+                    }
+                  >
+                    Extend invitation
+                  </button>
+                  <button disabled={busy} onClick={() => edit(p)}>
+                    Edit respondent
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          p.active
+                            ? "Remove this respondent? Their answers will be retained and access withdrawn."
+                            : "Reinstate this respondent? A fresh invitation will be needed.",
+                        )
+                      )
+                        void run(() =>
+                          change(p, p.active ? "remove" : "reinstate"),
+                        );
+                    }}
+                  >
+                    {p.active ? "Withdraw respondent" : "Reinstate respondent"}
+                  </button>
+                </div>
+              </article>
+            ))}
         </div>
         <button
           disabled={
@@ -375,11 +532,12 @@ export default function Administration({
       <section className="tb-card" style={{ marginTop: 20 }}>
         <h2>Share a read-only dashboard</h2>
         <p>
-          Create separate private links for Gaia or regional leaders. Links
-          contain completion counts only. No names, individual answers or
-          exports. Groups with fewer than five invitations are hidden. Anyone
-          holding a link can see its dashboard until expiry or revocation; share
-          privately.
+          Create separate private links for Gaia or regional leaders. Links show
+          named respondents and completion status. Gaia can see the full roster.
+          Regional leaders see only respondents assigned to their work email in
+          the CSV. Individual answers and exports remain in the authorised admin
+          area. Anyone holding a link can see its dashboard until expiry or
+          revocation; share privately.
         </p>
         <label className="tb-field">
           <span>Viewer / audience label</span>
@@ -399,47 +557,64 @@ export default function Administration({
             onChange={(e) => setDays(Number(e.target.value))}
           />
         </label>
-        {(
-          [
-            ["regions", "region", "Regions"],
-            ["countries", "country", "Countries"],
-            ["entities", "entity", "Employing entities"],
-          ] as const
-        ).map(([key, field, title]) => (
-          <label className="tb-field" key={key}>
-            <span>{title} (leave unselected for all)</span>
+        <label className="tb-field">
+          <span>Dashboard visibility</span>
+          <select
+            aria-label="Dashboard visibility"
+            value={shareRole}
+            onChange={(e) => setShareRole(e.target.value)}
+          >
+            <option value="regional_lead">
+              Regional leader: assigned team only
+            </option>
+            <option value="all">Gaia: full campaign visibility</option>
+          </select>
+        </label>
+        {shareRole === "regional_lead" && (
+          <label className="tb-field">
+            <span>Regional leader from CSV</span>
             <select
-              multiple
-              aria-label={title + " (leave unselected for all)"}
-              value={scope[key]}
-              onChange={(e) =>
-                setScope({
-                  ...scope,
-                  [key]: Array.from(e.target.selectedOptions).map(
-                    (o) => o.value,
-                  ),
-                })
-              }
+              aria-label="Regional leader from CSV"
+              value={regionalLeaderEmail}
+              onChange={(e) => setRegionalLeaderEmail(e.target.value)}
             >
-              {[...new Set(people.map((p) => p.profile[field]).filter(Boolean))]
+              <option value="">Choose a regional leader</option>
+              {[
+                ...new Set(
+                  people
+                    .map((p) => p.roster.regional_leader_email)
+                    .filter(Boolean),
+                ),
+              ]
                 .sort()
-                .map((v) => (
-                  <option key={v} value={v}>
-                    {v}
+                .map((email) => (
+                  <option key={email} value={email}>
+                    {people.find(
+                      (p) => p.roster.regional_leader_email === email,
+                    )?.roster.regional_leader_name || email}{" "}
+                    · {email}
                   </option>
                 ))}
             </select>
           </label>
-        ))}
+        )}
         <button
-          disabled={busy || !label.trim()}
+          disabled={
+            busy ||
+            !label.trim() ||
+            (shareRole === "regional_lead" && !regionalLeaderEmail)
+          }
           onClick={() =>
             void run(async () => {
               const r = await call<{ link: string }>("share", {
                 campaign,
                 label,
                 days,
-                scope,
+                scope: {
+                  role: shareRole,
+                  regionalLeaderEmail:
+                    shareRole === "regional_lead" ? regionalLeaderEmail : "",
+                },
               });
               setShareLink(r.link);
               setMessage("Private dashboard link created. No email sent.");

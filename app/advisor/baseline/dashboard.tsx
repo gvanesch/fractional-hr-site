@@ -1,6 +1,9 @@
+"use client";
+import { useState } from "react";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
 import { WORK_TYPES, countryLabel } from "@/lib/baseline/model";
 export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
+  const [search, setSearch] = useState("");
   const labels: Record<string, string> = {
     region: "Region",
     country: "Country",
@@ -48,12 +51,69 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
         value={d.completionPercent}
         style={{ width: "100%" }}
       />
-      {d.smallGroupsHidden && (
-        <p>
-          Groups with fewer than five invited respondents are hidden. Individual
-          answers are not available here.
-        </p>
-      )}
+      <h3>Respondents</h3>
+      <label className="tb-field">
+        <span>Search respondents</span>
+        <input
+          type="search"
+          aria-label="Search respondents"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Name, email, role, region, entity or team"
+        />
+      </label>
+      <div className="tb-roster">
+        {(d.participants ?? [])
+          .filter((p) =>
+            [
+              p.name,
+              p.email,
+              p.jobTitle,
+              p.region,
+              p.country,
+              p.entity,
+              p.team,
+              p.regionalLeaderName,
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(search.toLowerCase()),
+          )
+          .map((p) => (
+            <article className="tb-detail" key={p.participantId}>
+              <h4>{p.name}</h4>
+              <p>
+                {p.email} · {p.jobTitle}
+              </p>
+              <p>
+                {p.region} · {p.country} · {p.entity} · {p.team}
+              </p>
+              <p>
+                Regional leader:{" "}
+                {p.regionalLeaderName ||
+                  p.regionalLeaderEmail ||
+                  "Not recorded"}
+              </p>
+              <p>
+                {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"} ·{" "}
+                {p.invited ? "Invitation issued" : "Not invited"} · Step{" "}
+                {p.progress}
+              </p>
+              {p.inviteExpiresAt && (
+                <p>
+                  Invitation expires{" "}
+                  {new Date(p.inviteExpiresAt).toLocaleDateString("en-GB")}
+                </p>
+              )}
+              {p.submittedAt && (
+                <p>
+                  Completed{" "}
+                  {new Date(p.submittedAt).toLocaleDateString("en-GB")}
+                </p>
+              )}
+            </article>
+          ))}
+      </div>
       {Object.entries(d.groups).map(([key, groups]) => (
         <details key={key} open>
           <summary>Completion by {labels[key] ?? key}</summary>

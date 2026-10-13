@@ -152,3 +152,11 @@ Launch readiness is blocked until the reviewed broad-work design has a versioned
 ### Sixth private tester link (13 October 2026)
 
 A separate Tester 6 link is reserved for Greg to share with Giovanna. It uses the same latest QA questionnaire, security checks and 25 October expiry. The original five links are unchanged. No email is sent and no recipient account or personal email is inferred.
+
+### Named roster visibility and project-style controls (13 October 2026)
+
+The baseline is identified, so no small-group suppression is applied. Shared dashboards now show respondent name, work email, current role, country/region/entity/team, assigned regional leader, invitation state, progress and completion. Answer content and exports stay in the authenticated admin area. CSV adds `regional_leader_name` and `regional_leader_email`; the latter is lowercased and is the server-side visibility boundary for regional dashboard links. Gaia’s explicitly campaign-wide link sees all respondents. An individual’s reporting manager may differ from their regional leader; these fields are separate.
+
+Every new share must explicitly choose campaign-wide or regional-leader scope. Unassigned people are visible to the campaign-wide/admin view but not regional links. Role/scope comes from the stored link record, never caller-supplied request data. Old count-only shares are rejected rather than upgraded to identifiable roster access. Shared links remain bearer links that can be forwarded; use separate links per leader and revoke them when needed.
+
+Admin cards follow the existing project workspace pattern: name/role/status and invitation expiry, edit, resend, extend and withdraw/reinstate. Search spans name, email, role, country, region, entity, team and regional leader. Status and regional leader filters are available. Extending by 1–90 days preserves the same link but cannot outlast an open campaign’s closing date; completed or withdrawn respondents cannot be extended. The action is revision-checked and audited. QA email sending remains disabled and launch remains gated.

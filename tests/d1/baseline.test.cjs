@@ -1040,14 +1040,14 @@ test("Respondent edits protect concurrent work, revoke changed addresses and ret
     h.sqlite.close();
   }
 });
-test("Private completion dashboards enforce scope, suppress small groups and never return identities or answers", async () => {
+test("Named dashboards show small groups and bind regional visibility to CSV leader assignments", async () => {
   const h = harness();
   try {
     const { campaign } = await h.setup();
     await h.service.importRoster(
       "admin@example.invalid",
       campaign,
-      "name,email,country,region,entity,team\nC,c@example.invalid,GB,North,Entity A,Team A\nD,d@example.invalid,GB,North,Entity A,Team A\nE,e@example.invalid,GB,North,Entity A,Team A\nF,f@example.invalid,GB,North,Entity A,Team A\nG,g@example.invalid,GB,North,Entity A,Team A",
+      "name,email,country,region,entity,team,regional_leader_name,regional_leader_email\nC,c@example.invalid,GB,North,Entity A,Team A,Leader A,leader.a@example.invalid\nD,d@example.invalid,GB,North,Entity A,Team A,Leader A,leader.a@example.invalid\nE,e@example.invalid,GB,North,Entity A,Team B,Leader B,leader.b@example.invalid\nF,f@example.invalid,GB,North,Entity A,Team A,Leader A,leader.a@example.invalid\nG,g@example.invalid,GB,North,Entity A,Team A,Leader A,leader.a@example.invalid",
     );
     const rows = (await h.service.campaignRows(campaign)).participants;
     for (const p of rows)
@@ -1060,35 +1060,78 @@ test("Private completion dashboards enforce scope, suppress small groups and nev
     const share = await h.service.createDashboardShare(
         "admin@example.invalid",
         campaign,
-        { label: "North leader", days: 7, scope: { regions: ["North"] } },
+        {
+          label: "Leader A",
+          days: 7,
+          scope: {
+            role: "regional_lead",
+            regionalLeaderEmail: "leader.a@example.invalid",
+          },
+        },
       ),
       token = share.link.split("#")[1];
     const report = await h.service.sharedDashboard(h.request({}), token);
-    assert.equal(report.counts.invited, 5);
-    assert.equal(report.groups.region[0].label, "North");
-    assert.ok(!JSON.stringify(report).includes("@"));
-    assert.ok(!("participants" in report));
+    assert.equal(report.counts.invited, 4);
+    assert.equal(report.groups.region[0].invited, 4);
+    assert.equal(report.participants.length, 4);
+    assert.ok(
+      report.participants.every(
+        (p) => p.regionalLeaderEmail === "leader.a@example.invalid",
+      ),
+    );
+    assert.ok(!JSON.stringify(report).includes("e@example.invalid"));
     assert.ok(!("draft" in report));
     assert.ok(!("answers" in report));
-    const small = await h.service.createDashboardShare(
+    const leaderB = await h.service.createDashboardShare(
       "admin@example.invalid",
       campaign,
-      { label: "Test leader", scope: { regions: ["Test region"] } },
+      {
+        label: "Leader B",
+        scope: {
+          role: "regional_lead",
+          regionalLeaderEmail: "leader.b@example.invalid",
+        },
+      },
     );
-    const limited = await h.service.sharedDashboard(
+    const one = await h.service.sharedDashboard(
       h.request({}),
-      small.link.split("#")[1],
+      leaderB.link.split("#")[1],
     );
-    assert.equal(limited.counts.invited, 2);
-    assert.equal(limited.groups.region.length, 0);
+    assert.equal(one.participants.length, 1);
+    assert.equal(one.groups.region[0].invited, 1);
+    const gaia = await h.service.createDashboardShare(
+      "admin@example.invalid",
+      campaign,
+      { label: "Gaia", scope: { role: "all" } },
+    );
+    const all = await h.service.sharedDashboard(
+      h.request({}),
+      gaia.link.split("#")[1],
+    );
+    assert.equal(all.participants.length, 7);
+    assert.equal(all.counts.invited, 7);
+    await assert.rejects(
+      h.service.createDashboardShare("admin@example.invalid", campaign, {
+        label: "Unknown leader",
+        scope: {
+          role: "regional_lead",
+          regionalLeaderEmail: "not-in-roster@example.invalid",
+        },
+      }),
+    );
+    await assert.rejects(
+      h.service.createDashboardShare("admin@example.invalid", campaign, {
+        label: "Missing role",
+        scope: { regions: ["North"] },
+      }),
+    );
     const shares = await h.service.dashboardShares(campaign);
     assert.ok(!JSON.stringify(shares).includes(token));
     assert.ok(!JSON.stringify(shares).includes("token_hash"));
-    const shareId = shares.find((s) => s.label === "North leader").share_id;
     await h.service.revokeDashboardShare(
       "admin@example.invalid",
       campaign,
-      shareId,
+      shares.find((s) => s.label === "Leader A").share_id,
     );
     await assert.rejects(
       h.service.sharedDashboard(h.request({}), token),
@@ -1096,14 +1139,27 @@ test("Private completion dashboards enforce scope, suppress small groups and nev
     );
     h.state.admin = false;
     const anonymous = await h.route.POST(
-      h.request({ token: small.link.split("#")[1] }),
+      h.request({ token: leaderB.link.split("#")[1], scope: { role: "all" } }),
       { params: Promise.resolve({ path: ["dashboard"] }) },
     );
     assert.equal(anonymous.status, 200);
+    assert.equal((await anonymous.json()).participants.length, 1);
     const admin = await h.route.POST(h.request({ campaign }), {
       params: Promise.resolve({ path: ["admin", "share"] }),
     });
     assert.equal(admin.status, 403);
+    h.sqlite
+      .prepare(
+        "UPDATE tb_baseline_dashboard_shares SET scope_json=? WHERE label=?",
+      )
+      .run(
+        JSON.stringify({ regions: [], countries: [], entities: [] }),
+        "Gaia",
+      );
+    await assert.rejects(
+      h.service.sharedDashboard(h.request({}), gaia.link.split("#")[1]),
+      (e) => e.status === 403,
+    );
   } finally {
     h.sqlite.close();
   }
@@ -1173,6 +1229,73 @@ test("Production cannot open or mail the earlier questionnaire even with active 
       (e) => e.status === 409,
     );
     assert.equal(h.state.emails.length, 0);
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Invitation extension keeps the link, respects campaign closing and prevents withdrawn/completed changes", async () => {
+  const h = harness();
+  try {
+    const { campaign, a, token } = await h.setup();
+    await h.service.configureCampaign("admin@example.invalid", campaign, {
+      closesAt: new Date(Date.now() + 100 * 86400000).toISOString(),
+    });
+    let p = (await h.service.campaignRows(campaign)).participants.find(
+      (p) => p.participant_id === a.participant_id,
+    );
+    const prior = p.invite_expires_at;
+    const extended = await h.service.extendBaselineInvite(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      { revision: p.revision, days: 21 },
+    );
+    assert.ok(extended.expiresAt > prior);
+    await h.access(token);
+    await assert.rejects(
+      h.service.extendBaselineInvite(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        { revision: p.revision, days: 21 },
+      ),
+      (e) => e.status === 409,
+    );
+    p = (await h.service.campaignRows(campaign)).participants.find(
+      (p) => p.participant_id === a.participant_id,
+    );
+    await assert.rejects(
+      h.service.extendBaselineInvite(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        { revision: p.revision, days: 0 },
+      ),
+    );
+    await h.service.changeParticipant(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      { action: "remove", revision: p.revision },
+    );
+    await assert.rejects(
+      h.service.extendBaselineInvite(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        { revision: p.revision + 1, days: 21 },
+      ),
+    );
+    assert.equal(h.state.emails.length, 0);
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT count(*) AS n FROM tb_baseline_audit WHERE action='invitation_extended'",
+        )
+        .get().n,
+      1,
+    );
   } finally {
     h.sqlite.close();
   }

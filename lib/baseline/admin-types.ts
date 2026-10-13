@@ -15,8 +15,14 @@ export type CompletionDashboard = {
     { label: string; invited: number; completed: number; inProgress: number }[]
   >;
   generatedAt: string;
-  smallGroupsHidden: boolean;
-  scope: { regions: string[]; countries: string[]; entities: string[] };
+  participants: DashboardParticipant[];
+  scope: {
+    regions: string[];
+    countries: string[];
+    entities: string[];
+    role: "all" | "regional_lead" | "legacy";
+    regionalLeaderEmail: string;
+  };
 };
 export type LaunchReadiness = {
   ready: boolean;
@@ -25,4 +31,24 @@ export type LaunchReadiness = {
   active: number;
   toInvite: number;
   questionnaireVersion: string;
+};
+
+export type DashboardParticipant = {
+  participantId: string;
+  name: string;
+  email: string;
+  jobTitle: string;
+  country: string;
+  region: string;
+  entity: string;
+  team: string;
+  regionalLeaderName: string;
+  regionalLeaderEmail: string;
+  status: string;
+  active: boolean;
+  invited: boolean;
+  inviteExpiresAt: string | null;
+  progress: number;
+  updatedAt: string;
+  submittedAt: string | null;
 };

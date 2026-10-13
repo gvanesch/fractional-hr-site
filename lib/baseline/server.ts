@@ -462,7 +462,7 @@ export async function campaignRows(campaign: string) {
   const rows = (
     await db()
       .prepare(
-        "SELECT p.participant_id,p.email,p.profile_json,p.active,COALESCE(m.metadata_json,'{}') AS metadata_json,r.draft_json,r.status,r.progress,r.revision,r.submitted_at,r.updated_at,EXISTS(SELECT 1 FROM tb_baseline_invites i WHERE i.participant_id=p.participant_id) AS invited FROM tb_baseline_participants p JOIN tb_baseline_responses r ON r.participant_id=p.participant_id LEFT JOIN tb_baseline_roster_details m ON m.participant_id=p.participant_id WHERE p.campaign_id=? ORDER BY p.created_at,p.participant_id",
+        "SELECT p.participant_id,p.email,p.profile_json,p.active,COALESCE(m.metadata_json,'{}') AS metadata_json,r.draft_json,r.status,r.progress,r.revision,r.submitted_at,r.updated_at,(SELECT MAX(i.expires_at) FROM tb_baseline_invites i WHERE i.participant_id=p.participant_id AND i.revoked_at IS NULL) AS invite_expires_at,EXISTS(SELECT 1 FROM tb_baseline_invites i WHERE i.participant_id=p.participant_id) AS invited FROM tb_baseline_participants p JOIN tb_baseline_responses r ON r.participant_id=p.participant_id LEFT JOIN tb_baseline_roster_details m ON m.participant_id=p.participant_id WHERE p.campaign_id=? ORDER BY p.created_at,p.participant_id",
       )
       .bind(campaign)
       .all<Record<string, unknown>>()
@@ -484,8 +484,12 @@ export async function campaignRows(campaign: string) {
       email: String(row.email),
       active: Number(row.active),
       invited: Number(row.invited),
+      invite_expires_at: row.invite_expires_at
+        ? String(row.invite_expires_at)
+        : null,
       status: String(row.status),
       progress: Number(row.progress),
+      updated_at: String(row.updated_at),
       submitted_at: row.submitted_at,
       profile: JSON.parse(String(row.profile_json)),
       draft: JSON.parse(String(row.draft_json)) as Draft,
@@ -1199,10 +1203,39 @@ type DashboardScope = {
   regions: string[];
   countries: string[];
   entities: string[];
+  role: "all" | "regional_lead" | "legacy";
+  regionalLeaderEmail: string;
 };
 function dashboardScope(input: unknown): DashboardScope {
   const value = (input ?? {}) as Record<string, unknown>,
-    scope: DashboardScope = { regions: [], countries: [], entities: [] };
+    scope: DashboardScope = {
+      regions: [],
+      countries: [],
+      entities: [],
+      role: "legacy",
+      regionalLeaderEmail: "",
+    };
+  if (
+    value.role !== undefined &&
+    !["all", "regional_lead"].includes(String(value.role))
+  )
+    throw new BaselineError(
+      "Choose campaign-wide or regional-leader visibility.",
+    );
+  scope.role =
+    value.role === "all"
+      ? "all"
+      : value.role === "regional_lead"
+        ? "regional_lead"
+        : "legacy";
+  scope.regionalLeaderEmail = String(value.regionalLeaderEmail ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    scope.role === "regional_lead" &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(scope.regionalLeaderEmail)
+  )
+    throw new BaselineError("Choose a regional leader from the roster.");
   for (const key of ["regions", "countries", "entities"] as const) {
     const list = value[key] ?? [];
     if (
@@ -1218,11 +1251,18 @@ function dashboardScope(input: unknown): DashboardScope {
 export async function completionDashboard(
   campaign: string,
   scopeInput: unknown = {},
-  shared = false,
+  _shared = false,
 ) {
   const data = await campaignRows(campaign),
     scope = dashboardScope(scopeInput);
+  if (_shared && scope.role === "legacy")
+    throw new BaselineError("This dashboard link needs replacing.", 403);
   const eligible = data.participants
+    .filter(
+      (p) =>
+        scope.role !== "regional_lead" ||
+        p.roster.regional_leader_email === scope.regionalLeaderEmail,
+    )
     .filter(
       (p) => !scope.regions.length || scope.regions.includes(p.profile.region),
     )
@@ -1275,9 +1315,9 @@ export async function completionDashboard(
       if (p.status === "in_progress") g.inProgress++;
       map.set(label, g);
     }
-    groups[key] = [...map.values()]
-      .filter((g) => !shared || g.invited >= 5)
-      .sort((a, b) => a.label.localeCompare(b.label));
+    groups[key] = [...map.values()].sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
   }
   return {
     campaign: {
@@ -1291,7 +1331,25 @@ export async function completionDashboard(
       : 0,
     groups,
     generatedAt: now(),
-    smallGroupsHidden: shared,
+    participants: eligible.map((p) => ({
+      participantId: p.participant_id,
+      name: String(p.profile.name),
+      email: p.email,
+      jobTitle: String(p.profile.job_title),
+      country: String(p.profile.country),
+      region: String(p.profile.region),
+      entity: String(p.profile.entity),
+      team: String(p.roster.team ?? ""),
+      regionalLeaderName: String(p.roster.regional_leader_name ?? ""),
+      regionalLeaderEmail: String(p.roster.regional_leader_email ?? ""),
+      status: p.status,
+      active: Number(p.active) === 1,
+      invited: Number(p.invited) === 1,
+      inviteExpiresAt: p.invite_expires_at,
+      progress: p.progress,
+      updatedAt: String(p.updated_at ?? ""),
+      submittedAt: p.submitted_at ? String(p.submitted_at) : null,
+    })),
     scope,
   };
 }
@@ -1325,6 +1383,19 @@ export async function createDashboardShare(
     throw new BaselineError(
       "Add a dashboard label and an expiry of 1–30 days.",
     );
+  if (scope.role === "legacy")
+    throw new BaselineError("Choose dashboard visibility.");
+  if (scope.role === "regional_lead") {
+    const roster = await campaignRows(campaign);
+    if (
+      !roster.participants.some(
+        (p) => p.roster.regional_leader_email === scope.regionalLeaderEmail,
+      )
+    )
+      throw new BaselineError(
+        "This regional leader has no assigned respondents in the roster.",
+      );
+  }
   const id = randomUUID(),
     token = randomBytes(32).toString("hex"),
     stamp = now(),
@@ -1414,11 +1485,13 @@ export async function sharedDashboard(request: Request, token: string) {
       "This dashboard link has expired or been withdrawn.",
       403,
     );
-  return completionDashboard(
-    share.campaign_id,
-    JSON.parse(share.scope_json),
-    true,
-  );
+  const scope = dashboardScope(JSON.parse(share.scope_json));
+  if (scope.role === "legacy")
+    throw new BaselineError(
+      "This older dashboard link needs replacing. Ask the organiser for a new link.",
+      403,
+    );
+  return completionDashboard(share.campaign_id, scope, true);
 }
 export async function launchReadiness(campaign: string) {
   const data = await campaignRows(campaign),
@@ -1541,4 +1614,83 @@ export async function inviteBatch(
     failed: failed.length,
   });
   return { sent, failed };
+}
+
+export async function extendBaselineInvite(
+  actor: string,
+  campaign: string,
+  id: string,
+  body: Record<string, unknown>,
+) {
+  const data = await campaignRows(campaign),
+    p = data.participants.find((p) => p.participant_id === id),
+    days = Number(body.days ?? 21),
+    revision = Number(body.revision);
+  if (!p || !p.active || p.status === "completed")
+    throw new BaselineError(
+      "Only active, incomplete respondents can have an invitation extended.",
+    );
+  if (revision !== p.revision || !Number.isSafeInteger(revision))
+    throw new BaselineError("This record changed. Refresh the roster.", 409);
+  if (!Number.isInteger(days) || days < 1 || days > 90)
+    throw new BaselineError("Choose 1–90 extra days.");
+  const invitation = await db()
+    .prepare(
+      "SELECT invite_id,expires_at FROM tb_baseline_invites WHERE participant_id=? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(id)
+    .first<{ invite_id: string; expires_at: string }>();
+  if (!invitation)
+    throw new BaselineError("Generate an invitation before extending it.");
+  const expires = new Date(
+    Math.min(
+      Math.max(Date.now(), Date.parse(invitation.expires_at)) + days * 86400000,
+      Date.parse(data.campaign.closes_at),
+    ),
+  ).toISOString();
+  if (
+    data.campaign.status !== "open" ||
+    expires <= invitation.expires_at ||
+    expires <= now()
+  )
+    throw new BaselineError(
+      "Open the campaign and extend its closing date first. An invitation cannot outlast the campaign.",
+    );
+  const mutation = randomUUID(),
+    database = db();
+  const result = await database.batch([
+    database
+      .prepare(
+        "UPDATE tb_baseline_responses SET revision=revision+1,mutation_id=? WHERE participant_id=? AND revision=?",
+      )
+      .bind(mutation, id, revision),
+    database
+      .prepare(
+        "UPDATE tb_baseline_invites SET expires_at=? WHERE invite_id=? AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(expires, invitation.invite_id, id, mutation),
+    database
+      .prepare(
+        "UPDATE tb_baseline_sessions SET expires_at=? WHERE invite_id=? AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(expires, invitation.invite_id, id, mutation),
+    database
+      .prepare(
+        "INSERT INTO tb_baseline_audit SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(
+        randomUUID(),
+        campaign,
+        actor,
+        "invitation_extended",
+        id,
+        JSON.stringify({ days, expires }),
+        now(),
+        id,
+        mutation,
+      ),
+  ]);
+  if (result[0].meta.changes !== 1)
+    throw new BaselineError("This record changed. Refresh the roster.", 409);
+  return { success: true, expiresAt: expires };
 }

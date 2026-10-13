@@ -19,6 +19,8 @@ export const EXTRA_ROSTER_FIELDS = [
   "manager_name",
   "manager_email",
   "leader_email",
+  "regional_leader_name",
+  "regional_leader_email",
   "job_level",
   "contracted_hours",
   "full_time_hours",
@@ -44,6 +46,8 @@ export const FIELD_LABELS: Record<string, string> = {
   manager_name: "Line manager name",
   manager_email: "Line manager work email",
   leader_email: "Responsible leader work email",
+  regional_leader_name: "Regional leader name",
+  regional_leader_email: "Regional leader work email",
   job_level: "Current job level",
   contracted_hours: "Contracted hours per week",
   full_time_hours: "Full-time hours per week",
@@ -55,7 +59,7 @@ export function rosterMetadata(p: Record<string, unknown>) {
   );
 }
 export function validateRosterExtras(p: Record<string, string>, row: number) {
-  for (const key of ["manager_email", "leader_email"])
+  for (const key of ["manager_email", "leader_email", "regional_leader_email"])
     if (p[key] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p[key]))
       throw new Error(`Check ${key} on row ${row}.`);
   for (const key of ["contracted_hours", "full_time_hours", "working_fraction"])

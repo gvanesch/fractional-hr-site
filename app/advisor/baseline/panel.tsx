@@ -35,6 +35,7 @@ type Person = {
   profile: Record<string, string>;
   roster: Record<string, string>;
   revision: number;
+  invite_expires_at: string | null;
 };
 type Result = {
   campaigns: Campaign[];

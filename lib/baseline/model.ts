@@ -849,6 +849,12 @@ export function parseRoster(csv: string): Partial<Profile>[] {
         allowed.map((key) => [key, (r[headers.indexOf(key)] ?? "").trim()]),
       ) as Record<string, string>;
       p.email = p.email.toLowerCase();
+      for (const key of [
+        "manager_email",
+        "leader_email",
+        "regional_leader_email",
+      ])
+        p[key] = p[key].toLowerCase();
       if (
         !p.name ||
         p.name.length > 250 ||

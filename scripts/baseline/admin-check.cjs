@@ -43,6 +43,8 @@ const root = path.resolve(__dirname, "../..");
         invited: 0,
         status: "not_started",
         progress: 0,
+        updated_at: "2026-10-13T12:00:00Z",
+        invite_expires_at: "2026-10-31T23:59:59Z",
         revision: 0,
         profile: {
           name: "Synthetic person",
@@ -60,6 +62,8 @@ const root = path.resolve(__dirname, "../..");
           full_time_hours: "40",
           working_fraction: "0.8",
           team: "Team A",
+          regional_leader_name: "Leader A",
+          regional_leader_email: "leader.a@example.invalid",
         },
       };
       person.draft = {
@@ -74,7 +78,7 @@ const root = path.resolve(__dirname, "../..");
         campaign_id: "c1",
         name: "Synthetic campaign",
         version: "team-blue-baseline-v2",
-        status: "draft",
+        status: "open",
         closes_at: "2026-12-31T23:59:59Z",
         privacy_notice:
           "Synthetic data use statement for isolated QA testing only.",
@@ -99,7 +103,7 @@ const root = path.resolve(__dirname, "../..");
           data = {
             campaign: {
               name: campaign.name,
-              status: "draft",
+              status: "open",
               closesAt: campaign.closes_at,
             },
             counts: {
@@ -150,6 +154,11 @@ const root = path.resolve(__dirname, "../..");
           if (body.action === "reinstate") person.active = 1;
           person.revision++;
           data = { success: true };
+        }
+        if (op === "extend") {
+          person.invite_expires_at = "2026-11-21T23:59:59Z";
+          person.revision++;
+          data = { success: true, expiresAt: person.invite_expires_at };
         }
         if (op === "share") {
           shares = [
@@ -246,6 +255,31 @@ const root = path.resolve(__dirname, "../..");
         .waitFor();
       assert.equal(requests.filter((r) => r.op === "import").length, 2);
       await page
+        .getByLabel("Search participant list", { exact: true })
+        .fill("not-found");
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Edit respondent", exact: true })
+          .count(),
+        0,
+      );
+      await page
+        .getByLabel("Search participant list", { exact: true })
+        .fill("person@example.invalid");
+      await page
+        .getByRole("button", { name: "Extend invitation", exact: true })
+        .click();
+      await page
+        .getByText(
+          "Invitation extended. The same private link continues to work.",
+          { exact: true },
+        )
+        .waitFor();
+      assert.ok(requests.some((r) => r.op === "extend" && r.body.days === 21));
+      await page
+        .getByLabel("Search participant list", { exact: true })
+        .fill("");
+      await page
         .getByRole("button", { name: "Edit respondent", exact: true })
         .click();
       await page
@@ -270,7 +304,7 @@ const root = path.resolve(__dirname, "../..");
       );
       page.on("dialog", (d) => d.accept());
       await page
-        .getByRole("button", { name: "Remove respondent", exact: true })
+        .getByRole("button", { name: "Withdraw respondent", exact: true })
         .click();
       await page
         .getByText("Respondent removed. Access withdrawn; answers retained.", {
@@ -289,8 +323,8 @@ const root = path.resolve(__dirname, "../..");
         .getByLabel("Viewer / audience label", { exact: true })
         .fill("North leader");
       await page
-        .getByLabel("Regions (leave unselected for all)", { exact: true })
-        .selectOption(["North"]);
+        .getByLabel("Regional leader from CSV", { exact: true })
+        .selectOption("leader.a@example.invalid");
       await page
         .getByRole("button", { name: "Create dashboard link", exact: true })
         .click();
@@ -305,8 +339,8 @@ const root = path.resolve(__dirname, "../..");
         ).includes("/baseline/dashboard#"),
       );
       assert.deepEqual(
-        requests.find((r) => r.op === "share").body.scope.regions,
-        ["North"],
+        requests.find((r) => r.op === "share").body.scope.regionalLeaderEmail,
+        "leader.a@example.invalid",
       );
       await page
         .getByRole("button", { name: "Revoke dashboard link", exact: true })

@@ -124,6 +124,15 @@ export async function POST(request: Request, context: Context) {
           body,
         ),
       );
+    if (path === "admin/extend")
+      return json(
+        await service.extendBaselineInvite(
+          actor,
+          campaign,
+          String(body.participantId ?? ""),
+          body,
+        ),
+      );
     if (path === "admin/share")
       return json(await service.createDashboardShare(actor, campaign, body));
     if (path === "admin/share-revoke")
