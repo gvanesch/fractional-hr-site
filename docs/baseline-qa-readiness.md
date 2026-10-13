@@ -30,3 +30,11 @@ Create a new baseline project to use `team-blue-baseline-v3`. Old v2 projects an
 Actual Greg messages use a separate `BASELINE_QA_RESEND_API_KEY`, a `greg-only` test flag, and a once-only ledger. `BASELINE_MAIL_MODE` stays `preview`; no general sending is activated. CI must inspect the ledger and must not reset reserved/failed entries or resend automatically.
 
 Answer-copy preferences are recorded and preview-only in QA. Production copy delivery/retries are guarded by production mail configuration and recorded in a durable outbox with the invitation email snapshot. No answer-copy messages are authorised during QA.
+
+## Verification checkpoint after first reviewed deployment
+
+- Commit `e8bb596` deployed to QA successfully; reviewed desktop/mobile browser flow, QA migrations, build/deploy, anonymous boundaries and old hosted contract passed.
+- Mail phase stopped before any message because the repository has no `RESEND_API_KEY` secret. No mail test ledger entry was created by that stopped run.
+- Follow-up reuses an existing QA Worker `RESEND_API_KEY` binding only inside the exact-Greg, once-only guard if secret-name inventory confirms it exists. No credential value is read/copied, and general mail stays preview-only.
+- Added explicit save/sign-out, consistent shared dashboard styling, synthetic code/link pairing and a real hosted reviewed HTTP/D1 fixture. This fixture creates only its own synthetic QA session through the privileged QA DB connection; it does not weaken or bypass the runtime verification endpoint and sends no mail.
+- Next: complete the full workflow including hosted reviewed contract, Worker credential availability and the two authorised Greg previews. If the ledger contains reserved/failed entries, stop duplicate attempts and report their status.

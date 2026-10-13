@@ -606,6 +606,7 @@ export default function AdminPanel({
                                   send: false,
                                 });
                                 setLink(result.link);
+                                setQaCode("");
                                 await refresh();
                                 setMessage(
                                   "Private test link created. No email was sent.",

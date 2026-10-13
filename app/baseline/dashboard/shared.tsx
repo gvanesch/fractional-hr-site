@@ -52,20 +52,23 @@ export default function SharedDashboard() {
     };
   }, []);
   return (
-    <main className="tb-shell" style={{ maxWidth: 1400 }}>
-      <header className="tb-header">
-        <span>team.blue · Baseline completion</span>
-        <p>Private, read-only dashboard</p>
-      </header>
-      {error ? (
-        <p role="alert" className="tb-error">
-          {error}
-        </p>
-      ) : data ? (
-        <Dashboard data={data} />
-      ) : (
-        <p role="status">Loading dashboard…</p>
-      )}
+    <main className="tb-advisor brand-light-section">
+      <div className="brand-container tb-shell tb-workspace-body">
+        <header className="tb-header">
+          <p className="brand-section-kicker">team.blue baseline</p>
+          <span>team.blue · Baseline completion</span>
+          <p>Private, read-only dashboard</p>
+        </header>
+        {error ? (
+          <p role="alert" className="tb-error">
+            {error}
+          </p>
+        ) : data ? (
+          <Dashboard data={data} />
+        ) : (
+          <p role="status">Loading dashboard…</p>
+        )}
+      </div>
     </main>
   );
 }

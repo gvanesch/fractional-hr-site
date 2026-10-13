@@ -44,6 +44,7 @@ export default function CollectionJourney() {
     [challenge, setChallenge] = useState(""),
     [code, setCode] = useState(""),
     [error, setError] = useState(""),
+    [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true);
   const revision = useRef(0),
@@ -140,6 +141,14 @@ export default function CollectionJourney() {
         managerRecord={saved.campaign.manager}
         savedCollection={saved}
         saveCollection={save}
+        endCollectionSession={async () => {
+          await api("logout", {});
+          setSaved(null);
+          setError("");
+          setMessage(
+            "Signed out. Your answers are saved securely. Open your private invitation to return.",
+          );
+        }}
       />
     );
   return (
@@ -155,6 +164,7 @@ export default function CollectionJourney() {
             {error}
           </p>
         )}
+        {message && <p role="status">{message}</p>}
         {loading ? (
           <p>Opening your assessment…</p>
         ) : token ? (

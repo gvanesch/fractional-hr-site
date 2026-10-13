@@ -56,6 +56,7 @@ export default function Prototype({
   managerRecord,
   savedCollection,
   saveCollection,
+  endCollectionSession,
 }: {
   tester?: string;
   technologyPreview?: boolean;
@@ -67,6 +68,7 @@ export default function Prototype({
     campaign: { privacy: string; closed: boolean; copyPreview?: boolean };
     copyStatus?: string | null;
   };
+  endCollectionSession?: () => Promise<void>;
   saveCollection?: (
     draft: CollectionDraft,
     progress: number,
@@ -237,6 +239,17 @@ export default function Prototype({
               : "The collection period has ended."}
           </h1>
           <p>Your answers are saved securely.</p>
+          {endCollectionSession && (
+            <button
+              onClick={() =>
+                void endCollectionSession().catch((e) =>
+                  setSaveError(e.message),
+                )
+              }
+            >
+              Sign out
+            </button>
+          )}
           {submitted && answerCopy && (
             <p>
               {savedCollection?.campaign.copyPreview !== false
@@ -261,6 +274,30 @@ export default function Prototype({
           {tester ? `${tester} · Private design test` : "QA design test"} · Use
           example answers only. Answers stay in this page and reset on refresh.
         </aside>
+      )}
+      {endCollectionSession && (
+        <button
+          disabled={saveState === "Signing out…"}
+          onClick={() => {
+            if (pendingSave.current) clearTimeout(pendingSave.current);
+            setSaveState("Signing out…");
+            void (
+              started && saveCollection
+                ? saveCollection(payload, currentStage)
+                : Promise.resolve()
+            )
+              .then(() => {
+                persistedPayload.current = JSON.stringify(payload);
+                return endCollectionSession();
+              })
+              .catch((e) => {
+                setSaveState("Save needs attention");
+                setSaveError(e.message);
+              });
+          }}
+        >
+          Save and sign out
+        </button>
       )}
       {saveCollection && (
         <p role="status" className="tb-save">

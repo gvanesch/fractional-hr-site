@@ -60,15 +60,24 @@ jobs:
       - name: Verify real hosted participant and QA D1 contract
         run: node scripts/baseline/hosted-participant.mjs
 
-      - name: Provision isolated Greg-only QA email credential
+      - name: Verify reviewed hosted collection and QA D1 contract
+        run: node scripts/baseline/hosted-reviewed.mjs
+      - name: Verify existing QA email credential or provision the isolated test binding
         env:
           BASELINE_QA_RESEND_TOKEN: ${{ secrets.RESEND_API_KEY }}
         run: |
-          if [ -z "$BASELINE_QA_RESEND_TOKEN" ]; then
-            echo "Existing repository email credential is unavailable. No test email can be sent."
-            exit 1
+          if [ -n "$BASELINE_QA_RESEND_TOKEN" ]; then
+            printf '%s' "$BASELINE_QA_RESEND_TOKEN" | npx wrangler secret put BASELINE_QA_RESEND_API_KEY --env qa
+          else
+            node --input-type=module <<'NODE'
+            const account=process.env.CLOUDFLARE_ACCOUNT_ID;
+            if(account!=="73221f18acc676e4992c89fcbf2b2a8f")throw Error("QA account mismatch");
+            const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/fractional-hr-site-qa/secrets`,{headers:{Authorization:`Bearer ${process.env.CLOUDFLARE_API_TOKEN}`}});
+            if(!r.ok)throw Error(`QA secret-name inventory unavailable: HTTP ${r.status}`);
+            const b=await r.json();if(!b.success||!Array.isArray(b.result)||!b.result.some(s=>["BASELINE_QA_RESEND_API_KEY","RESEND_API_KEY"].includes(s.name)))throw Error("No configured QA email credential is available.");
+            console.log("Existing QA Worker email credential is available. Values were not read or copied; restricted Greg-only sending remains enforced.");
+            NODE
           fi
-          printf '%s' "$BASELINE_QA_RESEND_TOKEN" | npx wrangler secret put BASELINE_QA_RESEND_API_KEY --env qa
       - name: Send authorised Greg-only invitation and verification-code previews once
         env:
           BASELINE_QA_RESEND_TOKEN: ${{ secrets.RESEND_API_KEY }}

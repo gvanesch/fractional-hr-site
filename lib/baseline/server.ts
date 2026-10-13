@@ -2105,7 +2105,8 @@ async function sendGregTest(
       "QA email delivery is restricted to the authorised test recipient.",
       403,
     );
-  if (!env.BASELINE_QA_RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
+  const credential = env.BASELINE_QA_RESEND_API_KEY ?? env.RESEND_API_KEY;
+  if (!credential || !env.CONTACT_FROM_EMAIL)
     throw new BaselineError("QA email credentials are unavailable.", 503);
   const reserved = await db()
     .prepare(
@@ -2119,7 +2120,7 @@ async function sendGregTest(
       409,
     );
   try {
-    const result = await new Resend(env.BASELINE_QA_RESEND_API_KEY).emails.send(
+    const result = await new Resend(credential).emails.send(
       {
         from: env.CONTACT_FROM_EMAIL,
         to: "greg@vanesch.uk",
