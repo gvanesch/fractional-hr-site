@@ -46,3 +46,5 @@ Answer-copy preferences are recorded and preview-only in QA. Production copy del
 - Email-code previews now link directly to the existing challenge. Reopening the invitation reuses that challenge without sending another message. A current-code control supports normal production expiry handling; QA remains once-only. General QA invitation sending is denied even if mail mode is misconfigured.
 
 - Successful actual email preview on `144a174`: both ledger kinds are sent. Never reset that ledger or resend on continuation. The configured credential remains in the QA Worker and was not read or copied.
+
+- Final display polish `7d8af86` stopped before deployment because the browser check still expected the old payroll review label. The assertion is updated to the new plain-English label; no functional failure or additional email occurred. Rerun before reporting final release readiness.

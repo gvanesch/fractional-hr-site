@@ -341,7 +341,7 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Review", exact: true })
         .waitFor();
-      await page.getByText(/Personal payroll days: 3.5/).waitFor();
+      await page.getByText(/Your days per cycle: 3.5/).waitFor();
       await page
         .getByText(
           /I am not involved. Handled by: External payroll partner, Finance/,

@@ -279,7 +279,13 @@ const root = path.resolve(__dirname, "../..");
               "2026-10-27T23:59:59Z",
             ),
           ],
-          ["code", emailModule.exports.verificationEmail("123456")],
+          [
+            "code",
+            emailModule.exports.verificationEmail(
+              "123456",
+              "https://collection.example.invalid/baseline/start#synthetic-preview",
+            ),
+          ],
         ];
         for (const [name, message] of previewMessages) {
           await page.setContent(message.html);
