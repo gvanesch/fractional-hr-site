@@ -58,9 +58,11 @@ async function api(path: string, body?: unknown): Promise<Result> {
     throw new Error(data.error ?? "Unable to complete this request.");
   return data;
 }
-export default function AdminPanel() {
+export default function AdminPanel({
+  initialCampaign = "",
+}: { initialCampaign?: string } = {}) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]),
-    [id, setId] = useState(""),
+    [id, setId] = useState(initialCampaign),
     [current, setCurrent] = useState<Campaign | null>(null),
     [people, setPeople] = useState<Person[]>([]),
     [name, setName] = useState("team.blue People Operations Baseline — QA"),
@@ -99,8 +101,9 @@ export default function AdminPanel() {
     }
   }
   useEffect(() => {
-    void refresh("").catch((e) => setError(e.message));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setId(initialCampaign);
+    void refresh(initialCampaign).catch((e) => setError(e.message));
+  }, [initialCampaign]); // eslint-disable-line react-hooks/exhaustive-deps
   async function action(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
