@@ -321,3 +321,38 @@
 .tb-advisor [hidden] {
   display: none !important;
 }
+.tb-participant-editor {
+  width: min(960px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 28px;
+  overflow-y: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  color: #0d1f3c;
+  background: white;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+}
+.tb-participant-editor::backdrop {
+  background: rgba(10, 22, 40, 0.55);
+}
+.tb-participant-editor h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.tb-register-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.tb-advisor .tb-register-views button[aria-pressed="true"] {
+  background: #0d1f3c;
+  border-color: #0d1f3c;
+  color: white;
+}
+@media (max-width: 640px) {
+  .tb-participant-editor {
+    padding: 20px;
+  }
+}

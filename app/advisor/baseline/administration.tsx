@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ROSTER_FIELDS, FIELD_LABELS } from "@/lib/baseline/roster-fields";
 import { WORK_TYPES, toCsv } from "@/lib/baseline/model";
 import type { LaunchReadiness } from "@/lib/baseline/admin-types";
@@ -39,8 +39,12 @@ export default function Administration({
   people,
   refresh,
   section,
+  editParticipantId,
+  onEditOpened,
 }: {
   section: string;
+  editParticipantId: string | null;
+  onEditOpened: () => void;
   campaign: string;
   name: string;
   people: Person[];
@@ -65,6 +69,21 @@ export default function Administration({
     [shareLink, setShareLink] = useState(""),
     [confirmation, setConfirmation] = useState(""),
     [selected, setSelected] = useState<string[]>([]);
+  const editor = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (editing) {
+      editor.current?.showModal();
+      editor.current?.querySelector<HTMLInputElement>("input")?.focus();
+    } else editor.current?.close();
+  }, [editing]);
+  useEffect(() => {
+    if (!editParticipantId) return;
+    const target = people.find((p) => p.participant_id === editParticipantId);
+    if (target) {
+      edit(target);
+      onEditOpened();
+    }
+  }, [editParticipantId, people]); // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
     const query = "?campaign=" + encodeURIComponent(campaign);
     const [r, s] = await Promise.all([
@@ -121,7 +140,7 @@ export default function Administration({
   }
   return (
     <>
-      {error && (
+      {error && !editing && (
         <p className="tb-error" role="alert">
           {error}
         </p>
@@ -195,6 +214,28 @@ export default function Administration({
             Removing a respondent withdraws access. Changing their email
             invalidates their old invitation and session.
           </p>
+          <div className="tb-register-views">
+            <button
+              aria-pressed={statusFilter === "all"}
+              onClick={() => {
+                setStatusFilter("all");
+                setSearch("");
+                setLeaderFilter("");
+              }}
+            >
+              All participants ({people.length})
+            </button>
+            <button
+              aria-pressed={statusFilter === "withdrawn"}
+              onClick={() => {
+                setStatusFilter("withdrawn");
+                setSearch("");
+                setLeaderFilter("");
+              }}
+            >
+              Withdrawn participants ({people.filter((p) => !p.active).length})
+            </button>
+          </div>
           <div className="tb-register-filters">
             <label className="tb-field">
               <span>Search participant list</span>
@@ -399,7 +440,7 @@ export default function Administration({
                       Extend invitation
                     </button>
                     <button disabled={busy} onClick={() => edit(p)}>
-                      Edit respondent
+                      Edit participant data
                     </button>
                     <button
                       disabled={busy}
@@ -418,7 +459,7 @@ export default function Administration({
                     >
                       {p.active
                         ? "Withdraw respondent"
-                        : "Reinstate respondent"}
+                        : "Reinstate participant"}
                     </button>
                   </div>
                 </article>
@@ -451,97 +492,6 @@ export default function Administration({
           >
             Send selected invitations / reminders ({selected.length}/20)
           </button>
-          {editing && (
-            <form
-              className="tb-process"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void run(async () => {
-                  const csv = toCsv([
-                    Object.fromEntries(
-                      ROSTER_FIELDS.map((k) => [k, fields[k] ?? ""]),
-                    ),
-                  ]);
-                  if (person)
-                    await call("participant", {
-                      campaign,
-                      participantId: person.participant_id,
-                      revision: person.revision,
-                      action: "edit",
-                      csv,
-                    });
-                  else await call("import", { campaign, csv });
-                  setEditing(false);
-                  setMessage(
-                    person
-                      ? "Respondent details saved. If the email changed, issue a fresh invitation."
-                      : "Respondent added. No invitation sent.",
-                  );
-                });
-              }}
-            >
-              <h3>{person ? "Edit respondent" : "Add respondent"}</h3>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
-                  gap: 12,
-                }}
-              >
-                {ROSTER_FIELDS.map((k) => (
-                  <label key={k} className="tb-field">
-                    <span>
-                      {FIELD_LABELS[k]}
-                      {["name", "email"].includes(k) ? " *" : ""}
-                    </span>
-                    {["work_type", "manages_people"].includes(k) ? (
-                      <select
-                        value={fields[k] ?? ""}
-                        onChange={(e) =>
-                          setFields({ ...fields, [k]: e.target.value })
-                        }
-                      >
-                        <option value="">Not recorded</option>
-                        {(k === "work_type"
-                          ? WORK_TYPES
-                          : [
-                              ["yes", "Yes"],
-                              ["no", "No"],
-                              ["not_sure", "Not sure"],
-                            ]
-                        ).map(([c, l]) => (
-                          <option key={c} value={c}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        required={["name", "email"].includes(k)}
-                        type={k.includes("email") ? "email" : "text"}
-                        maxLength={250}
-                        value={fields[k] ?? ""}
-                        onChange={(e) =>
-                          setFields({ ...fields, [k]: e.target.value })
-                        }
-                      />
-                    )}
-                  </label>
-                ))}
-              </div>
-              <p>
-                Hours use the same weekly basis. Working fraction is 0–1, for
-                example 0.8. Record formal direct reports only. Do not upload
-                salary, performance ratings or sensitive personal data.
-              </p>
-              <button disabled={busy} className="tb-primary" type="submit">
-                Save respondent
-              </button>
-              <button type="button" onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            </form>
-          )}
         </section>
       </div>
       <div hidden={section !== "sharing"}>
@@ -685,6 +635,123 @@ export default function Administration({
           ))}
         </section>
       </div>
+      <dialog
+        ref={editor}
+        className="tb-participant-editor"
+        aria-labelledby="participant-editor-title"
+        onCancel={() => setEditing(false)}
+      >
+        {editing && (
+          <form
+            className="tb-process"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(async () => {
+                const csv = toCsv([
+                  Object.fromEntries(
+                    ROSTER_FIELDS.map((k) => [k, fields[k] ?? ""]),
+                  ),
+                ]);
+                if (person)
+                  await call("participant", {
+                    campaign,
+                    participantId: person.participant_id,
+                    revision: person.revision,
+                    action: "edit",
+                    csv,
+                  });
+                else await call("import", { campaign, csv });
+                setEditing(false);
+                setMessage(
+                  person
+                    ? "Respondent details saved. If the email changed, issue a fresh invitation."
+                    : "Respondent added. No invitation sent.",
+                );
+              });
+            }}
+          >
+            {error && (
+              <p className="tb-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="tb-register-identity">
+              <h2 id="participant-editor-title">
+                {person ? "Edit participant data" : "Add respondent"}
+              </h2>
+              <button type="button" onClick={() => setEditing(false)}>
+                Close editor
+              </button>
+            </div>
+            <p>
+              {person
+                ? person.profile.name + " · " + person.email
+                : "Add a new participant."}{" "}
+              All CSV roster fields can be edited here. This does not change
+              their assessment answers.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
+                gap: 12,
+              }}
+            >
+              {ROSTER_FIELDS.map((k) => (
+                <label key={k} className="tb-field">
+                  <span>
+                    {FIELD_LABELS[k]}
+                    {["name", "email"].includes(k) ? " *" : ""}
+                  </span>
+                  {["work_type", "manages_people"].includes(k) ? (
+                    <select
+                      value={fields[k] ?? ""}
+                      onChange={(e) =>
+                        setFields({ ...fields, [k]: e.target.value })
+                      }
+                    >
+                      <option value="">Not recorded</option>
+                      {(k === "work_type"
+                        ? WORK_TYPES
+                        : [
+                            ["yes", "Yes"],
+                            ["no", "No"],
+                            ["not_sure", "Not sure"],
+                          ]
+                      ).map(([c, l]) => (
+                        <option key={c} value={c}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      required={["name", "email"].includes(k)}
+                      type={k.includes("email") ? "email" : "text"}
+                      maxLength={250}
+                      value={fields[k] ?? ""}
+                      onChange={(e) =>
+                        setFields({ ...fields, [k]: e.target.value })
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <p>
+              Hours use the same weekly basis. Working fraction is 0–1, for
+              example 0.8. Record formal direct reports only. Do not upload
+              salary, performance ratings or sensitive personal data.
+            </p>
+            <button disabled={busy} className="tb-primary" type="submit">
+              Save respondent
+            </button>
+            <button type="button" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </form>
+        )}
+      </dialog>
     </>
   );
 }

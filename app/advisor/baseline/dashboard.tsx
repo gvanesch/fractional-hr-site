@@ -3,7 +3,13 @@ import { useState } from "react";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
 import "./admin.css";
 import { WORK_TYPES, countryLabel } from "@/lib/baseline/model";
-export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
+export default function Dashboard({
+  data: d,
+  onEditParticipant,
+}: {
+  data: CompletionDashboard;
+  onEditParticipant?: (id: string) => void;
+}) {
   const [search, setSearch] = useState("");
   const labels: Record<string, string> = {
     region: "Region",
@@ -123,6 +129,11 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
                   Completed{" "}
                   {new Date(p.submittedAt).toLocaleDateString("en-GB")}
                 </p>
+              )}
+              {onEditParticipant && (
+                <button onClick={() => onEditParticipant(p.participantId)}>
+                  Edit participant data
+                </button>
               )}
             </article>
           ))}

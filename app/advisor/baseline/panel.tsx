@@ -69,6 +69,7 @@ export default function AdminPanel({
   const router = useRouter();
   const id = initialCampaign;
   const [tab, setTab] = useState("overview"),
+    [editParticipantId, setEditParticipantId] = useState<string | null>(null),
     [current, setCurrent] = useState<Campaign | null>(null),
     [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
     [people, setPeople] = useState<Person[]>([]),
@@ -215,7 +216,15 @@ export default function AdminPanel({
           tab === "overview" &&
           id &&
           current &&
-          dashboard && <Dashboard data={dashboard} />}
+          dashboard && (
+            <Dashboard
+              data={dashboard}
+              onEditParticipant={(id) => {
+                setTab("respondents");
+                setEditParticipantId(id);
+              }}
+            />
+          )}
         {mode === "create" || tab === "settings" ? (
           <section
             id="campaign-settings"
@@ -605,6 +614,8 @@ export default function AdminPanel({
               </section>
             </div>
             <Administration
+              editParticipantId={editParticipantId}
+              onEditOpened={() => setEditParticipantId(null)}
               section={tab}
               campaign={id}
               name={current.name}

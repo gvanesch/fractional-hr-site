@@ -289,6 +289,17 @@ const root = path.resolve(__dirname, "../..");
         0,
       );
       await page
+        .getByRole("button", { name: "Edit participant data", exact: true })
+        .first()
+        .click();
+      await page.getByRole("dialog").waitFor();
+      assert.equal(
+        await page.getByLabel("Work email *", { exact: true }).inputValue(),
+        "person@example.invalid",
+      );
+      await page.keyboard.press("Escape");
+      assert.ok(!(await page.getByRole("dialog").isVisible()));
+      await page
         .getByRole("button", { name: "Settings and launch", exact: true })
         .click();
       await page
@@ -330,6 +341,11 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("button", { name: "Add respondent", exact: true })
         .click();
+      assert.ok(await page.getByRole("dialog").isVisible());
+      assert.equal(
+        await page.getByRole("dialog").locator("input,select").count(),
+        24,
+      );
       await page.getByLabel("Name *", { exact: true }).fill("Added");
       await page
         .getByLabel("Work email *", { exact: true })
@@ -346,7 +362,7 @@ const root = path.resolve(__dirname, "../..");
         .fill("not-found");
       assert.equal(
         await page
-          .getByRole("button", { name: "Edit respondent", exact: true })
+          .getByRole("button", { name: "Edit participant data", exact: true })
           .count(),
         0,
       );
@@ -367,7 +383,7 @@ const root = path.resolve(__dirname, "../..");
         .getByLabel("Search participant list", { exact: true })
         .fill("");
       await page
-        .getByRole("button", { name: "Edit respondent", exact: true })
+        .getByRole("button", { name: "Edit participant data", exact: true })
         .click();
       await page
         .getByLabel("Contracted hours per week", { exact: true })
@@ -399,13 +415,22 @@ const root = path.resolve(__dirname, "../..");
         })
         .waitFor();
       await page
-        .getByRole("button", { name: "Reinstate respondent", exact: true })
+        .getByRole("button", {
+          name: "Withdrawn participants (1)",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("button", { name: "Reinstate participant", exact: true })
         .click();
       await page
         .getByText("Respondent reinstated. Generate a fresh invitation.", {
           exact: true,
         })
         .waitFor();
+      await page
+        .getByRole("button", { name: "All participants (1)", exact: true })
+        .click();
       await page.getByRole("button", { name: "Sharing", exact: true }).click();
       await page
         .getByLabel("Viewer / audience label", { exact: true })
