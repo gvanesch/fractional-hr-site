@@ -43,6 +43,8 @@ jobs:
         run: node scripts/baseline/technology-check.cjs
       - name: Test advisor-only manager preview on desktop and mobile
         run: node scripts/baseline/management-check.cjs
+      - name: Test baseline administration on desktop and mobile
+        run: node scripts/baseline/admin-check.cjs
       - name: Apply dedicated baseline schema to QA only
         run: npx wrangler d1 migrations apply DB --env qa --remote
       - name: Build QA Worker

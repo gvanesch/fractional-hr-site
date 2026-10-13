@@ -1,3 +1,4 @@
+import { rosterMetadata, CORE_ROSTER_FIELDS } from "./roster-fields";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
@@ -461,7 +462,7 @@ export async function campaignRows(campaign: string) {
   const rows = (
     await db()
       .prepare(
-        "SELECT p.participant_id,p.email,p.profile_json,p.active,r.draft_json,r.status,r.progress,r.revision,r.submitted_at,r.updated_at,EXISTS(SELECT 1 FROM tb_baseline_invites i WHERE i.participant_id=p.participant_id) AS invited FROM tb_baseline_participants p JOIN tb_baseline_responses r ON r.participant_id=p.participant_id WHERE p.campaign_id=? ORDER BY p.created_at,p.participant_id",
+        "SELECT p.participant_id,p.email,p.profile_json,p.active,COALESCE(m.metadata_json,'{}') AS metadata_json,r.draft_json,r.status,r.progress,r.revision,r.submitted_at,r.updated_at,EXISTS(SELECT 1 FROM tb_baseline_invites i WHERE i.participant_id=p.participant_id) AS invited FROM tb_baseline_participants p JOIN tb_baseline_responses r ON r.participant_id=p.participant_id LEFT JOIN tb_baseline_roster_details m ON m.participant_id=p.participant_id WHERE p.campaign_id=? ORDER BY p.created_at,p.participant_id",
       )
       .bind(campaign)
       .all<Record<string, unknown>>()
@@ -469,17 +470,28 @@ export async function campaignRows(campaign: string) {
   return {
     campaign: {
       ...c,
+      name: String(c.name),
+      status: String(c.status),
+      closes_at: String(c.closes_at),
+      privacy_notice: String(c.privacy_notice),
+      retention_days: Number(c.retention_days),
       version: String(c.version),
       entities: JSON.parse(String(c.entities_json)) as EntityOption[],
     },
     participants: rows.map((row) => ({
       ...row,
       participant_id: String(row.participant_id),
+      email: String(row.email),
+      active: Number(row.active),
+      invited: Number(row.invited),
       status: String(row.status),
       progress: Number(row.progress),
       submitted_at: row.submitted_at,
       profile: JSON.parse(String(row.profile_json)),
       draft: JSON.parse(String(row.draft_json)) as Draft,
+      roster: JSON.parse(String(row.metadata_json)),
+      revision: Number(row.revision),
+      metadata_json: undefined,
       profile_json: undefined,
       draft_json: undefined,
     })),
@@ -525,10 +537,10 @@ export async function createCampaign(
     const roster = (
       await database
         .prepare(
-          "SELECT profile_json FROM tb_baseline_participants WHERE campaign_id=? AND active=1",
+          "SELECT p.profile_json,COALESCE(m.metadata_json,'{}') AS metadata_json FROM tb_baseline_participants p LEFT JOIN tb_baseline_roster_details m USING(participant_id) WHERE campaign_id=? AND active=1",
         )
         .bind(String(body.copyRosterFrom))
-        .all<{ profile_json: string }>()
+        .all<{ profile_json: string; metadata_json: string }>()
     ).results;
     if (roster.length > 200)
       throw new BaselineError(
@@ -546,10 +558,16 @@ export async function createCampaign(
       "direct_reports",
     ];
     copiedProfiles = roster.map((row) => {
-      const profile = JSON.parse(row.profile_json);
-      return Object.fromEntries(
-        fields.map((field) => [field, String(profile[field] ?? "")]),
-      );
+      const profile = {
+        ...JSON.parse(row.profile_json),
+        ...JSON.parse(row.metadata_json),
+      };
+      return {
+        ...Object.fromEntries(
+          fields.map((field) => [field, String(profile[field] ?? "")]),
+        ),
+        ...rosterMetadata(profile),
+      };
     });
   }
   await database
@@ -617,6 +635,16 @@ export async function configureCampaign(
     retention > 730
   )
     throw new BaselineError("Check the campaign settings.");
+  if (
+    status === "open" &&
+    baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
+    (String(c.version) !== REVIEWED_COLLECTION_VERSION ||
+      String(VERSION) !== REVIEWED_COLLECTION_VERSION)
+  )
+    throw new BaselineError(
+      "The reviewed questionnaire is not ready for production collection.",
+      409,
+    );
   if (
     (privacy !== c.privacy_notice ||
       JSON.stringify(entities) !== c.entities_json) &&
@@ -703,7 +731,14 @@ export async function importRoster(
     statements: D1PreparedStatement[] = [];
   for (const profile of profiles) {
     const id = randomUUID(),
-      draft = initialDraft(profile);
+      draft = initialDraft(
+        Object.fromEntries(
+          CORE_ROSTER_FIELDS.map((key) => [
+            key,
+            (profile as Record<string, string>)[key] ?? "",
+          ]),
+        ),
+      );
     statements.push(
       database
         .prepare("INSERT INTO tb_baseline_participants VALUES(?,?,?,?,1,?)")
@@ -712,6 +747,13 @@ export async function importRoster(
           campaign,
           profile.email!,
           JSON.stringify(draft.profile),
+          stamp,
+        ),
+      database
+        .prepare("INSERT INTO tb_baseline_roster_details VALUES(?,?,?)")
+        .bind(
+          id,
+          JSON.stringify(rosterMetadata(profile as Record<string, unknown>)),
           stamp,
         ),
       database
@@ -752,12 +794,13 @@ export async function invite(
 ) {
   const p = await db()
     .prepare(
-      "SELECT p.email,p.profile_json,c.name,c.closes_at FROM tb_baseline_participants p JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE p.participant_id=? AND p.campaign_id=? AND p.active=1 AND c.status='open'",
+      "SELECT p.email,p.profile_json,c.name,c.closes_at,c.version FROM tb_baseline_participants p JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE p.participant_id=? AND p.campaign_id=? AND p.active=1 AND c.status='open'",
     )
     .bind(participantId, campaign)
     .first<{
       email: string;
       profile_json: string;
+      version: string;
       name: string;
       closes_at: string;
     }>();
@@ -775,10 +818,22 @@ export async function invite(
     site = env.NEXT_PUBLIC_SITE_URL;
   if (!site || new URL(site).protocol !== "https:")
     throw new BaselineError("The assessment site URL is not configured.", 503);
+  if (
+    send &&
+    env.NEXT_PUBLIC_APP_ENV !== "qa" &&
+    (p.version !== REVIEWED_COLLECTION_VERSION ||
+      String(VERSION) !== REVIEWED_COLLECTION_VERSION)
+  )
+    throw new BaselineError(
+      "The reviewed questionnaire is not ready for production invitations.",
+      409,
+    );
   if (send && env.BASELINE_MAIL_MODE !== "send")
     throw new BaselineError(
       "Email is disabled in QA. Generate a test link instead.",
     );
+  if (send && (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL))
+    throw new BaselineError("Email is not configured.", 503);
   await db().batch([
     db()
       .prepare(
@@ -883,7 +938,9 @@ export async function exportDataset(
       status: p.status,
       progress: p.progress,
       submitted_at: p.submitted_at,
-      ...draft.profile,
+      ...p.profile,
+      ...p.roster,
+      access_active: Number(p.active),
       primary_pillar: pillar(draft.profile.work_type),
     };
     respondents.push({
@@ -977,4 +1034,511 @@ export async function exportDataset(
           null,
           2,
         );
+}
+
+// Administration for the reviewed baseline. Launch is pinned to the saved collection version.
+const REVIEWED_COLLECTION_VERSION = "team-blue-baseline-v3";
+export async function previewRoster(campaign: string, csv: string) {
+  const data = await campaignRows(campaign);
+  let rows: Partial<Profile>[];
+  try {
+    rows = parseRoster(csv);
+  } catch (e) {
+    throw new BaselineError(e instanceof Error ? e.message : "Check the CSV.");
+  }
+  if (!rows.length) throw new BaselineError("The roster is empty.");
+  const existing = new Set(
+    data.participants.map((p) => String(p.email).toLowerCase()),
+  );
+  const duplicates = rows
+    .filter((p) => existing.has(p.email!))
+    .map((p) => p.email);
+  return {
+    rows,
+    count: rows.length,
+    duplicates,
+    canImport: !duplicates.length,
+  };
+}
+export async function changeParticipant(
+  actor: string,
+  campaign: string,
+  id: string,
+  body: Record<string, unknown>,
+) {
+  const data = await campaignRows(campaign),
+    p = data.participants.find((p) => p.participant_id === id);
+  if (!p)
+    throw new BaselineError("Participant not found in this campaign.", 404);
+  const action = String(body.action ?? "edit"),
+    revision = Number(body.revision);
+  if (
+    !["edit", "remove", "reinstate"].includes(action) ||
+    !Number.isSafeInteger(revision) ||
+    revision !== p.revision
+  )
+    throw new BaselineError(
+      "This record changed. Refresh the roster before making this change.",
+      409,
+    );
+  let profile = p.profile as Profile,
+    metadata = p.roster as Record<string, string>;
+  if (action === "edit") {
+    let parsed: Partial<Profile>[];
+    try {
+      parsed = parseRoster(String(body.csv ?? ""));
+    } catch (e) {
+      throw new BaselineError(
+        e instanceof Error ? e.message : "Check the respondent details.",
+      );
+    }
+    if (parsed.length !== 1)
+      throw new BaselineError("Edit one respondent at a time.");
+    const value = parsed[0];
+    profile = initialDraft(
+      Object.fromEntries(
+        CORE_ROSTER_FIELDS.map((k) => [
+          k,
+          (value as Record<string, string>)[k] ?? "",
+        ]),
+      ),
+    ).profile;
+    metadata = rosterMetadata(value as Record<string, unknown>);
+    if (
+      data.participants.some(
+        (other) => other.participant_id !== id && other.email === profile.email,
+      )
+    )
+      throw new BaselineError(
+        "This work email is already in the campaign.",
+        409,
+      );
+  }
+  const stamp = now(),
+    mutation = randomUUID(),
+    database = db(),
+    emailChanged = profile.email !== p.email;
+  const statements = [
+    database
+      .prepare(
+        "UPDATE tb_baseline_responses SET revision=revision+1,mutation_id=? WHERE participant_id=? AND revision=?",
+      )
+      .bind(mutation, id, revision),
+    database
+      .prepare(
+        "UPDATE tb_baseline_participants SET email=?,profile_json=?,active=? WHERE participant_id=? AND campaign_id=? AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(
+        profile.email,
+        JSON.stringify(profile),
+        action === "remove" ? 0 : action === "reinstate" ? 1 : p.active,
+        id,
+        campaign,
+        id,
+        mutation,
+      ),
+    database
+      .prepare(
+        "INSERT INTO tb_baseline_roster_details SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?) ON CONFLICT(participant_id) DO UPDATE SET metadata_json=excluded.metadata_json,updated_at=excluded.updated_at",
+      )
+      .bind(id, JSON.stringify(metadata), stamp, id, mutation),
+  ];
+  if (emailChanged || action === "remove" || action === "reinstate")
+    statements.push(
+      database
+        .prepare(
+          "UPDATE tb_baseline_invites SET revoked_at=? WHERE participant_id=? AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+        )
+        .bind(stamp, id, id, mutation),
+      database
+        .prepare(
+          "DELETE FROM tb_baseline_sessions WHERE participant_id=? AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+        )
+        .bind(id, id, mutation),
+    );
+  statements.push(
+    database
+      .prepare(
+        "INSERT INTO tb_baseline_audit SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(
+        randomUUID(),
+        campaign,
+        actor,
+        "participant_" + action,
+        id,
+        JSON.stringify({
+          emailChanged,
+          changedFields:
+            action === "edit"
+              ? [
+                  ...CORE_ROSTER_FIELDS.filter(
+                    (k) => profile[k as keyof Profile] !== p.profile[k],
+                  ),
+                  ...Object.keys(metadata).filter(
+                    (k) => metadata[k] !== p.roster[k],
+                  ),
+                ]
+              : [],
+          answersRetained: true,
+        }),
+        stamp,
+        id,
+        mutation,
+      ),
+  );
+  const results = await database.batch(statements);
+  if (results[0].meta.changes !== 1)
+    throw new BaselineError("This record changed. Refresh the roster.", 409);
+  return {
+    success: true,
+    needsNewInvitation: emailChanged || action === "reinstate",
+  };
+}
+type DashboardScope = {
+  regions: string[];
+  countries: string[];
+  entities: string[];
+};
+function dashboardScope(input: unknown): DashboardScope {
+  const value = (input ?? {}) as Record<string, unknown>,
+    scope: DashboardScope = { regions: [], countries: [], entities: [] };
+  for (const key of ["regions", "countries", "entities"] as const) {
+    const list = value[key] ?? [];
+    if (
+      !Array.isArray(list) ||
+      list.length > 50 ||
+      list.some((x) => typeof x !== "string" || !x.trim() || x.length > 250)
+    )
+      throw new BaselineError("Check dashboard scope.");
+    scope[key] = [...new Set(list)] as string[];
+  }
+  return scope;
+}
+export async function completionDashboard(
+  campaign: string,
+  scopeInput: unknown = {},
+  shared = false,
+) {
+  const data = await campaignRows(campaign),
+    scope = dashboardScope(scopeInput);
+  const eligible = data.participants
+    .filter(
+      (p) => !scope.regions.length || scope.regions.includes(p.profile.region),
+    )
+    .filter(
+      (p) =>
+        !scope.countries.length || scope.countries.includes(p.profile.country),
+    )
+    .filter(
+      (p) =>
+        !scope.entities.length || scope.entities.includes(p.profile.entity),
+    );
+  const active = eligible.filter((p) => Number(p.active) === 1),
+    invited = active.filter((p) => Number(p.invited) === 1);
+  const counts = {
+    roster: active.length,
+    removed: eligible.length - active.length,
+    invited: invited.length,
+    notInvited: active.length - invited.length,
+    notStarted: invited.filter((p) => p.status === "not_started").length,
+    inProgress: invited.filter((p) => p.status === "in_progress").length,
+    completed: invited.filter((p) => p.status === "completed").length,
+  };
+  const groups: Record<
+    string,
+    { label: string; invited: number; completed: number; inProgress: number }[]
+  > = {};
+  for (const key of [
+    "region",
+    "country",
+    "work_type",
+    "entity",
+    "division",
+    "team",
+  ]) {
+    const map = new Map<
+      string,
+      { label: string; invited: number; completed: number; inProgress: number }
+    >();
+    for (const p of invited) {
+      const label =
+        String(p.profile[key] ?? p.roster[key] ?? "") || "Not recorded";
+      const g = map.get(label) ?? {
+        label,
+        invited: 0,
+        completed: 0,
+        inProgress: 0,
+      };
+      g.invited++;
+      if (p.status === "completed") g.completed++;
+      if (p.status === "in_progress") g.inProgress++;
+      map.set(label, g);
+    }
+    groups[key] = [...map.values()]
+      .filter((g) => !shared || g.invited >= 5)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+  return {
+    campaign: {
+      name: String(data.campaign.name),
+      status: String(data.campaign.status),
+      closesAt: String(data.campaign.closes_at),
+    },
+    counts,
+    completionPercent: counts.invited
+      ? Math.round((counts.completed / counts.invited) * 100)
+      : 0,
+    groups,
+    generatedAt: now(),
+    smallGroupsHidden: shared,
+    scope,
+  };
+}
+export async function dashboardShares(campaign: string) {
+  await campaignRows(campaign);
+  return (
+    await db()
+      .prepare(
+        "SELECT share_id,label,scope_json,expires_at,revoked_at,created_at FROM tb_baseline_dashboard_shares WHERE campaign_id=? ORDER BY created_at DESC",
+      )
+      .bind(campaign)
+      .all()
+  ).results;
+}
+export async function createDashboardShare(
+  actor: string,
+  campaign: string,
+  body: Record<string, unknown>,
+) {
+  await campaignRows(campaign);
+  const label = String(body.label ?? "").trim(),
+    scope = dashboardScope(body.scope),
+    days = Number(body.days ?? 14);
+  if (
+    !label ||
+    label.length > 150 ||
+    !Number.isInteger(days) ||
+    days < 1 ||
+    days > 30
+  )
+    throw new BaselineError(
+      "Add a dashboard label and an expiry of 1–30 days.",
+    );
+  const id = randomUUID(),
+    token = randomBytes(32).toString("hex"),
+    stamp = now(),
+    expires = new Date(Date.now() + days * 86400000).toISOString(),
+    site = baselineEnv().NEXT_PUBLIC_SITE_URL;
+  if (!site || new URL(site).protocol !== "https:")
+    throw new BaselineError("Site URL is unavailable.", 503);
+  await db().batch([
+    db()
+      .prepare(
+        "INSERT INTO tb_baseline_dashboard_shares VALUES(?,?,?,?,?,?,NULL,?)",
+      )
+      .bind(
+        id,
+        campaign,
+        label,
+        JSON.stringify(scope),
+        hashToken(token),
+        expires,
+        stamp,
+      ),
+    db()
+      .prepare("INSERT INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
+      .bind(
+        randomUUID(),
+        campaign,
+        actor,
+        "dashboard_share_created",
+        id,
+        JSON.stringify({ scope, expires }),
+        stamp,
+      ),
+  ]);
+  return {
+    link: site.replace(/\/$/, "") + "/baseline/dashboard#" + token,
+    expiresAt: expires,
+  };
+}
+export async function revokeDashboardShare(
+  actor: string,
+  campaign: string,
+  id: string,
+) {
+  const share = await db()
+    .prepare(
+      "SELECT share_id FROM tb_baseline_dashboard_shares WHERE share_id=? AND campaign_id=?",
+    )
+    .bind(id, campaign)
+    .first();
+  if (!share) throw new BaselineError("Dashboard link not found.", 404);
+  await db().batch([
+    db()
+      .prepare(
+        "UPDATE tb_baseline_dashboard_shares SET revoked_at=? WHERE share_id=? AND campaign_id=?",
+      )
+      .bind(now(), id, campaign),
+    db()
+      .prepare("INSERT INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
+      .bind(
+        randomUUID(),
+        campaign,
+        actor,
+        "dashboard_share_revoked",
+        id,
+        "{}",
+        now(),
+      ),
+  ]);
+  return { success: true };
+}
+export async function sharedDashboard(request: Request, token: string) {
+  await rateLimit(
+    request,
+    "dashboard-ip:" + (request.headers.get("cf-connecting-ip") ?? "local"),
+    240,
+  );
+  if (!/^[a-f0-9]{64}$/.test(token))
+    throw new BaselineError("This dashboard link is not available.", 403);
+  const share = await db()
+    .prepare(
+      "SELECT campaign_id,scope_json FROM tb_baseline_dashboard_shares WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?",
+    )
+    .bind(hashToken(token), now())
+    .first<{ campaign_id: string; scope_json: string }>();
+  if (!share)
+    throw new BaselineError(
+      "This dashboard link has expired or been withdrawn.",
+      403,
+    );
+  return completionDashboard(
+    share.campaign_id,
+    JSON.parse(share.scope_json),
+    true,
+  );
+}
+export async function launchReadiness(campaign: string) {
+  const data = await campaignRows(campaign),
+    env = baselineEnv(),
+    active = data.participants.filter((p) => Number(p.active) === 1),
+    blockers: string[] = [];
+  if (
+    data.campaign.version !== REVIEWED_COLLECTION_VERSION ||
+    String(VERSION) !== REVIEWED_COLLECTION_VERSION
+  )
+    blockers.push(
+      "The reviewed broad-work questionnaire still needs its versioned saving, submission and answer-copy flow. This campaign uses the earlier questionnaire.",
+    );
+  if (!active.length) blockers.push("Add at least one active respondent.");
+  if (String(data.campaign.closes_at) <= now())
+    blockers.push("Set a future closing date.");
+  if (
+    env.BASELINE_MAIL_MODE !== "send" ||
+    !env.RESEND_API_KEY ||
+    !env.CONTACT_FROM_EMAIL
+  )
+    blockers.push(
+      "Invitation email delivery is disabled or not configured. QA must remain in preview mode.",
+    );
+  if (
+    active.some(
+      (p) =>
+        !p.profile.manages_people || !p.profile.country || !p.profile.region,
+    )
+  )
+    blockers.push(
+      "Complete country, region and formal manager status for all active respondents.",
+    );
+  const missingCapacity = active.filter(
+    (p) => !p.roster.contracted_hours && !p.roster.working_fraction,
+  ).length;
+  return {
+    ready: !blockers.length,
+    blockers,
+    warnings: missingCapacity
+      ? [
+          `${missingCapacity} respondents have no contracted hours or working fraction. Capacity comparisons will be limited.`,
+        ]
+      : [],
+    active: active.length,
+    toInvite: active.filter((p) => !Number(p.invited)).length,
+    questionnaireVersion: data.campaign.version,
+  };
+}
+export async function launchCampaign(
+  actor: string,
+  campaign: string,
+  body: Record<string, unknown>,
+) {
+  const readiness = await launchReadiness(campaign),
+    data = await campaignRows(campaign);
+  if (!readiness.ready)
+    throw new BaselineError(
+      "Launch is blocked: " + readiness.blockers.join(" "),
+      409,
+    );
+  if (
+    body.confirmation !== data.campaign.name ||
+    Number(body.expectedActive) !== readiness.active
+  )
+    throw new BaselineError(
+      "Confirm the current campaign name and roster count before launch.",
+      409,
+    );
+  await configureCampaign(actor, campaign, { status: "open" });
+  await audit(actor, "campaign_launched", campaign, campaign, {
+    version: data.campaign.version,
+    active: readiness.active,
+  });
+  return { success: true, toInvite: readiness.toInvite };
+}
+export async function inviteBatch(
+  actor: string,
+  campaign: string,
+  body: Record<string, unknown>,
+) {
+  const readiness = await launchReadiness(campaign);
+  if (!readiness.ready)
+    throw new BaselineError(
+      "Resolve launch readiness before sending invitations.",
+      409,
+    );
+  const data = await campaignRows(campaign),
+    ids = body.participantIds;
+  if (
+    !Array.isArray(ids) ||
+    !ids.length ||
+    ids.length > 20 ||
+    new Set(ids).size !== ids.length ||
+    ids.some(
+      (id) =>
+        typeof id !== "string" ||
+        !data.participants.some(
+          (p) =>
+            p.participant_id === id &&
+            Number(p.active) === 1 &&
+            p.status !== "completed",
+        ),
+    )
+  )
+    throw new BaselineError(
+      "Choose up to 20 active, incomplete respondents from this campaign.",
+    );
+  const sent: string[] = [],
+    failed: string[] = [];
+  for (const id of ids as string[])
+    try {
+      await invite(actor, campaign, id, true);
+      sent.push(id);
+    } catch {
+      failed.push(id);
+    }
+  await audit(actor, "invitation_batch_finished", campaign, campaign, {
+    sent: sent.length,
+    failed: failed.length,
+  });
+  return { sent, failed };
 }

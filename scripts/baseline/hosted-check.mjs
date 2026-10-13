@@ -7,13 +7,18 @@ if (
 for (const path of [
   "/baseline/start",
   "/baseline/test",
+  "/baseline/dashboard",
   "/api/baseline/response",
   "/api/baseline/admin/campaigns",
   "/advisor/baseline/api/campaigns",
   "/advisor/baseline/prototype",
 ]) {
   const response = await fetch(site + path, { redirect: "manual" });
-  if (path === "/baseline/start" || path === "/baseline/test") {
+  if (
+    path === "/baseline/start" ||
+    path === "/baseline/test" ||
+    path === "/baseline/dashboard"
+  ) {
     if (
       response.status !== 200 ||
       !(response.headers.get("x-robots-tag") ?? "").includes("noindex") ||
@@ -49,3 +54,13 @@ if (crossOrigin.status !== 403)
 console.log(
   "Outbound design-test entry loads without advisor login; invalid and cross-origin links are rejected.",
 );
+
+const invalidDashboard = await fetch(site + "/api/baseline/dashboard", {
+  method: "POST",
+  headers: { Origin: site, "Content-Type": "application/json" },
+  body: JSON.stringify({ token: "0".repeat(64) }),
+  redirect: "manual",
+});
+if (invalidDashboard.status !== 403)
+  throw new Error("Invalid dashboard token was accepted.");
+console.log("Private dashboard anonymous gate verified.");

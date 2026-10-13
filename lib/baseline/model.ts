@@ -1,3 +1,4 @@
+import { ROSTER_FIELDS, validateRosterExtras } from "./roster-fields";
 import { AREA_HELP, OPTION_HELP, GROUP_LABELS } from "./help";
 export const VERSION = "team-blue-baseline-v2";
 export const WORK_TYPES = [
@@ -829,17 +830,14 @@ export function parseRoster(csv: string): Partial<Profile>[] {
   )
     throw new Error("The CSV needs name and email columns. Use the template.");
   const emails = new Set<string>();
-  const allowed = [
-    "name",
-    "email",
-    "job_title",
-    "country",
-    "region",
-    "entity",
-    "work_type",
-    "manages_people",
-    "direct_reports",
-  ];
+  const allowed = ROSTER_FIELDS;
+  const unexpected = headers.filter((key) => !allowed.includes(key));
+  if (unexpected.length)
+    throw new Error(
+      "Unknown CSV columns: " +
+        unexpected.join(", ") +
+        ". Use the current template.",
+    );
   return rows
     .filter((r) => r.some((x) => x.trim()))
     .map((r, i) => {
@@ -879,6 +877,7 @@ export function parseRoster(csv: string): Partial<Profile>[] {
         throw new Error(`Check direct_reports on row ${i + 2}.`);
       if (Object.values(p).some((v) => v.length > 250))
         throw new Error(`Please shorten row ${i + 2}.`);
+      validateRosterExtras(p, i + 2);
       emails.add(p.email);
       return p;
     });

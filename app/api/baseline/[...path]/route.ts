@@ -28,6 +28,12 @@ export async function GET(request: Request, context: Context) {
       campaign = url.searchParams.get("campaign") ?? "";
     if (path === "admin/campaigns")
       return json({ campaigns: await service.campaigns() });
+    if (path === "admin/dashboard")
+      return json(await service.completionDashboard(campaign));
+    if (path === "admin/readiness")
+      return json(await service.launchReadiness(campaign));
+    if (path === "admin/shares")
+      return json({ shares: await service.dashboardShares(campaign) });
     if (path === "admin/campaign") {
       const data = await service.campaignRows(campaign);
       await service.audit(actor, "campaign_viewed", campaign, campaign);
@@ -61,8 +67,12 @@ export async function POST(request: Request, context: Context) {
     const path = (await context.params).path.join("/");
     const body = await service.readBody(
       request,
-      path === "admin/import" ? 300000 : 75000,
+      ["admin/import", "admin/import-preview"].includes(path) ? 300000 : 75000,
     );
+    if (path === "dashboard")
+      return json(
+        await service.sharedDashboard(request, String(body.token ?? "")),
+      );
     if (path === "access") {
       const value = await service.redeem(request, String(body.token ?? ""));
       const response = json({ success: true });
@@ -101,6 +111,33 @@ export async function POST(request: Request, context: Context) {
     }
     const actor = await service.admin(),
       campaign = String(body.campaign ?? "");
+    if (path === "admin/import-preview")
+      return json(
+        await service.previewRoster(campaign, String(body.csv ?? "")),
+      );
+    if (path === "admin/participant")
+      return json(
+        await service.changeParticipant(
+          actor,
+          campaign,
+          String(body.participantId ?? ""),
+          body,
+        ),
+      );
+    if (path === "admin/share")
+      return json(await service.createDashboardShare(actor, campaign, body));
+    if (path === "admin/share-revoke")
+      return json(
+        await service.revokeDashboardShare(
+          actor,
+          campaign,
+          String(body.shareId ?? ""),
+        ),
+      );
+    if (path === "admin/launch")
+      return json(await service.launchCampaign(actor, campaign, body));
+    if (path === "admin/invite-batch")
+      return json(await service.inviteBatch(actor, campaign, body));
     if (path === "admin/create")
       return json(await service.createCampaign(actor, body));
     if (path === "admin/configure")

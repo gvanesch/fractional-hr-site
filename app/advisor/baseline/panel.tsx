@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Administration from "./administration";
+import { ROSTER_FIELDS } from "@/lib/baseline/roster-fields";
 import {
   PRIVACY,
   WORK_TYPES,
@@ -30,6 +32,9 @@ type Person = {
   progress: number;
   updated_at: string;
   draft: Draft;
+  profile: Record<string, string>;
+  roster: Record<string, string>;
+  revision: number;
 };
 type Result = {
   campaigns: Campaign[];
@@ -52,27 +57,6 @@ async function api(path: string, body?: unknown): Promise<Result> {
     throw new Error(data.error ?? "Unable to complete this request.");
   return data;
 }
-function breakdown(rows: Person[], key: "country" | "region" | "work_type") {
-  const groups = new Map<string, { invited: number; completed: number }>();
-  for (const p of rows) {
-    const code = p.draft.profile[key] || "Not recorded";
-    const g = groups.get(code) ?? { invited: 0, completed: 0 };
-    g.invited++;
-    if (p.status === "completed") g.completed++;
-    groups.set(code, g);
-  }
-  return [...groups]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([code, g]) => ({
-      label:
-        key === "country" && code !== "Not recorded"
-          ? countryLabel(code)
-          : key === "work_type"
-            ? (WORK_TYPES.find(([c]) => c === code)?.[1] ?? code)
-            : code,
-      ...g,
-    }));
-}
 export default function AdminPanel() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]),
     [id, setId] = useState(""),
@@ -84,6 +68,12 @@ export default function AdminPanel() {
     [retention, setRetention] = useState(90),
     [entityList, setEntityList] = useState(""),
     [csv, setCsv] = useState(""),
+    [preview, setPreview] = useState<{
+      count: number;
+      duplicates: string[];
+      canImport: boolean;
+      rows: Record<string, string>[];
+    } | null>(null),
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -124,16 +114,10 @@ export default function AdminPanel() {
       setBusy(false);
     }
   }
-  const invited = people.filter((p) => p.invited === 1),
-    total = (status: string) =>
-      invited.filter((p) => p.status === status).length;
   const template = () => {
-    const blob = new Blob(
-      [
-        "name,email,job_title,country,region,entity,work_type,manages_people,direct_reports\nQA Respondent,respondent@example.invalid,Current title,GB,Test region,Test business,people_operations,no,0\n",
-      ],
-      { type: "text/csv" },
-    );
+    const blob = new Blob([ROSTER_FIELDS.join(",") + "\n"], {
+      type: "text/csv",
+    });
     const url = URL.createObjectURL(blob),
       a = document.createElement("a");
     a.href = url;
@@ -145,7 +129,7 @@ export default function AdminPanel() {
     <main className="tb-shell" style={{ maxWidth: 1100 }}>
       <header className="tb-header">
         <Link href="/advisor/baseline/prototype">
-          Try the shorter process-based prototype
+          Review the current questionnaire preview
         </Link>
         <span>team.blue · Baseline administration</span>
         <p>
@@ -169,6 +153,7 @@ export default function AdminPanel() {
               const value = e.target.value;
               setId(value);
               setLink("");
+              setPreview(null);
               setView(null);
               setCurrent(null);
               setPeople([]);
@@ -321,7 +306,10 @@ export default function AdminPanel() {
                 Save settings
               </button>
               <button
-                disabled={current?.version !== VERSION}
+                disabled={
+                  current?.version !== VERSION ||
+                  process.env.NEXT_PUBLIC_APP_ENV !== "qa"
+                }
                 className="tb-primary"
                 onClick={() =>
                   void action(async () => {
@@ -331,7 +319,7 @@ export default function AdminPanel() {
                   })
                 }
               >
-                Open campaign
+                Open earlier questionnaire for QA testing
               </button>
               <button
                 onClick={() =>
@@ -353,7 +341,7 @@ export default function AdminPanel() {
       {id && current && (
         <>
           <section className="tb-card" style={{ marginTop: 20 }}>
-            <h2>Roster and invitations</h2>
+            <h2>CSV roster import</h2>
             <p>
               Import a CSV with name and email. Optional columns: job_title,
               country, region, entity, work_type, manages_people,
@@ -376,6 +364,7 @@ export default function AdminPanel() {
                       return;
                     }
                     setCsv(await file.text());
+                    setPreview(null);
                   }
                 }}
               />
@@ -384,17 +373,66 @@ export default function AdminPanel() {
               disabled={busy || !csv}
               onClick={() =>
                 void action(async () => {
-                  const result = await api("import", { campaign: id, csv });
-                  setCsv("");
-                  await refresh();
-                  setMessage(
-                    `${result.imported} participants imported. No invitations were sent.`,
+                  const response = await fetch(
+                    "/advisor/baseline/api/import-preview",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ campaign: id, csv }),
+                    },
                   );
+                  const result = (await response.json()) as {
+                    count: number;
+                    duplicates: string[];
+                    canImport: boolean;
+                    rows: Record<string, string>[];
+                    error?: string;
+                  };
+                  if (!response.ok)
+                    throw new Error(result.error ?? "Check the CSV.");
+                  setPreview(result);
                 })
               }
             >
-              Validate and import
+              Preview and validate CSV
             </button>
+            {preview && (
+              <div className="tb-process">
+                <h3>CSV preview</h3>
+                <p>
+                  {preview.count} respondents. {preview.duplicates.length}{" "}
+                  emails already in this campaign.
+                </p>
+                {preview.rows.slice(0, 5).map((p) => (
+                  <p key={p.email}>
+                    {p.name} · {p.email} · {p.region} · {p.entity}
+                  </p>
+                ))}
+                {preview.count > 5 && <p>First five records shown.</p>}
+                {preview.duplicates.length > 0 && (
+                  <p className="tb-error">
+                    Existing emails: {preview.duplicates.join(", ")}. No rows
+                    will be imported.
+                  </p>
+                )}
+                <button
+                  disabled={busy || !preview.canImport}
+                  onClick={() =>
+                    void action(async () => {
+                      const result = await api("import", { campaign: id, csv });
+                      setCsv("");
+                      setPreview(null);
+                      await refresh();
+                      setMessage(
+                        `${result.imported} respondents imported. No invitations sent.`,
+                      );
+                    })
+                  }
+                >
+                  Confirm import
+                </button>
+              </div>
+            )}
             <p>
               QA email sending is disabled. Generate private test links to
               exercise the journey. A new link revokes the previous link and its
@@ -430,107 +468,101 @@ export default function AdminPanel() {
                 onChange={(e) => setFilter(e.target.value)}
               />
             </label>
-            <div className="tb-roster">
-              {people
-                .filter((p) =>
-                  (p.email + " " + p.draft.profile.name)
-                    .toLowerCase()
-                    .includes(filter.toLowerCase()),
-                )
-                .map((p) => (
-                  <article key={p.participant_id} className="tb-detail">
-                    <h3>{p.draft.profile.name}</h3>
-                    <p>
-                      {p.email} · {p.status.replaceAll("_", " ")} · Step{" "}
-                      {p.progress} / 8 ·{" "}
-                      {p.active ? "Access active" : "Access revoked"}
-                    </p>
-                    <p>
-                      {p.draft.profile.job_title} ·{" "}
-                      {p.draft.profile.region || "Region not recorded"} ·{" "}
-                      {p.draft.profile.country
-                        ? countryLabel(p.draft.profile.country)
-                        : "Country not recorded"}
-                    </p>
-                    <button
-                      disabled={busy || !p.active}
-                      onClick={() =>
-                        void action(async () => {
-                          const result = await api("invite", {
-                            campaign: id,
-                            participantId: p.participant_id,
-                            send: false,
-                          });
-                          setLink(result.link);
-                          await refresh();
-                          setMessage(
-                            "Private test link created. No email was sent.",
-                          );
-                        })
-                      }
-                    >
-                      {p.invited
-                        ? "Generate replacement link"
-                        : "Generate test invitation"}
-                    </button>
-                    <button
-                      disabled={busy || !p.active}
-                      onClick={() =>
-                        void action(async () => {
-                          await api("invite", {
-                            campaign: id,
-                            participantId: p.participant_id,
-                            send: true,
-                          });
-                          await refresh();
-                          setMessage("Invitation sent.");
-                        })
-                      }
-                    >
-                      Send / resend email
-                    </button>
-                    <button onClick={() => setView(p)}>View response</button>
-                    <button
-                      disabled={busy || !p.active}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Revoke this person's access? Their saved response will be retained.",
-                          )
-                        )
+            <details>
+              <summary>
+                Earlier questionnaire: private test invitations and saved
+                responses
+              </summary>
+              <div className="tb-roster">
+                {people
+                  .filter((p) =>
+                    (p.email + " " + p.draft.profile.name)
+                      .toLowerCase()
+                      .includes(filter.toLowerCase()),
+                  )
+                  .map((p) => (
+                    <article key={p.participant_id} className="tb-detail">
+                      <h3>{p.draft.profile.name}</h3>
+                      <p>
+                        {p.email} · {p.status.replaceAll("_", " ")} · Step{" "}
+                        {p.progress} / 8 ·{" "}
+                        {p.active ? "Access active" : "Access revoked"}
+                      </p>
+                      <p>
+                        {p.draft.profile.job_title} ·{" "}
+                        {p.draft.profile.region || "Region not recorded"} ·{" "}
+                        {p.draft.profile.country
+                          ? countryLabel(p.draft.profile.country)
+                          : "Country not recorded"}
+                      </p>
+                      <button
+                        disabled={busy || !p.active}
+                        onClick={() =>
                           void action(async () => {
-                            await api("revoke", {
+                            const result = await api("invite", {
                               campaign: id,
                               participantId: p.participant_id,
+                              send: false,
+                            });
+                            setLink(result.link);
+                            await refresh();
+                            setMessage(
+                              "Private test link created. No email was sent.",
+                            );
+                          })
+                        }
+                      >
+                        {p.invited
+                          ? "Generate replacement link"
+                          : "Generate test invitation"}
+                      </button>
+                      <button
+                        disabled={busy || !p.active}
+                        onClick={() =>
+                          void action(async () => {
+                            await api("invite", {
+                              campaign: id,
+                              participantId: p.participant_id,
+                              send: true,
                             });
                             await refresh();
-                          });
-                      }}
-                    >
-                      Revoke access
-                    </button>
-                  </article>
-                ))}
-            </div>
+                            setMessage("Invitation sent.");
+                          })
+                        }
+                      >
+                        Send / resend email
+                      </button>
+                      <button onClick={() => setView(p)}>View response</button>
+                      <button
+                        disabled={busy || !p.active}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Revoke this person's access? Their saved response will be retained.",
+                            )
+                          )
+                            void action(async () => {
+                              await api("revoke", {
+                                campaign: id,
+                                participantId: p.participant_id,
+                              });
+                              await refresh();
+                            });
+                        }}
+                      >
+                        Revoke access
+                      </button>
+                    </article>
+                  ))}
+              </div>
+            </details>
           </section>
-          <section className="tb-card" style={{ marginTop: 20 }}>
-            <h2>Completion</h2>
-            <p>
-              {people.length} roster records · {invited.length} invited ·{" "}
-              {total("not_started")} not started · {total("in_progress")} in
-              progress · {total("completed")} completed
-            </p>
-            {(["region", "country", "work_type"] as const).map((key) => (
-              <details key={key} open>
-                <summary>Completion by {key.replaceAll("_", " ")}</summary>
-                {breakdown(invited, key).map((g) => (
-                  <p key={g.label}>
-                    {g.label}: {g.completed} completed / {g.invited} invited
-                  </p>
-                ))}
-              </details>
-            ))}
-          </section>
+          <Administration
+            campaign={id}
+            name={current.name}
+            people={people}
+            refresh={() => refresh()}
+          />
           <section className="tb-card" style={{ marginTop: 20 }}>
             <h2>Analysis-ready exports</h2>
             <p>

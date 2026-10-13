@@ -273,6 +273,12 @@ function harness() {
       "utf8",
     ),
   );
+  sqlite.exec(
+    fs.readFileSync(
+      path.join(root, "baseline-migrations/0003_administration.sql"),
+      "utf8",
+    ),
+  );
   const db = {
     prepare(sql) {
       const s = sqlite.prepare(sql);
@@ -866,6 +872,307 @@ test("Baseline administration stays under the page's Access path and still requi
     );
     assert.ok(!panel.includes("/api/baseline/admin/"));
     assert.ok(panel.includes("/advisor/baseline/api/"));
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Expanded roster validates hours and imports metadata atomically without exposing it to respondents", async () => {
+  const h = harness();
+  try {
+    const c = await h.service.createCampaign("admin@example.invalid", {
+      name: "Roster QA",
+      privacy: h.model.PRIVACY,
+      closesAt: new Date(Date.now() + 86400000).toISOString(),
+    });
+    const csv =
+      "name,email,country,region,manages_people,direct_reports,participant_reference,division,brand,team,manager_email,contracted_hours,full_time_hours,working_fraction\nPerson,a@example.invalid,GB,North,yes,3,REF1,Division A,Brand A,Team A,manager@example.invalid,32,40,0.8";
+    const preview = await h.service.previewRoster(c.campaignId, csv);
+    assert.equal(preview.canImport, true);
+    assert.equal(preview.count, 1);
+    assert.equal(
+      h.sqlite
+        .prepare("SELECT count(*) AS n FROM tb_baseline_participants")
+        .get().n,
+      0,
+    );
+    await h.service.importRoster("admin@example.invalid", c.campaignId, csv);
+    const p = (await h.service.campaignRows(c.campaignId)).participants[0];
+    assert.equal(p.roster.contracted_hours, "32");
+    assert.equal(p.roster.working_fraction, "0.8");
+    assert.ok(!("manager_email" in p.profile));
+    assert.ok(!("contracted_hours" in p.draft.profile));
+    const dup = await h.service.previewRoster(c.campaignId, csv);
+    assert.equal(dup.canImport, false);
+    assert.equal(dup.duplicates.length, 1);
+    assert.throws(
+      () => h.model.parseRoster(csv.replace("32,40,0.8", "32,40,0.5")),
+      /fraction/,
+    );
+    assert.throws(
+      () =>
+        h.model.parseRoster(
+          csv.replace("manager@example.invalid", "bad-address"),
+        ),
+      /manager_email/,
+    );
+    assert.throws(
+      () =>
+        h.model.parseRoster("name,email,health\nPerson,x@example.invalid,none"),
+      /Unknown CSV columns/,
+    );
+    await h.service.configureCampaign("admin@example.invalid", c.campaignId, {
+      status: "open",
+    });
+    const link = await h.service.invite(
+        "admin@example.invalid",
+        c.campaignId,
+        p.participant_id,
+        false,
+      ),
+      identity = await h.access(link.link.split("#")[1]);
+    const response = await h.service.readResponse(identity);
+    assert.equal(response.draft.profile.email, "");
+    assert.ok(!("roster" in response));
+    const exported = JSON.parse(
+      await h.service.exportDataset(
+        "admin@example.invalid",
+        c.campaignId,
+        "json",
+      ),
+    );
+    assert.equal(exported.respondents[0].participant_reference, "REF1");
+    assert.equal(exported.respondents[0].working_fraction, "0.8");
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Respondent edits protect concurrent work, revoke changed addresses and retain answers on removal", async () => {
+  const h = harness();
+  try {
+    const { campaign, a, token } = await h.setup();
+    const identity = await h.access(token);
+    const before = await h.service.readResponse(identity);
+    await h.service.saveResponse(identity, before.draft, 0, 1, false);
+    let p = (await h.service.campaignRows(campaign)).participants.find(
+      (p) => p.participant_id === a.participant_id,
+    );
+    const original = p.draft;
+    await assert.rejects(
+      h.service.changeParticipant(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        {
+          action: "edit",
+          revision: 0,
+          csv: "name,email\nNew,new@example.invalid",
+        },
+      ),
+      (e) => e.status === 409,
+    );
+    await h.service.changeParticipant(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      {
+        action: "edit",
+        revision: p.revision,
+        csv: "name,email,manages_people,contracted_hours\nNew,new@example.invalid,no,35",
+      },
+    );
+    await assert.rejects(
+      h.service.participant(h.request({})),
+      (e) => e.status === 401,
+    );
+    await assert.rejects(
+      h.service.redeem(h.request({}), token),
+      (e) => e.status === 403,
+    );
+    p = (await h.service.campaignRows(campaign)).participants.find(
+      (p) => p.participant_id === a.participant_id,
+    );
+    assert.equal(p.email, "new@example.invalid");
+    assert.equal(p.draft.anything, original.anything);
+    assert.equal(p.roster.contracted_hours, "35");
+    await assert.rejects(
+      h.service.changeParticipant(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        {
+          action: "edit",
+          revision: p.revision,
+          csv: "name,email\nDup,b@example.invalid",
+        },
+      ),
+      (e) => e.status === 409,
+    );
+    await h.service.changeParticipant(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      { action: "remove", revision: p.revision },
+    );
+    p = (await h.service.campaignRows(campaign)).participants.find(
+      (p) => p.participant_id === a.participant_id,
+    );
+    assert.equal(p.active, 0);
+    assert.equal(p.status, "in_progress");
+    await h.service.changeParticipant(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      { action: "reinstate", revision: p.revision },
+    );
+    await assert.rejects(
+      h.service.redeem(h.request({}), token),
+      (e) => e.status === 403,
+    );
+    const events = h.sqlite
+      .prepare("SELECT action FROM tb_baseline_audit WHERE subject_id=?")
+      .all(p.participant_id)
+      .map((x) => x.action);
+    assert.ok(events.includes("participant_edit"));
+    assert.ok(events.includes("participant_remove"));
+    assert.ok(events.includes("participant_reinstate"));
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Private completion dashboards enforce scope, suppress small groups and never return identities or answers", async () => {
+  const h = harness();
+  try {
+    const { campaign } = await h.setup();
+    await h.service.importRoster(
+      "admin@example.invalid",
+      campaign,
+      "name,email,country,region,entity,team\nC,c@example.invalid,GB,North,Entity A,Team A\nD,d@example.invalid,GB,North,Entity A,Team A\nE,e@example.invalid,GB,North,Entity A,Team A\nF,f@example.invalid,GB,North,Entity A,Team A\nG,g@example.invalid,GB,North,Entity A,Team A",
+    );
+    const rows = (await h.service.campaignRows(campaign)).participants;
+    for (const p of rows)
+      await h.service.invite(
+        "admin@example.invalid",
+        campaign,
+        p.participant_id,
+        false,
+      );
+    const share = await h.service.createDashboardShare(
+        "admin@example.invalid",
+        campaign,
+        { label: "North leader", days: 7, scope: { regions: ["North"] } },
+      ),
+      token = share.link.split("#")[1];
+    const report = await h.service.sharedDashboard(h.request({}), token);
+    assert.equal(report.counts.invited, 5);
+    assert.equal(report.groups.region[0].label, "North");
+    assert.ok(!JSON.stringify(report).includes("@"));
+    assert.ok(!("participants" in report));
+    assert.ok(!("draft" in report));
+    assert.ok(!("answers" in report));
+    const small = await h.service.createDashboardShare(
+      "admin@example.invalid",
+      campaign,
+      { label: "Test leader", scope: { regions: ["Test region"] } },
+    );
+    const limited = await h.service.sharedDashboard(
+      h.request({}),
+      small.link.split("#")[1],
+    );
+    assert.equal(limited.counts.invited, 2);
+    assert.equal(limited.groups.region.length, 0);
+    const shares = await h.service.dashboardShares(campaign);
+    assert.ok(!JSON.stringify(shares).includes(token));
+    assert.ok(!JSON.stringify(shares).includes("token_hash"));
+    const shareId = shares.find((s) => s.label === "North leader").share_id;
+    await h.service.revokeDashboardShare(
+      "admin@example.invalid",
+      campaign,
+      shareId,
+    );
+    await assert.rejects(
+      h.service.sharedDashboard(h.request({}), token),
+      (e) => e.status === 403,
+    );
+    h.state.admin = false;
+    const anonymous = await h.route.POST(
+      h.request({ token: small.link.split("#")[1] }),
+      { params: Promise.resolve({ path: ["dashboard"] }) },
+    );
+    assert.equal(anonymous.status, 200);
+    const admin = await h.route.POST(h.request({ campaign }), {
+      params: Promise.resolve({ path: ["admin", "share"] }),
+    });
+    assert.equal(admin.status, 403);
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Launch preflight blocks the preview questionnaire and QA delivery before any email or campaign mutation", async () => {
+  const h = harness();
+  try {
+    const { campaign } = await h.setup();
+    const ready = await h.service.launchReadiness(campaign);
+    assert.equal(ready.ready, false);
+    assert.ok(ready.blockers.some((b) => b.includes("versioned saving")));
+    assert.ok(ready.blockers.some((b) => b.includes("preview mode")));
+    await assert.rejects(
+      h.service.launchCampaign("admin@example.invalid", campaign, {
+        confirmation: "Synthetic baseline",
+        expectedActive: 2,
+      }),
+      (e) => e.status === 409,
+    );
+    await assert.rejects(
+      h.service.inviteBatch("admin@example.invalid", campaign, {
+        participantIds: [],
+      }),
+      (e) => e.status === 409,
+    );
+    assert.equal(h.state.emails.length, 0);
+    const events = h.sqlite
+      .prepare(
+        "SELECT count(*) AS n FROM tb_baseline_audit WHERE action='campaign_launched'",
+      )
+      .get();
+    assert.equal(events.n, 0);
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Production cannot open or mail the earlier questionnaire even with active D1 flags", async () => {
+  const h = harness();
+  try {
+    const { campaign, a } = await h.setup();
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    h.env.BASELINE_MAIL_MODE = "send";
+    h.env.RESEND_API_KEY = "synthetic";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <mail@example.invalid>";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    await assert.rejects(
+      h.service.configureCampaign("admin@example.invalid", campaign, {
+        status: "open",
+      }),
+      (e) => e.status === 409,
+    );
+    await assert.rejects(
+      h.service.invite(
+        "admin@example.invalid",
+        campaign,
+        a.participant_id,
+        true,
+      ),
+      (e) => e.status === 409,
+    );
+    assert.equal(h.state.emails.length, 0);
   } finally {
     h.sqlite.close();
   }
