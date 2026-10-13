@@ -120,6 +120,7 @@ export default function Administration({
   return (
     <>
       <section className="tb-card" style={{ marginTop: 20 }}>
+        <p className="brand-section-kicker">Campaign controls</p>
         <h2>Launch readiness</h2>
         {error && (
           <p className="tb-error" role="alert">
@@ -178,7 +179,8 @@ export default function Administration({
           </>
         )}
       </section>
-      <section className="tb-card" style={{ marginTop: 20 }}>
+      <section id="respondents" className="tb-card" style={{ marginTop: 20 }}>
+        <p className="brand-section-kicker">Participant register</p>
         <h2>Manage respondents</h2>
         <button disabled={busy} onClick={() => edit(null)}>
           Add respondent
@@ -188,60 +190,63 @@ export default function Administration({
           Removing a respondent withdraws access. Changing their email
           invalidates their old invitation and session.
         </p>
-        <label className="tb-field">
-          <span>Search participant list</span>
-          <input
-            aria-label="Search participant list"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, email, role, region, entity or team"
-          />
-        </label>
-        <label className="tb-field">
-          <span>Participant status</span>
-          <select
-            aria-label="Participant status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            {[
-              ["all", "All"],
-              ["not_started", "Not started"],
-              ["in_progress", "In progress"],
-              ["completed", "Completed"],
-              ["withdrawn", "Withdrawn"],
-            ].map(([c, l]) => (
-              <option key={c} value={c}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="tb-field">
-          <span>Filter by regional leader</span>
-          <select
-            aria-label="Filter by regional leader"
-            value={leaderFilter}
-            onChange={(e) => setLeaderFilter(e.target.value)}
-          >
-            <option value="">All regional leaders</option>
-            {[
-              ...new Set(
-                people
-                  .map((p) => p.roster.regional_leader_email)
-                  .filter(Boolean),
-              ),
-            ]
-              .sort()
-              .map((email) => (
-                <option key={email} value={email}>
-                  {people.find((p) => p.roster.regional_leader_email === email)
-                    ?.roster.regional_leader_name || email}
+        <div className="tb-register-filters">
+          <label className="tb-field">
+            <span>Search participant list</span>
+            <input
+              aria-label="Search participant list"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name, email, role, region, entity or team"
+            />
+          </label>
+          <label className="tb-field">
+            <span>Participant status</span>
+            <select
+              aria-label="Participant status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {[
+                ["all", "All"],
+                ["not_started", "Not started"],
+                ["in_progress", "In progress"],
+                ["completed", "Completed"],
+                ["withdrawn", "Withdrawn"],
+              ].map(([c, l]) => (
+                <option key={c} value={c}>
+                  {l}
                 </option>
               ))}
-          </select>
-        </label>
+            </select>
+          </label>
+          <label className="tb-field">
+            <span>Filter by regional leader</span>
+            <select
+              aria-label="Filter by regional leader"
+              value={leaderFilter}
+              onChange={(e) => setLeaderFilter(e.target.value)}
+            >
+              <option value="">All regional leaders</option>
+              {[
+                ...new Set(
+                  people
+                    .map((p) => p.roster.regional_leader_email)
+                    .filter(Boolean),
+                ),
+              ]
+                .sort()
+                .map((email) => (
+                  <option key={email} value={email}>
+                    {people.find(
+                      (p) => p.roster.regional_leader_email === email,
+                    )?.roster.regional_leader_name || email}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
         <div className="tb-management-grid">
           {people
             .filter((p) =>
@@ -276,7 +281,15 @@ export default function Administration({
                 className="tb-detail tb-management-card"
                 key={p.participant_id}
               >
-                <h3>{p.profile.name}</h3>
+                <div className="tb-register-identity">
+                  <h3>{p.profile.name}</h3>
+                  <span
+                    className="tb-status"
+                    data-status={p.active ? p.status : "withdrawn"}
+                  >
+                    {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"}
+                  </span>
+                </div>
                 <p>
                   {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
                   {p.active ? "Active" : "Removed"}
@@ -520,7 +533,8 @@ export default function Administration({
           </form>
         )}
       </section>
-      <section className="tb-card" style={{ marginTop: 20 }}>
+      <section id="sharing" className="tb-card" style={{ marginTop: 20 }}>
+        <p className="brand-section-kicker">Leadership access</p>
         <h2>Share a read-only dashboard</h2>
         <p>
           Create separate private links for Gaia or regional leaders. Links show

@@ -233,6 +233,11 @@ const root = path.resolve(__dirname, "../..");
       });
       await page.goto("https://admin.example.invalid/advisor/baseline");
       await page.addStyleTag({
+        content:
+          "*, *::before, *::after {box-sizing:border-box} body {margin:0} h1,h2,h3,h4,p {margin:0} a {color:inherit;text-decoration:none}" +
+          fs.readFileSync(root + "/app/globals.css", "utf8"),
+      });
+      await page.addStyleTag({
         content: fs.readFileSync(
           root + "/app/baseline/start/style.css",
           "utf8",

@@ -22,7 +22,8 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
     ["Completed", d.counts.completed],
   ];
   return (
-    <section className="tb-card tb-dashboard">
+    <section id="overview" className="tb-card tb-dashboard">
+      <p className="brand-section-kicker">Campaign overview</p>
       <h2>Completion dashboard</h2>
       <p>
         {d.campaign.name} · {d.campaign.status} · Closes{" "}
@@ -36,7 +37,7 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
         }}
       >
         {cards.map(([label, value]) => (
-          <div className="tb-detail" key={label}>
+          <div className="tb-detail tb-metric" key={label}>
             <strong style={{ fontSize: 28, display: "block" }}>{value}</strong>
             {label}
           </div>
@@ -85,7 +86,15 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
               className="tb-detail tb-respondent-card"
               key={p.participantId}
             >
-              <h4>{p.name}</h4>
+              <div className="tb-register-identity">
+                <h4>{p.name}</h4>
+                <span
+                  className="tb-status"
+                  data-status={p.active ? p.status : "withdrawn"}
+                >
+                  {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"}
+                </span>
+              </div>
               <p>
                 {p.email} · {p.jobTitle}
               </p>
