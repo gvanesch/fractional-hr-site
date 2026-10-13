@@ -419,6 +419,79 @@ const root = path.resolve(__dirname, "../..");
           .count(),
         0,
       );
+      assert.equal(
+        await testerPage
+          .getByRole("checkbox", {
+            name: "People management and team leadership",
+            exact: true,
+          })
+          .count(),
+        0,
+      );
+      await testerPage
+        .getByLabel("Test participant example", { exact: true })
+        .selectOption("manager");
+      await testerPage
+        .getByRole("button", { name: "Start with empty answers", exact: true })
+        .click();
+      await testerPage
+        .getByRole("checkbox", {
+          name: "People management and team leadership",
+          exact: true,
+        })
+        .waitFor();
+      await testerPage
+        .getByRole("checkbox", {
+          name: "People management and team leadership",
+          exact: true,
+        })
+        .check();
+      await testerPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await testerPage
+        .getByLabel("Time spent: People management and team leadership", {
+          exact: true,
+        })
+        .fill("100");
+      await testerPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await testerPage
+        .getByRole("checkbox", {
+          name: "Main contact routes: Work email (your own work address)",
+          exact: true,
+        })
+        .check();
+      await testerPage
+        .getByLabel("Request share: Work email (your own work address)", {
+          exact: true,
+        })
+        .fill("100");
+      await testerPage
+        .getByLabel(
+          "Are these requests recorded so others can see their status?",
+          { exact: true },
+        )
+        .selectOption("none");
+      await testerPage
+        .getByLabel(
+          "How often does the same request reach more than one person or arrive through more than one route?",
+          { exact: true },
+        )
+        .selectOption("unknown");
+      await testerPage
+        .getByLabel(
+          "Do employees and managers generally use the same routes?",
+          { exact: true },
+        )
+        .selectOption("same");
+      await testerPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await testerPage
+        .getByRole("heading", { name: "Managing your team", exact: true })
+        .waitFor();
       await testerPage.close();
     }
     console.log(

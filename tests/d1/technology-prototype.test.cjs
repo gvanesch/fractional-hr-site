@@ -45,7 +45,7 @@ test("Technology detail is opt-in for advisor preview; ordinary tool use skips i
     path.resolve(__dirname, "../../app/baseline/test/test-access.tsx"),
     "utf8",
   );
-  assert.ok(!entry.includes("technologyPreview"));
+  assert.ok(entry.includes("technologyPreview"));
 });
 test("Technology time uses only three groups; missing percentages and platform roles are highlighted", () => {
   const d = m.emptyTechnology();

@@ -5,6 +5,7 @@ const STORAGE = "tb-baseline-design-link";
 export default function TestAccess() {
   const [tester, setTester] = useState("");
   const [error, setError] = useState("");
+  const [managerExample, setManagerExample] = useState(false);
   useEffect(() => {
     let cancelled = false;
     async function check() {
@@ -63,7 +64,34 @@ export default function TestAccess() {
       cancelled = true;
     };
   }, []);
-  if (tester) return <Prototype tester={tester} />;
+  if (tester)
+    return (
+      <>
+        <section className="tb-shell">
+          <label className="tb-field">
+            <span>Test participant example</span>
+            <select
+              aria-label="Test participant example"
+              value={managerExample ? "manager" : "non_manager"}
+              onChange={(e) => setManagerExample(e.target.value === "manager")}
+            >
+              <option value="non_manager">Not a people manager</option>
+              <option value="manager">Confirmed people manager</option>
+            </select>
+          </label>
+          <p>
+            This changes the example record for testing. It does not record your
+            manager status. Switching examples clears your test answers.
+          </p>
+        </section>
+        <Prototype
+          key={managerExample ? "manager" : "non_manager"}
+          tester={tester}
+          technologyPreview
+          managerRecord={{ isPeopleManager: managerExample }}
+        />
+      </>
+    );
   return (
     <main className="tb-shell">
       <section className="tb-card">

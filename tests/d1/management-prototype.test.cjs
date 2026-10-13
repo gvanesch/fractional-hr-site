@@ -41,7 +41,7 @@ test("Management is gated by confirmed roster status and selected workload, not 
   );
   assert.ok(!b.BROAD_AREAS.some((a) => a.code === "people_management"));
   assert.ok(
-    !fs
+    fs
       .readFileSync(
         path.resolve(__dirname, "../../app/baseline/test/test-access.tsx"),
         "utf8",
