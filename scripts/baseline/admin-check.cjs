@@ -190,6 +190,22 @@ const root = path.resolve(__dirname, "../..");
       );
       await page.addScriptTag({ content: build.outputFiles[0].text });
       await page
+        .getByRole("heading", { name: "Campaigns", exact: true })
+        .waitFor();
+      console.log(
+        "Admin controls:",
+        JSON.stringify(
+          await page
+            .locator("select")
+            .evaluateAll((nodes) =>
+              nodes.map((n) => ({
+                label: n.getAttribute("aria-label"),
+                options: n.options.length,
+              })),
+            ),
+        ),
+      );
+      await page
         .getByLabel("Choose a campaign", { exact: true })
         .selectOption("c1");
       await page

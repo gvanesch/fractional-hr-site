@@ -148,6 +148,7 @@ export default function AdminPanel() {
         <label className="tb-field">
           <span>Choose a campaign</span>
           <select
+            aria-label="Choose a campaign"
             value={id}
             onChange={(e) => {
               const value = e.target.value;
