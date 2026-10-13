@@ -133,11 +133,11 @@ export default function Technology({
         maintain or manage the system for other users.
       </p>
       <Pick
-        label="Do you support, maintain or improve systems, data or reports?"
+        label="Which description best matches your work with systems, data or reports?"
         value={d.involvement}
         options={[
-          ["yes", "Yes"],
-          ["no", "No. I only use tools for my other work."],
+          ["yes", "I support, maintain or improve systems, data or reports"],
+          ["no", "I use tools for my other work"],
           ["unknown", "Not sure"],
         ]}
         invalid={bad("involvement")}

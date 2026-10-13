@@ -1,4 +1,5 @@
 "use client";
+import Info from "./info";
 import { useId } from "react";
 import {
   CONTACT_ROUTES,
@@ -11,6 +12,14 @@ import {
   routeTotal,
   type RichDraft,
 } from "@/lib/baseline/prototype-enrichment";
+const QUESTION_HELP: Record<string, string> = {
+  "Do you regularly support one business or more than one?":
+    "Think about the businesses or brands you regularly support. Include work you do for another business as part of your usual role.",
+  "Are these requests recorded so others can see their status?":
+    "A shared record lets colleagues see a request, who is handling it, and whether it is complete. Examples include a ticket system, shared inbox or shared tracker.",
+  "Do employees and managers generally use the same routes?":
+    "Think about how employees and managers contact you or your team. Compare the main routes used by each group.",
+};
 const HELP: Record<string, string> = {
   do: "You carry out this stage yourself. Others may also help.",
   check: "You review the work or give approval for it to proceed.",
@@ -50,7 +59,12 @@ export function Pick({
       : HELP[value];
   return (
     <label className="tb-field">
-      <span>{label}</span>
+      <span className="tb-question-label">
+        <span>{label}</span>
+        {QUESTION_HELP[label] && (
+          <Info label={label}>{QUESTION_HELP[label]}</Info>
+        )}
+      </span>
       <select
         aria-label={label}
         aria-invalid={invalid}
@@ -497,7 +511,7 @@ export default function Context({
       <section className="tb-process">
         <h3>What could work better, and what should we keep?</h3>
         <Text
-          label="Which work takes more time or manual effort than it should? (optional)"
+          label="Where could a simpler process or better tools save you time? (optional)"
           value={d.manualNote}
           change={(manualNote) => change({ manualNote })}
         />

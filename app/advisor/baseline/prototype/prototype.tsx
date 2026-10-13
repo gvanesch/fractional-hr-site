@@ -11,6 +11,7 @@ import {
 } from "@/lib/baseline/broad-prototype";
 import "@/app/baseline/start/style.css";
 import "./prototype.css";
+import Info from "./info";
 import Context, { Pick } from "./context";
 import ContextReview from "./review";
 import {
@@ -132,6 +133,7 @@ export default function Prototype({
       </aside>
       <header className="tb-header">
         <span>team.blue · Current work baseline</span>
+        <small className="tb-hosted-by">Hosted by Van Esch Advisory</small>
         <p>
           Understand current work, protect strengths and improve how we work.
         </p>
@@ -144,9 +146,9 @@ export default function Prototype({
             in each area.
           </p>
           <p>
-            The examples help explain each area. You do not need to do every
-            example to select it. You will not be asked to list or describe
-            every task.
+            The examples help explain each area. Select an area when it
+            describes some of your regular work. Your answers describe broad
+            areas of work.
           </p>
           <p>
             This design test adds contact routes, payroll responsibilities and
@@ -253,6 +255,14 @@ export default function Prototype({
                   This does not need to be exact. Think about an average month.
                   About one day each week is 20%. Count each piece of work once.
                 </p>
+                <div className="tb-question-label">
+                  <span>Estimating your time</span>
+                  <Info label="Estimating your time">
+                    Think about an average month. One day each week is about
+                    20%. Count each activity once, in the area that best
+                    describes it.
+                  </Info>
+                </div>
                 <div className="tb-total" aria-live="polite">
                   Total: {total}%
                   <progress

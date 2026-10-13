@@ -356,3 +356,16 @@
     padding: 20px;
   }
 }
+.tb-dashboard-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0 16px;
+}
+.tb-dashboard .tb-metric {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.tb-dashboard .tb-metric:hover {
+  border-color: #1e6fd9;
+}

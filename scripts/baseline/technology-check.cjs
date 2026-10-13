@@ -106,7 +106,7 @@ const root = path.resolve(__dirname, "../..");
         .getByRole("heading", { name: "Your technology work", exact: true })
         .waitFor();
       await pick(
-        "Do you support, maintain or improve systems, data or reports?",
+        "Which description best matches your work with systems, data or reports?",
         "no",
       );
       assert.equal(
@@ -124,7 +124,7 @@ const root = path.resolve(__dirname, "../..");
         .waitFor();
       await button("Edit your technology work").click();
       await pick(
-        "Do you support, maintain or improve systems, data or reports?",
+        "Which description best matches your work with systems, data or reports?",
         "yes",
       );
       await button("Return to review").click();

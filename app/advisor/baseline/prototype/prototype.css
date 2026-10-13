@@ -117,3 +117,98 @@
   padding: 0;
   margin: 18px 0 0;
 }
+/* Shared advisory design tokens, with restrained client-facing branding. */
+.tb-shell.tb-prototype {
+  max-width: 1040px;
+  font-family: inherit;
+  color: var(--brand-light-text, #0d1f3c);
+}
+.tb-prototype .tb-header {
+  border-bottom: 1px solid #e2e8f0;
+  margin: 18px 0 24px;
+  padding: 18px 0 24px;
+}
+.tb-prototype .tb-header > span {
+  color: #0d1f3c;
+  font-size: 1.2rem;
+}
+.tb-prototype .tb-hosted-by {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+.tb-prototype .tb-card {
+  border-color: #e2e8f0;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+.tb-prototype .tb-card h1 {
+  color: #0d1f3c;
+  letter-spacing: -0.025em;
+}
+.tb-prototype button {
+  border-color: #cbd5e1;
+  background: white;
+  font-weight: 600;
+}
+.tb-prototype .tb-primary {
+  background: #1e6fd9;
+  border-color: #1e6fd9;
+  color: white;
+}
+.tb-prototype .tb-primary:hover {
+  background: #2979ff;
+}
+.tb-prototype input[type="checkbox"],
+.tb-prototype progress {
+  accent-color: #1e6fd9;
+}
+.tb-prototype .tb-total,
+.tb-prototype .tb-definition {
+  background: #eff6ff;
+  border-color: #1e6fd9;
+}
+.tb-prototype .tb-estimate {
+  color: #1557b0;
+}
+.tb-prototype :focus-visible {
+  outline-color: #1e6fd9;
+}
+.tb-question-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tb-info {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+}
+.tb-prototype .tb-info-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  color: #1557b0;
+  background: #eff6ff;
+  font-style: normal;
+}
+.tb-info-panel {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: 36px;
+  width: min(340px, calc(100vw - 64px));
+  background: #0d1f3c;
+  color: white;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.2);
+}
