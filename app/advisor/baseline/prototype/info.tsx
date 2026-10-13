@@ -25,6 +25,7 @@ export default function Info({
         className="tb-info-button"
         aria-label={"More information: " + label}
         aria-expanded={open}
+        aria-describedby={open ? id : undefined}
         aria-controls={id}
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -45,7 +46,7 @@ export default function Info({
         i
       </button>
       {open && (
-        <span id={id} role="note" className="tb-info-panel">
+        <span id={id} role="tooltip" className="tb-info-panel">
           {children}
         </span>
       )}

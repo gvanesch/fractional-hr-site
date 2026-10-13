@@ -46,6 +46,10 @@ const root = path.resolve(__dirname, "../..");
       );
       await page.addStyleTag({
         content:
+          "body{font-family:ui-sans-serif,system-ui,sans-serif}h1,h2,h3,h4,p{margin:0}",
+      });
+      await page.addStyleTag({
+        content:
           fs.readFileSync(root + "/app/baseline/start/style.css", "utf8") +
           fs.readFileSync(
             root + "/app/advisor/baseline/prototype/prototype.css",
@@ -177,6 +181,16 @@ const root = path.resolve(__dirname, "../..");
       await check(
         "Who do you regularly work with on this technology work?: IT",
       );
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            mobile ? "technology-mobile.png" : "technology-desktop.png",
+          ),
+          fullPage: true,
+        });
+      }
       await button("Return to review").click();
       await page
         .getByRole("heading", { name: "Review", exact: true })

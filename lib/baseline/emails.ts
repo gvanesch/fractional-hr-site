@@ -1,3 +1,10 @@
+export function baselineSender(configured: string) {
+  const address =
+    configured.match(/<([^>]+)>/)?.[1]?.trim() ?? configured.trim();
+  if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(address))
+    throw new Error("The baseline sender address is not configured correctly.");
+  return "team.blue baseline via Van Esch Advisory <" + address + ">";
+}
 const escape = (v: string) =>
   v.replace(
     /[&<>"']/g,

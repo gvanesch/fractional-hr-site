@@ -31,7 +31,7 @@ const root = path.resolve(__dirname, "../..");
     define: { "process.env.NODE_ENV": '"production"' },
   });
   const css =
-    "*,*::before,*::after{box-sizing:border-box}body{margin:0}" +
+    "*,*::before,*::after{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif}h1,h2,h3,h4,p{margin:0}" +
     [
       "app/globals.css",
       "app/baseline/start/style.css",
@@ -39,6 +39,18 @@ const root = path.resolve(__dirname, "../..");
     ]
       .map((p) => fs.readFileSync(root + "/" + p, "utf8"))
       .join("\n");
+  const emailBuild = await esbuild.build({
+    entryPoints: [root + "/lib/baseline/emails.ts"],
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    write: false,
+  });
+  const emailModule = { exports: {} };
+  new Function("module", "exports", emailBuild.outputFiles[0].text)(
+    emailModule,
+    emailModule.exports,
+  );
   const browser = await chromium.launch({
     channel: "chromium",
     headless: true,
@@ -196,7 +208,7 @@ const root = path.resolve(__dirname, "../..");
         exact: true,
       });
       await info.focus();
-      await page.getByRole("note").waitFor();
+      await page.getByRole("tooltip").waitFor();
       await info.press("Escape");
       await page
         .getByLabel("Do you regularly support one business or more than one?", {
@@ -218,6 +230,16 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("button", { name: "Review answers", exact: true })
         .click();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            mobile ? "collection-mobile.png" : "collection-desktop.png",
+          ),
+          fullPage: true,
+        });
+      }
       await page
         .getByLabel(
           "I would like a copy sent to the email address used for my invitation.",
@@ -247,6 +269,29 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .waitFor();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        const previewMessages = [
+          [
+            "invite",
+            emailModule.exports.invitationEmail(
+              "team.blue Current work baseline",
+              "https://assessment.example.invalid/start",
+              "2026-10-27T23:59:59Z",
+            ),
+          ],
+          ["code", emailModule.exports.verificationEmail("123456")],
+        ];
+        for (const [name, message] of previewMessages) {
+          await page.setContent(message.html);
+          await page.screenshot({
+            path: path.join(
+              process.env.BASELINE_SCREENSHOT_DIR,
+              `${name}-email-${mobile ? "mobile" : "desktop"}.png`,
+            ),
+            fullPage: true,
+          });
+        }
+      }
       await page.close();
     }
   } finally {

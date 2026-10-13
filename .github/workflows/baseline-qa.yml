@@ -15,6 +15,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      BASELINE_SCREENSHOT_DIR: ${{ runner.temp }}/baseline-visuals
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,6 +48,12 @@ jobs:
         run: node scripts/baseline/admin-check.cjs
       - name: Test reviewed collection save, resume and submission on desktop and mobile
         run: node scripts/baseline/collection-check.cjs
+      - name: Save synthetic QA visual checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-visual-checks
+          path: ${{ runner.temp }}/baseline-visuals
+          retention-days: 7
       - name: Apply dedicated baseline schema to QA only
         run: npx wrangler d1 migrations apply DB --env qa --remote
       - name: Build QA Worker
@@ -69,14 +76,7 @@ jobs:
           if [ -n "$BASELINE_QA_RESEND_TOKEN" ]; then
             printf '%s' "$BASELINE_QA_RESEND_TOKEN" | npx wrangler secret put BASELINE_QA_RESEND_API_KEY --env qa
           else
-            node --input-type=module <<'NODE'
-            const account=process.env.CLOUDFLARE_ACCOUNT_ID;
-            if(account!=="73221f18acc676e4992c89fcbf2b2a8f")throw Error("QA account mismatch");
-            const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/fractional-hr-site-qa/secrets`,{headers:{Authorization:`Bearer ${process.env.CLOUDFLARE_API_TOKEN}`}});
-            if(!r.ok)throw Error(`QA secret-name inventory unavailable: HTTP ${r.status}`);
-            const b=await r.json();if(!b.success||!Array.isArray(b.result)||!b.result.some(s=>["BASELINE_QA_RESEND_API_KEY","RESEND_API_KEY"].includes(s.name)))throw Error("No configured QA email credential is available.");
-            console.log("Existing QA Worker email credential is available. Values were not read or copied; restricted Greg-only sending remains enforced.");
-            NODE
+            node scripts/baseline/qa-mail-credential.mjs
           fi
       - name: Send authorised Greg-only invitation and verification-code previews once
         env:

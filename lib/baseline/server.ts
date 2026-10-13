@@ -1,4 +1,9 @@
-import { invitationEmail, verificationEmail, answerCopyEmail } from "./emails";
+import {
+  invitationEmail,
+  verificationEmail,
+  answerCopyEmail,
+  baselineSender,
+} from "./emails";
 import {
   COLLECTION_VERSION,
   COLLECTION_DEFINITION,
@@ -908,7 +913,7 @@ export async function invite(
     if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
       throw new BaselineError("Email is not configured.", 503);
     const result = await new Resend(env.RESEND_API_KEY).emails.send({
-      from: env.CONTACT_FROM_EMAIL,
+      from: baselineSender(env.CONTACT_FROM_EMAIL),
       to: p.email,
       replyTo: "info@vanesch.uk",
       ...invitationEmail(p.name, link, p.closes_at),
@@ -2105,7 +2110,9 @@ async function sendGregTest(
       "QA email delivery is restricted to the authorised test recipient.",
       403,
     );
-  const credential = env.BASELINE_QA_RESEND_API_KEY ?? env.RESEND_API_KEY;
+  const credential = (
+    env.BASELINE_QA_RESEND_API_KEY ?? env.RESEND_API_KEY
+  )?.trim();
   if (!credential || !env.CONTACT_FROM_EMAIL)
     throw new BaselineError("QA email credentials are unavailable.", 503);
   const reserved = await db()
@@ -2122,7 +2129,7 @@ async function sendGregTest(
   try {
     const result = await new Resend(credential).emails.send(
       {
-        from: env.CONTACT_FROM_EMAIL,
+        from: baselineSender(env.CONTACT_FROM_EMAIL),
         to: "greg@vanesch.uk",
         replyTo: "info@vanesch.uk",
         ...message,
@@ -2219,7 +2226,7 @@ export async function requestVerification(
       if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
         throw new BaselineError("Email verification is not configured.", 503);
       const result = await new Resend(env.RESEND_API_KEY).emails.send({
-        from: env.CONTACT_FROM_EMAIL,
+        from: baselineSender(env.CONTACT_FROM_EMAIL),
         to: p.email,
         replyTo: "info@vanesch.uk",
         ...verificationEmail(code),
@@ -2323,7 +2330,7 @@ async function deliverAnswerCopy(participantId: string) {
     const message = answerCopyEmail(evidence);
     const result = await new Resend(env.RESEND_API_KEY).emails.send(
       {
-        from: env.CONTACT_FROM_EMAIL,
+        from: baselineSender(env.CONTACT_FROM_EMAIL),
         to: row.recipient_email,
         replyTo: "info@vanesch.uk",
         ...message,

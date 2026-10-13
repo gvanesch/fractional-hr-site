@@ -253,7 +253,7 @@ const root = path.resolve(__dirname, "../..");
       await page.goto("https://admin.example.invalid/advisor/baseline");
       await page.addStyleTag({
         content:
-          "*, *::before, *::after {box-sizing:border-box} body {margin:0} h1,h2,h3,h4,p {margin:0} a {color:inherit;text-decoration:none}" +
+          "*, *::before, *::after {box-sizing:border-box} body {margin:0;font-family:ui-sans-serif,system-ui,sans-serif} h1,h2,h3,h4,p {margin:0} a {color:inherit;text-decoration:none}" +
           fs.readFileSync(root + "/app/globals.css", "utf8"),
       });
       await page.addStyleTag({
@@ -515,6 +515,16 @@ const root = path.resolve(__dirname, "../..");
           }),
         );
       await page.getByRole("button", { name: "Overview", exact: true }).click();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            mobile ? "admin-mobile.png" : "admin-desktop.png",
+          ),
+          fullPage: true,
+        });
+      }
       const respondentPositions = await page
         .locator(".tb-respondent-card")
         .evaluateAll((nodes) =>
@@ -572,7 +582,7 @@ const root = path.resolve(__dirname, "../..");
         );
         await page.addStyleTag({
           content:
-            "*, *::before, *::after {box-sizing:border-box} body {margin:0}" +
+            "*, *::before, *::after {box-sizing:border-box} body {margin:0;font-family:ui-sans-serif,system-ui,sans-serif}" +
             fs.readFileSync(root + "/app/globals.css", "utf8") +
             fs.readFileSync(root + "/app/baseline/start/style.css", "utf8") +
             fs.readFileSync(root + "/app/advisor/baseline/admin.css", "utf8"),
