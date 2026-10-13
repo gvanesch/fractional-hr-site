@@ -33,11 +33,26 @@ export default function ContextReview({
         ))}
         <p>
           Requests recorded:{" "}
-          {e.contact.recording === "unknown" ? "Not sure" : e.contact.recording}
+          {labels(
+            [e.contact.recording],
+            [
+              ["all", "All requests"],
+              ["most", "Most requests"],
+              ["some", "Some requests"],
+              ["none", "None"],
+              ["unknown", "Not sure"],
+            ],
+          )}
           . Duplicate requests:{" "}
-          {e.contact.duplicateRequests === "unknown"
-            ? "Not sure"
-            : e.contact.duplicateRequests}
+          {labels(
+            [e.contact.duplicateRequests],
+            [
+              ["often", "Often"],
+              ["sometimes", "Sometimes"],
+              ["rarely", "Rarely"],
+              ["unknown", "Not sure"],
+            ],
+          )}
           .
         </p>
         {e.contact.recordingNote && (
@@ -91,8 +106,20 @@ export default function ContextReview({
                 </p>
               ))}
               <p>
-                Cycle: {e.payroll.cycle?.replaceAll("_", " ")}. Personal payroll
-                days:{" "}
+                Payroll cycle:{" "}
+                {labels(
+                  [e.payroll.cycle ?? "unknown"],
+                  [
+                    ["weekly", "Weekly"],
+                    ["fortnightly", "Every two weeks"],
+                    ["four_weekly", "Every four weeks"],
+                    ["monthly", "Monthly"],
+                    ["varies", "Several cycles / it varies"],
+                    ["other", "Other"],
+                    ["unknown", "Not sure"],
+                  ],
+                )}
+                . Your days per cycle:{" "}
                 {e.payroll.daysUnknown
                   ? "Not sure"
                   : e.payroll.estimatedPersonalDays}

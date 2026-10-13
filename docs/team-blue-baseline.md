@@ -1,4 +1,6 @@
-# team.blue current-work baseline — QA implementation
+# team.blue current-work baseline — implementation history
+
+This document records earlier design iterations. For the current reviewed v3 collection, verification method, QA access and release boundary, use [baseline-qa-readiness.md](baseline-qa-readiness.md). Earlier prototype-only and bearer-only statements below describe their historical versions, not the current v3 collection.
 
 ## Process-based design prototype (10 October review)
 

@@ -366,6 +366,12 @@ export default function Prototype({
             covers a broad range of People activities, it may take closer to
             20–30 minutes.
           </p>
+          {saveCollection && (
+            <p>
+              Your answers save as you go. Use your private invitation to return
+              later.
+            </p>
+          )}
           <button
             className="tb-primary"
             disabled={Boolean(saveCollection) && !accepted}
@@ -391,7 +397,7 @@ export default function Prototype({
         </section>
       ) : (
         <>
-          <nav className="tb-progress" aria-label="Prototype progress">
+          <nav className="tb-progress" aria-label="Assessment progress">
             <span>
               Step {currentStage + 1} of {steps.length}
             </span>

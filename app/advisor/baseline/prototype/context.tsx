@@ -26,7 +26,7 @@ const HELP: Record<string, string> = {
   do: "You carry out this stage yourself. Others may also help.",
   check: "You review the work or give approval for it to proceed.",
   coordinate:
-    "You organise information, chase progress or support the people doing it.",
+    "You organise information, follow up on progress or support the people doing it.",
   none: "You do not take part in this payroll stage. Tell us who handles it, or choose Not sure.",
   unknown: "You do not know enough to describe this confidently.",
   routine:

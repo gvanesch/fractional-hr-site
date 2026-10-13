@@ -9,8 +9,8 @@ Greg authorised immediate autonomous preparation on 13 October 2026. Production 
 - Added accessible information controls and kept positive question/answer direction.
 - Added a separate read-only production checkpoint workflow. No production mutation.
 - Phase 1 deployed and verified: UI filters/design/help. Read-only production checkpoint confirmed migrations 0001–0005, production D1 binding, all five flags off and existing Supabase authentication.
-- Phase 2 implemented locally: separate `team-blue-baseline-v3` reviewed collection, CAS autosave/resume/submission, dedicated broad work records and exports, immutable manager context, hashed bounded OTP challenges, answer-copy outbox (QA preview only), final invitation/code templates, exact-recipient Greg-only mail ledger and dedicated QA mail credential.
-- Local checks: 77 tests passed. Next: full CI browser and real hosted verification, authorised once-only Greg messages, final readiness/QA report.
+- Phase 2 deployed and verified on QA: separate `team-blue-baseline-v3` reviewed collection, CAS autosave/resume/submission, dedicated broad work records and exports, immutable manager context, hashed bounded OTP challenges, answer-copy outbox (QA preview only), final invitation/code templates, exact-recipient Greg-only mail ledger and dedicated QA mail credential.
+- Workflow `38446233527` passed on `144a174`: 77 tests, desktop/mobile journeys, QA build/deploy, real hosted reviewed contract, existing Worker mail credential inventory and one invitation plus one code to Greg. No other real emails. Final visual/wording polish and QA notes remain. See [baseline-final-qa.md](baseline-final-qa.md).
 - Production baseline schema and application cutover are still not applied/enabled. Neither approval is implied by QA testing.
 
 ## Safety and continuity
@@ -44,3 +44,5 @@ Answer-copy preferences are recorded and preview-only in QA. Production copy del
 
 - Commit `5e286b2` did not run: GitHub rejected the job-level `runner.temp` context. The screenshot directory now uses `GITHUB_ENV` from the installer step. No deployment or email happened from that invalid workflow.
 - Email-code previews now link directly to the existing challenge. Reopening the invitation reuses that challenge without sending another message. A current-code control supports normal production expiry handling; QA remains once-only. General QA invitation sending is denied even if mail mode is misconfigured.
+
+- Successful actual email preview on `144a174`: both ledger kinds are sent. Never reset that ledger or resend on continuation. The configured credential remains in the QA Worker and was not read or copied.
