@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, "../..");
   const build = await esbuild.build({
     stdin: {
       contents:
-        'import React from "react";import {createRoot} from "react-dom/client";import AdminPanel from "./app/advisor/baseline/panel";createRoot(document.getElementById("root")).render(<AdminPanel/>);',
+        'import React from "react";import {createRoot} from "react-dom/client";import AdminPanel from "./app/advisor/baseline/panel";import ProjectList from "./app/advisor/baseline/projects";import {AppRouterContext} from "next/dist/shared/lib/app-router-context.shared-runtime";createRoot(document.getElementById("root")).render(<AppRouterContext.Provider value={{push:(url)=>window.location.assign(url)}}>{window.BASELINE_SCREEN === "list" ? <ProjectList/> : window.BASELINE_SCREEN === "create" ? <AdminPanel mode="create"/> : <AdminPanel initialCampaign="c1"/>}</AppRouterContext.Provider>);',
       resolveDir: root,
       loader: "tsx",
     },
@@ -98,7 +98,26 @@ const root = path.resolve(__dirname, "../..");
           body = req.method() === "POST" ? req.postDataJSON() : null;
         requests.push({ op, body });
         let data = {};
-        if (op === "campaigns") data = { campaigns: [campaign] };
+        if (op === "campaigns")
+          data = {
+            campaigns: [
+              campaign,
+              {
+                ...campaign,
+                campaign_id: "c2",
+                name: "Closed example",
+                status: "closed",
+              },
+              {
+                ...campaign,
+                campaign_id: "c3",
+                name: "Draft example",
+                status: "draft",
+              },
+            ],
+          };
+        if (op === "create")
+          data = { campaignId: "11111111-1111-4111-8111-111111111111" };
         if (op === "campaign")
           data = {
             campaign,
@@ -257,11 +276,21 @@ const root = path.resolve(__dirname, "../..");
       );
       await page.addScriptTag({ content: build.outputFiles[0].text });
       await page
-        .getByRole("heading", { name: "Campaigns", exact: true })
+        .getByRole("heading", { name: "Completion dashboard", exact: true })
         .waitFor();
+      assert.equal(
+        await page.getByLabel("Choose a campaign", { exact: true }).count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Create project", exact: true })
+          .count(),
+        0,
+      );
       await page
-        .getByLabel("Choose a campaign", { exact: true })
-        .selectOption("c1");
+        .getByRole("button", { name: "Settings and launch", exact: true })
+        .click();
       await page
         .getByRole("heading", { name: "Launch readiness", exact: true })
         .waitFor();
@@ -271,8 +300,8 @@ const root = path.resolve(__dirname, "../..");
           .isDisabled(),
       );
       await page
-        .getByRole("heading", { name: "Completion dashboard", exact: true })
-        .waitFor();
+        .getByRole("button", { name: "Respondents", exact: true })
+        .click();
       await page
         .getByLabel("Choose a CSV (up to 200 people per file)", { exact: true })
         .setInputFiles({
@@ -377,6 +406,7 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .waitFor();
+      await page.getByRole("button", { name: "Sharing", exact: true }).click();
       await page
         .getByLabel("Viewer / audience label", { exact: true })
         .fill("North leader");
@@ -406,6 +436,9 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByText("Dashboard link revoked.", { exact: true })
         .waitFor();
+      await page
+        .getByRole("button", { name: "Respondents", exact: true })
+        .click();
       await page.locator(".tb-management-card").nth(2).waitFor();
       const positions = await page
         .locator(".tb-management-card")
@@ -415,6 +448,7 @@ const root = path.resolve(__dirname, "../..");
             return { x: r.x, y: r.y, width: r.width };
           }),
         );
+      await page.getByRole("button", { name: "Overview", exact: true }).click();
       const respondentPositions = await page
         .locator(".tb-respondent-card")
         .evaluateAll((nodes) =>
@@ -423,11 +457,28 @@ const root = path.resolve(__dirname, "../..");
             return { x: r.x, y: r.y };
           }),
         );
-      const dashboardBox = await page.locator(".tb-dashboard").boundingBox();
-      const campaignsBox = await page
-        .getByRole("heading", { name: "Campaigns", exact: true })
-        .boundingBox();
-      assert.ok(dashboardBox.y < campaignsBox.y);
+      assert.ok(
+        await page
+          .getByRole("heading", { name: "Completion dashboard", exact: true })
+          .isVisible(),
+      );
+      assert.equal(
+        await page
+          .getByRole("heading", { name: "Project settings", exact: true })
+          .count(),
+        0,
+      );
+      await page.getByRole("button", { name: "Exports", exact: true }).click();
+      assert.ok(
+        await page
+          .getByRole("link", { name: "Respondent-level CSV", exact: true })
+          .isVisible(),
+      );
+      assert.ok(
+        !(await page
+          .getByRole("heading", { name: "Completion dashboard", exact: true })
+          .isVisible()),
+      );
       if (mobile) {
         assert.equal(positions[0].x, positions[1].x);
         assert.ok(positions[1].y > positions[0].y);
@@ -448,6 +499,94 @@ const root = path.resolve(__dirname, "../..");
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       );
+      // Exercise the separate directory and creation entry points with the same API boundaries.
+      for (const screen of ["list", "create"]) {
+        await page.goto(
+          "https://admin.example.invalid/advisor/baseline/" + screen,
+        );
+        await page.addStyleTag({
+          content:
+            "*, *::before, *::after {box-sizing:border-box} body {margin:0}" +
+            fs.readFileSync(root + "/app/globals.css", "utf8") +
+            fs.readFileSync(root + "/app/baseline/start/style.css", "utf8") +
+            fs.readFileSync(root + "/app/advisor/baseline/admin.css", "utf8"),
+        });
+        await page.addScriptTag({
+          content:
+            "window.process = {env:{NODE_ENV:'production'}};window.BASELINE_SCREEN=" +
+            JSON.stringify(screen),
+        });
+        await page.addScriptTag({ content: build.outputFiles[0].text });
+        if (screen === "list") {
+          await page
+            .getByRole("heading", { name: "Your projects", exact: true })
+            .waitFor();
+          await page
+            .getByRole("link", { name: "Open project", exact: true })
+            .nth(2)
+            .waitFor();
+          await page
+            .getByLabel("Project status", { exact: true })
+            .selectOption("closed");
+          assert.equal(
+            await page
+              .getByRole("link", { name: "Open project", exact: true })
+              .count(),
+            1,
+          );
+          assert.ok(
+            await page
+              .getByRole("heading", { name: "Closed example", exact: true })
+              .isVisible(),
+          );
+          await page
+            .getByLabel("Search projects", { exact: true })
+            .fill("no match");
+          await page
+            .getByText("No projects match your search and status filter.", {
+              exact: true,
+            })
+            .waitFor();
+          await page.getByLabel("Search projects", { exact: true }).fill("");
+          await page
+            .getByLabel("Project status", { exact: true })
+            .selectOption("open");
+          assert.equal(
+            await page
+              .getByRole("link", { name: "Open project", exact: true })
+              .getAttribute("href"),
+            "/advisor/baseline/project/c1",
+          );
+        } else {
+          await page
+            .getByRole("heading", { name: "New project", exact: true })
+            .waitFor();
+          assert.equal(
+            await page
+              .getByRole("heading", { name: "Manage respondents", exact: true })
+              .count(),
+            0,
+          );
+          await page
+            .getByLabel("Campaign name", { exact: true })
+            .fill("New synthetic project");
+          await page
+            .getByLabel("Closing date (end of day, UTC)", { exact: true })
+            .fill("2026-12-31");
+          await page
+            .getByRole("button", { name: "Create project", exact: true })
+            .click();
+          await page.waitForURL(
+            "**/advisor/baseline/project/11111111-1111-4111-8111-111111111111",
+          );
+          assert.ok(
+            requests.some(
+              (r) =>
+                r.op === "create" && r.body.name === "New synthetic project",
+            ),
+          );
+        }
+      }
       await page.close();
     }
   } finally {

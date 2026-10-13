@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { baselineEnv } from "@/lib/baseline/server";
-import AdminPanel from "./panel";
+import ProjectList from "./projects";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "team.blue baseline administration",
@@ -19,9 +19,7 @@ export default async function Page({
   }
   if (!(await requireAdvisorUser())) redirect("/advisor/login");
   const requested = (await searchParams).campaign ?? "";
-  return (
-    <AdminPanel
-      initialCampaign={/^[a-f0-9-]{36}$/.test(requested) ? requested : ""}
-    />
-  );
+  if (/^[a-f0-9-]{36}$/.test(requested))
+    redirect("/advisor/baseline/project/" + requested);
+  return <ProjectList />;
 }

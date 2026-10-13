@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Administration from "./administration";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
@@ -63,9 +64,11 @@ async function api<T = Result>(path: string, body?: unknown): Promise<T> {
 }
 export default function AdminPanel({
   initialCampaign = "",
-}: { initialCampaign?: string } = {}) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]),
-    [id, setId] = useState(initialCampaign),
+  mode = "workspace",
+}: { initialCampaign?: string; mode?: "create" | "workspace" } = {}) {
+  const router = useRouter();
+  const id = initialCampaign;
+  const [tab, setTab] = useState("overview"),
     [current, setCurrent] = useState<Campaign | null>(null),
     [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
     [people, setPeople] = useState<Person[]>([]),
@@ -88,8 +91,6 @@ export default function AdminPanel({
     [view, setView] = useState<Person | null>(null),
     [filter, setFilter] = useState("");
   async function refresh(campaign = id) {
-    const list = await api("campaigns");
-    setCampaigns(list.campaigns);
     if (campaign) {
       const [data, report] = await Promise.all([
         api("campaign?campaign=" + encodeURIComponent(campaign)),
@@ -109,7 +110,6 @@ export default function AdminPanel({
     }
   }
   useEffect(() => {
-    setId(initialCampaign);
     void refresh(initialCampaign).catch((e) => setError(e.message));
   }, [initialCampaign]); // eslint-disable-line react-hooks/exhaustive-deps
   async function action(fn: () => Promise<void>) {
@@ -143,7 +143,11 @@ export default function AdminPanel({
         <div className="brand-container brand-section brand-hero-content">
           <p className="brand-kicker">Advisor workspace</p>
           <div className="tb-workspace-title">
-            <h1 className="brand-heading-lg">People Operations Baseline</h1>
+            <h1 className="brand-heading-lg">
+              {mode === "create"
+                ? "Create baseline project"
+                : (current?.name ?? "Baseline project")}
+            </h1>
             <span
               className="tb-status"
               data-status={current?.status ?? "draft"}
@@ -152,11 +156,13 @@ export default function AdminPanel({
             </span>
           </div>
           <p className="brand-subheading">
-            {current?.name ?? "team.blue · Campaign administration"}
+            {mode === "create"
+              ? "Set up a new assessment project. Add respondents after creating it."
+              : "team.blue · People Operations Baseline"}
           </p>
           <div className="tb-hero-actions">
-            <Link className="brand-button-dark" href="/advisor/projects">
-              All projects
+            <Link className="brand-button-dark" href="/advisor/baseline">
+              Baseline projects
             </Link>
             <Link
               className="brand-button-dark"
@@ -167,26 +173,33 @@ export default function AdminPanel({
           </div>
         </div>
       </section>
-      <nav
-        className="tb-workspace-nav"
-        aria-label="Baseline workspace sections"
-      >
-        <div className="brand-container">
-          <span>Baseline workspace</span>
-          <div>
-            <a href="#overview">Overview</a>
-            {id && <a href="#respondents">Respondents</a>}
-            <a href="#campaign-settings">Campaign settings</a>
-            {id && (
-              <>
-                <a href="#roster-import">CSV import</a>
-                <a href="#sharing">Sharing</a>
-                <a href="#exports">Exports</a>
-              </>
-            )}
+      {mode === "workspace" && (
+        <nav
+          className="tb-workspace-nav"
+          aria-label="Baseline workspace sections"
+        >
+          <div className="brand-container">
+            <span>Project workspace</span>
+            <div>
+              {[
+                ["overview", "Overview"],
+                ["respondents", "Respondents"],
+                ["settings", "Settings and launch"],
+                ["sharing", "Sharing"],
+                ["exports", "Exports"],
+              ].map(([code, label]) => (
+                <button
+                  key={code}
+                  aria-current={tab === code ? "page" : undefined}
+                  onClick={() => setTab(code)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      )}
       <div className="brand-container tb-shell tb-workspace-body">
         <div className="tb-qa-notice">
           QA workspace · Synthetic roster data. Production collection is not
@@ -198,477 +211,443 @@ export default function AdminPanel({
           </div>
         )}
         {message && <p role="status">{message}</p>}
-        {id && current && dashboard && <Dashboard data={dashboard} />}
-        <section
-          id="campaign-settings"
-          className="tb-card"
-          style={{ marginTop: 20 }}
-        >
-          <p className="brand-section-kicker">Campaign configuration</p>
-          <h2>Campaigns</h2>
-          <label className="tb-field">
-            <span>Choose a campaign</span>
-            <select
-              aria-label="Choose a campaign"
-              value={id}
-              onChange={(e) => {
-                const value = e.target.value;
-                setId(value);
-                setLink("");
-                setPreview(null);
-                setView(null);
-                setCurrent(null);
-                setDashboard(null);
-                setPeople([]);
-                if (value) void action(() => refresh(value));
-                else {
-                  setNotice(PRIVACY);
-                  setEntityList("");
-                }
-              }}
-            >
-              <option value="">Create a campaign</option>
-              {campaigns.map((c) => (
-                <option key={c.campaign_id} value={c.campaign_id}>
-                  {c.name} · {c.status}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset disabled={busy}>
-            {!id && (
+        {mode === "workspace" &&
+          tab === "overview" &&
+          id &&
+          current &&
+          dashboard && <Dashboard data={dashboard} />}
+        {mode === "create" || tab === "settings" ? (
+          <section
+            id="campaign-settings"
+            className="tb-card"
+            style={{ marginTop: 20 }}
+          >
+            <p className="brand-section-kicker">Campaign configuration</p>
+            <h2>{mode === "create" ? "New project" : "Project settings"}</h2>
+            <fieldset disabled={busy}>
+              {!id && (
+                <label className="tb-field">
+                  <span>Campaign name</span>
+                  <input
+                    value={name}
+                    maxLength={150}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+              )}
+              <p>
+                Questionnaire: {current?.version ?? VERSION}. The version is
+                fixed for this campaign.
+              </p>
               <label className="tb-field">
-                <span>Campaign name</span>
+                <span>Closing date (end of day, UTC)</span>
                 <input
-                  value={name}
-                  maxLength={150}
-                  onChange={(e) => setName(e.target.value)}
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
                 />
               </label>
-            )}
-            <p>
-              Questionnaire: {current?.version ?? VERSION}. The version is fixed
-              for this campaign.
-            </p>
-            <label className="tb-field">
-              <span>Closing date (end of day, UTC)</span>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
-            <label className="tb-field">
-              <span>Planned retention in days</span>
-              <input
-                type="number"
-                min={30}
-                max={730}
-                value={retention}
-                onChange={(e) => setRetention(Number(e.target.value))}
-              />
-              <small>
-                QA placeholder. Confirm controller, access, lawful use and
-                retention before real employee collection. No automatic deletion
-                runs.
-              </small>
-            </label>
-            <label className="tb-field">
-              <span>Data-use statement shown before starting</span>
-              <textarea
-                rows={6}
-                value={notice}
-                maxLength={4000}
-                onChange={(e) => setNotice(e.target.value)}
-              />
-            </label>
-            <label className="tb-field">
-              <span>Approved brands / legal entities (one per line)</span>
-              <textarea
-                rows={5}
-                value={entityList}
-                maxLength={60000}
-                onChange={(e) => setEntityList(e.target.value)}
-              />
-              <small>
-                Use the supplied team.blue list. Choices are fixed once
-                invitations are created. Leave blank for the initial QA test.
-              </small>
-            </label>
-            {current && current.version !== VERSION && (
-              <>
+              <label className="tb-field">
+                <span>Planned retention in days</span>
+                <input
+                  type="number"
+                  min={30}
+                  max={730}
+                  value={retention}
+                  onChange={(e) => setRetention(Number(e.target.value))}
+                />
+                <small>
+                  QA placeholder. Confirm controller, access, lawful use and
+                  retention before real employee collection. No automatic
+                  deletion runs.
+                </small>
+              </label>
+              <label className="tb-field">
+                <span>Data-use statement shown before starting</span>
+                <textarea
+                  rows={6}
+                  value={notice}
+                  maxLength={4000}
+                  onChange={(e) => setNotice(e.target.value)}
+                />
+              </label>
+              <label className="tb-field">
+                <span>Approved brands / legal entities (one per line)</span>
+                <textarea
+                  rows={5}
+                  value={entityList}
+                  maxLength={60000}
+                  onChange={(e) => setEntityList(e.target.value)}
+                />
+                <small>
+                  Use the supplied team.blue list. Choices are fixed once
+                  invitations are created. Leave blank for the initial QA test.
+                </small>
+              </label>
+              {current && current.version !== VERSION && (
                 <p>
-                  This campaign uses the earlier questionnaire. Its responses
-                  and exports are retained. Create a revised campaign for the
-                  updated questionnaire.
+                  This project uses an earlier questionnaire. Its responses and
+                  exports are retained.{" "}
+                  <Link href="/advisor/baseline/create">
+                    Create a new project
+                  </Link>{" "}
+                  for the updated questionnaire.
                 </p>
+              )}
+              {!id ? (
                 <button
-                  onClick={() =>
-                    void action(async () => {
-                      const result = await api("create", {
-                        name: (current.name + " — revised").slice(0, 150),
-                        closesAt: date + "T23:59:59.000Z",
-                        privacy: PRIVACY,
-                        retentionDays: retention,
-                        entityList,
-                        copyRosterFrom: id,
-                      });
-                      setId(result.campaignId);
-                      setLink("");
-                      setView(null);
-                      await refresh(result.campaignId);
-                      setMessage(
-                        "Revised draft created. Roster copied; earlier responses retained. Open this campaign and create a new private test link.",
-                      );
-                    })
-                  }
-                >
-                  Create revised campaign (copy roster)
-                </button>
-              </>
-            )}
-            {!id ? (
-              <button
-                className="tb-primary"
-                onClick={() =>
-                  void action(async () => {
-                    const result = await api("create", {
-                      name,
-                      closesAt: date + "T23:59:59.000Z",
-                      privacy: notice,
-                      retentionDays: retention,
-                      entityList,
-                    });
-                    setId(result.campaignId);
-                    await refresh(result.campaignId);
-                    setMessage(
-                      "Campaign created in draft. Import a synthetic roster, then open it.",
-                    );
-                  })
-                }
-              >
-                Create draft campaign
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() =>
-                    void action(async () => {
-                      await api("configure", {
-                        campaign: id,
-                        privacy: notice,
-                        closesAt: date + "T23:59:59.000Z",
-                        retentionDays: retention,
-                        entityList,
-                      });
-                      await refresh();
-                      setMessage("Campaign settings saved.");
-                    })
-                  }
-                >
-                  Save settings
-                </button>
-                <button
-                  disabled={
-                    current?.version !== VERSION ||
-                    process.env.NEXT_PUBLIC_APP_ENV !== "qa"
-                  }
                   className="tb-primary"
                   onClick={() =>
                     void action(async () => {
-                      await api("configure", { campaign: id, status: "open" });
-                      await refresh();
-                      setMessage("Campaign opened.");
-                    })
-                  }
-                >
-                  Open earlier questionnaire for QA testing
-                </button>
-                <button
-                  onClick={() =>
-                    void action(async () => {
-                      await api("configure", {
-                        campaign: id,
-                        status: "closed",
+                      const result = await api("create", {
+                        name,
+                        closesAt: date + "T23:59:59.000Z",
+                        privacy: notice,
+                        retentionDays: retention,
+                        entityList,
                       });
-                      await refresh();
-                      setMessage(
-                        "Campaign closed. Saved responses are retained.",
+                      router.push(
+                        "/advisor/baseline/project/" + result.campaignId,
                       );
                     })
                   }
                 >
-                  Close campaign
+                  Create project
                 </button>
-              </>
-            )}
-          </fieldset>
-        </section>
-        {id && current && (
-          <>
-            <section
-              id="roster-import"
-              className="tb-card"
-              style={{ marginTop: 20 }}
-            >
-              <p className="brand-section-kicker">Participant roster</p>
-              <h2>CSV roster import</h2>
-              <p>
-                Import a CSV with name and email. Optional columns: job_title,
-                country, region, entity, work_type, manages_people,
-                direct_reports. Management refers to formal direct reports; use
-                yes, no or not_sure. These roster fields are not shown or asked
-                in the questionnaire. Use supplied country codes. Work type
-                codes: {WORK_TYPES.map(([code]) => code).join(", ")}.
-              </p>
-              <button onClick={template}>Download CSV template</button>
-              <label className="tb-field">
-                <span>Choose a CSV (up to 200 people per file)</span>
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 250000) {
-                        setError("Use a CSV under 250 KB.");
-                        return;
-                      }
-                      setCsv(await file.text());
-                      setPreview(null);
-                    }
-                  }}
-                />
-              </label>
-              <button
-                disabled={busy || !csv}
-                onClick={() =>
-                  void action(async () => {
-                    const response = await fetch(
-                      "/advisor/baseline/api/import-preview",
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ campaign: id, csv }),
-                      },
-                    );
-                    const result = (await response.json()) as {
-                      count: number;
-                      duplicates: string[];
-                      canImport: boolean;
-                      rows: Record<string, string>[];
-                      error?: string;
-                    };
-                    if (!response.ok)
-                      throw new Error(result.error ?? "Check the CSV.");
-                    setPreview(result);
-                  })
-                }
-              >
-                Preview and validate CSV
-              </button>
-              {preview && (
-                <div className="tb-process">
-                  <h3>CSV preview</h3>
-                  <p>
-                    {preview.count} respondents. {preview.duplicates.length}{" "}
-                    emails already in this campaign.
-                  </p>
-                  {preview.rows.slice(0, 5).map((p) => (
-                    <p key={p.email}>
-                      {p.name} · {p.email} · {p.region} · {p.entity}
-                    </p>
-                  ))}
-                  {preview.count > 5 && <p>First five records shown.</p>}
-                  {preview.duplicates.length > 0 && (
-                    <p className="tb-error">
-                      Existing emails: {preview.duplicates.join(", ")}. No rows
-                      will be imported.
-                    </p>
-                  )}
+              ) : (
+                <>
                   <button
-                    disabled={busy || !preview.canImport}
                     onClick={() =>
                       void action(async () => {
-                        const result = await api("import", {
+                        await api("configure", {
                           campaign: id,
-                          csv,
+                          privacy: notice,
+                          closesAt: date + "T23:59:59.000Z",
+                          retentionDays: retention,
+                          entityList,
                         });
-                        setCsv("");
-                        setPreview(null);
+                        await refresh();
+                        setMessage("Campaign settings saved.");
+                      })
+                    }
+                  >
+                    Save settings
+                  </button>
+                  <button
+                    disabled={
+                      current?.version !== VERSION ||
+                      process.env.NEXT_PUBLIC_APP_ENV !== "qa"
+                    }
+                    className="tb-primary"
+                    onClick={() =>
+                      void action(async () => {
+                        await api("configure", {
+                          campaign: id,
+                          status: "open",
+                        });
+                        await refresh();
+                        setMessage("Campaign opened.");
+                      })
+                    }
+                  >
+                    Open earlier questionnaire for QA testing
+                  </button>
+                  <button
+                    onClick={() =>
+                      void action(async () => {
+                        await api("configure", {
+                          campaign: id,
+                          status: "closed",
+                        });
                         await refresh();
                         setMessage(
-                          `${result.imported} respondents imported. No invitations sent.`,
+                          "Campaign closed. Saved responses are retained.",
                         );
                       })
                     }
                   >
-                    Confirm import
+                    Close campaign
                   </button>
-                </div>
+                </>
               )}
-              <p>
-                QA email sending is disabled. Generate private test links to
-                exercise the journey. A new link revokes the previous link and
-                its sessions; saved answers remain.
-              </p>
-              {link && (
-                <div className="tb-detail">
-                  <p role="status">
-                    Private test invitation — do not share it publicly.
-                  </p>
+            </fieldset>
+          </section>
+        ) : null}
+        {id && current && (
+          <>
+            <div hidden={tab !== "respondents"}>
+              <section
+                id="roster-import"
+                className="tb-card"
+                style={{ marginTop: 20 }}
+              >
+                <p className="brand-section-kicker">Participant roster</p>
+                <h2>CSV roster import</h2>
+                <p>
+                  Import a CSV with name and email. Optional columns: job_title,
+                  country, region, entity, work_type, manages_people,
+                  direct_reports. Management refers to formal direct reports;
+                  use yes, no or not_sure. These roster fields are not shown or
+                  asked in the questionnaire. Use supplied country codes. Work
+                  type codes: {WORK_TYPES.map(([code]) => code).join(", ")}.
+                </p>
+                <button onClick={template}>Download CSV template</button>
+                <label className="tb-field">
+                  <span>Choose a CSV (up to 200 people per file)</span>
                   <input
-                    aria-label="Private test invitation"
-                    readOnly
-                    value={link}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 250000) {
+                          setError("Use a CSV under 250 KB.");
+                          return;
+                        }
+                        setCsv(await file.text());
+                        setPreview(null);
+                      }
+                    }}
                   />
-                  <button
-                    onClick={() =>
-                      void navigator.clipboard
-                        .writeText(link)
-                        .then(() => setMessage("Private link copied."))
-                    }
-                  >
-                    Copy private link
-                  </button>
-                  <button onClick={() => setLink("")}>Hide link</button>
-                </div>
-              )}
-              <label className="tb-field">
-                <span>Find a participant</span>
-                <input
-                  type="search"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                />
-              </label>
-              <details>
-                <summary>
-                  Earlier questionnaire: private test invitations and saved
-                  responses
-                </summary>
-                <div className="tb-roster">
-                  {people
-                    .filter((p) =>
-                      (p.email + " " + p.draft.profile.name)
-                        .toLowerCase()
-                        .includes(filter.toLowerCase()),
-                    )
-                    .map((p) => (
-                      <article key={p.participant_id} className="tb-detail">
-                        <h3>{p.draft.profile.name}</h3>
-                        <p>
-                          {p.email} · {p.status.replaceAll("_", " ")} · Step{" "}
-                          {p.progress} / 8 ·{" "}
-                          {p.active ? "Access active" : "Access revoked"}
-                        </p>
-                        <p>
-                          {p.draft.profile.job_title} ·{" "}
-                          {p.draft.profile.region || "Region not recorded"} ·{" "}
-                          {p.draft.profile.country
-                            ? countryLabel(p.draft.profile.country)
-                            : "Country not recorded"}
-                        </p>
-                        <button
-                          disabled={busy || !p.active}
-                          onClick={() =>
-                            void action(async () => {
-                              const result = await api("invite", {
-                                campaign: id,
-                                participantId: p.participant_id,
-                                send: false,
-                              });
-                              setLink(result.link);
-                              await refresh();
-                              setMessage(
-                                "Private test link created. No email was sent.",
-                              );
-                            })
-                          }
-                        >
-                          {p.invited
-                            ? "Generate replacement link"
-                            : "Generate test invitation"}
-                        </button>
-                        <button
-                          disabled={busy || !p.active}
-                          onClick={() =>
-                            void action(async () => {
-                              await api("invite", {
-                                campaign: id,
-                                participantId: p.participant_id,
-                                send: true,
-                              });
-                              await refresh();
-                              setMessage("Invitation sent.");
-                            })
-                          }
-                        >
-                          Send / resend email
-                        </button>
-                        <button onClick={() => setView(p)}>
-                          View response
-                        </button>
-                        <button
-                          disabled={busy || !p.active}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                "Revoke this person's access? Their saved response will be retained.",
-                              )
-                            )
+                </label>
+                <button
+                  disabled={busy || !csv}
+                  onClick={() =>
+                    void action(async () => {
+                      const response = await fetch(
+                        "/advisor/baseline/api/import-preview",
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ campaign: id, csv }),
+                        },
+                      );
+                      const result = (await response.json()) as {
+                        count: number;
+                        duplicates: string[];
+                        canImport: boolean;
+                        rows: Record<string, string>[];
+                        error?: string;
+                      };
+                      if (!response.ok)
+                        throw new Error(result.error ?? "Check the CSV.");
+                      setPreview(result);
+                    })
+                  }
+                >
+                  Preview and validate CSV
+                </button>
+                {preview && (
+                  <div className="tb-process">
+                    <h3>CSV preview</h3>
+                    <p>
+                      {preview.count} respondents. {preview.duplicates.length}{" "}
+                      emails already in this campaign.
+                    </p>
+                    {preview.rows.slice(0, 5).map((p) => (
+                      <p key={p.email}>
+                        {p.name} · {p.email} · {p.region} · {p.entity}
+                      </p>
+                    ))}
+                    {preview.count > 5 && <p>First five records shown.</p>}
+                    {preview.duplicates.length > 0 && (
+                      <p className="tb-error">
+                        Existing emails: {preview.duplicates.join(", ")}. No
+                        rows will be imported.
+                      </p>
+                    )}
+                    <button
+                      disabled={busy || !preview.canImport}
+                      onClick={() =>
+                        void action(async () => {
+                          const result = await api("import", {
+                            campaign: id,
+                            csv,
+                          });
+                          setCsv("");
+                          setPreview(null);
+                          await refresh();
+                          setMessage(
+                            `${result.imported} respondents imported. No invitations sent.`,
+                          );
+                        })
+                      }
+                    >
+                      Confirm import
+                    </button>
+                  </div>
+                )}
+                <p>
+                  QA email sending is disabled. Generate private test links to
+                  exercise the journey. A new link revokes the previous link and
+                  its sessions; saved answers remain.
+                </p>
+                {link && (
+                  <div className="tb-detail">
+                    <p role="status">
+                      Private test invitation — do not share it publicly.
+                    </p>
+                    <input
+                      aria-label="Private test invitation"
+                      readOnly
+                      value={link}
+                    />
+                    <button
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(link)
+                          .then(() => setMessage("Private link copied."))
+                      }
+                    >
+                      Copy private link
+                    </button>
+                    <button onClick={() => setLink("")}>Hide link</button>
+                  </div>
+                )}
+                <label className="tb-field">
+                  <span>Find a participant</span>
+                  <input
+                    type="search"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                  />
+                </label>
+                <details>
+                  <summary>
+                    Earlier questionnaire: private test invitations and saved
+                    responses
+                  </summary>
+                  <div className="tb-roster">
+                    {people
+                      .filter((p) =>
+                        (p.email + " " + p.draft.profile.name)
+                          .toLowerCase()
+                          .includes(filter.toLowerCase()),
+                      )
+                      .map((p) => (
+                        <article key={p.participant_id} className="tb-detail">
+                          <h3>{p.draft.profile.name}</h3>
+                          <p>
+                            {p.email} · {p.status.replaceAll("_", " ")} · Step{" "}
+                            {p.progress} / 8 ·{" "}
+                            {p.active ? "Access active" : "Access revoked"}
+                          </p>
+                          <p>
+                            {p.draft.profile.job_title} ·{" "}
+                            {p.draft.profile.region || "Region not recorded"} ·{" "}
+                            {p.draft.profile.country
+                              ? countryLabel(p.draft.profile.country)
+                              : "Country not recorded"}
+                          </p>
+                          <button
+                            disabled={busy || !p.active}
+                            onClick={() =>
                               void action(async () => {
-                                await api("revoke", {
+                                const result = await api("invite", {
                                   campaign: id,
                                   participantId: p.participant_id,
+                                  send: false,
+                                });
+                                setLink(result.link);
+                                await refresh();
+                                setMessage(
+                                  "Private test link created. No email was sent.",
+                                );
+                              })
+                            }
+                          >
+                            {p.invited
+                              ? "Generate replacement link"
+                              : "Generate test invitation"}
+                          </button>
+                          <button
+                            disabled={busy || !p.active}
+                            onClick={() =>
+                              void action(async () => {
+                                await api("invite", {
+                                  campaign: id,
+                                  participantId: p.participant_id,
+                                  send: true,
                                 });
                                 await refresh();
-                              });
-                          }}
-                        >
-                          Revoke access
-                        </button>
-                      </article>
-                    ))}
-                </div>
-              </details>
-            </section>
+                                setMessage("Invitation sent.");
+                              })
+                            }
+                          >
+                            Send / resend email
+                          </button>
+                          <button onClick={() => setView(p)}>
+                            View response
+                          </button>
+                          <button
+                            disabled={busy || !p.active}
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  "Revoke this person's access? Their saved response will be retained.",
+                                )
+                              )
+                                void action(async () => {
+                                  await api("revoke", {
+                                    campaign: id,
+                                    participantId: p.participant_id,
+                                  });
+                                  await refresh();
+                                });
+                            }}
+                          >
+                            Revoke access
+                          </button>
+                        </article>
+                      ))}
+                  </div>
+                </details>
+              </section>
+            </div>
             <Administration
+              section={tab}
               campaign={id}
               name={current.name}
               people={people}
               refresh={() => refresh()}
             />
-            <section id="exports" className="tb-card" style={{ marginTop: 20 }}>
-              <p className="brand-section-kicker">Data downloads</p>
-              <h2>Analysis-ready exports</h2>
-              <p>
-                Includes response status, questionnaire version and current work
-                type. Reception and Facilities are mapped to People Operations,
-                without losing their work-type classification. Draft answers are
-                clearly marked; do not treat them as completed responses.
-              </p>
-              {(["respondents", "activities", "json"] as const).map(
-                (format) => (
-                  <a
-                    style={{
-                      display: "inline-block",
-                      padding: 12,
-                      textDecoration: "underline",
-                    }}
-                    key={format}
-                    href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=${format}`}
-                  >
-                    {format === "respondents"
-                      ? "Respondent-level CSV"
-                      : format === "activities"
-                        ? "Work-area-level CSV"
-                        : "Complete structured JSON"}
-                  </a>
-                ),
-              )}
-            </section>
-            {view && (
+            <div hidden={tab !== "exports"}>
+              <section
+                id="exports"
+                className="tb-card"
+                style={{ marginTop: 20 }}
+              >
+                <p className="brand-section-kicker">Data downloads</p>
+                <h2>Analysis-ready exports</h2>
+                <p>
+                  Includes response status, questionnaire version and current
+                  work type. Reception and Facilities are mapped to People
+                  Operations, without losing their work-type classification.
+                  Draft answers are clearly marked; do not treat them as
+                  completed responses.
+                </p>
+                {(["respondents", "activities", "json"] as const).map(
+                  (format) => (
+                    <a
+                      style={{
+                        display: "inline-block",
+                        padding: 12,
+                        textDecoration: "underline",
+                      }}
+                      key={format}
+                      href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=${format}`}
+                    >
+                      {format === "respondents"
+                        ? "Respondent-level CSV"
+                        : format === "activities"
+                          ? "Work-area-level CSV"
+                          : "Complete structured JSON"}
+                    </a>
+                  ),
+                )}
+              </section>
+            </div>
+            {view && tab === "respondents" && (
               <section className="tb-card" style={{ marginTop: 20 }}>
                 <h2>Response: {view.draft.profile.name}</h2>
                 <button onClick={() => setView(null)}>Close response</button>

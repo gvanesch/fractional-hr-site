@@ -38,7 +38,9 @@ export default function Administration({
   name,
   people,
   refresh,
+  section,
 }: {
+  section: string;
   campaign: string;
   name: string;
   people: Person[];
@@ -119,556 +121,570 @@ export default function Administration({
   }
   return (
     <>
-      <section className="tb-card" style={{ marginTop: 20 }}>
-        <p className="brand-section-kicker">Campaign controls</p>
-        <h2>Launch readiness</h2>
-        {error && (
-          <p className="tb-error" role="alert">
-            {error}
+      {error && (
+        <p className="tb-error" role="alert">
+          {error}
+        </p>
+      )}
+      {message && <p role="status">{message}</p>}
+      <div hidden={section !== "settings"}>
+        <section className="tb-card" style={{ marginTop: 20 }}>
+          <p className="brand-section-kicker">Campaign controls</p>
+          <h2>Launch readiness</h2>
+          {readiness && (
+            <>
+              <p>
+                {readiness.active} active respondents · {readiness.toInvite} not
+                yet invited · Questionnaire {readiness.questionnaireVersion}
+              </p>
+              {readiness.blockers.length > 0 && (
+                <div className="tb-error">
+                  <strong>Launch is blocked</strong>
+                  <ul>
+                    {readiness.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {readiness.warnings.map((w) => (
+                <p key={w}>{w}</p>
+              ))}
+              <label className="tb-field">
+                <span>Confirm campaign name to launch</span>
+                <input
+                  value={confirmation}
+                  onChange={(e) => setConfirmation(e.target.value)}
+                />
+              </label>
+              <button
+                className="tb-primary"
+                disabled={busy || !readiness.ready || confirmation !== name}
+                onClick={() =>
+                  void run(async () => {
+                    await call("launch", {
+                      campaign,
+                      confirmation,
+                      expectedActive: readiness.active,
+                    });
+                    setMessage(
+                      "Campaign launched. Review the roster and send invitations in batches.",
+                    );
+                  })
+                }
+              >
+                Launch campaign
+              </button>
+              <p>
+                Launch opens collection. Emails are sent separately to the
+                selected roster batch. QA sending remains disabled.
+              </p>
+            </>
+          )}
+        </section>
+      </div>
+      <div hidden={section !== "respondents"}>
+        <section id="respondents" className="tb-card" style={{ marginTop: 20 }}>
+          <p className="brand-section-kicker">Participant register</p>
+          <h2>Manage respondents</h2>
+          <button disabled={busy} onClick={() => edit(null)}>
+            Add respondent
+          </button>
+          <p>
+            Changes affect roster metadata. Submitted answers are retained.
+            Removing a respondent withdraws access. Changing their email
+            invalidates their old invitation and session.
           </p>
-        )}
-        {message && <p role="status">{message}</p>}
-        {readiness && (
-          <>
-            <p>
-              {readiness.active} active respondents · {readiness.toInvite} not
-              yet invited · Questionnaire {readiness.questionnaireVersion}
-            </p>
-            {readiness.blockers.length > 0 && (
-              <div className="tb-error">
-                <strong>Launch is blocked</strong>
-                <ul>
-                  {readiness.blockers.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {readiness.warnings.map((w) => (
-              <p key={w}>{w}</p>
-            ))}
+          <div className="tb-register-filters">
             <label className="tb-field">
-              <span>Confirm campaign name to launch</span>
+              <span>Search participant list</span>
               <input
-                value={confirmation}
-                onChange={(e) => setConfirmation(e.target.value)}
+                aria-label="Search participant list"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name, email, role, region, entity or team"
               />
             </label>
-            <button
-              className="tb-primary"
-              disabled={busy || !readiness.ready || confirmation !== name}
-              onClick={() =>
-                void run(async () => {
-                  await call("launch", {
-                    campaign,
-                    confirmation,
-                    expectedActive: readiness.active,
-                  });
-                  setMessage(
-                    "Campaign launched. Review the roster and send invitations in batches.",
-                  );
-                })
-              }
-            >
-              Launch campaign
-            </button>
-            <p>
-              Launch opens collection. Emails are sent separately to the
-              selected roster batch. QA sending remains disabled.
-            </p>
-          </>
-        )}
-      </section>
-      <section id="respondents" className="tb-card" style={{ marginTop: 20 }}>
-        <p className="brand-section-kicker">Participant register</p>
-        <h2>Manage respondents</h2>
-        <button disabled={busy} onClick={() => edit(null)}>
-          Add respondent
-        </button>
-        <p>
-          Changes affect roster metadata. Submitted answers are retained.
-          Removing a respondent withdraws access. Changing their email
-          invalidates their old invitation and session.
-        </p>
-        <div className="tb-register-filters">
-          <label className="tb-field">
-            <span>Search participant list</span>
-            <input
-              aria-label="Search participant list"
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, email, role, region, entity or team"
-            />
-          </label>
-          <label className="tb-field">
-            <span>Participant status</span>
-            <select
-              aria-label="Participant status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              {[
-                ["all", "All"],
-                ["not_started", "Not started"],
-                ["in_progress", "In progress"],
-                ["completed", "Completed"],
-                ["withdrawn", "Withdrawn"],
-              ].map(([c, l]) => (
-                <option key={c} value={c}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="tb-field">
-            <span>Filter by regional leader</span>
-            <select
-              aria-label="Filter by regional leader"
-              value={leaderFilter}
-              onChange={(e) => setLeaderFilter(e.target.value)}
-            >
-              <option value="">All regional leaders</option>
-              {[
-                ...new Set(
-                  people
-                    .map((p) => p.roster.regional_leader_email)
-                    .filter(Boolean),
-                ),
-              ]
-                .sort()
-                .map((email) => (
-                  <option key={email} value={email}>
-                    {people.find(
-                      (p) => p.roster.regional_leader_email === email,
-                    )?.roster.regional_leader_name || email}
+            <label className="tb-field">
+              <span>Participant status</span>
+              <select
+                aria-label="Participant status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                {[
+                  ["all", "All"],
+                  ["not_started", "Not started"],
+                  ["in_progress", "In progress"],
+                  ["completed", "Completed"],
+                  ["withdrawn", "Withdrawn"],
+                ].map(([c, l]) => (
+                  <option key={c} value={c}>
+                    {l}
                   </option>
                 ))}
-            </select>
-          </label>
-        </div>
-        <div className="tb-management-grid">
-          {people
-            .filter((p) =>
-              [
-                p.profile.name,
-                p.email,
-                p.profile.job_title,
-                p.profile.country,
-                p.profile.region,
-                p.profile.entity,
-                p.roster.team,
-                p.roster.regional_leader_name,
-              ]
-                .join(" ")
-                .toLowerCase()
-                .includes(search.toLowerCase()),
-            )
-            .filter(
-              (p) =>
-                statusFilter === "all" ||
-                (statusFilter === "withdrawn"
-                  ? !p.active
-                  : p.active && p.status === statusFilter),
-            )
-            .filter(
-              (p) =>
-                !leaderFilter ||
-                p.roster.regional_leader_email === leaderFilter,
-            )
-            .map((p) => (
-              <article
-                className="tb-detail tb-management-card"
-                key={p.participant_id}
+              </select>
+            </label>
+            <label className="tb-field">
+              <span>Filter by regional leader</span>
+              <select
+                aria-label="Filter by regional leader"
+                value={leaderFilter}
+                onChange={(e) => setLeaderFilter(e.target.value)}
               >
-                <div className="tb-register-identity">
-                  <h3>{p.profile.name}</h3>
-                  <span
-                    className="tb-status"
-                    data-status={p.active ? p.status : "withdrawn"}
-                  >
-                    {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"}
-                  </span>
-                </div>
-                <p>
-                  {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
-                  {p.active ? "Active" : "Removed"}
-                </p>
-                <p>
-                  {p.profile.job_title} · {p.roster.team || p.profile.entity} ·{" "}
-                  {p.roster.contracted_hours
-                    ? `${p.roster.contracted_hours} hours/week`
-                    : p.roster.working_fraction
-                      ? `Working fraction ${p.roster.working_fraction}`
-                      : "Capacity not recorded"}
-                </p>
-                <p>
-                  Regional leader:{" "}
-                  {p.roster.regional_leader_name ||
-                    p.roster.regional_leader_email ||
-                    "Not recorded"}
-                </p>
-                <p>
-                  Step {p.progress} · Invitation expires{" "}
-                  {p.invite_expires_at
-                    ? new Date(p.invite_expires_at).toLocaleDateString("en-GB")
-                    : "Not issued"}
-                </p>
-                <label>
-                  <input
-                    type="checkbox"
-                    aria-label={"Select respondent: " + p.email}
-                    disabled={!p.active || p.status === "completed" || busy}
-                    checked={selected.includes(p.participant_id)}
-                    onChange={() =>
-                      setSelected(
-                        selected.includes(p.participant_id)
-                          ? selected.filter((id) => id !== p.participant_id)
-                          : [...selected, p.participant_id],
-                      )
-                    }
-                  />{" "}
-                  Select for invitation / reminder
-                </label>
-                <div className="tb-respondent-controls">
-                  <button
-                    disabled={
-                      busy ||
-                      !readiness?.ready ||
-                      !p.active ||
-                      p.status === "completed"
-                    }
-                    onClick={() =>
-                      void run(async () => {
-                        await call("invite", {
-                          campaign,
-                          participantId: p.participant_id,
-                          send: true,
-                        });
-                        setMessage("Invitation sent again.");
-                      })
-                    }
-                  >
-                    Resend invitation
-                  </button>
-                  <label className="tb-field">
-                    <span>Extra invitation days</span>
+                <option value="">All regional leaders</option>
+                {[
+                  ...new Set(
+                    people
+                      .map((p) => p.roster.regional_leader_email)
+                      .filter(Boolean),
+                  ),
+                ]
+                  .sort()
+                  .map((email) => (
+                    <option key={email} value={email}>
+                      {people.find(
+                        (p) => p.roster.regional_leader_email === email,
+                      )?.roster.regional_leader_name || email}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+          <div className="tb-management-grid">
+            {people
+              .filter((p) =>
+                [
+                  p.profile.name,
+                  p.email,
+                  p.profile.job_title,
+                  p.profile.country,
+                  p.profile.region,
+                  p.profile.entity,
+                  p.roster.team,
+                  p.roster.regional_leader_name,
+                ]
+                  .join(" ")
+                  .toLowerCase()
+                  .includes(search.toLowerCase()),
+              )
+              .filter(
+                (p) =>
+                  statusFilter === "all" ||
+                  (statusFilter === "withdrawn"
+                    ? !p.active
+                    : p.active && p.status === statusFilter),
+              )
+              .filter(
+                (p) =>
+                  !leaderFilter ||
+                  p.roster.regional_leader_email === leaderFilter,
+              )
+              .map((p) => (
+                <article
+                  className="tb-detail tb-management-card"
+                  key={p.participant_id}
+                >
+                  <div className="tb-register-identity">
+                    <h3>{p.profile.name}</h3>
+                    <span
+                      className="tb-status"
+                      data-status={p.active ? p.status : "withdrawn"}
+                    >
+                      {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"}
+                    </span>
+                  </div>
+                  <p>
+                    {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
+                    {p.active ? "Active" : "Removed"}
+                  </p>
+                  <p>
+                    {p.profile.job_title} · {p.roster.team || p.profile.entity}{" "}
+                    ·{" "}
+                    {p.roster.contracted_hours
+                      ? `${p.roster.contracted_hours} hours/week`
+                      : p.roster.working_fraction
+                        ? `Working fraction ${p.roster.working_fraction}`
+                        : "Capacity not recorded"}
+                  </p>
+                  <p>
+                    Regional leader:{" "}
+                    {p.roster.regional_leader_name ||
+                      p.roster.regional_leader_email ||
+                      "Not recorded"}
+                  </p>
+                  <p>
+                    Step {p.progress} · Invitation expires{" "}
+                    {p.invite_expires_at
+                      ? new Date(p.invite_expires_at).toLocaleDateString(
+                          "en-GB",
+                        )
+                      : "Not issued"}
+                  </p>
+                  <label>
                     <input
-                      aria-label={"Extra invitation days: " + p.email}
-                      type="number"
-                      min={1}
-                      max={90}
-                      value={extensionDays[p.participant_id] ?? 21}
-                      onChange={(e) =>
-                        setExtensionDays({
-                          ...extensionDays,
-                          [p.participant_id]: Number(e.target.value),
+                      type="checkbox"
+                      aria-label={"Select respondent: " + p.email}
+                      disabled={!p.active || p.status === "completed" || busy}
+                      checked={selected.includes(p.participant_id)}
+                      onChange={() =>
+                        setSelected(
+                          selected.includes(p.participant_id)
+                            ? selected.filter((id) => id !== p.participant_id)
+                            : [...selected, p.participant_id],
+                        )
+                      }
+                    />{" "}
+                    Select for invitation / reminder
+                  </label>
+                  <div className="tb-respondent-controls">
+                    <button
+                      disabled={
+                        busy ||
+                        !readiness?.ready ||
+                        !p.active ||
+                        p.status === "completed"
+                      }
+                      onClick={() =>
+                        void run(async () => {
+                          await call("invite", {
+                            campaign,
+                            participantId: p.participant_id,
+                            send: true,
+                          });
+                          setMessage("Invitation sent again.");
                         })
                       }
-                    />
-                  </label>
-                  <button
-                    disabled={
-                      busy ||
-                      !p.active ||
-                      p.status === "completed" ||
-                      !p.invite_expires_at
-                    }
-                    onClick={() =>
-                      void run(async () => {
-                        await call("extend", {
-                          campaign,
-                          participantId: p.participant_id,
-                          revision: p.revision,
-                          days: extensionDays[p.participant_id] ?? 21,
-                        });
-                        setMessage(
-                          "Invitation extended. The same private link continues to work.",
-                        );
-                      })
-                    }
-                  >
-                    Extend invitation
-                  </button>
-                  <button disabled={busy} onClick={() => edit(p)}>
-                    Edit respondent
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          p.active
-                            ? "Remove this respondent? Their answers will be retained and access withdrawn."
-                            : "Reinstate this respondent? A fresh invitation will be needed.",
-                        )
-                      )
-                        void run(() =>
-                          change(p, p.active ? "remove" : "reinstate"),
-                        );
-                    }}
-                  >
-                    {p.active ? "Withdraw respondent" : "Reinstate respondent"}
-                  </button>
-                </div>
-              </article>
-            ))}
-        </div>
-        <button
-          disabled={
-            busy ||
-            !readiness?.ready ||
-            !selected.length ||
-            selected.length > 20
-          }
-          onClick={() => {
-            if (
-              window.confirm(
-                `Send invitations or reminders to ${selected.length} selected respondents? Existing links will be replaced.`,
-              )
-            )
-              void run(async () => {
-                const r = await call<{ sent: string[]; failed: string[] }>(
-                  "invite-batch",
-                  { campaign, participantIds: selected },
-                );
-                setSelected(r.failed);
-                setMessage(
-                  `${r.sent.length} emails sent. ${r.failed.length} failed; only failed rows remain selected.`,
-                );
-              });
-          }}
-        >
-          Send selected invitations / reminders ({selected.length}/20)
-        </button>
-        {editing && (
-          <form
-            className="tb-process"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                const csv = toCsv([
-                  Object.fromEntries(
-                    ROSTER_FIELDS.map((k) => [k, fields[k] ?? ""]),
-                  ),
-                ]);
-                if (person)
-                  await call("participant", {
-                    campaign,
-                    participantId: person.participant_id,
-                    revision: person.revision,
-                    action: "edit",
-                    csv,
-                  });
-                else await call("import", { campaign, csv });
-                setEditing(false);
-                setMessage(
-                  person
-                    ? "Respondent details saved. If the email changed, issue a fresh invitation."
-                    : "Respondent added. No invitation sent.",
-                );
-              });
-            }}
-          >
-            <h3>{person ? "Edit respondent" : "Add respondent"}</h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
-                gap: 12,
-              }}
-            >
-              {ROSTER_FIELDS.map((k) => (
-                <label key={k} className="tb-field">
-                  <span>
-                    {FIELD_LABELS[k]}
-                    {["name", "email"].includes(k) ? " *" : ""}
-                  </span>
-                  {["work_type", "manages_people"].includes(k) ? (
-                    <select
-                      value={fields[k] ?? ""}
-                      onChange={(e) =>
-                        setFields({ ...fields, [k]: e.target.value })
+                    >
+                      Resend invitation
+                    </button>
+                    <label className="tb-field">
+                      <span>Extra invitation days</span>
+                      <input
+                        aria-label={"Extra invitation days: " + p.email}
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={extensionDays[p.participant_id] ?? 21}
+                        onChange={(e) =>
+                          setExtensionDays({
+                            ...extensionDays,
+                            [p.participant_id]: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <button
+                      disabled={
+                        busy ||
+                        !p.active ||
+                        p.status === "completed" ||
+                        !p.invite_expires_at
+                      }
+                      onClick={() =>
+                        void run(async () => {
+                          await call("extend", {
+                            campaign,
+                            participantId: p.participant_id,
+                            revision: p.revision,
+                            days: extensionDays[p.participant_id] ?? 21,
+                          });
+                          setMessage(
+                            "Invitation extended. The same private link continues to work.",
+                          );
+                        })
                       }
                     >
-                      <option value="">Not recorded</option>
-                      {(k === "work_type"
-                        ? WORK_TYPES
-                        : [
-                            ["yes", "Yes"],
-                            ["no", "No"],
-                            ["not_sure", "Not sure"],
-                          ]
-                      ).map(([c, l]) => (
-                        <option key={c} value={c}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      required={["name", "email"].includes(k)}
-                      type={k.includes("email") ? "email" : "text"}
-                      maxLength={250}
-                      value={fields[k] ?? ""}
-                      onChange={(e) =>
-                        setFields({ ...fields, [k]: e.target.value })
-                      }
-                    />
-                  )}
-                </label>
+                      Extend invitation
+                    </button>
+                    <button disabled={busy} onClick={() => edit(p)}>
+                      Edit respondent
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            p.active
+                              ? "Remove this respondent? Their answers will be retained and access withdrawn."
+                              : "Reinstate this respondent? A fresh invitation will be needed.",
+                          )
+                        )
+                          void run(() =>
+                            change(p, p.active ? "remove" : "reinstate"),
+                          );
+                      }}
+                    >
+                      {p.active
+                        ? "Withdraw respondent"
+                        : "Reinstate respondent"}
+                    </button>
+                  </div>
+                </article>
               ))}
-            </div>
-            <p>
-              Hours use the same weekly basis. Working fraction is 0–1, for
-              example 0.8. Record formal direct reports only. Do not upload
-              salary, performance ratings or sensitive personal data.
-            </p>
-            <button disabled={busy} className="tb-primary" type="submit">
-              Save respondent
-            </button>
-            <button type="button" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </form>
-        )}
-      </section>
-      <section id="sharing" className="tb-card" style={{ marginTop: 20 }}>
-        <p className="brand-section-kicker">Leadership access</p>
-        <h2>Share a read-only dashboard</h2>
-        <p>
-          Create separate private links for Gaia or regional leaders. Links show
-          named respondents and completion status. Gaia can see the full roster.
-          Regional leaders see only respondents assigned to their work email in
-          the CSV. Individual answers and exports remain in the authorised admin
-          area. Anyone holding a link can see its dashboard until expiry or
-          revocation; share privately.
-        </p>
-        <label className="tb-field">
-          <span>Viewer / audience label</span>
-          <input
-            maxLength={150}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-        </label>
-        <label className="tb-field">
-          <span>Link expiry in days (1–30)</span>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          />
-        </label>
-        <label className="tb-field">
-          <span>Dashboard visibility</span>
-          <select
-            aria-label="Dashboard visibility"
-            value={shareRole}
-            onChange={(e) => setShareRole(e.target.value)}
+          </div>
+          <button
+            disabled={
+              busy ||
+              !readiness?.ready ||
+              !selected.length ||
+              selected.length > 20
+            }
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Send invitations or reminders to ${selected.length} selected respondents? Existing links will be replaced.`,
+                )
+              )
+                void run(async () => {
+                  const r = await call<{ sent: string[]; failed: string[] }>(
+                    "invite-batch",
+                    { campaign, participantIds: selected },
+                  );
+                  setSelected(r.failed);
+                  setMessage(
+                    `${r.sent.length} emails sent. ${r.failed.length} failed; only failed rows remain selected.`,
+                  );
+                });
+            }}
           >
-            <option value="regional_lead">
-              Regional leader: assigned team only
-            </option>
-            <option value="all">Gaia: full campaign visibility</option>
-          </select>
-        </label>
-        {shareRole === "regional_lead" && (
-          <label className="tb-field">
-            <span>Regional leader from CSV</span>
-            <select
-              aria-label="Regional leader from CSV"
-              value={regionalLeaderEmail}
-              onChange={(e) => setRegionalLeaderEmail(e.target.value)}
+            Send selected invitations / reminders ({selected.length}/20)
+          </button>
+          {editing && (
+            <form
+              className="tb-process"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  const csv = toCsv([
+                    Object.fromEntries(
+                      ROSTER_FIELDS.map((k) => [k, fields[k] ?? ""]),
+                    ),
+                  ]);
+                  if (person)
+                    await call("participant", {
+                      campaign,
+                      participantId: person.participant_id,
+                      revision: person.revision,
+                      action: "edit",
+                      csv,
+                    });
+                  else await call("import", { campaign, csv });
+                  setEditing(false);
+                  setMessage(
+                    person
+                      ? "Respondent details saved. If the email changed, issue a fresh invitation."
+                      : "Respondent added. No invitation sent.",
+                  );
+                });
+              }}
             >
-              <option value="">Choose a regional leader</option>
-              {[
-                ...new Set(
-                  people
-                    .map((p) => p.roster.regional_leader_email)
-                    .filter(Boolean),
-                ),
-              ]
-                .sort()
-                .map((email) => (
-                  <option key={email} value={email}>
-                    {people.find(
-                      (p) => p.roster.regional_leader_email === email,
-                    )?.roster.regional_leader_name || email}{" "}
-                    · {email}
-                  </option>
+              <h3>{person ? "Edit respondent" : "Add respondent"}</h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
+                  gap: 12,
+                }}
+              >
+                {ROSTER_FIELDS.map((k) => (
+                  <label key={k} className="tb-field">
+                    <span>
+                      {FIELD_LABELS[k]}
+                      {["name", "email"].includes(k) ? " *" : ""}
+                    </span>
+                    {["work_type", "manages_people"].includes(k) ? (
+                      <select
+                        value={fields[k] ?? ""}
+                        onChange={(e) =>
+                          setFields({ ...fields, [k]: e.target.value })
+                        }
+                      >
+                        <option value="">Not recorded</option>
+                        {(k === "work_type"
+                          ? WORK_TYPES
+                          : [
+                              ["yes", "Yes"],
+                              ["no", "No"],
+                              ["not_sure", "Not sure"],
+                            ]
+                        ).map(([c, l]) => (
+                          <option key={c} value={c}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        required={["name", "email"].includes(k)}
+                        type={k.includes("email") ? "email" : "text"}
+                        maxLength={250}
+                        value={fields[k] ?? ""}
+                        onChange={(e) =>
+                          setFields({ ...fields, [k]: e.target.value })
+                        }
+                      />
+                    )}
+                  </label>
                 ))}
+              </div>
+              <p>
+                Hours use the same weekly basis. Working fraction is 0–1, for
+                example 0.8. Record formal direct reports only. Do not upload
+                salary, performance ratings or sensitive personal data.
+              </p>
+              <button disabled={busy} className="tb-primary" type="submit">
+                Save respondent
+              </button>
+              <button type="button" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </form>
+          )}
+        </section>
+      </div>
+      <div hidden={section !== "sharing"}>
+        <section id="sharing" className="tb-card" style={{ marginTop: 20 }}>
+          <p className="brand-section-kicker">Leadership access</p>
+          <h2>Share a read-only dashboard</h2>
+          <p>
+            Create separate private links for Gaia or regional leaders. Links
+            show named respondents and completion status. Gaia can see the full
+            roster. Regional leaders see only respondents assigned to their work
+            email in the CSV. Individual answers and exports remain in the
+            authorised admin area. Anyone holding a link can see its dashboard
+            until expiry or revocation; share privately.
+          </p>
+          <label className="tb-field">
+            <span>Viewer / audience label</span>
+            <input
+              maxLength={150}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </label>
+          <label className="tb-field">
+            <span>Link expiry in days (1–30)</span>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+            />
+          </label>
+          <label className="tb-field">
+            <span>Dashboard visibility</span>
+            <select
+              aria-label="Dashboard visibility"
+              value={shareRole}
+              onChange={(e) => setShareRole(e.target.value)}
+            >
+              <option value="regional_lead">
+                Regional leader: assigned team only
+              </option>
+              <option value="all">Gaia: full campaign visibility</option>
             </select>
           </label>
-        )}
-        <button
-          disabled={
-            busy ||
-            !label.trim() ||
-            (shareRole === "regional_lead" && !regionalLeaderEmail)
-          }
-          onClick={() =>
-            void run(async () => {
-              const r = await call<{ link: string }>("share", {
-                campaign,
-                label,
-                days,
-                scope: {
-                  role: shareRole,
-                  regionalLeaderEmail:
-                    shareRole === "regional_lead" ? regionalLeaderEmail : "",
-                },
-              });
-              setShareLink(r.link);
-              setMessage("Private dashboard link created. No email sent.");
-            })
-          }
-        >
-          Create dashboard link
-        </button>
-        {shareLink && (
-          <div className="tb-detail">
-            <input
-              aria-label="Private dashboard link"
-              readOnly
-              value={shareLink}
-            />
-            <button
-              onClick={() =>
-                void navigator.clipboard
-                  .writeText(shareLink)
-                  .then(() => setMessage("Dashboard link copied."))
-              }
-            >
-              Copy dashboard link
-            </button>
-            <button onClick={() => setShareLink("")}>Hide link</button>
-          </div>
-        )}
-        {shares.map((s) => (
-          <article className="tb-detail" key={s.share_id}>
-            <strong>{s.label}</strong>
-            <p>
-              {s.revoked_at
-                ? "Revoked"
-                : "Expires " + new Date(s.expires_at).toLocaleString("en-GB")}
-            </p>
-            <button
-              disabled={busy || Boolean(s.revoked_at)}
-              onClick={() =>
-                void run(async () => {
-                  await call("share-revoke", { campaign, shareId: s.share_id });
-                  setMessage("Dashboard link revoked.");
-                })
-              }
-            >
-              Revoke dashboard link
-            </button>
-          </article>
-        ))}
-      </section>
+          {shareRole === "regional_lead" && (
+            <label className="tb-field">
+              <span>Regional leader from CSV</span>
+              <select
+                aria-label="Regional leader from CSV"
+                value={regionalLeaderEmail}
+                onChange={(e) => setRegionalLeaderEmail(e.target.value)}
+              >
+                <option value="">Choose a regional leader</option>
+                {[
+                  ...new Set(
+                    people
+                      .map((p) => p.roster.regional_leader_email)
+                      .filter(Boolean),
+                  ),
+                ]
+                  .sort()
+                  .map((email) => (
+                    <option key={email} value={email}>
+                      {people.find(
+                        (p) => p.roster.regional_leader_email === email,
+                      )?.roster.regional_leader_name || email}{" "}
+                      · {email}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+          <button
+            disabled={
+              busy ||
+              !label.trim() ||
+              (shareRole === "regional_lead" && !regionalLeaderEmail)
+            }
+            onClick={() =>
+              void run(async () => {
+                const r = await call<{ link: string }>("share", {
+                  campaign,
+                  label,
+                  days,
+                  scope: {
+                    role: shareRole,
+                    regionalLeaderEmail:
+                      shareRole === "regional_lead" ? regionalLeaderEmail : "",
+                  },
+                });
+                setShareLink(r.link);
+                setMessage("Private dashboard link created. No email sent.");
+              })
+            }
+          >
+            Create dashboard link
+          </button>
+          {shareLink && (
+            <div className="tb-detail">
+              <input
+                aria-label="Private dashboard link"
+                readOnly
+                value={shareLink}
+              />
+              <button
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(shareLink)
+                    .then(() => setMessage("Dashboard link copied."))
+                }
+              >
+                Copy dashboard link
+              </button>
+              <button onClick={() => setShareLink("")}>Hide link</button>
+            </div>
+          )}
+          {shares.map((s) => (
+            <article className="tb-detail" key={s.share_id}>
+              <strong>{s.label}</strong>
+              <p>
+                {s.revoked_at
+                  ? "Revoked"
+                  : "Expires " + new Date(s.expires_at).toLocaleString("en-GB")}
+              </p>
+              <button
+                disabled={busy || Boolean(s.revoked_at)}
+                onClick={() =>
+                  void run(async () => {
+                    await call("share-revoke", {
+                      campaign,
+                      shareId: s.share_id,
+                    });
+                    setMessage("Dashboard link revoked.");
+                  })
+                }
+              >
+                Revoke dashboard link
+              </button>
+            </article>
+          ))}
+        </section>
+      </div>
     </>
   );
 }

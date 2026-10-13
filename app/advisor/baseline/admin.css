@@ -304,3 +304,20 @@
     padding: 16px;
   }
 }
+.tb-workspace-nav button {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-workspace-nav button[aria-current="page"] {
+  background: #0d1f3c;
+  color: white;
+  border-color: #0d1f3c;
+}
+.tb-advisor [hidden] {
+  display: none !important;
+}
