@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { COLLECTION_VERSION } from "@/lib/baseline/collection";
 import Administration from "./administration";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
@@ -89,6 +90,7 @@ export default function AdminPanel({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [link, setLink] = useState(""),
+    [qaCode, setQaCode] = useState(""),
     [view, setView] = useState<Person | null>(null),
     [filter, setFilter] = useState("");
   async function refresh(campaign = id) {
@@ -245,8 +247,8 @@ export default function AdminPanel({
                 </label>
               )}
               <p>
-                Questionnaire: {current?.version ?? VERSION}. The version is
-                fixed for this campaign.
+                Questionnaire: {current?.version ?? COLLECTION_VERSION}. The
+                version is fixed for this campaign.
               </p>
               <label className="tb-field">
                 <span>Closing date (end of day, UTC)</span>
@@ -293,7 +295,7 @@ export default function AdminPanel({
                   invitations are created. Leave blank for the initial QA test.
                 </small>
               </label>
-              {current && current.version !== VERSION && (
+              {current && current.version !== COLLECTION_VERSION && (
                 <p>
                   This project uses an earlier questionnaire. Its responses and
                   exports are retained.{" "}
@@ -309,6 +311,7 @@ export default function AdminPanel({
                   onClick={() =>
                     void action(async () => {
                       const result = await api("create", {
+                        questionnaireVersion: COLLECTION_VERSION,
                         name,
                         closesAt: date + "T23:59:59.000Z",
                         privacy: notice,
@@ -359,7 +362,7 @@ export default function AdminPanel({
                       })
                     }
                   >
-                    Open earlier questionnaire for QA testing
+                    Open project for QA testing
                   </button>
                   <button
                     onClick={() =>
@@ -510,7 +513,55 @@ export default function AdminPanel({
                     >
                       Copy private link
                     </button>
-                    <button onClick={() => setLink("")}>Hide link</button>
+                    <button
+                      onClick={() => {
+                        setLink("");
+                        setQaCode("");
+                      }}
+                    >
+                      Hide link
+                    </button>
+                    {current.version === COLLECTION_VERSION && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void action(async () => {
+                              const result = await api<{
+                                code: string;
+                                challenge: string;
+                              }>("test-code", {
+                                token: link.split("#")[1].split(":")[0],
+                              });
+                              setQaCode(result.code);
+                              setLink(
+                                link.split("#")[0] +
+                                  "#" +
+                                  link.split("#")[1].split(":")[0] +
+                                  ":" +
+                                  result.challenge,
+                              );
+                            })
+                          }
+                        >
+                          Create synthetic QA verification code
+                        </button>
+                        <p>
+                          This private preview works with synthetic .invalid
+                          recipients. It sends no email.
+                        </p>
+                        {qaCode && (
+                          <label className="tb-field">
+                            <span>QA verification code</span>
+                            <input
+                              readOnly
+                              aria-label="QA verification code"
+                              value={qaCode}
+                            />
+                          </label>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
                 <label className="tb-field">
@@ -522,30 +573,27 @@ export default function AdminPanel({
                   />
                 </label>
                 <details>
-                  <summary>
-                    Earlier questionnaire: private test invitations and saved
-                    responses
-                  </summary>
+                  <summary>Private test access and saved responses</summary>
                   <div className="tb-roster">
                     {people
                       .filter((p) =>
-                        (p.email + " " + p.draft.profile.name)
+                        (p.email + " " + p.profile.name)
                           .toLowerCase()
                           .includes(filter.toLowerCase()),
                       )
                       .map((p) => (
                         <article key={p.participant_id} className="tb-detail">
-                          <h3>{p.draft.profile.name}</h3>
+                          <h3>{p.profile.name}</h3>
                           <p>
                             {p.email} · {p.status.replaceAll("_", " ")} · Step{" "}
                             {p.progress} / 8 ·{" "}
                             {p.active ? "Access active" : "Access revoked"}
                           </p>
                           <p>
-                            {p.draft.profile.job_title} ·{" "}
-                            {p.draft.profile.region || "Region not recorded"} ·{" "}
-                            {p.draft.profile.country
-                              ? countryLabel(p.draft.profile.country)
+                            {p.profile.job_title} ·{" "}
+                            {p.profile.region || "Region not recorded"} ·{" "}
+                            {p.profile.country
+                              ? countryLabel(p.profile.country)
                               : "Country not recorded"}
                           </p>
                           <button
@@ -630,6 +678,33 @@ export default function AdminPanel({
               >
                 <p className="brand-section-kicker">Data downloads</p>
                 <h2>Analysis-ready exports</h2>
+                {current.version === COLLECTION_VERSION && (
+                  <>
+                    <p>
+                      Requested answer-copy emails stay in preview mode in QA.
+                      Failed production deliveries can be retried after
+                      production mail is approved.
+                    </p>
+                    <button
+                      disabled={
+                        busy || process.env.NEXT_PUBLIC_APP_ENV === "qa"
+                      }
+                      onClick={() =>
+                        void action(async () => {
+                          const result = await api<{ sent: number }>(
+                            "retry-answer-copies",
+                            { campaign: id },
+                          );
+                          setMessage(
+                            result.sent + " requested answer copies sent.",
+                          );
+                        })
+                      }
+                    >
+                      Retry requested answer copies
+                    </button>
+                  </>
+                )}
                 <p>
                   Includes response status, questionnaire version and current
                   work type. Reception and Facilities are mapped to People
@@ -660,7 +735,7 @@ export default function AdminPanel({
             </div>
             {view && tab === "respondents" && (
               <section className="tb-card" style={{ marginTop: 20 }}>
-                <h2>Response: {view.draft.profile.name}</h2>
+                <h2>Response: {view.profile.name}</h2>
                 <button onClick={() => setView(null)}>Close response</button>
                 <pre
                   style={{

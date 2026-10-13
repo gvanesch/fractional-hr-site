@@ -94,7 +94,7 @@ export default function Management({
           (optional)
         </span>
         <textarea
-          aria-label="Is anything making your management work take more time than it should? (optional)"
+          aria-label="Where could clearer processes or support save management time? (optional)"
           maxLength={1000}
           value={d.note}
           onChange={(e) => change({ note: e.target.value })}

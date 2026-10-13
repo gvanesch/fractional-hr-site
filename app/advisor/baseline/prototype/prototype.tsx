@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BROAD_AREAS,
   emptyBroadDraft,
@@ -11,6 +11,10 @@ import {
 } from "@/lib/baseline/broad-prototype";
 import "@/app/baseline/start/style.css";
 import "./prototype.css";
+import {
+  COLLECTION_VERSION,
+  type CollectionDraft,
+} from "@/lib/baseline/collection";
 import Info from "./info";
 import Context, { Pick } from "./context";
 import ContextReview from "./review";
@@ -50,14 +54,30 @@ export default function Prototype({
   tester,
   technologyPreview = false,
   managerRecord,
+  savedCollection,
+  saveCollection,
 }: {
   tester?: string;
   technologyPreview?: boolean;
   managerRecord?: ManagerRecord;
+  savedCollection?: {
+    draft: CollectionDraft;
+    progress: number;
+    status: string;
+    campaign: { privacy: string; closed: boolean; copyPreview?: boolean };
+    copyStatus?: string | null;
+  };
+  saveCollection?: (
+    draft: CollectionDraft,
+    progress: number,
+    submit?: boolean,
+  ) => Promise<unknown>;
 } = {}) {
-  const [draft, setDraft] = useState(emptyBroadDraft),
-    [started, setStarted] = useState(false),
-    [stage, setStage] = useState(0),
+  const [draft, setDraft] = useState(
+      savedCollection?.draft.broad ?? emptyBroadDraft,
+    ),
+    [started, setStarted] = useState(savedCollection?.draft.started ?? false),
+    [stage, setStage] = useState(Math.min(savedCollection?.progress ?? 0, 7)),
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false);
   const areas = managerRecord?.isPeopleManager
@@ -67,10 +87,16 @@ export default function Prototype({
         ...BROAD_AREAS.filter((a) => a.code === "other"),
       ]
     : BROAD_AREAS;
-  const [management, setManagement] = useState(emptyManagement);
+  const [management, setManagement] = useState(
+    savedCollection?.draft.management ?? emptyManagement,
+  );
   const showManagement = managementVisible(managerRecord, draft.selected);
-  const [rich, setRich] = useState(emptyRichDraft);
-  const [technology, setTechnology] = useState(emptyTechnology);
+  const [rich, setRich] = useState(
+    savedCollection?.draft.rich ?? emptyRichDraft,
+  );
+  const [technology, setTechnology] = useState(
+    savedCollection?.draft.technology ?? emptyTechnology,
+  );
   const showTechnology = technologyVisible(technologyPreview, draft.selected);
   const payrollVisible = draft.selected.includes("pay_benefits");
   const steps = [
@@ -83,8 +109,80 @@ export default function Prototype({
     ...(showTechnology ? ["technology"] : []),
     "review",
   ];
+  const [answerCopy, setAnswerCopy] = useState(
+      savedCollection?.draft.answerCopy ?? false,
+    ),
+    [accepted, setAccepted] = useState(savedCollection?.draft.started ?? false),
+    [submitted, setSubmitted] = useState(
+      savedCollection?.status === "completed",
+    ),
+    [saveState, setSaveState] = useState("Saved securely"),
+    [saveError, setSaveError] = useState(""),
+    [copyDelivery, setCopyDelivery] = useState<string | null>(
+      savedCollection?.copyStatus ?? null,
+    );
+  const pendingSave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const payload: CollectionDraft = useMemo(
+    () => ({
+      version: COLLECTION_VERSION,
+      broad: draft,
+      rich,
+      technology,
+      management,
+      started,
+      answerCopy,
+    }),
+    [draft, rich, technology, management, started, answerCopy],
+  );
+  const persistedPayload = useRef(
+    JSON.stringify(savedCollection?.draft ?? payload),
+  );
+  const currentStage = Math.min(stage, steps.length - 1);
+  useEffect(() => {
+    if (
+      !saveCollection ||
+      !started ||
+      submitted ||
+      savedCollection?.campaign.closed
+    )
+      return;
+    pendingSave.current = setTimeout(() => {
+      setSaveState("Saving…");
+      void saveCollection(payload, currentStage)
+        .then(() => {
+          persistedPayload.current = JSON.stringify(payload);
+          setSaveState("Saved securely");
+          setSaveError("");
+        })
+        .catch((e) => {
+          setSaveState("Save needs attention");
+          setSaveError(e.message);
+        });
+    }, 700);
+    return () => {
+      if (pendingSave.current) clearTimeout(pendingSave.current);
+    };
+  }, [
+    payload,
+    started,
+    currentStage,
+    submitted,
+    saveCollection,
+    savedCollection?.campaign.closed,
+  ]);
+  useEffect(() => {
+    if (!saveCollection || submitted) return;
+    const leave = (event: BeforeUnloadEvent) => {
+      if (JSON.stringify(payload) !== persistedPayload.current) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", leave);
+    return () => window.removeEventListener("beforeunload", leave);
+  }, [payload, saveCollection, submitted]);
   const reviewStage = steps.length - 1;
-  const key = steps[stage];
+  const key = steps[currentStage];
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -105,14 +203,14 @@ export default function Prototype({
           : steps[i] === "technology"
             ? technologyIssues(technology)
             : richIssues(rich, steps[i], draft.selected);
-  const issues = checked ? validate(stage) : [];
+  const issues = checked ? validate(currentStage) : [];
   function go(next: number) {
     const invalid =
       next === reviewStage
         ? steps
             .slice(0, reviewStage)
             .findIndex((_, i) => validate(i).length > 0)
-        : next > stage && validate(stage).length
+        : next > stage && validate(currentStage).length
           ? stage
           : -1;
     if (invalid >= 0) {
@@ -125,12 +223,68 @@ export default function Prototype({
     setChecked(false);
     if (next === reviewStage) setReviewVisited(true);
   }
+  if (saveCollection && (submitted || savedCollection?.campaign.closed))
+    return (
+      <main className="tb-shell tb-prototype">
+        <header className="tb-header">
+          <span>team.blue · Current work baseline</span>
+          <small className="tb-hosted-by">Hosted by Van Esch Advisory</small>
+        </header>
+        <section className="tb-card">
+          <h1>
+            {submitted
+              ? "Thank you. Your answers have been submitted."
+              : "The collection period has ended."}
+          </h1>
+          <p>Your answers are saved securely.</p>
+          {submitted && answerCopy && (
+            <p>
+              {savedCollection?.campaign.copyPreview !== false
+                ? "Your answer-copy preference has been saved. QA email delivery remains in preview mode."
+                : copyDelivery === "sent"
+                  ? "A copy has been emailed to the address used for your invitation."
+                  : "Your answer copy is queued for delivery."}
+            </p>
+          )}
+          {broadEvidence(draft, areas).workAreas.map((a) => (
+            <p key={a.code}>
+              {a.label}: {a.percentage}%
+            </p>
+          ))}
+        </section>
+      </main>
+    );
   return (
     <main className="tb-shell tb-prototype">
-      <aside className="tb-prototype-note">
-        {tester ? `${tester} · Private design test` : "QA design test"} · Use
-        example answers only. Answers stay in this page and reset on refresh.
-      </aside>
+      {!saveCollection && (
+        <aside className="tb-prototype-note">
+          {tester ? `${tester} · Private design test` : "QA design test"} · Use
+          example answers only. Answers stay in this page and reset on refresh.
+        </aside>
+      )}
+      {saveCollection && (
+        <p role="status" className="tb-save">
+          {saveState}
+        </p>
+      )}
+      {saveError && (
+        <p role="alert" className="tb-error">
+          {saveError} Keep this page open and try again.
+          <button
+            onClick={() => {
+              setSaveState("Saving…");
+              void saveCollection?.(payload, currentStage)
+                .then(() => {
+                  setSaveState("Saved securely");
+                  setSaveError("");
+                })
+                .catch((e) => setSaveError(e.message));
+            }}
+          >
+            Retry save
+          </button>
+        </p>
+      )}
       <header className="tb-header">
         <span>team.blue · Current work baseline</span>
         <small className="tb-hosted-by">Hosted by Van Esch Advisory</small>
@@ -150,46 +304,68 @@ export default function Prototype({
             describes some of your regular work. Your answers describe broad
             areas of work.
           </p>
-          <p>
-            This design test adds contact routes, payroll responsibilities and
-            working context. It does not collect a campaign response.
-          </p>
+          {!saveCollection && (
+            <p>
+              This design test adds contact routes, payroll responsibilities and
+              working context. It does not collect a campaign response.
+            </p>
+          )}
+          {saveCollection && (
+            <section className="tb-process">
+              <h2>How your answers will be used</h2>
+              <p>{savedCollection?.campaign.privacy}</p>
+              <label className="tb-check">
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(e) => setAccepted(e.target.checked)}
+                />
+                I understand how my answers will be used.
+              </label>
+            </section>
+          )}
           <p className="tb-estimate">
             Most people will complete this in around 10–15 minutes. If your role
             covers a broad range of People activities, it may take closer to
             20–30 minutes.
           </p>
-          <button className="tb-primary" onClick={() => setStarted(true)}>
-            Start with empty answers
-          </button>
           <button
-            onClick={() => {
-              setDraft({
-                ...emptyBroadDraft(),
-                selected: areas
-                  .filter((a) => a.code !== "other")
-                  .map((a) => a.code),
-              });
-              setStarted(true);
-            }}
+            className="tb-primary"
+            disabled={Boolean(saveCollection) && !accepted}
+            onClick={() => setStarted(true)}
           >
-            Try a broad example
+            {saveCollection ? "Start assessment" : "Start with empty answers"}
           </button>
+          {!saveCollection && (
+            <button
+              onClick={() => {
+                setDraft({
+                  ...emptyBroadDraft(),
+                  selected: areas
+                    .filter((a) => a.code !== "other")
+                    .map((a) => a.code),
+                });
+                setStarted(true);
+              }}
+            >
+              Try a broad example
+            </button>
+          )}
         </section>
       ) : (
         <>
           <nav className="tb-progress" aria-label="Prototype progress">
             <span>
-              Step {stage + 1} of {steps.length}
+              Step {currentStage + 1} of {steps.length}
             </span>
-            <progress max={steps.length} value={stage + 1} />
+            <progress max={steps.length} value={currentStage + 1} />
             <span>{active.length} work areas</span>
           </nav>
           {issues.length > 0 && (
             <div role="alert" className="tb-error">
               {!active.length
                 ? "Choose at least one work area."
-                : stage === 1
+                : currentStage === 1
                   ? issues.some((i) => !i.startsWith("nature_"))
                     ? "Check the highlighted time estimates and answers. Aim for 100% in total."
                     : "Choose the type of work in the highlighted areas."
@@ -245,7 +421,7 @@ export default function Prototype({
                 </p>
               </>
             )}
-            {stage === 1 && (
+            {currentStage === 1 && (
               <>
                 <p>
                   In a typical month, about how much of your working time is
@@ -432,27 +608,75 @@ export default function Prototype({
                 />
                 {showManagement && <ManagementReview draft={management} />}
                 {showTechnology && <TechnologyReview draft={technology} />}
-                <p>
-                  This completes the prototype. No campaign response has been
-                  submitted.
-                </p>
+                {saveCollection ? (
+                  <>
+                    <p>Review your answers, then submit them.</p>
+                    <label className="tb-check">
+                      <input
+                        type="checkbox"
+                        checked={answerCopy}
+                        onChange={(e) => setAnswerCopy(e.target.checked)}
+                      />
+                      I would like a copy sent to the email address used for my
+                      invitation.
+                    </label>
+                    <p className="tb-compact-text">
+                      QA records this preference. Answer-copy delivery remains
+                      in preview mode.
+                    </p>
+                    <button
+                      className="tb-primary"
+                      disabled={saveState === "Submitting…"}
+                      onClick={() => {
+                        if (pendingSave.current)
+                          clearTimeout(pendingSave.current);
+                        setSaveState("Submitting…");
+                        void saveCollection(payload, 8, true)
+                          .then((result) => {
+                            persistedPayload.current = JSON.stringify(payload);
+                            setCopyDelivery(
+                              (result as { copyStatus?: string | null })
+                                ?.copyStatus ?? null,
+                            );
+                            setSubmitted(true);
+                          })
+                          .catch((e) => {
+                            setSaveState("Submission needs attention");
+                            setSaveError(e.message);
+                          });
+                      }}
+                    >
+                      Submit answers
+                    </button>
+                  </>
+                ) : (
+                  <p>
+                    This completes the prototype. No campaign response has been
+                    submitted.
+                  </p>
+                )}
               </>
             )}
             <footer className="tb-actions">
-              {stage > 0 && stage < reviewStage && (
-                <button onClick={() => go(stage - 1)}>Back</button>
+              {currentStage > 0 && currentStage < reviewStage && (
+                <button onClick={() => go(currentStage - 1)}>Back</button>
               )}
-              {stage < reviewStage && (
-                <button className="tb-primary" onClick={() => go(stage + 1)}>
-                  {stage === reviewStage - 1 ? "Review answers" : "Continue"}
+              {currentStage < reviewStage && (
+                <button
+                  className="tb-primary"
+                  onClick={() => go(currentStage + 1)}
+                >
+                  {currentStage === reviewStage - 1
+                    ? "Review answers"
+                    : "Continue"}
                 </button>
               )}
-              {reviewVisited && stage < reviewStage && (
+              {reviewVisited && currentStage < reviewStage && (
                 <button onClick={() => go(reviewStage)}>
                   Return to review
                 </button>
               )}
-              {key === "review" && (
+              {key === "review" && !saveCollection && (
                 <button
                   onClick={() => {
                     setDraft(emptyBroadDraft());

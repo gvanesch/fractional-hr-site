@@ -279,6 +279,12 @@ function harness() {
       "utf8",
     ),
   );
+  sqlite.exec(
+    fs.readFileSync(
+      path.join(root, "baseline-migrations/0004_reviewed_collection.sql"),
+      "utf8",
+    ),
+  );
   const db = {
     prepare(sql) {
       const s = sqlite.prepare(sql);
@@ -361,7 +367,9 @@ function harness() {
         emails = {
           send: async (message) => {
             state.emails.push(message);
-            return { data: { id: "fake" }, error: null };
+            return state.failMail
+              ? { data: null, error: { message: "Synthetic delivery failure" } }
+              : { data: { id: "fake" }, error: null };
           },
         };
       },
@@ -486,6 +494,7 @@ function harness() {
     service,
     model,
     prototype,
+    collection: load("lib/baseline/collection.ts"),
     route,
     adminRoute,
     request,
@@ -1296,6 +1305,286 @@ test("Invitation extension keeps the link, respects campaign closing and prevent
         .get().n,
       1,
     );
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+async function reviewedSetup(h, email = "reviewed@example.invalid") {
+  const c = await h.service.createCampaign("admin@example.invalid", {
+    questionnaireVersion: h.collection.COLLECTION_VERSION,
+    name: "Reviewed synthetic baseline",
+    privacy: h.model.PRIVACY,
+    closesAt: new Date(Date.now() + 86400000).toISOString(),
+  });
+  await h.service.importRoster(
+    "admin@example.invalid",
+    c.campaignId,
+    "name,email,country,region,manages_people,direct_reports\nSynthetic," +
+      email +
+      ",GB,QA,no,0",
+  );
+  await h.service.configureCampaign("admin@example.invalid", c.campaignId, {
+    status: "open",
+  });
+  const p = (await h.service.campaignRows(c.campaignId)).participants[0];
+  const link = await h.service.invite(
+    "admin@example.invalid",
+    c.campaignId,
+    p.participant_id,
+    false,
+  );
+  return { campaign: c.campaignId, p, token: link.link.split("#")[1] };
+}
+function reviewedComplete(h) {
+  const d = h.collection.initialCollection();
+  d.started = true;
+  d.broad.selected = ["office"];
+  d.broad.time = { office: 100 };
+  Object.assign(d.rich, {
+    routes: ["work_email"],
+    routeTime: { work_email: 100 },
+    recording: "none",
+    duplicates: "rarely",
+    sameRoutes: "same",
+    scope: "one",
+    localNeeds: ["none"],
+    systems: ["excel"],
+  });
+  return d;
+}
+test("Reviewed collection requires OTP, saves/resumes atomically and submits separate versioned evidence", async () => {
+  const h = harness();
+  try {
+    const { campaign, p, token } = await reviewedSetup(h);
+    await assert.rejects(
+      h.service.redeem(h.request({}), token),
+      (e) => e.status === 403,
+    );
+    const code = await h.service.requestVerification(
+      h.request({}),
+      token,
+      true,
+    );
+    const verified = await h.route.POST(
+      h.request({ token, challenge: code.challenge, code: code.code }),
+      { params: Promise.resolve({ path: ["verify-code"] }) },
+    );
+    assert.equal(verified.status, 200);
+    const identity = await h.service.participant(h.request({}));
+    let response = await h.service.readResponse(identity);
+    assert.equal(response.draft.version, h.collection.COLLECTION_VERSION);
+    assert.ok(!("profile" in response.draft));
+    assert.ok(!("email" in response.campaign));
+    const d = reviewedComplete(h);
+    d.rich.recording = "";
+    await h.service.saveResponse(identity, d, 0, 2);
+    await assert.rejects(
+      h.service.saveResponse(identity, d, 0, 2),
+      (e) => e.status === 409,
+    );
+    await assert.rejects(h.service.saveResponse(identity, d, 1, 8, true));
+    d.rich.recording = "none";
+    d.answerCopy = true;
+    const saved = await h.service.saveResponse(identity, d, 1, 7);
+    assert.equal(saved.revision, 2);
+    response = await h.service.readResponse(identity);
+    assert.equal(response.draft.broad.time.office, 100);
+    await h.service.saveResponse(identity, d, 2, 8, true);
+    await assert.rejects(
+      h.service.saveResponse(identity, d, 3, 7),
+      (e) => e.status === 409,
+    );
+    const exported = JSON.parse(
+      await h.service.exportDataset("admin@example.invalid", campaign, "json"),
+    );
+    assert.equal(exported.activities[0].area_code, "office");
+    assert.equal(exported.respondents[0].answerCopyRequested, true);
+    assert.ok(!("activity_pillar" in exported.activities[0]));
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM tb_baseline_work WHERE participant_id=?",
+        )
+        .get(p.participant_id).n,
+      0,
+    );
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT status FROM tb_baseline_answer_copies WHERE participant_id=?",
+        )
+        .get(p.participant_id).status,
+      "preview",
+    );
+    assert.equal(h.state.emails.length, 0);
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Reviewed OTPs are hashed, expire, bind to invitations, limit guesses and cannot be replayed", async () => {
+  const h = harness();
+  try {
+    const { token } = await reviewedSetup(h);
+    const c = await h.service.requestVerification(h.request({}), token, true);
+    assert.notEqual(
+      h.sqlite
+        .prepare(
+          "SELECT code_hash FROM tb_baseline_verifications WHERE challenge_id=?",
+        )
+        .get(c.challenge).code_hash,
+      c.code,
+    );
+    const wrong = c.code === "000000" ? "000001" : "000000";
+    for (let i = 0; i < 6; i++)
+      await assert.rejects(
+        h.service.verifyCode(h.request({}), token, c.challenge, wrong),
+        (e) => e.status === 403,
+      );
+    await assert.rejects(
+      h.service.verifyCode(h.request({}), token, c.challenge, c.code),
+      (e) => e.status === 429 || e.status === 403,
+    );
+    const next = await h.service.requestVerification(
+      h.request({}),
+      token,
+      true,
+    );
+    h.sqlite
+      .prepare(
+        "UPDATE tb_baseline_verifications SET expires_at='2000-01-01T00:00:00Z' WHERE challenge_id=?",
+      )
+      .run(next.challenge);
+    await assert.rejects(
+      h.service.verifyCode(h.request({}), token, next.challenge, next.code),
+      (e) => e.status === 403,
+    );
+    const fresh = await h.service.requestVerification(
+      h.request({}),
+      token,
+      true,
+    );
+    await h.service.verifyCode(
+      h.request({}),
+      token,
+      fresh.challenge,
+      fresh.code,
+    );
+    await assert.rejects(
+      h.service.verifyCode(h.request({}), token, fresh.challenge, fresh.code),
+      (e) => e.status === 403,
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("QA actual mail is exact-recipient restricted and once-only for invite and code", async () => {
+  const h = harness();
+  try {
+    h.env.BASELINE_QA_EMAIL_TESTS = "greg-only";
+    h.env.BASELINE_QA_RESEND_API_KEY = "synthetic-mail-key";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <mail@example.invalid>";
+    const ordinary = await reviewedSetup(h);
+    await assert.rejects(
+      h.service.qaTestInvitation(h.request({}), ordinary.token),
+      (e) => e.status === 403,
+    );
+    assert.equal(h.state.emails.length, 0);
+    const greg = await reviewedSetup(h, "greg@vanesch.uk");
+    await h.service.qaTestInvitation(h.request({}), greg.token);
+    await h.service.requestVerification(h.request({}), greg.token);
+    assert.equal(h.state.emails.length, 2);
+    assert.ok(
+      h.state.emails.every(
+        (m) => m.to === "greg@vanesch.uk" && m.replyTo === "info@vanesch.uk",
+      ),
+    );
+    await assert.rejects(
+      h.service.qaTestInvitation(h.request({}), greg.token),
+      (e) => e.status === 409,
+    );
+    await assert.rejects(
+      h.service.requestVerification(h.request({}), greg.token),
+      (e) => e.status === 409,
+    );
+    assert.equal(h.state.emails.length, 2);
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    await assert.rejects(
+      h.service.qaTestInvitation(h.request({}), greg.token),
+      (e) => e.status === 403,
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
+
+test("Requested copies remain preview-only in QA and production retries keep the invite email snapshot", async () => {
+  const h = harness();
+  try {
+    const { campaign, p, token } = await reviewedSetup(h);
+    const code = await h.service.requestVerification(
+      h.request({}),
+      token,
+      true,
+    );
+    const access = await h.service.verifyCode(
+      h.request({}),
+      token,
+      code.challenge,
+      code.code,
+    );
+    h.state.cookie = access.session;
+    const identity = await h.service.participant(h.request({}));
+    const d = reviewedComplete(h);
+    d.answerCopy = true;
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    h.env.BASELINE_MAIL_MODE = "send";
+    h.env.RESEND_API_KEY = "synthetic-production-mail";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <sender@example.invalid>";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    h.state.failMail = true;
+    const submitted = await h.service.saveResponse(identity, d, 0, 8, true);
+    assert.equal(submitted.status, "completed");
+    assert.equal(submitted.copyStatus, "failed");
+    await h.service.changeParticipant(
+      "admin@example.invalid",
+      campaign,
+      p.participant_id,
+      {
+        action: "edit",
+        revision: 1,
+        csv: "name,email,country,region,manages_people,direct_reports\nSynthetic,changed@example.invalid,GB,QA,no,0",
+      },
+    );
+    h.state.failMail = false;
+    const retried = await h.service.retryAnswerCopies(
+      "admin@example.invalid",
+      campaign,
+    );
+    assert.equal(retried.sent, 1);
+    assert.equal(h.state.emails.at(-1).to, "reviewed@example.invalid");
+    assert.equal(
+      h.state.emails.at(-1).attachments[0].filename,
+      "current-work-baseline-answers.json",
+    );
+    const calls = h.state.emails.length;
+    await h.service.retryAnswerCopies("admin@example.invalid", campaign);
+    assert.equal(h.state.emails.length, calls);
   } finally {
     h.sqlite.close();
   }

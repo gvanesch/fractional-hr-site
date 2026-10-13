@@ -73,6 +73,35 @@ export async function POST(request: Request, context: Context) {
       return json(
         await service.sharedDashboard(request, String(body.token ?? "")),
       );
+    if (path === "invitation-info")
+      return json(
+        await service.invitationInfo(request, String(body.token ?? "")),
+      );
+    if (path === "request-code")
+      return json(
+        await service.requestVerification(request, String(body.token ?? "")),
+      );
+    if (path === "qa-email-test")
+      return json(
+        await service.qaTestInvitation(request, String(body.token ?? "")),
+      );
+    if (path === "verify-code") {
+      const value = await service.verifyCode(
+        request,
+        String(body.token ?? ""),
+        String(body.challenge ?? ""),
+        String(body.code ?? ""),
+      );
+      const response = json({ success: true });
+      response.cookies.set(service.COOKIE, value.session, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+        expires: new Date(value.expires),
+      });
+      return response;
+    }
     if (path === "access") {
       const value = await service.redeem(request, String(body.token ?? ""));
       const response = json({ success: true });
@@ -111,6 +140,16 @@ export async function POST(request: Request, context: Context) {
     }
     const actor = await service.admin(),
       campaign = String(body.campaign ?? "");
+    if (path === "admin/test-code")
+      return json(
+        await service.requestVerification(
+          request,
+          String(body.token ?? ""),
+          true,
+        ),
+      );
+    if (path === "admin/retry-answer-copies")
+      return json(await service.retryAnswerCopies(actor, campaign));
     if (path === "admin/import-preview")
       return json(
         await service.previewRoster(campaign, String(body.csv ?? "")),

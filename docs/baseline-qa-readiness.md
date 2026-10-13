@@ -8,7 +8,10 @@ Greg authorised immediate autonomous preparation on 13 October 2026. Production 
 - Applied the existing Van Esch design tokens to the current broad questionnaire with subtle host attribution.
 - Added accessible information controls and kept positive question/answer direction.
 - Added a separate read-only production checkpoint workflow. No production mutation.
-- Next: reviewed versioned broad collection, server autosave/resume/submission/exports, OTP, optional answer-copy flow, restricted Greg-only invitation/code tests, complete QA verification.
+- Phase 1 deployed and verified: UI filters/design/help. Read-only production checkpoint confirmed migrations 0001–0005, production D1 binding, all five flags off and existing Supabase authentication.
+- Phase 2 implemented locally: separate `team-blue-baseline-v3` reviewed collection, CAS autosave/resume/submission, dedicated broad work records and exports, immutable manager context, hashed bounded OTP challenges, answer-copy outbox (QA preview only), final invitation/code templates, exact-recipient Greg-only mail ledger and dedicated QA mail credential.
+- Local checks: 77 tests passed. Next: full CI browser and real hosted verification, authorised once-only Greg messages, final readiness/QA report.
+- Production baseline schema and application cutover are still not applied/enabled. Neither approval is implied by QA testing.
 
 ## Safety and continuity
 
@@ -19,3 +22,11 @@ Greg authorised immediate autonomous preparation on 13 October 2026. Production 
 - Persist a once-only QA mail ledger before any real sends. Continuation/retries must inspect it and must not send duplicate messages.
 - Never log secrets, raw bearer tokens or verification codes.
 - The 01:00 UK continuation task is a fallback; inspect this checkpoint and workflow runs and resume unfinished work only. Do not duplicate completed work or race an active implementation.
+
+## Reviewed collection QA access
+
+Create a new baseline project to use `team-blue-baseline-v3`. Old v2 projects and responses remain intact. Open the project for QA testing, add/import synthetic `.invalid` respondents, generate their private invitation, then generate a synthetic QA verification code. The private link includes the opaque challenge identifier; the code is shown only to the authenticated administrator and must be entered separately. No synthetic-recipient email is sent.
+
+Actual Greg messages use a separate `BASELINE_QA_RESEND_API_KEY`, a `greg-only` test flag, and a once-only ledger. `BASELINE_MAIL_MODE` stays `preview`; no general sending is activated. CI must inspect the ledger and must not reset reserved/failed entries or resend automatically.
+
+Answer-copy preferences are recorded and preview-only in QA. Production copy delivery/retries are guarded by production mail configuration and recorded in a durable outbox with the invitation email snapshot. No answer-copy messages are authorised during QA.

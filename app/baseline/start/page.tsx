@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { baselineEnv } from "@/lib/baseline/server";
-import BaselineJourney from "./journey";
+import BaselineJourney from "./collection-journey";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { absolute: "team.blue | Current work baseline" },

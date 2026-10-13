@@ -43,6 +43,7 @@
       "vars": {
         "BASELINE_ENABLED": "true",
         "BASELINE_MAIL_MODE": "preview",
+        "BASELINE_QA_EMAIL_TESTS": "greg-only",
         "NEXT_PUBLIC_APP_ENV": "qa",
         "D1_SYSTEM_EVENTS_MODE": "d1",
         "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "d1",

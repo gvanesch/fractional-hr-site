@@ -1,6 +1,25 @@
+import { invitationEmail, verificationEmail, answerCopyEmail } from "./emails";
+import {
+  COLLECTION_VERSION,
+  COLLECTION_DEFINITION,
+  initialCollection,
+  parseCollection,
+  collectionIssues,
+  collectionEvidence,
+  managerRecord,
+  collectionAreas,
+  type CollectionDraft,
+} from "./collection";
 import { rosterMetadata, CORE_ROSTER_FIELDS } from "./roster-fields";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  randomInt,
+  timingSafeEqual,
+} from "node:crypto";
 import { cookies } from "next/headers";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { Resend } from "resend";
@@ -24,6 +43,8 @@ import {
 type Env = CloudflareEnv & {
   BASELINE_ENABLED?: string;
   BASELINE_MAIL_MODE?: string;
+  BASELINE_QA_EMAIL_TESTS?: string;
+  BASELINE_QA_RESEND_API_KEY?: string;
   NEXT_PUBLIC_APP_ENV?: string;
   NEXT_PUBLIC_SITE_URL?: string;
   INVITE_RATE_LIMIT_SALT?: string;
@@ -167,7 +188,11 @@ export async function rateLimit(
     );
   void request; // Only the platform-supplied IP is passed in by callers, never forwarded headers.
 }
-export async function redeem(request: Request, token: string) {
+export async function redeem(
+  request: Request,
+  token: string,
+  verified = false,
+) {
   const ip = request.headers.get("cf-connecting-ip") ?? "local";
   // Shared office networks need a larger budget than a single private invitation.
   await rateLimit(request, "redeem-ip:" + ip, 120);
@@ -180,7 +205,7 @@ export async function redeem(request: Request, token: string) {
   const stamp = now();
   const p = await db()
     .prepare(
-      "SELECT p.participant_id,p.campaign_id,i.invite_id,i.expires_at FROM tb_baseline_invites i JOIN tb_baseline_participants p ON p.participant_id=i.participant_id JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE i.token_hash=? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1 AND c.status='open' AND c.closes_at>?",
+      "SELECT p.participant_id,p.campaign_id,i.invite_id,i.expires_at,c.version FROM tb_baseline_invites i JOIN tb_baseline_participants p ON p.participant_id=i.participant_id JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE i.token_hash=? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1 AND c.status='open' AND c.closes_at>?",
     )
     .bind(hashToken(token), stamp, stamp)
     .first<{
@@ -188,10 +213,16 @@ export async function redeem(request: Request, token: string) {
       campaign_id: string;
       invite_id: string;
       expires_at: string;
+      version: string;
     }>();
   if (!p)
     throw new BaselineError(
       "This invitation is not available. Ask the organiser for a new link.",
+      403,
+    );
+  if (p.version === COLLECTION_VERSION && !verified)
+    throw new BaselineError(
+      "Verify access using the code sent to your invitation email address.",
       403,
     );
   const session = randomBytes(32).toString("hex");
@@ -269,6 +300,7 @@ type ResponseRow = {
   submitted_at: string | null;
 };
 export async function readResponse(p: Identity) {
+  if (p.version === COLLECTION_VERSION) return readCollectionResponse(p);
   if (p.version !== VERSION)
     throw new BaselineError(
       "This invitation belongs to an earlier questionnaire. Ask the organiser for the updated invitation. Your earlier answers are retained.",
@@ -305,6 +337,8 @@ export async function saveResponse(
   progress: number,
   submit = false,
 ) {
+  if (p.version === COLLECTION_VERSION)
+    return saveCollectionResponse(p, input, revision, progress, submit);
   if (p.status !== "open" || p.closes_at <= now())
     throw new BaselineError(
       "This campaign is closed. Your saved answers are safe.",
@@ -525,7 +559,15 @@ export async function createCampaign(
     );
   const id = randomUUID(),
     stamp = now(),
-    definition = JSON.stringify(QUESTIONNAIRE),
+    selectedVersion =
+      body.questionnaireVersion === COLLECTION_VERSION
+        ? COLLECTION_VERSION
+        : VERSION,
+    definition = JSON.stringify(
+      selectedVersion === COLLECTION_VERSION
+        ? COLLECTION_DEFINITION
+        : QUESTIONNAIRE,
+    ),
     database = db();
   const entities = entityChoices(body.entityList);
   let copiedProfiles: Record<string, string>[] = [];
@@ -576,11 +618,11 @@ export async function createCampaign(
   }
   await database
     .prepare("INSERT OR IGNORE INTO tb_baseline_versions VALUES(?,?,?)")
-    .bind(VERSION, definition, stamp)
+    .bind(selectedVersion, definition, stamp)
     .run();
   const existing = await database
     .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
-    .bind(VERSION)
+    .bind(selectedVersion)
     .first<{ definition_json: string }>();
   if (existing?.definition_json !== definition)
     throw new BaselineError(
@@ -595,7 +637,7 @@ export async function createCampaign(
       .bind(
         id,
         name,
-        VERSION,
+        selectedVersion,
         "draft",
         closes.toISOString(),
         notice,
@@ -643,7 +685,7 @@ export async function configureCampaign(
     status === "open" &&
     baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
     (String(c.version) !== REVIEWED_COLLECTION_VERSION ||
-      String(VERSION) !== REVIEWED_COLLECTION_VERSION)
+      COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production collection.",
@@ -704,7 +746,7 @@ export async function importRoster(
     .prepare("SELECT version FROM tb_baseline_campaigns WHERE campaign_id=?")
     .bind(campaign)
     .first<{ version: string }>();
-  if (!c || c.version !== VERSION)
+  if (!c || ![VERSION, COLLECTION_VERSION].includes(c.version))
     throw new BaselineError("Campaign not found.", 404);
   let profiles: Partial<Profile>[];
   try {
@@ -766,10 +808,12 @@ export async function importRoster(
         )
         .bind(
           id,
-          VERSION,
+          c.version,
           "not_started",
           randomUUID(),
-          JSON.stringify(draft),
+          JSON.stringify(
+            c.version === COLLECTION_VERSION ? initialCollection() : draft,
+          ),
           stamp,
         ),
     );
@@ -826,7 +870,7 @@ export async function invite(
     send &&
     env.NEXT_PUBLIC_APP_ENV !== "qa" &&
     (p.version !== REVIEWED_COLLECTION_VERSION ||
-      String(VERSION) !== REVIEWED_COLLECTION_VERSION)
+      COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production invitations.",
@@ -866,9 +910,8 @@ export async function invite(
     const result = await new Resend(env.RESEND_API_KEY).emails.send({
       from: env.CONTACT_FROM_EMAIL,
       to: p.email,
-      replyTo: env.CONTACT_TO_EMAIL,
-      subject: "team.blue: describe your current work",
-      text: `You are invited to ${p.name}. This is a current-work baseline, not a performance assessment. Allow about 20–25 minutes. You can save and return. Keep this secure link private:\n\n${link}\n\nPlease do not forward it. Contact the organiser if you need help.`,
+      replyTo: "info@vanesch.uk",
+      ...invitationEmail(p.name, link, p.closes_at),
     });
     if (result.error) {
       await audit(actor, "invitation_delivery_failed", campaign, participantId);
@@ -911,8 +954,10 @@ export async function exportDataset(
   campaign: string,
   format: string,
 ) {
-  const data = await campaignRows(campaign),
-    respondents: Record<string, unknown>[] = [],
+  const data = await campaignRows(campaign);
+  if (data.campaign.version === COLLECTION_VERSION)
+    return exportCollection(actor, campaign, data, format);
+  const respondents: Record<string, unknown>[] = [],
     activities: Record<string, unknown>[] = [];
   const work = (
     await db()
@@ -1041,7 +1086,7 @@ export async function exportDataset(
 }
 
 // Administration for the reviewed baseline. Launch is pinned to the saved collection version.
-const REVIEWED_COLLECTION_VERSION = "team-blue-baseline-v3";
+const REVIEWED_COLLECTION_VERSION = COLLECTION_VERSION;
 export async function previewRoster(campaign: string, csv: string) {
   const data = await campaignRows(campaign);
   let rows: Partial<Profile>[];
@@ -1500,7 +1545,7 @@ export async function launchReadiness(campaign: string) {
     blockers: string[] = [];
   if (
     data.campaign.version !== REVIEWED_COLLECTION_VERSION ||
-    String(VERSION) !== REVIEWED_COLLECTION_VERSION
+    COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION
   )
     blockers.push(
       "The reviewed broad-work questionnaire still needs its versioned saving, submission and answer-copy flow. This campaign uses the earlier questionnaire.",
@@ -1693,4 +1738,649 @@ export async function extendBaselineInvite(
   if (result[0].meta.changes !== 1)
     throw new BaselineError("This record changed. Refresh the roster.", 409);
   return { success: true, expiresAt: expires };
+}
+
+// Versioned broad collection. Roster metadata is authoritative and never written by a participant.
+async function collectionDefinition() {
+  const definition = await db()
+    .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
+    .bind(COLLECTION_VERSION)
+    .first<{ definition_json: string }>();
+  if (definition?.definition_json !== JSON.stringify(COLLECTION_DEFINITION))
+    throw new BaselineError(
+      "This questionnaire version needs an update from the organiser. Your saved answers are retained.",
+      409,
+    );
+}
+async function savedCollectionManager(p: {
+  participant_id: string;
+  profile_json: string;
+}) {
+  const record = await db()
+    .prepare(
+      "SELECT manager_json FROM tb_baseline_collection_context WHERE participant_id=?",
+    )
+    .bind(p.participant_id)
+    .first<{ manager_json: string }>();
+  return record
+    ? (JSON.parse(record.manager_json) as ReturnType<typeof managerRecord>)
+    : managerRecord(JSON.parse(p.profile_json));
+}
+async function readCollectionResponse(p: Identity) {
+  await collectionDefinition();
+  const row = await db()
+    .prepare("SELECT * FROM tb_baseline_responses WHERE participant_id=?")
+    .bind(p.participant_id)
+    .first<ResponseRow>();
+  if (!row) throw new BaselineError("The response is not available.", 404);
+  return {
+    campaign: {
+      name: p.name,
+      privacy: p.privacy_notice,
+      version: p.version,
+      closed: p.status !== "open" || p.closes_at <= now(),
+      copyPreview: baselineEnv().NEXT_PUBLIC_APP_ENV === "qa",
+      manager: await savedCollectionManager(p),
+    },
+    draft: JSON.parse(row.draft_json) as CollectionDraft,
+    copyStatus:
+      (
+        await db()
+          .prepare(
+            "SELECT status FROM tb_baseline_answer_copies WHERE participant_id=?",
+          )
+          .bind(p.participant_id)
+          .first<{ status: string }>()
+      )?.status ?? null,
+    revision: row.revision,
+    progress: row.progress,
+    status: row.status,
+    updatedAt: row.updated_at,
+  };
+}
+async function saveCollectionResponse(
+  p: Identity,
+  input: unknown,
+  revision: number,
+  progress: number,
+  submit: boolean,
+) {
+  await collectionDefinition();
+  if (p.status !== "open" || p.closes_at <= now())
+    throw new BaselineError(
+      "The collection period has ended. Your saved answers are retained.",
+      409,
+    );
+  if (
+    !Number.isSafeInteger(revision) ||
+    revision < 0 ||
+    !Number.isInteger(progress) ||
+    progress < 0 ||
+    progress > 8
+  )
+    throw new BaselineError("Reload your saved response before continuing.");
+  const manager = await savedCollectionManager(p);
+  let draft: CollectionDraft;
+  try {
+    draft = parseCollection(input, manager);
+  } catch (e) {
+    throw new BaselineError(
+      e instanceof Error ? e.message : "Check your answers.",
+    );
+  }
+  if (submit && collectionIssues(draft, manager).length)
+    throw new BaselineError(
+      "Complete the highlighted sections before submitting your answers.",
+    );
+  const mutation = randomUUID(),
+    stamp = now(),
+    database = db();
+  const statements = [
+    database
+      .prepare(
+        "UPDATE tb_baseline_responses SET draft_json=?,status=?,progress=?,revision=revision+1,mutation_id=?,updated_at=?,submitted_at=? WHERE participant_id=? AND version=? AND revision=? AND status!='completed' AND EXISTS(SELECT 1 FROM tb_baseline_sessions s JOIN tb_baseline_invites i ON i.invite_id=s.invite_id JOIN tb_baseline_participants p ON p.participant_id=s.participant_id JOIN tb_baseline_campaigns c ON c.campaign_id=p.campaign_id WHERE s.session_hash=? AND s.participant_id=tb_baseline_responses.participant_id AND s.expires_at>? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1 AND c.status='open' AND c.closes_at>?)",
+      )
+      .bind(
+        JSON.stringify(draft),
+        submit ? "completed" : "in_progress",
+        submit ? 8 : progress,
+        mutation,
+        stamp,
+        submit ? stamp : null,
+        p.participant_id,
+        COLLECTION_VERSION,
+        revision,
+        p.session_hash,
+        stamp,
+        stamp,
+        stamp,
+      ),
+    database
+      .prepare(
+        "DELETE FROM tb_baseline_broad_work WHERE participant_id=? AND EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(p.participant_id, p.participant_id, mutation),
+  ];
+  statements.push(
+    database
+      .prepare(
+        "INSERT OR IGNORE INTO tb_baseline_collection_context SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+      )
+      .bind(
+        p.participant_id,
+        JSON.stringify(manager),
+        stamp,
+        p.participant_id,
+        mutation,
+      ),
+  );
+  for (const area of collectionAreas(manager).filter((a) =>
+    draft.broad.selected.includes(a.code),
+  ))
+    statements.push(
+      database
+        .prepare(
+          "INSERT INTO tb_baseline_broad_work SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+        )
+        .bind(
+          p.participant_id,
+          area.code,
+          area.label,
+          Number.isFinite(draft.broad.time[area.code])
+            ? draft.broad.time[area.code]
+            : null,
+          JSON.stringify({
+            note: draft.broad.notes[area.code] ?? "",
+            workNature: draft.rich.workNature[area.code] ?? null,
+          }),
+          p.participant_id,
+          mutation,
+        ),
+    );
+  if (submit) {
+    statements.push(
+      database
+        .prepare(
+          "INSERT INTO tb_baseline_audit SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+        )
+        .bind(
+          randomUUID(),
+          p.campaign_id,
+          p.participant_id,
+          "submitted",
+          p.participant_id,
+          JSON.stringify({
+            version: COLLECTION_VERSION,
+            answerCopy: draft.answerCopy,
+          }),
+          stamp,
+          p.participant_id,
+          mutation,
+        ),
+    );
+    if (draft.answerCopy)
+      statements.push(
+        database
+          .prepare(
+            "INSERT INTO tb_baseline_answer_copies SELECT ?,?,?,?,0,? WHERE EXISTS(SELECT 1 FROM tb_baseline_responses WHERE participant_id=? AND mutation_id=?)",
+          )
+          .bind(
+            p.participant_id,
+            COLLECTION_VERSION,
+            p.email,
+            baselineEnv().NEXT_PUBLIC_APP_ENV === "qa" ? "preview" : "pending",
+            stamp,
+            p.participant_id,
+            mutation,
+          ),
+      );
+  }
+  const results = await database.batch(statements);
+  if (results[0].meta.changes !== 1)
+    throw new BaselineError(
+      "A newer save exists, or your answers have been submitted. Reload before editing.",
+      409,
+    );
+  return {
+    revision: revision + 1,
+    status: submit ? "completed" : "in_progress",
+    updatedAt: stamp,
+    copyStatus:
+      submit && draft.answerCopy
+        ? await deliverAnswerCopy(p.participant_id)
+        : null,
+  };
+}
+async function exportCollection(
+  actor: string,
+  campaign: string,
+  data: Awaited<ReturnType<typeof campaignRows>>,
+  format: string,
+) {
+  const respondents: Record<string, unknown>[] = [],
+    activities: Record<string, unknown>[] = [];
+  const work = (
+    await db()
+      .prepare(
+        "SELECT w.* FROM tb_baseline_broad_work w JOIN tb_baseline_participants p USING(participant_id) WHERE p.campaign_id=?",
+      )
+      .bind(campaign)
+      .all<{
+        participant_id: string;
+        area_code: string;
+        label: string;
+        percentage: number | null;
+        detail_json: string;
+      }>()
+  ).results;
+  for (const p of data.participants) {
+    const draft = p.draft as unknown as CollectionDraft,
+      manager = await savedCollectionManager({
+        participant_id: p.participant_id,
+        profile_json: JSON.stringify(p.profile),
+      }),
+      e = collectionEvidence(draft, manager);
+    const base = {
+      participant_id: p.participant_id,
+      campaign_id: campaign,
+      questionnaire_version: draft.version,
+      status: p.status,
+      progress: p.progress,
+      submitted_at: p.submitted_at,
+      ...p.profile,
+      ...p.roster,
+      access_active: Number(p.active),
+    };
+    respondents.push({ ...base, ...e });
+    for (const area of e.workAreas) {
+      const row = work.find(
+        (w) =>
+          w.participant_id === p.participant_id && w.area_code === area.code,
+      );
+      if (!row)
+        throw new BaselineError(
+          "A saved work area is missing from this export.",
+          503,
+        );
+      activities.push({
+        ...base,
+        area_code: area.code,
+        area_label: area.label,
+        percentage: row.percentage,
+        ...JSON.parse(row.detail_json),
+        payroll: area.code === "pay_benefits" ? e.payroll : null,
+        technology: area.code === "systems_data" ? e.technology : null,
+        management: area.code === "people_management" ? e.management : null,
+      });
+    }
+  }
+  await audit(actor, "dataset_exported", campaign, campaign, {
+    format,
+    version: COLLECTION_VERSION,
+    respondents: respondents.length,
+    activities: activities.length,
+  });
+  const definition = await db()
+    .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
+    .bind(COLLECTION_VERSION)
+    .first<{ definition_json: string }>();
+  return format === "respondents"
+    ? toCsv(respondents)
+    : format === "activities"
+      ? toCsv(activities)
+      : JSON.stringify(
+          {
+            campaign: data.campaign,
+            questionnaire: definition
+              ? JSON.parse(definition.definition_json)
+              : COLLECTION_DEFINITION,
+            respondents,
+            activities,
+          },
+          null,
+          2,
+        );
+}
+
+async function invitationForVerification(request: Request, token: string) {
+  await rateLimit(
+    request,
+    "verification-ip:" + (request.headers.get("cf-connecting-ip") ?? "local"),
+    30,
+  );
+  if (!/^[a-f0-9]{64}$/.test(token))
+    throw new BaselineError(
+      "Open your private invitation link to continue.",
+      403,
+    );
+  const p = await db()
+    .prepare(
+      "SELECT p.participant_id,p.campaign_id,p.email,c.name,c.version,c.closes_at,i.invite_id FROM tb_baseline_invites i JOIN tb_baseline_participants p USING(participant_id) JOIN tb_baseline_campaigns c USING(campaign_id) WHERE i.token_hash=? AND i.revoked_at IS NULL AND i.expires_at>? AND p.active=1 AND c.status='open' AND c.closes_at>?",
+    )
+    .bind(hashToken(token), now(), now())
+    .first<{
+      participant_id: string;
+      campaign_id: string;
+      email: string;
+      name: string;
+      version: string;
+      closes_at: string;
+      invite_id: string;
+    }>();
+  if (!p)
+    throw new BaselineError(
+      "Ask the organiser for a current invitation link.",
+      403,
+    );
+  return p;
+}
+export async function invitationInfo(request: Request, token: string) {
+  const p = await invitationForVerification(request, token);
+  return { version: p.version };
+}
+function verificationHash(id: string, code: string) {
+  const salt = baselineEnv().INVITE_RATE_LIMIT_SALT;
+  if (!salt) throw new BaselineError("Verification is not configured.", 503);
+  return createHmac("sha256", salt)
+    .update(id + ":" + code)
+    .digest("hex");
+}
+function canTestMail(email: string) {
+  const env = baselineEnv();
+  return (
+    env.NEXT_PUBLIC_APP_ENV === "qa" &&
+    env.BASELINE_MAIL_MODE === "preview" &&
+    env.BASELINE_QA_EMAIL_TESTS === "greg-only" &&
+    email.trim().toLowerCase() === "greg@vanesch.uk"
+  );
+}
+async function sendGregTest(
+  kind: "invite" | "code",
+  email: string,
+  message: ReturnType<typeof verificationEmail>,
+) {
+  const env = baselineEnv();
+  if (!canTestMail(email))
+    throw new BaselineError(
+      "QA email delivery is restricted to the authorised test recipient.",
+      403,
+    );
+  if (!env.BASELINE_QA_RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
+    throw new BaselineError("QA email credentials are unavailable.", 503);
+  const reserved = await db()
+    .prepare(
+      "INSERT OR IGNORE INTO tb_baseline_qa_mail_tests VALUES(?,?,?,NULL,?)",
+    )
+    .bind(kind, "greg@vanesch.uk", "reserved", now())
+    .run();
+  if (reserved.meta.changes !== 1)
+    throw new BaselineError(
+      "This QA test message has already been attempted. Check the existing message before requesting another test.",
+      409,
+    );
+  try {
+    const result = await new Resend(env.BASELINE_QA_RESEND_API_KEY).emails.send(
+      {
+        from: env.CONTACT_FROM_EMAIL,
+        to: "greg@vanesch.uk",
+        replyTo: "info@vanesch.uk",
+        ...message,
+      },
+      { idempotencyKey: "baseline-qa-greg-" + kind },
+    );
+    if (result.error) throw Error("Delivery failed");
+    await db()
+      .prepare(
+        "UPDATE tb_baseline_qa_mail_tests SET status='sent',provider_id=?,updated_at=? WHERE kind=?",
+      )
+      .bind(result.data?.id ?? null, now(), kind)
+      .run();
+  } catch {
+    await db()
+      .prepare(
+        "UPDATE tb_baseline_qa_mail_tests SET status='failed',updated_at=? WHERE kind=?",
+      )
+      .bind(now(), kind)
+      .run();
+    throw new BaselineError(
+      "The QA message could not be delivered. Review the email-test status before retrying.",
+      502,
+    );
+  }
+}
+export async function qaTestInvitation(request: Request, token: string) {
+  const p = await invitationForVerification(request, token);
+  if (p.version !== COLLECTION_VERSION)
+    throw new BaselineError("Use the reviewed questionnaire for this QA test.");
+  const site = baselineEnv().NEXT_PUBLIC_SITE_URL;
+  if (!site) throw new BaselineError("QA site is not configured.", 503);
+  await sendGregTest(
+    "invite",
+    p.email,
+    invitationEmail(
+      p.name,
+      site.replace(/\/$/, "") + "/baseline/start#" + token,
+      p.closes_at,
+    ),
+  );
+  await audit(
+    p.participant_id,
+    "qa_invitation_sent",
+    p.campaign_id,
+    p.participant_id,
+  );
+  return { success: true };
+}
+export async function requestVerification(
+  request: Request,
+  token: string,
+  preview = false,
+) {
+  const p = await invitationForVerification(request, token),
+    env = baselineEnv();
+  if (p.version !== COLLECTION_VERSION)
+    throw new BaselineError("Use the invitation link for this questionnaire.");
+  if (
+    preview &&
+    (env.NEXT_PUBLIC_APP_ENV !== "qa" || !p.email.endsWith(".invalid"))
+  )
+    throw new BaselineError(
+      "Private QA code previews use synthetic recipients only.",
+      403,
+    );
+  if (
+    !preview &&
+    !canTestMail(p.email) &&
+    !(env.NEXT_PUBLIC_APP_ENV !== "qa" && env.BASELINE_MAIL_MODE === "send")
+  )
+    throw new BaselineError(
+      "Email verification is in QA preview mode. Ask the organiser for a synthetic test access code.",
+      403,
+    );
+  await rateLimit(request, "verification-token:" + hashToken(token), 4);
+  const challenge = randomUUID(),
+    code = String(randomInt(0, 1000000)).padStart(6, "0"),
+    stamp = now();
+  await db()
+    .prepare("INSERT INTO tb_baseline_verifications VALUES(?,?,?,?,0,NULL,?)")
+    .bind(
+      challenge,
+      p.invite_id,
+      verificationHash(challenge, code),
+      new Date(Date.now() + 600000).toISOString(),
+      stamp,
+    )
+    .run();
+  if (!preview) {
+    if (env.NEXT_PUBLIC_APP_ENV === "qa")
+      await sendGregTest("code", p.email, verificationEmail(code));
+    else {
+      if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
+        throw new BaselineError("Email verification is not configured.", 503);
+      const result = await new Resend(env.RESEND_API_KEY).emails.send({
+        from: env.CONTACT_FROM_EMAIL,
+        to: p.email,
+        replyTo: "info@vanesch.uk",
+        ...verificationEmail(code),
+      });
+      if (result.error)
+        throw new BaselineError(
+          "The verification email could not be delivered. Try again later.",
+          502,
+        );
+    }
+  }
+  await audit(
+    p.participant_id,
+    preview ? "qa_code_preview" : "verification_requested",
+    p.campaign_id,
+    p.participant_id,
+  );
+  return preview ? { challenge, code } : { challenge };
+}
+export async function verifyCode(
+  request: Request,
+  token: string,
+  challenge: string,
+  code: string,
+) {
+  const p = await invitationForVerification(request, token);
+  if (!/^[0-9a-f-]{36}$/.test(challenge) || !/^\d{6}$/.test(code))
+    throw new BaselineError("Enter the six-digit verification code.");
+  await rateLimit(request, "verification-attempt:" + challenge, 6);
+  const used = await db()
+    .prepare(
+      "UPDATE tb_baseline_verifications SET attempts=attempts+1 WHERE challenge_id=? AND invite_id=? AND consumed_at IS NULL AND expires_at>? AND attempts<6",
+    )
+    .bind(challenge, p.invite_id, now())
+    .run();
+  if (used.meta.changes !== 1)
+    throw new BaselineError("Request a current verification code.", 403);
+  const value = await db()
+    .prepare(
+      "SELECT code_hash FROM tb_baseline_verifications WHERE challenge_id=? AND invite_id=?",
+    )
+    .bind(challenge, p.invite_id)
+    .first<{ code_hash: string }>();
+  if (
+    !value ||
+    !timingSafeEqual(
+      Buffer.from(value.code_hash, "hex"),
+      Buffer.from(verificationHash(challenge, code), "hex"),
+    )
+  )
+    throw new BaselineError("Check the code in your verification email.", 403);
+  const consumed = await db()
+    .prepare(
+      "UPDATE tb_baseline_verifications SET consumed_at=? WHERE challenge_id=? AND invite_id=? AND consumed_at IS NULL AND expires_at>? AND attempts<=6",
+    )
+    .bind(now(), challenge, p.invite_id, now())
+    .run();
+  if (consumed.meta.changes !== 1)
+    throw new BaselineError("Request a current verification code.", 403);
+  return redeem(request, token, true);
+}
+
+// Requested answer copies are preview-only in QA. Production requires explicit mail activation.
+async function deliverAnswerCopy(participantId: string) {
+  const env = baselineEnv();
+  if (env.NEXT_PUBLIC_APP_ENV === "qa") return "preview";
+  const row = await db()
+    .prepare(
+      "SELECT a.*,r.draft_json,p.profile_json,p.active FROM tb_baseline_answer_copies a JOIN tb_baseline_responses r USING(participant_id) JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=? AND r.status='completed'",
+    )
+    .bind(participantId)
+    .first<{
+      recipient_email: string;
+      status: string;
+      attempts: number;
+      draft_json: string;
+      profile_json: string;
+      active: number;
+    }>();
+  if (!row || row.status === "sent") return row?.status ?? null;
+  if (
+    !row.active ||
+    env.BASELINE_MAIL_MODE !== "send" ||
+    !env.RESEND_API_KEY ||
+    !env.CONTACT_FROM_EMAIL
+  )
+    return "pending";
+  const claimed = await db()
+    .prepare(
+      "UPDATE tb_baseline_answer_copies SET status='delivering',attempts=attempts+1,updated_at=? WHERE participant_id=? AND status IN ('pending','failed') AND attempts=? AND attempts<3",
+    )
+    .bind(now(), participantId, row.attempts)
+    .run();
+  if (claimed.meta.changes !== 1) return "pending";
+  try {
+    const manager = await savedCollectionManager({
+        participant_id: participantId,
+        profile_json: row.profile_json,
+      }),
+      evidence = collectionEvidence(JSON.parse(row.draft_json), manager);
+    const message = answerCopyEmail(evidence);
+    const result = await new Resend(env.RESEND_API_KEY).emails.send(
+      {
+        from: env.CONTACT_FROM_EMAIL,
+        to: row.recipient_email,
+        replyTo: "info@vanesch.uk",
+        ...message,
+        attachments: [
+          {
+            filename: "current-work-baseline-answers.json",
+            content: Buffer.from(JSON.stringify(evidence, null, 2), "utf8"),
+          },
+        ],
+      },
+      { idempotencyKey: "baseline-answer-copy-" + participantId },
+    );
+    if (result.error) throw Error("Delivery failed");
+    await db()
+      .prepare(
+        "UPDATE tb_baseline_answer_copies SET status='sent',updated_at=? WHERE participant_id=?",
+      )
+      .bind(now(), participantId)
+      .run();
+    return "sent";
+  } catch {
+    await db()
+      .prepare(
+        "UPDATE tb_baseline_answer_copies SET status='failed',updated_at=? WHERE participant_id=?",
+      )
+      .bind(now(), participantId)
+      .run();
+    return "failed";
+  }
+}
+export async function retryAnswerCopies(actor: string, campaign: string) {
+  const data = await campaignRows(campaign);
+  if (data.campaign.version !== COLLECTION_VERSION)
+    throw new BaselineError(
+      "Answer copies are available for the reviewed questionnaire.",
+    );
+  if (baselineEnv().NEXT_PUBLIC_APP_ENV === "qa")
+    return { preview: true, sent: 0 };
+  await db()
+    .prepare(
+      "UPDATE tb_baseline_answer_copies SET status='failed' WHERE status='delivering' AND updated_at<? AND participant_id IN (SELECT participant_id FROM tb_baseline_participants WHERE campaign_id=?)",
+    )
+    .bind(new Date(Date.now() - 15 * 60000).toISOString(), campaign)
+    .run();
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT a.participant_id FROM tb_baseline_answer_copies a JOIN tb_baseline_participants p USING(participant_id) WHERE p.campaign_id=? AND p.active=1 AND a.status IN ('pending','failed') AND a.attempts<3 LIMIT 20",
+      )
+      .bind(campaign)
+      .all<{ participant_id: string }>()
+  ).results;
+  let sent = 0;
+  for (const r of rows)
+    if ((await deliverAnswerCopy(r.participant_id)) === "sent") sent++;
+  await audit(actor, "answer_copy_retry", campaign, campaign, {
+    attempted: rows.length,
+    sent,
+  });
+  return { sent, attempted: rows.length };
 }

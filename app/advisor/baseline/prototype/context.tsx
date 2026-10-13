@@ -13,6 +13,8 @@ import {
   type RichDraft,
 } from "@/lib/baseline/prototype-enrichment";
 const QUESTION_HELP: Record<string, string> = {
+  "Do you manage people who also report to another manager?":
+    "This means someone in your own team has responsibilities agreed with two managers. Think about formal reporting arrangements.",
   "Do you regularly support one business or more than one?":
     "Think about the businesses or brands you regularly support. Include work you do for another business as part of your usual role.",
   "Are these requests recorded so others can see their status?":

@@ -18,6 +18,8 @@ export function validate(config, ref) {
     qa.vars?.ADVISOR_AUTH_MODE !== "cloudflare_access" ||
     qa.vars?.BASELINE_ENABLED !== "true" ||
     qa.vars?.BASELINE_MAIL_MODE !== "preview" ||
+    (qa.vars?.BASELINE_QA_EMAIL_TESTS !== undefined &&
+      qa.vars.BASELINE_QA_EMAIL_TESTS !== "greg-only") ||
     config.vars?.BASELINE_ENABLED
   )
     throw new Error(

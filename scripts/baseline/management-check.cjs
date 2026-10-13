@@ -135,7 +135,7 @@ const root = path.resolve(__dirname, "../..");
       );
       await page
         .getByLabel(
-          "Is anything making your management work take more time than it should? (optional)",
+          "Where could clearer processes or support save management time? (optional)",
           { exact: true },
         )
         .fill("Repeated coordination meetings");
