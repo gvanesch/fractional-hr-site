@@ -182,6 +182,12 @@ const root = path.resolve(__dirname, "../..");
           "utf8",
         ),
       });
+      await page.addScriptTag({
+        content: "window.process = {env: {NODE_ENV: 'production'}};",
+      });
+      page.on("pageerror", (error) =>
+        console.error("Admin browser runtime: " + error.message),
+      );
       await page.addScriptTag({ content: build.outputFiles[0].text });
       await page
         .getByLabel("Choose a campaign", { exact: true })
