@@ -17,9 +17,9 @@
 .tb-management-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
 }
-.tb-respondent-card,
-.tb-management-card,
-.tb-breakdown-card {
+.tb-dashboard .tb-respondent-card,
+.tb-management-grid .tb-management-card,
+.tb-completion-breakdowns .tb-breakdown-card {
   min-width: 0;
   padding: 18px;
   border: 1px solid #d6e2e7;
@@ -71,9 +71,9 @@
   .tb-completion-breakdowns {
     grid-template-columns: minmax(0, 1fr);
   }
-  .tb-respondent-card,
-  .tb-management-card,
-  .tb-breakdown-card {
+  .tb-dashboard .tb-respondent-card,
+  .tb-management-grid .tb-management-card,
+  .tb-completion-breakdowns .tb-breakdown-card {
     padding: 14px;
   }
 }
