@@ -52,7 +52,7 @@ export default function SharedDashboard() {
     };
   }, []);
   return (
-    <main className="tb-shell" style={{ maxWidth: 1100 }}>
+    <main className="tb-shell" style={{ maxWidth: 1400 }}>
       <header className="tb-header">
         <span>team.blue · Baseline completion</span>
         <p>Private, read-only dashboard</p>

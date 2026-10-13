@@ -72,6 +72,7 @@ const root = path.resolve(__dirname, "../..");
         allocation: {},
         version: "team-blue-baseline-v2",
       };
+      let expandedRoster = false;
       let shares = [],
         requests = [];
       const campaign = {
@@ -98,7 +99,25 @@ const root = path.resolve(__dirname, "../..");
         requests.push({ op, body });
         let data = {};
         if (op === "campaigns") data = { campaigns: [campaign] };
-        if (op === "campaign") data = { campaign, participants: [person] };
+        if (op === "campaign")
+          data = {
+            campaign,
+            participants: expandedRoster
+              ? [
+                  person,
+                  ...[2, 3].map((n) => ({
+                    ...person,
+                    participant_id: "p" + n,
+                    email: "person" + n + "@example.invalid",
+                    profile: {
+                      ...person.profile,
+                      name: "Synthetic person " + n,
+                      email: "person" + n + "@example.invalid",
+                    },
+                  })),
+                ]
+              : [person],
+          };
         if (op === "dashboard")
           data = {
             campaign: {
@@ -116,7 +135,34 @@ const root = path.resolve(__dirname, "../..");
               completed: 0,
             },
             completionPercent: 0,
-            groups: { region: [] },
+            participants: [1, 2, 3].map((n) => ({
+              participantId: "p" + n,
+              name: "Synthetic respondent " + n,
+              email: "respondent" + n + "@example.invalid",
+              jobTitle: "Current title",
+              country: "GB",
+              region: "North",
+              entity: "Business A",
+              team: "Team A",
+              regionalLeaderName: "Leader A",
+              status: "completed",
+              active: true,
+              invited: true,
+              progress: 8,
+              updatedAt: new Date().toISOString(),
+              submittedAt: null,
+            })),
+            groups: {
+              region: [
+                { label: "North", invited: 3, completed: 3, inProgress: 0 },
+              ],
+              country: [
+                { label: "GB", invited: 3, completed: 3, inProgress: 0 },
+              ],
+              team: [
+                { label: "Team A", invited: 3, completed: 3, inProgress: 0 },
+              ],
+            },
             generatedAt: new Date().toISOString(),
             smallGroupsHidden: false,
             scope: { regions: [], countries: [], entities: [] },
@@ -176,6 +222,7 @@ const root = path.resolve(__dirname, "../..");
           };
         }
         if (op === "share-revoke") {
+          expandedRoster = true;
           shares[0].revoked_at = new Date().toISOString();
           data = { success: true };
         }
@@ -188,6 +235,12 @@ const root = path.resolve(__dirname, "../..");
       await page.addStyleTag({
         content: fs.readFileSync(
           root + "/app/baseline/start/style.css",
+          "utf8",
+        ),
+      });
+      await page.addStyleTag({
+        content: fs.readFileSync(
+          root + "/app/advisor/baseline/admin.css",
           "utf8",
         ),
       });
@@ -348,6 +401,38 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByText("Dashboard link revoked.", { exact: true })
         .waitFor();
+      await page.locator(".tb-management-card").nth(2).waitFor();
+      const positions = await page
+        .locator(".tb-management-card")
+        .evaluateAll((nodes) =>
+          nodes.map((n) => {
+            const r = n.getBoundingClientRect();
+            return { x: r.x, y: r.y, width: r.width };
+          }),
+        );
+      const respondentPositions = await page
+        .locator(".tb-respondent-card")
+        .evaluateAll((nodes) =>
+          nodes.map((n) => {
+            const r = n.getBoundingClientRect();
+            return { x: r.x, y: r.y };
+          }),
+        );
+      const dashboardBox = await page.locator(".tb-dashboard").boundingBox();
+      const campaignsBox = await page
+        .getByRole("heading", { name: "Campaigns", exact: true })
+        .boundingBox();
+      assert.ok(dashboardBox.y < campaignsBox.y);
+      if (mobile) {
+        assert.equal(positions[0].x, positions[1].x);
+        assert.ok(positions[1].y > positions[0].y);
+        assert.ok(respondentPositions[1].y > respondentPositions[0].y);
+      } else {
+        assert.equal(positions[0].y, positions[1].y);
+        assert.ok(positions[1].x > positions[0].x);
+        assert.equal(respondentPositions[0].y, respondentPositions[1].y);
+        assert.ok(respondentPositions[1].x > respondentPositions[0].x);
+      }
       assert.equal(
         requests.filter((r) => r.op === "launch" || r.op === "invite-batch")
           .length,

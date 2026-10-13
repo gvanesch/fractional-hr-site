@@ -164,3 +164,7 @@ Admin cards follow the existing project workspace pattern: name/role/status and 
 ### QA demonstration roster (13 October 2026)
 
 Reserved campaign `cb21a967-99a7-4aa9-b3ae-61c7dff289b1` is named QA Admin Demo — 20 synthetic respondents. Its verified initial mix is 15 completed, three in progress and two not started, with three explicit synthetic regional-leader assignments. All work emails use example.invalid. It uses the existing persistent v2 schema for admin testing; it is not evidence from the reviewed production questionnaire. The guarded seed only adds missing reserved synthetic records and never overwrites answers on a rerun. No email, real participant or production mutation. A campaign query parameter allows a direct authorised admin link.
+
+### Admin dashboard layout (13 October 2026)
+
+Completion dashboard now precedes campaign setup and respondent controls. The dashboard and shared leadership view use the wider available desktop space, with responsive grids for named respondents and completion breakdowns. Management cards use a separate responsive grid with compact action controls. All grids collapse to one column on mobile. No roster data, status, access scope or questionnaire changes. Existing desktop/mobile checks verify the dashboard order, multiple desktop columns and mobile stacking.

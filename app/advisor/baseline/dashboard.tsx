@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
+import "./admin.css";
 import { WORK_TYPES, countryLabel } from "@/lib/baseline/model";
 export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
   const [search, setSearch] = useState("");
@@ -21,7 +22,7 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
     ["Completed", d.counts.completed],
   ];
   return (
-    <section className="tb-card">
+    <section className="tb-card tb-dashboard">
       <h2>Completion dashboard</h2>
       <p>
         {d.campaign.name} · {d.campaign.status} · Closes{" "}
@@ -62,7 +63,7 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
           placeholder="Name, email, role, region, entity or team"
         />
       </label>
-      <div className="tb-roster">
+      <div className="tb-respondent-grid">
         {(d.participants ?? [])
           .filter((p) =>
             [
@@ -80,7 +81,10 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
               .includes(search.toLowerCase()),
           )
           .map((p) => (
-            <article className="tb-detail" key={p.participantId}>
+            <article
+              className="tb-detail tb-respondent-card"
+              key={p.participantId}
+            >
               <h4>{p.name}</h4>
               <p>
                 {p.email} · {p.jobTitle}
@@ -114,37 +118,39 @@ export default function Dashboard({ data: d }: { data: CompletionDashboard }) {
             </article>
           ))}
       </div>
-      {Object.entries(d.groups).map(([key, groups]) => (
-        <details key={key} open>
-          <summary>Completion by {labels[key] ?? key}</summary>
-          {groups.length ? (
-            groups.map((g) => (
-              <div className="tb-detail" key={g.label}>
-                <strong>
-                  {key === "country"
-                    ? countryLabel(g.label)
-                    : key === "work_type"
-                      ? (WORK_TYPES.find((o) => o[0] === g.label)?.[1] ??
-                        g.label)
-                      : g.label}
-                </strong>
-                <p>
-                  {g.completed} completed / {g.invited} invited · {g.inProgress}{" "}
-                  in progress
-                </p>
-                <progress
-                  aria-label={"Completion: " + g.label}
-                  max={g.invited}
-                  value={g.completed}
-                  style={{ width: "100%" }}
-                />
-              </div>
-            ))
-          ) : (
-            <p>No reportable groups yet.</p>
-          )}
-        </details>
-      ))}
+      <div className="tb-completion-breakdowns">
+        {Object.entries(d.groups).map(([key, groups]) => (
+          <details className="tb-breakdown-card" key={key} open>
+            <summary>Completion by {labels[key] ?? key}</summary>
+            {groups.length ? (
+              groups.map((g) => (
+                <div className="tb-detail" key={g.label}>
+                  <strong>
+                    {key === "country"
+                      ? countryLabel(g.label)
+                      : key === "work_type"
+                        ? (WORK_TYPES.find((o) => o[0] === g.label)?.[1] ??
+                          g.label)
+                        : g.label}
+                  </strong>
+                  <p>
+                    {g.completed} completed / {g.invited} invited ·{" "}
+                    {g.inProgress} in progress
+                  </p>
+                  <progress
+                    aria-label={"Completion: " + g.label}
+                    max={g.invited}
+                    value={g.completed}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              ))
+            ) : (
+              <p>No reportable groups yet.</p>
+            )}
+          </details>
+        ))}
+      </div>
       <small>Updated {new Date(d.generatedAt).toLocaleString("en-GB")}</small>
     </section>
   );

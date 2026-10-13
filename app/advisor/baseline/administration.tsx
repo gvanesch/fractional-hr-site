@@ -2,11 +2,7 @@
 import { useEffect, useState } from "react";
 import { ROSTER_FIELDS, FIELD_LABELS } from "@/lib/baseline/roster-fields";
 import { WORK_TYPES, toCsv } from "@/lib/baseline/model";
-import type {
-  CompletionDashboard,
-  LaunchReadiness,
-} from "@/lib/baseline/admin-types";
-import Dashboard from "./dashboard";
+import type { LaunchReadiness } from "@/lib/baseline/admin-types";
 type Person = {
   participant_id: string;
   email: string;
@@ -48,8 +44,7 @@ export default function Administration({
   people: Person[];
   refresh: () => Promise<void>;
 }) {
-  const [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
-    [readiness, setReadiness] = useState<LaunchReadiness | null>(null),
+  const [readiness, setReadiness] = useState<LaunchReadiness | null>(null),
     [shares, setShares] = useState<Share[]>([]),
     [person, setPerson] = useState<Person | null>(null),
     [editing, setEditing] = useState(false),
@@ -70,12 +65,10 @@ export default function Administration({
     [selected, setSelected] = useState<string[]>([]);
   async function load() {
     const query = "?campaign=" + encodeURIComponent(campaign);
-    const [d, r, s] = await Promise.all([
-      call<CompletionDashboard>("dashboard" + query),
+    const [r, s] = await Promise.all([
       call<LaunchReadiness>("readiness" + query),
       call<{ shares: Share[] }>("shares" + query),
     ]);
-    setDashboard(d);
     setReadiness(r);
     setShares(s.shares);
   }
@@ -249,7 +242,7 @@ export default function Administration({
               ))}
           </select>
         </label>
-        <div className="tb-roster">
+        <div className="tb-management-grid">
           {people
             .filter((p) =>
               [
@@ -279,7 +272,10 @@ export default function Administration({
                 p.roster.regional_leader_email === leaderFilter,
             )
             .map((p) => (
-              <article className="tb-detail" key={p.participant_id}>
+              <article
+                className="tb-detail tb-management-card"
+                key={p.participant_id}
+              >
                 <h3>{p.profile.name}</h3>
                 <p>
                   {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
@@ -321,7 +317,7 @@ export default function Administration({
                   />{" "}
                   Select for invitation / reminder
                 </label>
-                <div>
+                <div className="tb-respondent-controls">
                   <button
                     disabled={
                       busy ||
@@ -524,11 +520,6 @@ export default function Administration({
           </form>
         )}
       </section>
-      {dashboard && (
-        <div style={{ marginTop: 20 }}>
-          <Dashboard data={dashboard} />
-        </div>
-      )}
       <section className="tb-card" style={{ marginTop: 20 }}>
         <h2>Share a read-only dashboard</h2>
         <p>

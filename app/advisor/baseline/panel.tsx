@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Administration from "./administration";
+import Dashboard from "./dashboard";
+import type { CompletionDashboard } from "@/lib/baseline/admin-types";
+import "./admin.css";
 import { ROSTER_FIELDS } from "@/lib/baseline/roster-fields";
 import {
   PRIVACY,
@@ -46,14 +49,14 @@ type Result = {
   link: string;
   error?: string;
 };
-async function api(path: string, body?: unknown): Promise<Result> {
+async function api<T = Result>(path: string, body?: unknown): Promise<T> {
   const response = await fetch("/advisor/baseline/api/" + path, {
     method: body ? "POST" : "GET",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
-  const data = (await response.json()) as Result;
+  const data = (await response.json()) as T & { error?: string };
   if (!response.ok)
     throw new Error(data.error ?? "Unable to complete this request.");
   return data;
@@ -64,6 +67,7 @@ export default function AdminPanel({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]),
     [id, setId] = useState(initialCampaign),
     [current, setCurrent] = useState<Campaign | null>(null),
+    [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
     [people, setPeople] = useState<Person[]>([]),
     [name, setName] = useState("team.blue People Operations Baseline — QA"),
     [date, setDate] = useState(""),
@@ -87,9 +91,13 @@ export default function AdminPanel({
     const list = await api("campaigns");
     setCampaigns(list.campaigns);
     if (campaign) {
-      const data = await api(
-        "campaign?campaign=" + encodeURIComponent(campaign),
-      );
+      const [data, report] = await Promise.all([
+        api("campaign?campaign=" + encodeURIComponent(campaign)),
+        api<CompletionDashboard>(
+          "dashboard?campaign=" + encodeURIComponent(campaign),
+        ),
+      ]);
+      setDashboard(report);
       setCurrent(data.campaign);
       setPeople(data.participants);
       setDate(data.campaign.closes_at.slice(0, 10));
@@ -130,7 +138,7 @@ export default function AdminPanel({
     URL.revokeObjectURL(url);
   };
   return (
-    <main className="tb-shell" style={{ maxWidth: 1100 }}>
+    <main className="tb-shell" style={{ maxWidth: 1400 }}>
       <header className="tb-header">
         <Link href="/advisor/baseline/prototype">
           Review the current questionnaire preview
@@ -147,7 +155,8 @@ export default function AdminPanel({
         </div>
       )}
       {message && <p role="status">{message}</p>}
-      <section className="tb-card">
+      {id && current && dashboard && <Dashboard data={dashboard} />}
+      <section className="tb-card" style={{ marginTop: 20 }}>
         <h1>Campaigns</h1>
         <label className="tb-field">
           <span>Choose a campaign</span>
@@ -161,6 +170,7 @@ export default function AdminPanel({
               setPreview(null);
               setView(null);
               setCurrent(null);
+              setDashboard(null);
               setPeople([]);
               if (value) void action(() => refresh(value));
               else {

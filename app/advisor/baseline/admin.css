@@ -1,0 +1,79 @@
+/* Layout shared by the authorised admin and scoped leadership dashboards. */
+.tb-dashboard {
+  margin-bottom: 20px;
+}
+.tb-respondent-grid,
+.tb-management-grid,
+.tb-completion-breakdowns {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  margin: 16px 0 24px;
+}
+.tb-respondent-grid,
+.tb-completion-breakdowns {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+.tb-management-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+}
+.tb-respondent-card,
+.tb-management-card,
+.tb-breakdown-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d6e2e7;
+  border-radius: 12px;
+  background: #f8fbfc;
+  overflow-wrap: anywhere;
+}
+.tb-respondent-card,
+.tb-management-card {
+  height: 100%;
+}
+.tb-respondent-card p,
+.tb-management-card p {
+  margin: 8px 0;
+}
+.tb-breakdown-card summary {
+  font-weight: 650;
+  cursor: pointer;
+}
+.tb-breakdown-card .tb-detail {
+  padding: 12px 0;
+}
+.tb-breakdown-card .tb-detail:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.tb-respondent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-top: 14px;
+}
+.tb-respondent-controls .tb-field {
+  flex: 1 1 120px;
+  min-width: 0;
+  margin: 0;
+}
+.tb-respondent-controls button {
+  margin: 0;
+  max-width: 100%;
+}
+.tb-respondent-controls input {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .tb-respondent-grid,
+  .tb-management-grid,
+  .tb-completion-breakdowns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tb-respondent-card,
+  .tb-management-card,
+  .tb-breakdown-card {
+    padding: 14px;
+  }
+}
