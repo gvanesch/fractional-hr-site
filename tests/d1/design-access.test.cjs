@@ -22,13 +22,13 @@ function compile(file, requireMock = require, replace = (s) => s) {
   )(mod, mod.exports, requireMock);
   return mod.exports;
 }
-test("Five hashed design links are QA-only, expire and never disclose raw tokens", () => {
+test("Six hashed design links are QA-only, expire and never disclose raw tokens", () => {
   const token = crypto.randomBytes(32).toString("hex");
   const hash = crypto.createHash("sha256").update(token).digest("hex");
   const m = compile("lib/baseline/design-access.ts", require, (s) =>
     s.replace(/"[a-f0-9]{64}":\s*"Tester 1"/, `"${hash}": "Tester 1"`),
   );
-  assert.equal(m.DESIGN_TESTER_COUNT, 5);
+  assert.equal(m.DESIGN_TESTER_COUNT, 6);
   const now = Date.parse("2026-10-11T13:00:00Z");
   assert.equal(m.designTester(token, "qa", now), "Tester 1");
   for (const env of ["production", "local", undefined])

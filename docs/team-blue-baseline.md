@@ -148,3 +148,7 @@ Removal retains answers and audit evidence and invalidates access. Reinstatement
 `/baseline/dashboard` uses a separate hashed, expiring bearer link. Admin can restrict each link to regions, countries and/or employing entities (AND across fields), revoke it, and label the intended audience. It grants completion counts only, no names, individual answers, export or admin privileges. Shared breakdowns omit groups with fewer than five invited respondents. Links can be forwarded by their holder; they are private-link access, not verified Gaia/leader account login. No links or mail are sent automatically.
 
 Launch readiness is blocked until the reviewed broad-work design has a versioned persisted collection journey (`team-blue-baseline-v3`), final submission and optional answer-copy delivery. The existing persistent v2 questionnaire remains available for explicitly labelled QA testing only. Launch and invitation-batch endpoints enforce readiness on the server; batches are limited to 20 and report sent/failed separately. QA always remains email-preview only. No real employee collection is launched. Migration 0003 is QA-only until explicit production approval. Production D1 flags and data authority are unchanged.
+
+### Sixth private tester link (13 October 2026)
+
+A separate Tester 6 link is reserved for Greg to share with Giovanna. It uses the same latest QA questionnaire, security checks and 25 October expiry. The original five links are unchanged. No email is sent and no recipient account or personal email is inferred.

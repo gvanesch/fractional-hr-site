@@ -11,6 +11,8 @@ const TESTERS: Record<string, string> = {
   "34ab15319c3fcd85a33dc3b359d40fff87067fbdce47acaa088798ef5cf524ef":
     "Tester 4",
   cb22bf7279b50b5b00d0e3688903d7fec84c82f94da4f7e90a08fe10fe209ca4: "Tester 5",
+  "93fecb08f5273f689c728cad4d368fa35f6e69b47243c7f6a8f87c6de1ef6ca7":
+    "Tester 6",
 };
 export function designTester(
   token: unknown,
