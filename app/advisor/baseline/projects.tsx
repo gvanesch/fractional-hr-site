@@ -77,6 +77,7 @@ export default function ProjectList() {
             <label className="tb-field">
               <span>Project status</span>
               <select
+                aria-label="Project status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
