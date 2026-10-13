@@ -33,13 +33,13 @@ export function invitationEmail(name: string, link: string, closes: string) {
     ),
   };
 }
-export function verificationEmail(code: string) {
+export function verificationEmail(code: string, link?: string) {
   return {
     subject: "team.blue | Your verification code",
-    text: `team.blue — Verify access\n\nEnter this code on the baseline assessment page:\n\n${code}\n\nThe code is valid for 10 minutes. Keep it private.\n\nHosted and sent by Van Esch Advisory for team.blue. Reply to this email for help.`,
+    text: `team.blue — Verify access\n\nEnter this code on the baseline assessment page:\n\n${code}\n\nThe code is valid for 10 minutes. Keep it private.${link ? "\n\nReturn to your assessment:\n" + link : ""}\n\nHosted and sent by Van Esch Advisory for team.blue. Reply to this email for help.`,
     html: frame(
       "Verify access to your baseline",
-      `<p>Enter this code on the baseline assessment page:</p><p style="font-size:32px;font-weight:700;letter-spacing:6px;background:#eff6ff;padding:18px;border-radius:8px">${escape(code)}</p><p>The code is valid for 10 minutes. Keep it private.</p>`,
+      `<p>Enter this code on the baseline assessment page:</p><p style="font-size:32px;font-weight:700;letter-spacing:6px;background:#eff6ff;padding:18px;border-radius:8px">${escape(code)}</p><p>The code is valid for 10 minutes. Keep it private.</p>${link ? '<p><a href="' + escape(link) + '" style="color:#1e6fd9">Return to your assessment</a></p>' : ""}`,
     ),
   };
 }

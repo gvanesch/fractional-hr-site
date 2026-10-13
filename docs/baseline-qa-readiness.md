@@ -41,3 +41,6 @@ Answer-copy preferences are recorded and preview-only in QA. Production copy del
 
 - Follow-up hosted reviewed HTTP/D1 contract passed on `d7d48a6`, including denial of unverified bearer access, synthetic-recipient mail denial, CAS save/resume, immutable submission and preview-only answer copies. Mail inventory runner had a shell heredoc indentation error and did not inspect the Worker or send messages. This is fixed by a dedicated JS helper; no credential conclusion is inferred from that syntax failure.
 - Synthetic-only visual artifacts are generated for desktop/mobile admin, collection review and technology pages. They contain no real invitation tokens or verification codes.
+
+- Commit `5e286b2` did not run: GitHub rejected the job-level `runner.temp` context. The screenshot directory now uses `GITHUB_ENV` from the installer step. No deployment or email happened from that invalid workflow.
+- Email-code previews now link directly to the existing challenge. Reopening the invitation reuses that challenge without sending another message. A current-code control supports normal production expiry handling; QA remains once-only. General QA invitation sending is denied even if mail mode is misconfigured.

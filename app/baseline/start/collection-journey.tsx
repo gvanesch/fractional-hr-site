@@ -170,8 +170,9 @@ export default function CollectionJourney() {
         ) : token ? (
           <>
             <p>
-              We will send a verification code to the email address used for
-              your invitation.
+              {challenge
+                ? "Enter the code sent to the email address used for your invitation."
+                : "We will send a verification code to the email address used for your invitation."}
             </p>
             {!challenge ? (
               <button
@@ -216,7 +217,26 @@ export default function CollectionJourney() {
                 <button className="tb-primary" disabled={busy}>
                   Verify and continue
                 </button>
-                <p>The code is valid for 10 minutes.</p>
+                <p>
+                  The code is valid for 10 minutes. Use the most recent code.
+                </p>
+                <button
+                  className="tb-secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      const r = await api<{ challenge: string }>(
+                        "request-code",
+                        { token },
+                      );
+                      setChallenge(r.challenge);
+                      setCode("");
+                    })
+                  }
+                >
+                  Get a current code
+                </button>
               </form>
             )}
           </>

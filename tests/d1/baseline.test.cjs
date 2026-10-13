@@ -1492,7 +1492,10 @@ test("QA actual mail is exact-recipient restricted and once-only for invite and 
     assert.equal(h.state.emails.length, 0);
     const greg = await reviewedSetup(h, "greg@vanesch.uk");
     await h.service.qaTestInvitation(h.request({}), greg.token);
-    await h.service.requestVerification(h.request({}), greg.token);
+    const sentCode = await h.service.requestVerification(
+      h.request({}),
+      greg.token,
+    );
     assert.equal(h.state.emails.length, 2);
     assert.ok(
       h.state.emails.every(
@@ -1503,10 +1506,11 @@ test("QA actual mail is exact-recipient restricted and once-only for invite and 
       h.service.qaTestInvitation(h.request({}), greg.token),
       (e) => e.status === 409,
     );
-    await assert.rejects(
-      h.service.requestVerification(h.request({}), greg.token),
-      (e) => e.status === 409,
+    const reused = await h.service.requestVerification(
+      h.request({}),
+      greg.token,
     );
+    assert.equal(reused.challenge, sentCode.challenge);
     assert.equal(h.state.emails.length, 2);
     h.env.NEXT_PUBLIC_APP_ENV = "production";
     for (const flag of [

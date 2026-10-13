@@ -881,7 +881,10 @@ export async function invite(
       "The reviewed questionnaire is not ready for production invitations.",
       409,
     );
-  if (send && env.BASELINE_MAIL_MODE !== "send")
+  if (
+    send &&
+    (env.NEXT_PUBLIC_APP_ENV === "qa" || env.BASELINE_MAIL_MODE !== "send")
+  )
     throw new BaselineError(
       "Email is disabled in QA. Generate a test link instead.",
     );
@@ -2103,6 +2106,12 @@ async function sendGregTest(
   kind: "invite" | "code",
   email: string,
   message: ReturnType<typeof verificationEmail>,
+  binding?: {
+    challenge: string;
+    participant: string;
+    invite: string;
+    campaign: string;
+  },
 ) {
   const env = baselineEnv();
   if (!canTestMail(email))
@@ -2125,6 +2134,14 @@ async function sendGregTest(
     throw new BaselineError(
       "This QA test message has already been attempted. Check the existing message before requesting another test.",
       409,
+    );
+  if (kind === "code" && binding)
+    await audit(
+      "qa-mail",
+      "qa_code_mail_bound",
+      binding.campaign,
+      binding.participant,
+      { challenge: binding.challenge, invite: binding.invite },
     );
   try {
     const result = await new Resend(credential).emails.send(
@@ -2205,6 +2222,47 @@ export async function requestVerification(
       "Email verification is in QA preview mode. Ask the organiser for a synthetic test access code.",
       403,
     );
+  if (!preview && env.NEXT_PUBLIC_APP_ENV === "qa" && canTestMail(p.email)) {
+    const prior = await db()
+      .prepare(
+        "SELECT status,updated_at FROM tb_baseline_qa_mail_tests WHERE kind='code'",
+      )
+      .first<{ status: string; updated_at: string }>();
+    if (prior) {
+      if (prior.status !== "sent")
+        throw new BaselineError(
+          "The QA email test needs review before another message can be attempted.",
+          409,
+        );
+      const linked = await db()
+        .prepare(
+          "SELECT metadata_json FROM tb_baseline_audit WHERE subject_id=? AND action='qa_code_mail_bound' ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(p.participant_id)
+        .first<{ metadata_json: string }>();
+      const binding = linked ? JSON.parse(linked.metadata_json) : null;
+      const existing = (
+        await db()
+          .prepare(
+            "SELECT challenge_id FROM tb_baseline_verifications WHERE invite_id=? AND expires_at>? AND consumed_at IS NULL AND attempts<6 AND created_at<=? ORDER BY created_at DESC",
+          )
+          .bind(p.invite_id, now(), prior.updated_at)
+          .all<{ challenge_id: string }>()
+      ).results;
+      const selected =
+        binding?.invite === p.invite_id
+          ? existing.find((c) => c.challenge_id === binding.challenge)
+          : existing.length === 1
+            ? existing[0]
+            : null;
+      if (!selected)
+        throw new BaselineError(
+          "The QA email preview code has expired or been used. Ask the organiser for current synthetic QA test access.",
+          409,
+        );
+      return { challenge: selected.challenge_id };
+    }
+  }
   await rateLimit(request, "verification-token:" + hashToken(token), 4);
   const challenge = randomUUID(),
     code = String(randomInt(0, 1000000)).padStart(6, "0"),
@@ -2221,7 +2279,24 @@ export async function requestVerification(
     .run();
   if (!preview) {
     if (env.NEXT_PUBLIC_APP_ENV === "qa")
-      await sendGregTest("code", p.email, verificationEmail(code));
+      await sendGregTest(
+        "code",
+        p.email,
+        verificationEmail(
+          code,
+          env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") +
+            "/baseline/start#" +
+            token +
+            ":" +
+            challenge,
+        ),
+        {
+          challenge,
+          participant: p.participant_id,
+          invite: p.invite_id,
+          campaign: p.campaign_id,
+        },
+      );
     else {
       if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
         throw new BaselineError("Email verification is not configured.", 503);
@@ -2229,7 +2304,14 @@ export async function requestVerification(
         from: baselineSender(env.CONTACT_FROM_EMAIL),
         to: p.email,
         replyTo: "info@vanesch.uk",
-        ...verificationEmail(code),
+        ...verificationEmail(
+          code,
+          env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") +
+            "/baseline/start#" +
+            token +
+            ":" +
+            challenge,
+        ),
       });
       if (result.error)
         throw new BaselineError(
