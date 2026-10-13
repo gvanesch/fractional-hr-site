@@ -77,7 +77,7 @@ test("Simpler payroll asks who handles work when uninvolved and does not force g
     daysUnknown: true,
     days: 4,
   });
-  assert.equal(m.PAYROLL_STAGES.length, 4);
+  assert.equal(m.PAYROLL_STAGES.length, 5);
   assert.ok(
     !m.PAYROLL_STAGES.some(([c]) =>
       ["pay", "reconcile", "calculate", "approve"].includes(c),
@@ -151,4 +151,23 @@ test("Tracking explanation is required only for recorded requests; systems requi
   assert.ok(m.richIssues(d, "context").includes("otherSystems"));
   d.otherSystems = "Local payroll tool";
   assert.ok(!m.richIssues(d, "context").includes("otherSystems"));
+});
+
+test("Payroll preparation and provider submission retain independent actors", () => {
+  const d = m.emptyRichDraft();
+  Object.assign(d, { payroll: "yes", cycle: "monthly", daysUnknown: true });
+  for (const [code] of m.PAYROLL_STAGES)
+    d.payrollStages[code] = { mine: "unknown", others: [] };
+  d.payrollStages.prepare = { mine: "do", others: ["other_hr"] };
+  d.payrollStages.submit_provider = {
+    mine: "coordinate",
+    others: ["partner", "finance"],
+  };
+  assert.deepEqual(m.richIssues(d, "payroll"), []);
+  const e = m.richEvidence(d, ["pay_benefits"], true).payroll.stages;
+  assert.equal(e.find((s) => s.code === "prepare").mine, "do");
+  assert.deepEqual(e.find((s) => s.code === "submit_provider").others, [
+    "partner",
+    "finance",
+  ]);
 });

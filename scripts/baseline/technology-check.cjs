@@ -97,6 +97,10 @@ const root = path.resolve(__dirname, "../..");
       );
       await check("Does any of your work need the following?: None of these");
       await check("Systems and tools you use regularly: HiBob");
+      await check("Systems and tools you use regularly: Other tools");
+      await page
+        .getByLabel("Other systems or tools", { exact: true })
+        .fill("Custom A\nCustom B");
       await button("Continue").click();
       await page
         .getByRole("heading", { name: "Your technology work", exact: true })
@@ -142,6 +146,24 @@ const root = path.resolve(__dirname, "../..");
           .getByLabel("Technology time: " + label, { exact: true })
           .fill(value);
       await check("Systems you support or improve: HiBob");
+      await check("Systems you support or improve: Other tools");
+      assert.equal(
+        await page
+          .getByLabel("Other systems you support or improve", { exact: true })
+          .inputValue(),
+        "Custom A\nCustom B",
+      );
+      for (const system of ["Custom A", "Custom B", "HiBob"]) {
+        const summary = page
+          .locator("summary")
+          .filter({ hasText: "Your involvement: " + system });
+        if (!(await summary.evaluate((el) => el.parentElement.open)))
+          await summary.click();
+      }
+      await check(
+        "Your involvement: Custom A: Technical configuration or development",
+      );
+      await check("Your involvement: Custom B: Support and troubleshooting");
       await check(
         "Your involvement: HiBob: Technical configuration or development",
       );
@@ -158,6 +180,14 @@ const root = path.resolve(__dirname, "../..");
       await button("Return to review").click();
       await page
         .getByRole("heading", { name: "Review", exact: true })
+        .waitFor();
+      await page
+        .getByText("Custom A: Technical configuration or development", {
+          exact: true,
+        })
+        .waitFor();
+      await page
+        .getByText("Custom B: Support and troubleshooting", { exact: true })
         .waitFor();
       await page
         .getByText(

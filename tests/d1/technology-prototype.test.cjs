@@ -99,6 +99,59 @@ test("Technology selections preserve uncertainty and omit hidden platform answer
   d.platforms = ["other"];
   assert.ok(m.technologyIssues(d).includes("otherPlatform"));
   d.otherPlatform = "Custom application";
-  d.roles.other = ["technical"];
+  d.roles[m.technologyPlatforms(d)[0].code] = ["technical"];
   assert.deepEqual(m.technologyIssues(d), []);
+});
+
+test("Each named other system needs its own involvement and has a stable identity", () => {
+  const d = m.emptyTechnology();
+  Object.assign(d, {
+    involvement: "yes",
+    activities: ["support"],
+    time: { run: 100, improve: 0, deliver: 0 },
+    platforms: ["other"],
+    otherPlatform: "Custom A\nCustom B",
+    partners: ["it"],
+  });
+  const [a, b] = m.technologyPlatforms(d);
+  d.roles[a.code] = ["technical"];
+  assert.ok(m.technologyIssues(d).includes("roles_" + b.code));
+  d.roles[b.code] = ["support"];
+  assert.deepEqual(m.technologyIssues(d), []);
+  d.otherPlatform = "Custom B\nCustom A\ncustom a";
+  assert.deepEqual(
+    m.technologyPlatforms(d).map((p) => p.code),
+    [b.code, a.code],
+  );
+  assert.deepEqual(
+    m
+      .technologyEvidence(d, true)
+      .platforms.map((p) => ({ label: p.label, roles: p.roles })),
+    [
+      { label: "Custom B", roles: ["support"] },
+      { label: "Custom A", roles: ["technical"] },
+    ],
+  );
+  d.otherPlatform = "Custom B";
+  assert.deepEqual(
+    m.technologyEvidence(d, true).platforms.map((p) => p.code),
+    [b.code],
+  );
+});
+
+test("Feedback activities stay within the existing broad work categories", () => {
+  const { BROAD_AREAS } = load("broad-prototype");
+  assert.equal(BROAD_AREAS.length, 10);
+  assert.match(
+    BROAD_AREAS.find((a) => a.code === "office").examples,
+    /fleet or company car management/,
+  );
+  assert.match(
+    BROAD_AREAS.find((a) => a.code === "policies").examples,
+    /Mandatory or compliance training/,
+  );
+  assert.match(
+    BROAD_AREAS.find((a) => a.code === "advice_cases").examples,
+    /termination, dismissal and redundancy case management/,
+  );
 });

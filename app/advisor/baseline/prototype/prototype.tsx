@@ -152,6 +152,11 @@ export default function Prototype({
             This design test adds contact routes, payroll responsibilities and
             working context. It does not collect a campaign response.
           </p>
+          <p className="tb-estimate">
+            Most people will complete this in around 10–15 minutes. If your role
+            covers a broad range of People activities, it may take closer to
+            20–30 minutes.
+          </p>
           <button className="tb-primary" onClick={() => setStarted(true)}>
             Start with empty answers
           </button>
@@ -382,6 +387,7 @@ export default function Prototype({
                 change={(patch) => setTechnology({ ...technology, ...patch })}
                 issues={issues}
                 regularSystems={rich.systems}
+                regularOtherSystems={rich.otherSystems}
               />
             )}
             {key === "review" && (

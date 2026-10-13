@@ -303,11 +303,12 @@ const root = path.resolve(__dirname, "../..");
       assert.ok(!(await page.getByRole("alert").innerText()).includes("100%"));
       const stages = [
         "Collect employee changes and payroll inputs",
-        "Prepare or enter payroll information",
+        "Prepare payroll information / inputs",
+        "Communicate / submit payroll information to the external payroll provider",
         "Check payroll results and resolve corrections",
         "Answer employee payroll questions",
       ];
-      assert.equal(await page.getByRole("combobox").count(), 6);
+      assert.equal(await page.getByRole("combobox").count(), 7);
       await pick("Your part: " + stages[0], "do");
       await pick("Your part: " + stages[1], "none");
       await check(
@@ -322,6 +323,7 @@ const root = path.resolve(__dirname, "../..");
         0,
       );
       await pick("Your part: " + stages[3], "coordinate");
+      await pick("Your part: " + stages[4], "do");
       await page
         .getByLabel(
           "Any other payroll work or important responsibilities? (optional)",

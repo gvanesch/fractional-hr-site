@@ -1,9 +1,9 @@
-import { SYSTEMS } from "./prototype-enrichment";
+import { SYSTEMS, otherSystemNames } from "./prototype-enrichment";
 export const TECHNOLOGY_ACTIVITIES = [
   [
     "administration",
     "System administration",
-    "Maintain settings, records and day-to-day operation.",
+    "Configure, maintain or manage the system for other users.",
   ],
   [
     "configuration",
@@ -152,6 +152,26 @@ export const emptyTechnology = (): TechnologyDraft => ({
   otherPartner: "",
   note: "",
 });
+export function technologyPlatforms(d: TechnologyDraft) {
+  const standard = d.platforms
+    .filter((c) => c !== "other")
+    .map((code) => ({
+      code,
+      label: TECHNOLOGY_SYSTEMS.find((o) => o[0] === code)?.[1] ?? code,
+    }));
+  const custom = d.platforms.includes("other")
+    ? otherSystemNames(d.otherPlatform)
+        .filter(
+          (name) =>
+            !standard.some((p) => p.label.toLowerCase() === name.toLowerCase()),
+        )
+        .map((label) => ({
+          code: "custom:" + encodeURIComponent(label.toLowerCase()),
+          label,
+        }))
+    : [];
+  return [...standard, ...custom];
+}
 export const technologyVisible = (enabled: boolean, selected: string[]) =>
   enabled && selected.includes("systems_data");
 const valid = (values: string[], options: string[][]) =>
@@ -180,9 +200,16 @@ export function technologyIssues(d: TechnologyDraft) {
   if (!bad.length && (technologyTotal(d) < 98 || technologyTotal(d) > 102))
     issues.push(...TECHNOLOGY_TIME.map(([c]) => "time_" + c));
   if (!valid(d.platforms, TECHNOLOGY_SYSTEMS)) issues.push("platforms");
-  if (d.platforms.includes("other") && !d.otherPlatform.trim())
+  if (
+    d.platforms.includes("other") &&
+    (!d.otherPlatform.trim() ||
+      otherSystemNames(d.otherPlatform).length > 20 ||
+      otherSystemNames(d.otherPlatform).some((n) => n.length > 80))
+  )
     issues.push("otherPlatform");
-  for (const c of d.platforms.filter((c) => c !== "unknown"))
+  for (const { code: c } of technologyPlatforms(d).filter(
+    (p) => p.code !== "unknown",
+  ))
     if (!valid(d.roles[c] ?? [], TECHNOLOGY_ROLES)) issues.push("roles_" + c);
   if (!valid(d.partners, TECHNOLOGY_PARTNERS)) issues.push("partners");
   if (d.partners.includes("other") && !d.otherPartner.trim())
@@ -192,9 +219,9 @@ export function technologyIssues(d: TechnologyDraft) {
 export function technologyEvidence(d: TechnologyDraft, visible: boolean) {
   if (!visible) return null;
   if (d.involvement !== "yes")
-    return { version: "technology-preview-v1", involvement: d.involvement };
+    return { version: "technology-preview-v2", involvement: d.involvement };
   return {
-    version: "technology-preview-v1",
+    version: "technology-preview-v2",
     involvement: d.involvement,
     activities: d.activities,
     ...(d.activities.includes("other")
@@ -204,8 +231,9 @@ export function technologyEvidence(d: TechnologyDraft, visible: boolean) {
       code,
       shareOfTechnologyTime: d.time[code],
     })),
-    platforms: d.platforms.map((code) => ({
+    platforms: technologyPlatforms(d).map(({ code, label }) => ({
       code,
+      ...(code.startsWith("custom:") ? { label } : {}),
       roles: code === "unknown" ? [] : (d.roles[code] ?? []),
     })),
     ...(d.platforms.includes("other")

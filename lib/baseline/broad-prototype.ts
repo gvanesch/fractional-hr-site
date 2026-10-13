@@ -22,13 +22,13 @@ export const BROAD_AREAS = [
     code: "advice_cases",
     label: "Manager advice and employee cases",
     examples:
-      "Advising managers, employee concerns, absence or performance cases, complaints, investigations and working with Legal.",
+      "Advising managers, employee concerns, absence or performance cases, complaints, investigations, termination, dismissal and redundancy case management, and working with Legal.",
   },
   {
     code: "planning_development",
     label: "People planning, performance and development",
     examples:
-      "Staffing plans, team changes, performance reviews, talent and succession, training, development and supporting business changes.",
+      "Staffing plans, team changes, performance reviews, talent and succession, learning and development, and supporting business changes. Record mandatory or compliance training under Policies and local requirements.",
   },
   {
     code: "experience",
@@ -40,7 +40,7 @@ export const BROAD_AREAS = [
     code: "policies",
     label: "Policies and local requirements",
     examples:
-      "Writing or updating policies, local employment requirements, audits, employee representatives and consultation.",
+      "Writing or updating policies, local employment requirements, audits, employee representatives and consultation. Mandatory or compliance training, such as health and safety, privacy or other legally required training.",
   },
   {
     code: "systems_data",
@@ -52,7 +52,7 @@ export const BROAD_AREAS = [
     code: "office",
     label: "Reception, facilities and office support",
     examples:
-      "Reception, visitors, deliveries, office supplies, building access, repairs, meeting rooms, workplace suppliers and safety administration.",
+      "Reception, visitors, deliveries, office supplies, building access, repairs, meeting rooms, workplace suppliers, safety administration, and fleet or company car management.",
   },
   {
     code: "other",

@@ -64,3 +64,56 @@
     padding: 12px;
   }
 }
+.tb-prototype .tb-technology-time {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 20px 0 32px;
+}
+.tb-prototype .tb-technology-time .tb-field {
+  padding: 16px;
+  border: 1px solid #d6e2e7;
+  border-radius: 12px;
+  margin: 0;
+}
+.tb-prototype .tb-technology-platforms {
+  margin: 32px 0;
+  padding-top: 20px;
+  border-top: 2px solid #d6e2e7;
+}
+.tb-prototype .tb-payroll-stage {
+  margin: 24px 0;
+  padding: 22px;
+}
+.tb-prototype .tb-options {
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .tb-prototype .tb-technology-time {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .tb-prototype .tb-payroll-stage {
+    padding: 16px;
+  }
+}
+.tb-prototype .tb-platform-detail {
+  border: 1px solid #d6e2e7;
+  padding: 16px;
+  margin: 18px 0;
+  background: white;
+}
+.tb-prototype .tb-platform-detail summary {
+  display: list-item;
+  font-weight: 700;
+}
+.tb-prototype .tb-platform-detail summary small {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+}
+.tb-prototype .tb-platform-detail .tb-process {
+  border: 0;
+  padding: 0;
+  margin: 18px 0 0;
+}

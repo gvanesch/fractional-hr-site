@@ -11,7 +11,11 @@ export const CONTACT_ROUTES = [
 ];
 export const PAYROLL_STAGES = [
   ["collect", "Collect employee changes and payroll inputs"],
-  ["prepare", "Prepare or enter payroll information"],
+  ["prepare", "Prepare payroll information / inputs"],
+  [
+    "submit_provider",
+    "Communicate / submit payroll information to the external payroll provider",
+  ],
   ["check", "Check payroll results and resolve corrections"],
   ["queries", "Answer employee payroll questions"],
 ];
@@ -64,6 +68,17 @@ export const SYSTEMS = [
   ["none", "No systems or tools used regularly"],
   ["unknown", "Not sure"],
 ];
+// One named system per line. Names have a stable identity independent of line order.
+export const otherSystemNames = (text: string) => {
+  const names = text
+    .split(/\r?\n/)
+    .map((n) => n.trim())
+    .filter(Boolean);
+  return names.filter(
+    (name, i) =>
+      names.findIndex((n) => n.toLowerCase() === name.toLowerCase()) === i,
+  );
+};
 export type RichDraft = {
   routes: string[];
   routeTime: Record<string, number>;
@@ -242,7 +257,7 @@ export function richEvidence(
   payrollVisible: boolean,
 ) {
   return {
-    designVersion: "focused-work-prototype-v4",
+    designVersion: "focused-work-prototype-v5",
     contact: {
       routes: d.routes.map((code) => ({
         code,
@@ -289,6 +304,7 @@ export function richEvidence(
     localNote: d.localNote,
     systems: d.systems,
     otherSystems: d.otherSystems,
+    otherSystemNames: otherSystemNames(d.otherSystems),
     manualNote: d.manualNote,
     strengths: d.strengths,
     missing: d.missing,

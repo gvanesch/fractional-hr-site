@@ -345,7 +345,8 @@ export default function Context({
               return (
                 <section
                   className={
-                    "tb-process" + (bad("payroll_" + code) ? " tb-invalid" : "")
+                    "tb-process tb-payroll-stage" +
+                    (bad("payroll_" + code) ? " tb-invalid" : "")
                   }
                   key={code}
                 >
@@ -468,6 +469,11 @@ export default function Context({
       />
       <section className="tb-process">
         <h3>Systems and tools</h3>
+        <p>
+          Using a system for everyday work is different from administering it.
+          System administration means configuring, maintaining or managing it
+          for other users.
+        </p>
         <Checks
           label="Systems and tools you use regularly"
           values={d.systems}
@@ -482,26 +488,30 @@ export default function Context({
               ? "Other systems or tools"
               : "Other systems or tools (optional)"
           }
+          help="Enter one system per line. If you support or administer these systems, the technology section asks about each one separately."
           invalid={bad("otherSystems")}
           value={d.otherSystems}
           change={(otherSystems) => change({ otherSystems })}
         />
       </section>
-      <Text
-        label="Which work takes more time or manual effort than it should? (optional)"
-        value={d.manualNote}
-        change={(manualNote) => change({ manualNote })}
-      />
-      <Text
-        label="What works well and should we keep? (optional)"
-        value={d.strengths}
-        change={(strengths) => change({ strengths })}
-      />
-      <Text
-        label="Anything important about your work we have missed? (optional)"
-        value={d.missing}
-        change={(missing) => change({ missing })}
-      />
+      <section className="tb-process">
+        <h3>What could work better, and what should we keep?</h3>
+        <Text
+          label="Which work takes more time or manual effort than it should? (optional)"
+          value={d.manualNote}
+          change={(manualNote) => change({ manualNote })}
+        />
+        <Text
+          label="What works well and should we keep? (optional)"
+          value={d.strengths}
+          change={(strengths) => change({ strengths })}
+        />
+        <Text
+          label="Anything important about your work we have missed? (optional)"
+          value={d.missing}
+          change={(missing) => change({ missing })}
+        />
+      </section>
     </>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import {
   TECHNOLOGY_ACTIVITIES,
   TECHNOLOGY_TIME,
@@ -6,6 +7,7 @@ import {
   TECHNOLOGY_PARTNERS,
   TECHNOLOGY_SYSTEMS,
   technologyTotal,
+  technologyPlatforms,
   type TechnologyDraft,
 } from "@/lib/baseline/technology-prototype";
 import { toggleOption } from "@/lib/baseline/prototype-enrichment";
@@ -51,16 +53,56 @@ function Options({
     </fieldset>
   );
 }
+function PlatformRoles({
+  label,
+  values,
+  invalid,
+  change,
+}: {
+  label: string;
+  values: string[];
+  invalid: boolean;
+  change: (values: string[]) => void;
+}) {
+  const panel = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (invalid && panel.current) panel.current.open = true;
+  }, [invalid]);
+  return (
+    <details
+      ref={panel}
+      className={"tb-platform-detail" + (invalid ? " tb-invalid" : "")}
+    >
+      <summary>
+        <span>{"Your involvement: " + label}</span>
+        <small>
+          {values.length
+            ? values.length + " types of work selected"
+            : "Not answered yet"}
+        </small>
+      </summary>
+      <Options
+        label={"Your involvement: " + label}
+        values={values}
+        options={TECHNOLOGY_ROLES}
+        invalid={invalid}
+        change={change}
+      />
+    </details>
+  );
+}
 export default function Technology({
   draft: d,
   change,
   issues,
   regularSystems,
+  regularOtherSystems,
 }: {
   draft: TechnologyDraft;
   change: (p: Partial<TechnologyDraft>) => void;
   issues: string[];
   regularSystems: string[];
+  regularOtherSystems: string;
 }) {
   const bad = (k: string) => issues.includes(k);
   const text = (
@@ -86,8 +128,9 @@ export default function Technology({
   return (
     <>
       <p>
-        This section is about work on systems and data. Using a tool for
-        everyday work is different from supporting or improving it.
+        Using a system as part of your day-to-day work is different from
+        administering it. Select system administration only if you configure,
+        maintain or manage the system for other users.
       </p>
       <Pick
         label="Do you support, maintain or improve systems, data or reports?"
@@ -122,63 +165,77 @@ export default function Technology({
             Technology time: {technologyTotal(d)}%
             <small>Aim for 100% of your technology time.</small>
           </div>
-          {TECHNOLOGY_TIME.map(([code, label, help]) => (
-            <label className="tb-field" key={code}>
-              <span>{label}</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                inputMode="decimal"
-                aria-label={"Technology time: " + label}
-                aria-invalid={bad("time_" + code)}
-                value={Number.isFinite(d.time[code]) ? d.time[code] : ""}
-                onChange={(e) =>
-                  change({
-                    time: {
-                      ...d.time,
-                      [code]:
-                        e.target.value === "" ? NaN : Number(e.target.value),
-                    },
-                  })
-                }
-              />
-              <small>{help}</small>
-            </label>
-          ))}
+          <div className="tb-technology-time">
+            {TECHNOLOGY_TIME.map(([code, label, help]) => (
+              <label className="tb-field" key={code}>
+                <span>{label}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  inputMode="decimal"
+                  aria-label={"Technology time: " + label}
+                  aria-invalid={bad("time_" + code)}
+                  value={Number.isFinite(d.time[code]) ? d.time[code] : ""}
+                  onChange={(e) =>
+                    change({
+                      time: {
+                        ...d.time,
+                        [code]:
+                          e.target.value === "" ? NaN : Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+                <small>{help}</small>
+              </label>
+            ))}
+          </div>
           <Options
             label="Systems you support or improve"
             values={d.platforms}
             options={ordered}
             invalid={bad("platforms")}
-            change={(platforms) => change({ platforms })}
+            change={(platforms) =>
+              change({
+                platforms,
+                ...(platforms.includes("other") && !d.otherPlatform.trim()
+                  ? { otherPlatform: regularOtherSystems }
+                  : {}),
+              })
+            }
           />
           <p>
             Tools you selected earlier appear first. Select only the systems you
             work on. You can select others here.
           </p>
-          {d.platforms.includes("other") &&
-            text("otherPlatform", "Other systems you support or improve")}
-          {d.platforms
-            .filter((c) => c !== "unknown")
-            .map((code) => (
-              <Options
-                key={code}
-                label={
-                  "Your involvement: " +
-                  (code === "other"
-                    ? d.otherPlatform || "Other systems"
-                    : TECHNOLOGY_SYSTEMS.find((o) => o[0] === code)?.[1])
-                }
-                values={d.roles[code] ?? []}
-                options={TECHNOLOGY_ROLES}
-                invalid={bad("roles_" + code)}
-                change={(roles) =>
-                  change({ roles: { ...d.roles, [code]: roles } })
-                }
-              />
-            ))}
+          {d.platforms.includes("other") && (
+            <>
+              {text("otherPlatform", "Other systems you support or improve")}
+              <p className="tb-compact-text">
+                Enter one system per line. You can add up to 20 systems. We ask
+                about your involvement in each system separately.
+              </p>
+            </>
+          )}
+          <section className="tb-technology-platforms">
+            <h2>Your involvement in each system</h2>
+            <p>You can choose more than one type of work for each system.</p>
+            {technologyPlatforms(d)
+              .filter((p) => p.code !== "unknown")
+              .map(({ code, label }) => (
+                <PlatformRoles
+                  key={code}
+                  label={label}
+                  values={d.roles[code] ?? []}
+                  invalid={bad("roles_" + code)}
+                  change={(roles) =>
+                    change({ roles: { ...d.roles, [code]: roles } })
+                  }
+                />
+              ))}
+          </section>
           <Options
             label="Who do you regularly work with on this technology work?"
             values={d.partners}
@@ -218,13 +275,11 @@ export function TechnologyReview({ draft: d }: { draft: TechnologyDraft }) {
               {l}: {d.time[c]}% of technology time
             </p>
           ))}
-          {d.platforms.map((c) => (
-            <p key={c}>
-              {c === "other"
-                ? d.otherPlatform
-                : labels([c], TECHNOLOGY_SYSTEMS)}
-              {c !== "unknown" &&
-                ": " + labels(d.roles[c] ?? [], TECHNOLOGY_ROLES)}
+          {technologyPlatforms(d).map(({ code, label }) => (
+            <p key={code}>
+              {label}
+              {code !== "unknown" &&
+                ": " + labels(d.roles[code] ?? [], TECHNOLOGY_ROLES)}
             </p>
           ))}
           <p>
