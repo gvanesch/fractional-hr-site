@@ -37,14 +37,14 @@ The existing six private design links remain available until their existing expi
 
 ## Verified evidence
 
-Commit `144a17476d8c942e22b082706d73d8c12bd4675a`, workflow https://github.com/gvanesch/fractional-hr-site/actions/runs/38446233527 passed:
+Final source commit `589cb7dd995c709ec8df65981ae67ef1cf04473b`, workflow https://github.com/gvanesch/fractional-hr-site/actions/runs/38447616295 passed and was re-confirmed on 14 October 2026:
 
 - 77 automated tests, type checking and baseline lint.
 - Desktop/mobile generic, broad, technology, management, administration and reviewed collection browser checks.
 - QA migrations, build/deployment, configuration and anonymous-access boundaries.
 - Real hosted QA D1 legacy and reviewed collection contracts: private sessions, CAS save/resume, rejection of unverified access, locked submission, normalized work, copy preview and logout.
-- Synthetic desktop/mobile visual artifacts for administration, technology, review and email templates. Visual review completed; final display-label and metadata polish follows without changing the v3 semantic definition.
-- Existing QA Worker email credential verified by secret name only. One invitation and one verification-code email accepted by the provider for the exact authorised Greg address. General mail stays preview-only; other recipients and duplicate attempts are blocked. Provider acceptance does not prove inbox receipt.
+- Synthetic desktop/mobile visual artifacts for administration, technology, review and email templates. Final visual review, display-label and private metadata polish completed without changing the v3 semantic definition.
+- Existing QA Worker email credential verified by secret name only. One invitation and one verification-code email accepted by the provider for the exact authorised Greg address in the previous successful run `38446233527`. The final run confirmed both were already sent and sent no repeats. General mail stays preview-only; other recipients and duplicate attempts are blocked. Provider acceptance does not prove inbox receipt.
 
 ## Before production approval
 
