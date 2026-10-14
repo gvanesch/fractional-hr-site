@@ -173,7 +173,9 @@ export default function Context({
   draft: d,
   change,
   issues,
+  directPayroll = false,
 }: {
+  directPayroll?: boolean;
   step: string;
   draft: RichDraft;
   change: (p: Partial<RichDraft>) => void;
@@ -317,17 +319,30 @@ export default function Context({
           These questions cover preparing or checking information used to pay
           employees, and answering payroll questions.
         </p>
-        <Pick
-          label="Do you do any payroll-related work?"
-          value={d.payroll}
-          options={[
-            ["yes", "Yes"],
-            ["no", "No"],
-            ["unknown", "Not sure"],
-          ]}
-          invalid={bad("payroll")}
-          change={(payroll) => change({ payroll })}
-        />
+        {directPayroll ? (
+          <label className="tb-check">
+            <input
+              type="checkbox"
+              checked={d.payroll === "no"}
+              onChange={(e) =>
+                change({ payroll: e.target.checked ? "no" : "yes" })
+              }
+            />
+            My work in this area covers benefits or salary reviews only.
+          </label>
+        ) : (
+          <Pick
+            label="Do you do any payroll-related work?"
+            value={d.payroll}
+            options={[
+              ["yes", "Yes"],
+              ["no", "No"],
+              ["unknown", "Not sure"],
+            ]}
+            invalid={bad("payroll")}
+            change={(payroll) => change({ payroll })}
+          />
+        )}
         {d.payroll === "yes" && (
           <>
             <p>

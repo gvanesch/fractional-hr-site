@@ -287,7 +287,23 @@ const root = path.resolve(__dirname, "../..");
       );
       await button("Continue").click();
       await contactOneRoute();
-      await pick("Do you do any payroll-related work?", "no");
+      assert.equal(
+        await page
+          .getByLabel("Do you do any payroll-related work?", { exact: true })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .getByLabel("Your part: Prepare payroll information / inputs", {
+            exact: true,
+          })
+          .count(),
+        1,
+      );
+      await check(
+        "My work in this area covers benefits or salary reviews only.",
+      );
       assert.equal(
         await page
           .getByLabel("Personal payroll days per cycle", { exact: true })
@@ -298,7 +314,12 @@ const root = path.resolve(__dirname, "../..");
       await finishContext();
       assert.equal(await page.locator(".tb-review-area").count(), 9);
       await button("Edit payroll responsibilities").click();
-      await pick("Do you do any payroll-related work?", "yes");
+      await page
+        .getByRole("checkbox", {
+          name: "My work in this area covers benefits or salary reviews only.",
+          exact: true,
+        })
+        .uncheck();
       await button("Return to review").click();
       assert.ok(!(await page.getByRole("alert").innerText()).includes("100%"));
       const stages = [
@@ -308,7 +329,7 @@ const root = path.resolve(__dirname, "../..");
         "Check payroll results and resolve corrections",
         "Answer employee payroll questions",
       ];
-      assert.equal(await page.getByRole("combobox").count(), 7);
+      assert.equal(await page.getByRole("combobox").count(), 6);
       await pick("Your part: " + stages[0], "do");
       await pick("Your part: " + stages[1], "none");
       await check(

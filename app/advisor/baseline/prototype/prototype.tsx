@@ -94,7 +94,8 @@ export default function Prototype({
   );
   const showManagement = managementVisible(managerRecord, draft.selected);
   const [rich, setRich] = useState(
-    savedCollection?.draft.rich ?? emptyRichDraft,
+    () =>
+      savedCollection?.draft.rich ?? { ...emptyRichDraft(), payroll: "yes" },
   );
   const [technology, setTechnology] = useState(
     savedCollection?.draft.technology ?? emptyTechnology,
@@ -598,6 +599,7 @@ export default function Prototype({
             {["contact", "payroll", "context"].includes(key) && (
               <Context
                 step={key}
+                directPayroll={!saveCollection}
                 draft={rich}
                 change={(patch) => setRich({ ...rich, ...patch })}
                 issues={issues}
