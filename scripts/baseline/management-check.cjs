@@ -137,9 +137,14 @@ const root = path.resolve(__dirname, "../..");
           .inputValue(),
         "0",
       );
-      await pick(
-        "Do you manage people who also report to another manager?",
-        "yes",
+      assert.equal(
+        await page
+          .getByLabel(
+            "Do you manage people who also report to another manager?",
+            { exact: true },
+          )
+          .count(),
+        0,
       );
       await page
         .getByLabel(
@@ -168,7 +173,7 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .waitFor();
-      await page.getByText("Shared reporting: Yes", { exact: true }).waitFor();
+      assert.equal(await page.getByText(/Shared reporting:/).count(), 0);
       await page
         .getByText(
           "Team coordination: 30% of management time (9% of working time)",

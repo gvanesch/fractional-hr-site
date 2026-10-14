@@ -208,12 +208,7 @@ export default function Prototype({
           ]
         : steps[i] === "management"
           ? !saveCollection
-            ? [
-                ...managementTimeIssues(managementTime),
-                ...managementIssues(management).filter(
-                  (i) => i === "sharedReporting",
-                ),
-              ]
+            ? managementTimeIssues(managementTime)
             : managementIssues(management)
           : steps[i] === "technology"
             ? technologyIssues(technology)

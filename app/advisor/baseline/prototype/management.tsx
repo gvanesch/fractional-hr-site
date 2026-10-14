@@ -86,21 +86,25 @@ export default function Management({
           )}
         </>
       )}
-      <Pick
-        label="Do you manage people who also report to another manager?"
-        value={d.sharedReporting}
-        options={[
-          ["yes", "Yes"],
-          ["no", "No"],
-          ["unknown", "Not sure"],
-        ]}
-        invalid={issues.includes("sharedReporting")}
-        change={(sharedReporting) => change({ sharedReporting })}
-      />
-      <p>
-        For example, someone may report to you for their local work and to
-        another manager for specialist work.
-      </p>
+      {!timeDraft && (
+        <>
+          <Pick
+            label="Do you manage people who also report to another manager?"
+            value={d.sharedReporting}
+            options={[
+              ["yes", "Yes"],
+              ["no", "No"],
+              ["unknown", "Not sure"],
+            ]}
+            invalid={issues.includes("sharedReporting")}
+            change={(sharedReporting) => change({ sharedReporting })}
+          />
+          <p>
+            For example, someone may report to you for their local work and to
+            another manager for specialist work.
+          </p>
+        </>
+      )}
       <label className="tb-field">
         <span>
           Where could clearer processes or support save management time?
@@ -147,11 +151,13 @@ export function ManagementReview({
           {d.activities.includes("other") && <p>{d.other}</p>}
         </>
       )}
-      <p>
-        Shared reporting:{" "}
-        {{ yes: "Yes", no: "No", unknown: "Not sure" }[d.sharedReporting] ??
-          d.sharedReporting}
-      </p>
+      {!timeDraft && (
+        <p>
+          Shared reporting:{" "}
+          {{ yes: "Yes", no: "No", unknown: "Not sure" }[d.sharedReporting] ??
+            d.sharedReporting}
+        </p>
+      )}
       {d.note && <p>{d.note}</p>}
     </section>
   );

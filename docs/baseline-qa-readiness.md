@@ -66,3 +66,7 @@ Greg approved the management/local-context proposals. The design preview and exi
 The mandatory local-needs tick boxes are replaced in the preview by one optional current-work example about local knowledge or being at an office. Scope and systems remain required. Existing persisted v3 data/definitions are intact; deploy these agreed revisions as a new collection version before launching them for saved participant responses. No production change or new email is authorised.
 
 Local validation: 79 tests, types and baseline lint passed. Browser checks now cover the management split, bounded totals, Other, uncertainty, return-to-review, deselection and optional local context on desktop/mobile. QA workflow must pass before handing back the updated preview.
+
+## Shared-reporting question removed (14 October)
+
+Greg confirmed that the shared-reporting scenario does not apply. The revised QA design preview and private design streams remove the question, its explanatory example, its validation requirement and its review row. No answer is inferred or pre-filled. Existing persisted v3 responses remain versioned and unchanged; this removal joins the agreed revisions for the next collection version. No production change or new mail.
