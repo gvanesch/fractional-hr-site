@@ -13,7 +13,9 @@ const labels = (codes: string[], options: string[][]) =>
   codes.map((c) => options.find((o) => o[0] === c)?.[1] ?? c).join(", ");
 export default function ContextReview({
   evidence: e,
+  focusedLocalContext = false,
 }: {
+  focusedLocalContext?: boolean;
   evidence: ReturnType<typeof richEvidence>;
 }) {
   return (
@@ -145,8 +147,17 @@ export default function ContextReview({
             }[e.scope]
           }
         </p>
-        <p>Local requirements: {labels(e.localNeeds, LOCAL_NEEDS)}</p>
-        {e.localNote && <p>{e.localNote}</p>}
+        {!focusedLocalContext && (
+          <p>Local requirements: {labels(e.localNeeds, LOCAL_NEEDS)}</p>
+        )}
+        {e.localNote && (
+          <p>
+            {focusedLocalContext
+              ? "Work needing local knowledge or presence: "
+              : ""}
+            {e.localNote}
+          </p>
+        )}
         {e.systems.length > 0 && <p>Systems: {labels(e.systems, SYSTEMS)}</p>}
         {e.otherSystems && <p>Other tools: {e.otherSystems}</p>}
         {e.manualNote && <p>Extra manual effort: {e.manualNote}</p>}

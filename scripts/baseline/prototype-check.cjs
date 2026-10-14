@@ -149,7 +149,7 @@ const root = path.resolve(__dirname, "../..");
         assert.ok(
           !(await page.getByRole("alert").innerText()).includes("100%"),
         );
-        assert.equal(await page.locator("fieldset.tb-invalid").count(), 2);
+        assert.equal(await page.locator("fieldset.tb-invalid").count(), 1);
         assert.equal(
           await page
             .getByText("Main contribution within work areas (required)", {
@@ -158,9 +158,21 @@ const root = path.resolve(__dirname, "../..");
             .count(),
           0,
         );
-        await check(
-          "Does any of your work need the following?: Being physically present at an office or site",
+        assert.equal(
+          await page
+            .getByRole("group", {
+              name: "Does any of your work need the following?",
+              exact: true,
+            })
+            .count(),
+          0,
         );
+        await page
+          .getByLabel(
+            "Which parts of your current work need local knowledge or your presence at an office? Give one example. (optional)",
+            { exact: true },
+          )
+          .fill("Reception and visitor support at the office");
         await check("Systems and tools you use regularly: Excel");
         await page
           .getByLabel("What works well and should we keep? (optional)", {

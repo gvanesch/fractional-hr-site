@@ -58,3 +58,11 @@ No production changes are authorised or performed. Remaining intervention is Gre
 ## 14 October payroll preview feedback
 
 The memory-only design preview opens payroll detail directly when Pay and benefits is selected. The extra Yes/No screening question is removed. An inline benefits/salary-review-only checkbox avoids asking benefits-only respondents to describe payroll stages. Stage-specific involvement and provider/Finance questions are unchanged. Existing persisted v3 campaigns retain their versioned questionnaire; incorporate the agreed management/local-context changes together in a new collection version before rollout. No response rewrite or real email. Management percentages and a focused local-work prompt remain proposals awaiting Greg's design decision.
+
+## Agreed management and local-context preview changes (14 October)
+
+Greg approved the management/local-context proposals. The design preview and existing private test streams now divide management time across Team coordination, Individual support, Hiring and team changes, Management administration and optional Other. The total is 98–102% of the management time already entered, with numeric inputs, a floating total, field-specific highlighting and an uncertainty option. Review shows each management share and its approximate share of overall working time. Other requires a short description only when allocated time; uncertainty omits retained guesses from review. Existing shared-reporting and improvement questions remain.
+
+The mandatory local-needs tick boxes are replaced in the preview by one optional current-work example about local knowledge or being at an office. Scope and systems remain required. Existing persisted v3 data/definitions are intact; deploy these agreed revisions as a new collection version before launching them for saved participant responses. No production change or new email is authorised.
+
+Local validation: 79 tests, types and baseline lint passed. Browser checks now cover the management split, bounded totals, Other, uncertainty, return-to-review, deselection and optional local context on desktop/mobile. QA workflow must pass before handing back the updated preview.

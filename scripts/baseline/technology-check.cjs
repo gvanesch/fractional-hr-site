@@ -99,7 +99,15 @@ const root = path.resolve(__dirname, "../..");
         "Do you regularly support one business or more than one?",
         "one",
       );
-      await check("Does any of your work need the following?: None of these");
+      assert.equal(
+        await page
+          .getByRole("group", {
+            name: "Does any of your work need the following?",
+            exact: true,
+          })
+          .count(),
+        0,
+      );
       await check("Systems and tools you use regularly: HiBob");
       await check("Systems and tools you use regularly: Other tools");
       await page

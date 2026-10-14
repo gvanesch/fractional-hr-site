@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  emptyManagementTime,
+  managementTimeIssues,
+} from "@/lib/baseline/management-time-preview";
+import {
   BROAD_AREAS,
   emptyBroadDraft,
   broadSelected,
@@ -92,6 +96,7 @@ export default function Prototype({
   const [management, setManagement] = useState(
     savedCollection?.draft.management ?? emptyManagement,
   );
+  const [managementTime, setManagementTime] = useState(emptyManagementTime);
   const showManagement = managementVisible(managerRecord, draft.selected);
   const [rich, setRich] = useState(
     () =>
@@ -202,10 +207,22 @@ export default function Prototype({
             ...richIssues(rich, "time_nature", draft.selected),
           ]
         : steps[i] === "management"
-          ? managementIssues(management)
+          ? !saveCollection
+            ? [
+                ...managementTimeIssues(managementTime),
+                ...managementIssues(management).filter(
+                  (i) => i === "sharedReporting",
+                ),
+              ]
+            : managementIssues(management)
           : steps[i] === "technology"
             ? technologyIssues(technology)
-            : richIssues(rich, steps[i], draft.selected);
+            : richIssues(rich, steps[i], draft.selected).filter(
+                (issue) =>
+                  saveCollection ||
+                  steps[i] !== "context" ||
+                  issue !== "localNeeds",
+              );
   const issues = checked ? validate(currentStage) : [];
   function go(next: number) {
     const invalid =
@@ -414,7 +431,9 @@ export default function Prototype({
                     ? "Check the highlighted time estimates and answers. Aim for 100% in total."
                     : "Choose the type of work in the highlighted areas."
                   : key === "management"
-                    ? "Please answer the highlighted questions about managing your team."
+                    ? issues.some((i) => i.startsWith("time_"))
+                      ? "Check the highlighted management time estimates. Aim for 100% of your management time. Answer any other highlighted questions."
+                      : "Please answer the highlighted questions about managing your team."
                     : key === "technology"
                       ? issues.some((i) => i.startsWith("time_"))
                         ? "Check the highlighted technology time estimates. Aim for 100% of your technology time. Answer any other highlighted questions."
@@ -600,6 +619,7 @@ export default function Prototype({
               <Context
                 step={key}
                 directPayroll={!saveCollection}
+                focusedLocalContext={!saveCollection}
                 draft={rich}
                 change={(patch) => setRich({ ...rich, ...patch })}
                 issues={issues}
@@ -608,6 +628,13 @@ export default function Prototype({
             {key === "management" && (
               <Management
                 draft={management}
+                timeDraft={!saveCollection ? managementTime : undefined}
+                timeChange={
+                  !saveCollection
+                    ? (patch) =>
+                        setManagementTime({ ...managementTime, ...patch })
+                    : undefined
+                }
                 change={(patch) => setManagement({ ...management, ...patch })}
                 issues={issues}
               />
@@ -649,9 +676,16 @@ export default function Prototype({
                   </section>
                 )}
                 <ContextReview
+                  focusedLocalContext={!saveCollection}
                   evidence={richEvidence(rich, draft.selected, payrollVisible)}
                 />
-                {showManagement && <ManagementReview draft={management} />}
+                {showManagement && (
+                  <ManagementReview
+                    draft={management}
+                    timeDraft={!saveCollection ? managementTime : undefined}
+                    workingShare={draft.time.people_management ?? 0}
+                  />
+                )}
                 {showTechnology && <TechnologyReview draft={technology} />}
                 {saveCollection ? (
                   <>

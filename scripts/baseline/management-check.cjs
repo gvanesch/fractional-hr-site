@@ -52,6 +52,7 @@ const root = path.resolve(__dirname, "../..");
         );
         await page.addStyleTag({
           content:
+            "*,*::before,*::after{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif}h1,h2,h3,h4,p{margin:0}" +
             fs.readFileSync(root + "/app/baseline/start/style.css", "utf8") +
             fs.readFileSync(
               root + "/app/advisor/baseline/prototype/prototype.css",
@@ -112,22 +113,29 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Managing your team", exact: true })
         .waitFor();
-      assert.equal(await page.locator("input[type=number]").count(), 0);
+      assert.equal(await page.locator("input[type=number]").count(), 5);
       await btn("Continue").click();
       await page.getByRole("alert").waitFor();
-      assert.ok(!(await page.getByRole("alert").innerText()).includes("100%"));
-      await check("Main management activities: One-to-one meetings");
-      await check("Main management activities: Team meetings");
-      await check(
-        "Main management activities: Work allocation and coordination",
-      );
       assert.ok(
+        (await page.getByRole("alert").innerText()).includes(
+          "100% of your management time",
+        ),
+      );
+      const shares = [
+        ["Team coordination", "30"],
+        ["Individual support", "40"],
+        ["Hiring and team changes", "20"],
+        ["Management administration", "10"],
+      ];
+      for (const [label, value] of shares)
         await page
-          .getByRole("checkbox", {
-            name: "Main management activities: Development and coaching",
-            exact: true,
-          })
-          .isDisabled(),
+          .getByLabel("Management time: " + label, { exact: true })
+          .fill(value);
+      assert.equal(
+        await page
+          .getByLabel("Management time: Other management work", { exact: true })
+          .inputValue(),
+        "0",
       );
       await pick(
         "Do you manage people who also report to another manager?",
@@ -144,7 +152,15 @@ const root = path.resolve(__dirname, "../..");
         "Do you regularly support one business or more than one?",
         "one",
       );
-      await check("Does any of your work need the following?: None of these");
+      assert.equal(
+        await page
+          .getByRole("group", {
+            name: "Does any of your work need the following?",
+            exact: true,
+          })
+          .count(),
+        0,
+      );
       await check("Systems and tools you use regularly: Excel");
       await btn("Review answers").click();
       await page
@@ -153,16 +169,72 @@ const root = path.resolve(__dirname, "../..");
         })
         .waitFor();
       await page.getByText("Shared reporting: Yes", { exact: true }).waitFor();
+      await page
+        .getByText(
+          "Team coordination: 30% of management time (9% of working time)",
+          { exact: true },
+        )
+        .waitFor();
       await btn("Edit managing your team").click();
-      await check("Main management activities: Not sure");
-      assert.equal(
-        await page.getByRole("checkbox", { checked: true }).count(),
-        1,
+      await page
+        .getByLabel("Management time: Other management work", { exact: true })
+        .fill("10");
+      await btn("Return to review").click();
+      assert.ok(
+        (await page.getByRole("alert").innerText()).includes(
+          "100% of your management time",
+        ),
       );
+      assert.equal(
+        await page
+          .getByLabel("Management time: Team coordination", { exact: true })
+          .getAttribute("aria-invalid"),
+        "true",
+      );
+      await page
+        .getByLabel("Management time: Team coordination", { exact: true })
+        .fill("20");
+      await btn("Return to review").click();
+      assert.equal(
+        await page
+          .getByLabel("Describe your other management work", { exact: true })
+          .getAttribute("aria-invalid"),
+        "true",
+      );
+      await page
+        .getByLabel("Describe your other management work", { exact: true })
+        .fill("Own-team wellbeing check-ins");
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            "management-" + (mobile ? "mobile" : "desktop") + ".png",
+          ),
+          fullPage: true,
+        });
+      }
       await btn("Return to review").click();
       await page
-        .getByText("Main activities: Not sure", { exact: true })
+        .getByText(
+          "Team coordination: 20% of management time (6% of working time)",
+          { exact: true },
+        )
         .waitFor();
+      await page
+        .getByText(/Other management work: 10% of management time/)
+        .waitFor();
+      await btn("Edit managing your team").click();
+      await check("Not sure how to split my management time");
+      assert.equal(await page.locator("input[type=number]").count(), 0);
+      await btn("Return to review").click();
+      await page
+        .getByText("Management time split: Not sure", { exact: true })
+        .waitFor();
+      assert.equal(
+        await page.getByText(/Team coordination:.*of management time/).count(),
+        0,
+      );
       await btn("Edit your work areas").click();
       await page
         .getByRole("checkbox", {
@@ -197,7 +269,7 @@ const root = path.resolve(__dirname, "../..");
     await browser.close();
   }
   console.log(
-    "Manager roster branching, shared time total, top-three limit, uncertainty, review edits and mobile layout passed. No API writes.",
+    "Manager roster branching, management-only time shares, percentage validation, Other description, uncertainty, review edits, optional local context and mobile layout passed. No API writes.",
   );
 })().catch((e) => {
   console.error(e.message);

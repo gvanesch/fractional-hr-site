@@ -174,7 +174,9 @@ export default function Context({
   change,
   issues,
   directPayroll = false,
+  focusedLocalContext = false,
 }: {
+  focusedLocalContext?: boolean;
   directPayroll?: boolean;
   step: string;
   draft: RichDraft;
@@ -469,9 +471,9 @@ export default function Context({
   return (
     <>
       <p>
-        Two short questions help us understand the reach of your work and any
-        local requirements. Additional notes are optional. Do not include names
-        or details of individual employee cases.
+        Tell us which businesses you support. You can also give one example of
+        work that needs local knowledge or your presence at an office. Do not
+        include names or details of individual employee cases.
       </p>
       <Pick
         label="Do you regularly support one business or more than one?"
@@ -485,16 +487,27 @@ export default function Context({
         invalid={bad("scope")}
         change={(scope) => change({ scope })}
       />
-      <Checks
-        label="Does any of your work need the following?"
-        values={d.localNeeds}
-        options={LOCAL_NEEDS}
-        exclusive={["none", "unknown"]}
-        invalid={bad("localNeeds")}
-        change={(localNeeds) => change({ localNeeds })}
-      />
+      {!focusedLocalContext && (
+        <Checks
+          label="Does any of your work need the following?"
+          values={d.localNeeds}
+          options={LOCAL_NEEDS}
+          exclusive={["none", "unknown"]}
+          invalid={bad("localNeeds")}
+          change={(localNeeds) => change({ localNeeds })}
+        />
+      )}
       <Text
-        label="Anything important about these local requirements? (optional)"
+        label={
+          focusedLocalContext
+            ? "Which parts of your current work need local knowledge or your presence at an office? Give one example. (optional)"
+            : "Anything important about these local requirements? (optional)"
+        }
+        help={
+          focusedLocalContext
+            ? "For example: local employment rules, country payroll requirements or reception duties at an office. A short answer is enough."
+            : undefined
+        }
         value={d.localNote}
         change={(localNote) => change({ localNote })}
       />
