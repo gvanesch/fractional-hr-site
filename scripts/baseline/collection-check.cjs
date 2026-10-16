@@ -57,13 +57,13 @@ const root = path.resolve(__dirname, "../..");
     args: ["--no-sandbox"],
   });
   try {
-    for (const mobile of [false, true]) {
+    for (const version of [m.exports.COLLECTION_VERSION, m.exports.FROZEN_COLLECTION_VERSION]) for (const mobile of [false, true]) {
       const page = await browser.newPage({
         viewport: mobile
           ? { width: 390, height: 844 }
           : { width: 1280, height: 900 },
       });
-      let stored = m.exports.initialCollection(),
+      let stored = m.exports.initialCollection(version),
         revision = 0,
         progress = 0,
         status = "not_started",
@@ -87,7 +87,7 @@ const root = path.resolve(__dirname, "../..");
             body = request.method() === "POST" ? request.postDataJSON() : null;
           let result = {};
           if (action === "invitation-info")
-            result = { version: m.exports.COLLECTION_VERSION };
+            result = { version };
           if (action === "request-code")
             result = { challenge: "synthetic-challenge" };
           if (action === "verify-code") {
@@ -105,7 +105,7 @@ const root = path.resolve(__dirname, "../..");
                 name: "Synthetic reviewed campaign",
                 privacy:
                   "We use these answers to understand current work and improve support. This is synthetic QA data.",
-                version: m.exports.COLLECTION_VERSION,
+                version,
                 closed: false,
                 manager: { isPeopleManager: false },
               },
@@ -215,7 +215,7 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .selectOption("one");
-      await page
+      if (version === m.exports.COLLECTION_VERSION) await page
         .getByRole("checkbox", {
           name: "Does any of your work need the following?: None of these",
           exact: true,

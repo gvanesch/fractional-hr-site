@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Prototype from "@/app/advisor/baseline/prototype/prototype";
 import LegacyJourney from "./journey";
 import {
-  COLLECTION_VERSION,
+  isCollectionVersion,
   type CollectionDraft,
 } from "@/lib/baseline/collection";
 import type { ManagerRecord } from "@/lib/baseline/management-prototype";
@@ -52,7 +52,7 @@ export default function CollectionJourney() {
     queue = useRef<Promise<unknown>>(Promise.resolve());
   async function load() {
     const data = await api<Saved>("response");
-    if (data.campaign.version !== COLLECTION_VERSION) {
+    if (!isCollectionVersion(data.campaign.version)) {
       setLegacy(true);
       return;
     }
@@ -75,7 +75,7 @@ export default function CollectionJourney() {
             token: fragment,
           });
           if (!active) return;
-          if (info.version !== COLLECTION_VERSION) {
+          if (!isCollectionVersion(info.version)) {
             setLegacy(true);
             return;
           }

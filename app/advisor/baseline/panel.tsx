@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { COLLECTION_VERSION } from "@/lib/baseline/collection";
+import { FROZEN_COLLECTION_VERSION as COLLECTION_VERSION, isCollectionVersion } from "@/lib/baseline/collection";
 import Administration from "./administration";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
@@ -521,7 +521,7 @@ export default function AdminPanel({
                     >
                       Hide link
                     </button>
-                    {current.version === COLLECTION_VERSION && (
+                    {isCollectionVersion(current.version) && (
                       <>
                         <button
                           disabled={busy}
@@ -679,7 +679,7 @@ export default function AdminPanel({
               >
                 <p className="brand-section-kicker">Data downloads</p>
                 <h2>Analysis-ready exports</h2>
-                {current.version === COLLECTION_VERSION && (
+                {isCollectionVersion(current.version) && (
                   <>
                     <p>
                       Requested answer-copy emails stay in preview mode in QA.

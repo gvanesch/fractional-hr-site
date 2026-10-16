@@ -1,3 +1,4 @@
+import { MANAGEMENT_TIME_GROUPS, emptyManagementTime, managementTimeIssues, managementTimeEvidence, type ManagementTimeDraft } from "./management-time-preview";
 import {
   BROAD_AREAS,
   emptyBroadDraft,
@@ -38,8 +39,11 @@ import {
   type ManagerRecord,
 } from "./management-prototype";
 export const COLLECTION_VERSION = "team-blue-baseline-v3";
+export const FROZEN_COLLECTION_VERSION = "team-blue-baseline-v4";
+export const isCollectionVersion = (v: unknown): v is typeof COLLECTION_VERSION | typeof FROZEN_COLLECTION_VERSION => v === COLLECTION_VERSION || v === FROZEN_COLLECTION_VERSION;
 export type CollectionDraft = {
-  version: typeof COLLECTION_VERSION;
+  version: typeof COLLECTION_VERSION | typeof FROZEN_COLLECTION_VERSION;
+  managementTime?: ManagementTimeDraft;
   broad: BroadDraft;
   rich: RichDraft;
   technology: TechnologyDraft;
@@ -47,10 +51,11 @@ export type CollectionDraft = {
   started: boolean;
   answerCopy: boolean;
 };
-export const initialCollection = (): CollectionDraft => ({
-  version: COLLECTION_VERSION,
+export const initialCollection = (version: CollectionDraft["version"] = COLLECTION_VERSION): CollectionDraft => ({
+  version,
+  ...(version === FROZEN_COLLECTION_VERSION ? { managementTime: emptyManagementTime() } : {}),
   broad: emptyBroadDraft(),
-  rich: emptyRichDraft(),
+  rich: { ...emptyRichDraft(), ...(version === FROZEN_COLLECTION_VERSION ? { payroll: "yes" } : {}) },
   technology: emptyTechnology(),
   management: emptyManagement(),
   started: false,
@@ -105,6 +110,17 @@ export const COLLECTION_DEFINITION = {
   method: "broad-current-state-capacity",
   copy: "optional-invite-email-only",
 };
+export const FROZEN_COLLECTION_DEFINITION = {
+  ...COLLECTION_DEFINITION,
+  version: FROZEN_COLLECTION_VERSION,
+  localNeeds: [],
+  localContext: "optional-current-work-example",
+  managementActivities: [],
+  managementTimeGroups: MANAGEMENT_TIME_GROUPS,
+  managementSharedReporting: false,
+  payrollEntry: "direct-with-benefits-only-option",
+};
+export const collectionDefinitionFor = (version: string) => version === FROZEN_COLLECTION_VERSION ? FROZEN_COLLECTION_DEFINITION : COLLECTION_DEFINITION;
 function object(x: unknown): Record<string, unknown> {
   if (!x || typeof x !== "object" || Array.isArray(x))
     throw Error("Please check your saved answers.");
@@ -159,10 +175,10 @@ export function parseCollection(
   manager: ManagerRecord,
 ): CollectionDraft {
   tree(input);
-  const raw = fields(input, Object.keys(initialCollection()));
-  if (raw.version !== COLLECTION_VERSION)
+  const raw = fields(input, [...Object.keys(initialCollection()), "managementTime"]);
+  if (!isCollectionVersion(raw.version))
     throw Error("This answer belongs to a different questionnaire version.");
-  const d = { ...initialCollection(), ...raw } as CollectionDraft;
+  const d = { ...initialCollection(raw.version), ...raw } as CollectionDraft;
   const broad = fields(d.broad, Object.keys(emptyBroadDraft())),
     rich = fields(d.rich, Object.keys(emptyRichDraft())),
     technology = fields(d.technology, Object.keys(emptyTechnology())),
@@ -250,6 +266,14 @@ export function parseCollection(
   for (const k of ["other", "sharedReporting", "note"] as const)
     if (typeof d.management[k] !== "string")
       throw Error("Check the management answers.");
+  if (d.version === FROZEN_COLLECTION_VERSION) {
+    const split = fields(d.managementTime, ["time", "uncertain", "other"]);
+    numberMap(split.time, MANAGEMENT_TIME_GROUPS.map(([code]) => code));
+    if (typeof split.uncertain !== "boolean" || typeof split.other !== "string")
+      throw Error("Check the management time answers.");
+  } else if (raw.managementTime !== undefined) {
+    throw Error("Management time belongs to a newer questionnaire version.");
+  }
   return d;
 }
 export function collectionIssues(d: CollectionDraft, manager: ManagerRecord) {
@@ -260,12 +284,12 @@ export function collectionIssues(d: CollectionDraft, manager: ManagerRecord) {
     ...broadIssues(d.broad, 1, areas),
     ...richIssues(d.rich, "time_nature", selected),
     ...richIssues(d.rich, "contact", selected),
-    ...richIssues(d.rich, "context", selected),
+    ...richIssues(d.rich, "context", selected).filter(issue => d.version !== FROZEN_COLLECTION_VERSION || issue !== "localNeeds"),
     ...(selected.includes("pay_benefits")
       ? richIssues(d.rich, "payroll", selected)
       : []),
     ...(manager.isPeopleManager && selected.includes(MANAGEMENT_AREA.code)
-      ? managementIssues(d.management)
+      ? d.version === FROZEN_COLLECTION_VERSION ? managementTimeIssues(d.managementTime!) : managementIssues(d.management)
       : []),
     ...(selected.includes("systems_data")
       ? technologyIssues(d.technology)
@@ -281,11 +305,16 @@ export function collectionEvidence(d: CollectionDraft, manager: ManagerRecord) {
       d.broad.selected,
       d.broad.selected.includes("pay_benefits"),
     ),
+    ...(d.version === FROZEN_COLLECTION_VERSION ? { localNeeds: [], designVersion: FROZEN_COLLECTION_VERSION } : {}),
     technology: technologyEvidence(
       d.technology,
       d.broad.selected.includes("systems_data"),
     ),
-    management: managementEvidence(
+    management: d.version === FROZEN_COLLECTION_VERSION
+      ? manager.isPeopleManager && d.broad.selected.includes(MANAGEMENT_AREA.code)
+        ? { ...managementTimeEvidence(d.managementTime!, d.broad.time[MANAGEMENT_AREA.code]), note: d.management.note }
+        : null
+      : managementEvidence(
       d.management,
       manager.isPeopleManager &&
         d.broad.selected.includes(MANAGEMENT_AREA.code),

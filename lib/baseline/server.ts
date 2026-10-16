@@ -5,8 +5,9 @@ import {
   baselineSender,
 } from "./emails";
 import {
-  COLLECTION_VERSION,
-  COLLECTION_DEFINITION,
+  FROZEN_COLLECTION_VERSION,
+  isCollectionVersion,
+  collectionDefinitionFor,
   initialCollection,
   parseCollection,
   collectionIssues,
@@ -225,7 +226,7 @@ export async function redeem(
       "This invitation is not available. Ask the organiser for a new link.",
       403,
     );
-  if (p.version === COLLECTION_VERSION && !verified)
+  if (isCollectionVersion(p.version) && !verified)
     throw new BaselineError(
       "Verify access using the code sent to your invitation email address.",
       403,
@@ -305,7 +306,7 @@ type ResponseRow = {
   submitted_at: string | null;
 };
 export async function readResponse(p: Identity) {
-  if (p.version === COLLECTION_VERSION) return readCollectionResponse(p);
+  if (isCollectionVersion(p.version)) return readCollectionResponse(p);
   if (p.version !== VERSION)
     throw new BaselineError(
       "This invitation belongs to an earlier questionnaire. Ask the organiser for the updated invitation. Your earlier answers are retained.",
@@ -342,7 +343,7 @@ export async function saveResponse(
   progress: number,
   submit = false,
 ) {
-  if (p.version === COLLECTION_VERSION)
+  if (isCollectionVersion(p.version))
     return saveCollectionResponse(p, input, revision, progress, submit);
   if (p.status !== "open" || p.closes_at <= now())
     throw new BaselineError(
@@ -565,12 +566,12 @@ export async function createCampaign(
   const id = randomUUID(),
     stamp = now(),
     selectedVersion =
-      body.questionnaireVersion === COLLECTION_VERSION
-        ? COLLECTION_VERSION
+      isCollectionVersion(body.questionnaireVersion)
+        ? body.questionnaireVersion
         : VERSION,
     definition = JSON.stringify(
-      selectedVersion === COLLECTION_VERSION
-        ? COLLECTION_DEFINITION
+      isCollectionVersion(selectedVersion)
+        ? collectionDefinitionFor(selectedVersion)
         : QUESTIONNAIRE,
     ),
     database = db();
@@ -690,7 +691,7 @@ export async function configureCampaign(
     status === "open" &&
     baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
     (String(c.version) !== REVIEWED_COLLECTION_VERSION ||
-      COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
+      FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production collection.",
@@ -751,7 +752,7 @@ export async function importRoster(
     .prepare("SELECT version FROM tb_baseline_campaigns WHERE campaign_id=?")
     .bind(campaign)
     .first<{ version: string }>();
-  if (!c || ![VERSION, COLLECTION_VERSION].includes(c.version))
+  if (!c || !(c.version === VERSION || isCollectionVersion(c.version)))
     throw new BaselineError("Campaign not found.", 404);
   let profiles: Partial<Profile>[];
   try {
@@ -817,7 +818,7 @@ export async function importRoster(
           "not_started",
           randomUUID(),
           JSON.stringify(
-            c.version === COLLECTION_VERSION ? initialCollection() : draft,
+            isCollectionVersion(c.version) ? initialCollection(c.version) : draft,
           ),
           stamp,
         ),
@@ -875,7 +876,7 @@ export async function invite(
     send &&
     env.NEXT_PUBLIC_APP_ENV !== "qa" &&
     (p.version !== REVIEWED_COLLECTION_VERSION ||
-      COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
+      FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production invitations.",
@@ -963,7 +964,7 @@ export async function exportDataset(
   format: string,
 ) {
   const data = await campaignRows(campaign);
-  if (data.campaign.version === COLLECTION_VERSION)
+  if (isCollectionVersion(data.campaign.version))
     return exportCollection(actor, campaign, data, format);
   const respondents: Record<string, unknown>[] = [],
     activities: Record<string, unknown>[] = [];
@@ -1094,7 +1095,7 @@ export async function exportDataset(
 }
 
 // Administration for the reviewed baseline. Launch is pinned to the saved collection version.
-const REVIEWED_COLLECTION_VERSION = COLLECTION_VERSION;
+const REVIEWED_COLLECTION_VERSION = FROZEN_COLLECTION_VERSION;
 export async function previewRoster(campaign: string, csv: string) {
   const data = await campaignRows(campaign);
   let rows: Partial<Profile>[];
@@ -1553,7 +1554,7 @@ export async function launchReadiness(campaign: string) {
     blockers: string[] = [];
   if (
     data.campaign.version !== REVIEWED_COLLECTION_VERSION ||
-    COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION
+    FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION
   )
     blockers.push(
       "The reviewed broad-work questionnaire still needs its versioned saving, submission and answer-copy flow. This campaign uses the earlier questionnaire.",
@@ -1749,12 +1750,12 @@ export async function extendBaselineInvite(
 }
 
 // Versioned broad collection. Roster metadata is authoritative and never written by a participant.
-async function collectionDefinition() {
+async function collectionDefinition(version: string) {
   const definition = await db()
     .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
-    .bind(COLLECTION_VERSION)
+    .bind(version)
     .first<{ definition_json: string }>();
-  if (definition?.definition_json !== JSON.stringify(COLLECTION_DEFINITION))
+  if (definition?.definition_json !== JSON.stringify(collectionDefinitionFor(version)))
     throw new BaselineError(
       "This questionnaire version needs an update from the organiser. Your saved answers are retained.",
       409,
@@ -1775,7 +1776,7 @@ async function savedCollectionManager(p: {
     : managerRecord(JSON.parse(p.profile_json));
 }
 async function readCollectionResponse(p: Identity) {
-  await collectionDefinition();
+  await collectionDefinition(p.version);
   const row = await db()
     .prepare("SELECT * FROM tb_baseline_responses WHERE participant_id=?")
     .bind(p.participant_id)
@@ -1813,7 +1814,7 @@ async function saveCollectionResponse(
   progress: number,
   submit: boolean,
 ) {
-  await collectionDefinition();
+  await collectionDefinition(p.version);
   if (p.status !== "open" || p.closes_at <= now())
     throw new BaselineError(
       "The collection period has ended. Your saved answers are retained.",
@@ -1831,6 +1832,7 @@ async function saveCollectionResponse(
   let draft: CollectionDraft;
   try {
     draft = parseCollection(input, manager);
+    if (draft.version !== p.version) throw Error("This answer belongs to a different questionnaire version.");
   } catch (e) {
     throw new BaselineError(
       e instanceof Error ? e.message : "Check your answers.",
@@ -1856,7 +1858,7 @@ async function saveCollectionResponse(
         stamp,
         submit ? stamp : null,
         p.participant_id,
-        COLLECTION_VERSION,
+        p.version,
         revision,
         p.session_hash,
         stamp,
@@ -1918,7 +1920,7 @@ async function saveCollectionResponse(
           "submitted",
           p.participant_id,
           JSON.stringify({
-            version: COLLECTION_VERSION,
+            version: draft.version,
             answerCopy: draft.answerCopy,
           }),
           stamp,
@@ -1934,7 +1936,7 @@ async function saveCollectionResponse(
           )
           .bind(
             p.participant_id,
-            COLLECTION_VERSION,
+            p.version,
             p.email,
             baselineEnv().NEXT_PUBLIC_APP_ENV === "qa" ? "preview" : "pending",
             stamp,
@@ -2024,13 +2026,13 @@ async function exportCollection(
   }
   await audit(actor, "dataset_exported", campaign, campaign, {
     format,
-    version: COLLECTION_VERSION,
+    version: data.campaign.version,
     respondents: respondents.length,
     activities: activities.length,
   });
   const definition = await db()
     .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
-    .bind(COLLECTION_VERSION)
+    .bind(data.campaign.version)
     .first<{ definition_json: string }>();
   return format === "respondents"
     ? toCsv(respondents)
@@ -2041,7 +2043,7 @@ async function exportCollection(
             campaign: data.campaign,
             questionnaire: definition
               ? JSON.parse(definition.definition_json)
-              : COLLECTION_DEFINITION,
+              : collectionDefinitionFor(data.campaign.version),
             respondents,
             activities,
           },
@@ -2175,7 +2177,7 @@ async function sendGregTest(
 }
 export async function qaTestInvitation(request: Request, token: string) {
   const p = await invitationForVerification(request, token);
-  if (p.version !== COLLECTION_VERSION)
+  if (!isCollectionVersion(p.version))
     throw new BaselineError("Use the reviewed questionnaire for this QA test.");
   const site = baselineEnv().NEXT_PUBLIC_SITE_URL;
   if (!site) throw new BaselineError("QA site is not configured.", 503);
@@ -2203,7 +2205,7 @@ export async function requestVerification(
 ) {
   const p = await invitationForVerification(request, token),
     env = baselineEnv();
-  if (p.version !== COLLECTION_VERSION)
+  if (!isCollectionVersion(p.version))
     throw new BaselineError("Use the invitation link for this questionnaire.");
   if (
     preview &&
@@ -2445,7 +2447,7 @@ async function deliverAnswerCopy(participantId: string) {
 }
 export async function retryAnswerCopies(actor: string, campaign: string) {
   const data = await campaignRows(campaign);
-  if (data.campaign.version !== COLLECTION_VERSION)
+  if (!isCollectionVersion(data.campaign.version))
     throw new BaselineError(
       "Answer copies are available for the reviewed questionnaire.",
     );

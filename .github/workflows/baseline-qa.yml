@@ -68,17 +68,6 @@ jobs:
         run: node scripts/baseline/hosted-participant.mjs
 
       - name: Verify reviewed hosted collection and QA D1 contract
-        run: node scripts/baseline/hosted-reviewed.mjs
-      - name: Verify existing QA email credential or provision the isolated test binding
-        env:
-          BASELINE_QA_RESEND_TOKEN: ${{ secrets.RESEND_API_KEY }}
         run: |
-          if [ -n "$BASELINE_QA_RESEND_TOKEN" ]; then
-            printf '%s' "$BASELINE_QA_RESEND_TOKEN" | npx wrangler secret put BASELINE_QA_RESEND_API_KEY --env qa
-          else
-            node scripts/baseline/qa-mail-credential.mjs
-          fi
-      - name: Send authorised Greg-only invitation and verification-code previews once
-        env:
-          BASELINE_QA_RESEND_TOKEN: ${{ secrets.RESEND_API_KEY }}
-        run: node scripts/baseline/greg-mail-smoke.mjs
+          node scripts/baseline/hosted-reviewed.mjs
+          BASELINE_COLLECTION_VERSION=team-blue-baseline-v4 node scripts/baseline/hosted-reviewed.mjs

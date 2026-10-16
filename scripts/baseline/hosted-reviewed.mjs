@@ -31,6 +31,9 @@ new Function("module", "exports", built.outputFiles[0].text)(
   module.exports,
 );
 const m = module.exports;
+const version = process.env.BASELINE_COLLECTION_VERSION || m.COLLECTION_VERSION;
+const frozen = version === m.FROZEN_COLLECTION_VERSION;
+if (!m.isCollectionVersion(version)) throw Error("Unsupported QA collection version");
 async function query(sql, params = []) {
   const r = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${database}/query`,
@@ -87,14 +90,14 @@ async function api(path, body, expected = 200) {
 }
 try {
   await query("INSERT OR IGNORE INTO tb_baseline_versions VALUES(?,?,?)", [
-    m.COLLECTION_VERSION,
-    JSON.stringify(m.COLLECTION_DEFINITION),
+    version,
+    JSON.stringify(m.collectionDefinitionFor(version)),
     stamp,
   ]);
   await query("INSERT INTO tb_baseline_campaigns VALUES(?,?,?,?,?,?,?,?,?)", [
     campaign,
     "Reviewed hosted QA — synthetic contract",
-    m.COLLECTION_VERSION,
+    version,
     "open",
     expires,
     "Synthetic QA data only. These answers test versioned saving and access boundaries. Production remains awaiting approval.",
@@ -112,8 +115,8 @@ try {
       country: "GB",
       region: "QA",
       work_type: "reception",
-      manages_people: "no",
-      direct_reports: "0",
+      manages_people: frozen ? "yes" : "no",
+      direct_reports: frozen ? "3" : "0",
     }),
     stamp,
   ]);
@@ -122,12 +125,12 @@ try {
     "{}",
     stamp,
   ]);
-  const draft = m.initialCollection();
+  const draft = m.initialCollection(version);
   await query(
     "INSERT INTO tb_baseline_responses VALUES(?,?,?,0,0,?,?,?,NULL)",
     [
       participant,
-      m.COLLECTION_VERSION,
+      version,
       "not_started",
       randomUUID(),
       JSON.stringify(draft),
@@ -155,19 +158,22 @@ try {
   cookie = "__Host-tb_baseline=" + session;
   const initial = await api("response");
   if (
-    initial.draft.version !== m.COLLECTION_VERSION ||
+    initial.draft.version !== version ||
     "profile" in initial.draft ||
     "email" in initial.campaign
   )
     throw Error("Reviewed response metadata privacy failed");
   draft.started = true;
-  draft.broad.selected = ["office"];
-  draft.broad.time = { office: 100 };
+  draft.broad.selected = frozen ? ["office", "people_management"] : ["office"];
+  draft.broad.time = frozen ? { office: 80, people_management: 20 } : { office: 100 };
+  if (frozen) draft.managementTime = { time: { coordination: 25, individual: 50, hiring: 15, administration: 10, other: 0 }, uncertain: false, other: "" };
   await api("save", { draft, revision: 0, progress: 1 });
   await api("save", { draft, revision: 0, progress: 1 }, 409);
   const resumed = await api("response");
-  if (resumed.revision !== 1 || resumed.draft.broad.time.office !== 100)
+  if (resumed.revision !== 1 || resumed.draft.broad.time.office !== (frozen ? 80 : 100))
     throw Error("Reviewed hosted autosave/resume failed");
+  if (frozen && JSON.stringify(resumed.draft.managementTime) !== JSON.stringify(draft.managementTime))
+    throw Error("Frozen management time did not survive hosted save/resume");
   Object.assign(draft.rich, {
     routes: ["work_email"],
     routeTime: { work_email: 100 },
@@ -175,7 +181,7 @@ try {
     duplicates: "rarely",
     sameRoutes: "same",
     scope: "one",
-    localNeeds: ["none"],
+    localNeeds: frozen ? [] : ["none"],
     systems: ["excel"],
   });
   draft.answerCopy = true;
@@ -195,8 +201,7 @@ try {
     [participant],
   );
   if (
-    rows[0]?.area_code !== "office" ||
-    rows[0]?.percentage !== 100 ||
+    !rows.some(row => row.area_code === "office" && row.percentage === (frozen ? 80 : 100)) ||
     rows[0]?.status !== "completed" ||
     rows[0]?.copy_status !== "preview"
   )
@@ -211,7 +216,7 @@ try {
     "reviewed_contract_verified",
     participant,
     JSON.stringify({
-      version: m.COLLECTION_VERSION,
+      version: version,
       commit: process.env.GITHUB_SHA,
       saveResume: true,
       submission: true,
@@ -220,7 +225,7 @@ try {
     stamp,
   ]);
   console.log(
-    "Real reviewed QA HTTP/D1 contract passed: verification required, synthetic recipients blocked from mail, private metadata, CAS save/resume, immutable submission, normalized work and preview-only answer copies. No emails sent.",
+    `Real reviewed ${version} QA HTTP/D1 contract passed: verification required, synthetic recipients blocked from mail, private metadata, CAS save/resume, immutable submission, normalized work and preview-only answer copies. No emails sent.`,
   );
 } finally {
   await query(

@@ -2,7 +2,7 @@ name: Baseline read-only production checkpoint
 on:
   push:
     branches: [feature/team-blue-baseline]
-    paths: [scripts/baseline/readiness-production-audit.mjs, .github/workflows/baseline-readiness-audit.yml]
+    paths: [scripts/baseline/readiness-production-audit.mjs, .github/workflows/baseline-readiness-audit.yml, lib/baseline/collection.ts]
 permissions:
   contents: read
 jobs:

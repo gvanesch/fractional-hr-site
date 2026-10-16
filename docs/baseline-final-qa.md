@@ -1,3 +1,15 @@
+## Recovery and frozen collection — 16 October 2026
+
+The approved 14 October revisions now have a separate saved collection version, `team-blue-baseline-v4`: direct payroll entry, management time percentages, optional local work example and no shared-reporting question. New projects use v4. Existing v2/v3 campaigns retain their original data and behaviour; their definitions are not rewritten.
+
+Local verification: all 80 database/security/model tests pass, TypeScript and baseline ESLint pass. The v4 contract covers verified access, version mismatch rejection, management save/resume, stale revisions, invalid totals, immutable submission, versioned exports and preview-only answer copies. Local Chromium downloads are unavailable; desktop/mobile browser validation and hosted QA deployment must pass in Actions before release can be recommended.
+
+The QA workflow tests v3 and v4 collection journeys and hosted contracts. It no longer provisions email credentials or runs mail-sending smoke tests. The separate production checkpoint only reads configuration and migration history. No production deployment, flag activation, authentication change or real respondent invitations are authorised.
+
+Release architecture: the baseline uses dedicated D1 tables directly. It does not require switching the five existing application-data flags or changing Supabase advisor authentication. Production requires its own additive baseline schema, code deployment, baseline enablement, verified administrator routing and mail configuration. Existing application-data cutover and later authentication migration remain separate releases. Confirm live production prerequisites from the new read-only audit before approval.
+
+Historical evidence and existing reviewer checklist follow; earlier results do not validate v4.
+
 # Baseline final QA and release boundary
 
 Prepared 13 October 2026. Production is unchanged. The reviewed questionnaire uses QA D1 and version `team-blue-baseline-v3`. Older v2 demo responses remain intact.
@@ -8,13 +20,13 @@ Prepared 13 October 2026. Production is unchanged. The reviewed questionnaire us
 - Questionnaire design preview: https://fractional-hr-site-qa.greg-732.workers.dev/advisor/baseline/prototype
 - Existing 20-record administration demo: https://fractional-hr-site-qa.greg-732.workers.dev/advisor/baseline/project/cb21a967-99a7-4aa9-b3ae-61c7dff289b1
 
-The existing six private design links remain available until their existing expiry. They show the revised design but retain answers only in memory. Use a **new v3 QA project** for actual autosave, save-and-return, final submission and exports. The 20-record v2 campaign tests administration, not the reviewed v3 collection.
+The existing six private design links remain available until their existing expiry. They show the revised design but retain answers only in memory. Use a **new v4 QA project** for actual autosave, save-and-return, final submission and exports. The 20-record v2 campaign tests administration, not the reviewed v3 collection.
 
 ## Focused review
 
 1. In the 20-record demo, check the top completion dashboard, status widgets, search and region/country/entity/team/regional-leader filters. Clear the filters. Check the full-roster breakdown labels.
 2. Open Respondents. Edit a synthetic record, including its working fraction and hours. Check that an inconsistent edit shows its error inside the dialog and keeps the values for correction. Withdraw and reinstate a synthetic incomplete respondent. A new invitation is required after reinstatement.
-3. Create a new QA project. Confirm its data-use notice and closing date before issuing invitations. Import synthetic `.invalid` respondents from the template, including one formal manager and one systems specialist. Formal manager status comes from the roster. Do not import real employee data during this QA.
+3. Create a new v4 QA project. Confirm its data-use notice and closing date before issuing invitations. Import synthetic `.invalid` respondents from the template, including one formal manager and one systems specialist. Formal manager status comes from the roster. Do not import real employee data during this QA.
 4. Open that QA project, generate a private test link and its synthetic QA access code. Open the link in a separate private browser and enter the code separately. Check ordinary office/hybrid work, payroll preparation versus submission to the provider, and manager/technology branching. Check each added technology system has its own involvement question.
 5. Enter an incomplete time total and leave a required answer blank. Check the summary and yellow field highlighting. Complete the answers. Wait for “Saved securely”, sign out and return using the invitation with a fresh synthetic QA code. Check that the answers and progress return.
 6. On review, edit an earlier section and use Return to review. Select the optional answer-copy preference and submit. Confirm the completion screen, locked completed answers, administrator status and both CSV datasets plus JSON. QA records the copy preference but sends no answer-copy email.

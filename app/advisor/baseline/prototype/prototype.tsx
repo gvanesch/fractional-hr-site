@@ -16,7 +16,7 @@ import {
 import "@/app/baseline/start/style.css";
 import "./prototype.css";
 import {
-  COLLECTION_VERSION,
+  FROZEN_COLLECTION_VERSION,
   type CollectionDraft,
 } from "@/lib/baseline/collection";
 import Info from "./info";
@@ -96,7 +96,8 @@ export default function Prototype({
   const [management, setManagement] = useState(
     savedCollection?.draft.management ?? emptyManagement,
   );
-  const [managementTime, setManagementTime] = useState(emptyManagementTime);
+  const revised = !saveCollection || savedCollection?.draft.version === FROZEN_COLLECTION_VERSION;
+  const [managementTime, setManagementTime] = useState(savedCollection?.draft.managementTime ?? emptyManagementTime);
   const showManagement = managementVisible(managerRecord, draft.selected);
   const [rich, setRich] = useState(
     () =>
@@ -132,7 +133,8 @@ export default function Prototype({
   const pendingSave = useRef<ReturnType<typeof setTimeout> | null>(null);
   const payload: CollectionDraft = useMemo(
     () => ({
-      version: COLLECTION_VERSION,
+      version: savedCollection?.draft.version ?? FROZEN_COLLECTION_VERSION,
+      ...(revised ? { managementTime } : {}),
       broad: draft,
       rich,
       technology,
@@ -140,7 +142,7 @@ export default function Prototype({
       started,
       answerCopy,
     }),
-    [draft, rich, technology, management, started, answerCopy],
+    [draft, rich, technology, management, started, answerCopy, revised, managementTime, savedCollection?.draft.version],
   );
   const persistedPayload = useRef(
     JSON.stringify(savedCollection?.draft ?? payload),
@@ -207,14 +209,14 @@ export default function Prototype({
             ...richIssues(rich, "time_nature", draft.selected),
           ]
         : steps[i] === "management"
-          ? !saveCollection
+          ? revised
             ? managementTimeIssues(managementTime)
             : managementIssues(management)
           : steps[i] === "technology"
             ? technologyIssues(technology)
             : richIssues(rich, steps[i], draft.selected).filter(
                 (issue) =>
-                  saveCollection ||
+                  !revised ||
                   steps[i] !== "context" ||
                   issue !== "localNeeds",
               );
@@ -613,8 +615,8 @@ export default function Prototype({
             {["contact", "payroll", "context"].includes(key) && (
               <Context
                 step={key}
-                directPayroll={!saveCollection}
-                focusedLocalContext={!saveCollection}
+                directPayroll={revised}
+                focusedLocalContext={revised}
                 draft={rich}
                 change={(patch) => setRich({ ...rich, ...patch })}
                 issues={issues}
@@ -623,9 +625,9 @@ export default function Prototype({
             {key === "management" && (
               <Management
                 draft={management}
-                timeDraft={!saveCollection ? managementTime : undefined}
+                timeDraft={revised ? managementTime : undefined}
                 timeChange={
-                  !saveCollection
+                  revised
                     ? (patch) =>
                         setManagementTime({ ...managementTime, ...patch })
                     : undefined
@@ -671,13 +673,13 @@ export default function Prototype({
                   </section>
                 )}
                 <ContextReview
-                  focusedLocalContext={!saveCollection}
+                  focusedLocalContext={revised}
                   evidence={richEvidence(rich, draft.selected, payrollVisible)}
                 />
                 {showManagement && (
                   <ManagementReview
                     draft={management}
-                    timeDraft={!saveCollection ? managementTime : undefined}
+                    timeDraft={revised ? managementTime : undefined}
                     workingShare={draft.time.people_management ?? 0}
                   />
                 )}

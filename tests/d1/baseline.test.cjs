@@ -1310,9 +1310,9 @@ test("Invitation extension keeps the link, respects campaign closing and prevent
   }
 });
 
-async function reviewedSetup(h, email = "reviewed@example.invalid") {
+async function reviewedSetup(h, email = "reviewed@example.invalid", version = h.collection.COLLECTION_VERSION) {
   const c = await h.service.createCampaign("admin@example.invalid", {
-    questionnaireVersion: h.collection.COLLECTION_VERSION,
+    questionnaireVersion: version,
     name: "Reviewed synthetic baseline",
     privacy: h.model.PRIVACY,
     closesAt: new Date(Date.now() + 86400000).toISOString(),
@@ -1592,4 +1592,49 @@ test("Requested copies remain preview-only in QA and production retries keep the
   } finally {
     h.sqlite.close();
   }
+});
+
+test("Frozen v4 persists manager shares, preserves v3, enforces version and exports the approved design", async () => {
+  const h = harness();
+  try {
+    const old = await reviewedSetup(h);
+    const oldDefinition = h.sqlite.prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?").get(h.collection.COLLECTION_VERSION).definition_json;
+    const v = h.collection.FROZEN_COLLECTION_VERSION;
+    const { campaign, p, token } = await reviewedSetup(h, "frozen@example.invalid", v);
+    const profile = JSON.parse(h.sqlite.prepare("SELECT profile_json FROM tb_baseline_participants WHERE participant_id=?").get(p.participant_id).profile_json);
+    profile.manages_people = "yes"; profile.direct_reports = "3";
+    h.sqlite.prepare("UPDATE tb_baseline_participants SET profile_json=? WHERE participant_id=?").run(JSON.stringify(profile), p.participant_id);
+    await assert.rejects(h.service.redeem(h.request({}), token), e => e.status === 403);
+    const code = await h.service.requestVerification(h.request({}), token, true);
+    const verified = await h.route.POST(h.request({ token, challenge: code.challenge, code: code.code }), { params: Promise.resolve({ path: ["verify-code"] }) });
+    assert.equal(verified.status, 200);
+    const identity = await h.service.participant(h.request({}));
+    let response = await h.service.readResponse(identity);
+    assert.equal(response.draft.version, v);
+    const d = { ...reviewedComplete(h), version: v, managementTime: { time: { coordination: 25, individual: 50, hiring: 15, administration: 10, other: 0 }, uncertain: false, other: "" } };
+    d.broad.selected = ["office", "people_management"];
+    d.broad.time = { office: 80, people_management: 20 };
+    d.rich.localNeeds = []; d.management.sharedReporting = "";
+    assert.equal(h.collection.collectionIssues(d, { isPeopleManager: true }).length, 0);
+    await assert.rejects(h.service.saveResponse(identity, reviewedComplete(h), 0, 2));
+    await h.service.saveResponse(identity, d, 0, 4);
+    response = await h.service.readResponse(identity);
+    assert.deepEqual(JSON.parse(JSON.stringify(response.draft.managementTime)), d.managementTime);
+    await assert.rejects(h.service.saveResponse(identity, d, 0, 4), e => e.status === 409);
+    const bad = structuredClone(d); bad.managementTime.time.individual = 10;
+    await assert.rejects(h.service.saveResponse(identity, bad, 1, 8, true));
+    const uncertain = structuredClone(bad); uncertain.managementTime.uncertain = true;
+    assert.equal(h.collection.collectionEvidence(uncertain, { isPeopleManager: true }).management.groups.length, 0);
+    d.answerCopy = true;
+    await h.service.saveResponse(identity, d, 1, 8, true);
+    await assert.rejects(h.service.saveResponse(identity, d, 2, 4), e => e.status === 409);
+    const exported = JSON.parse(await h.service.exportDataset("admin@example.invalid", campaign, "json"));
+    assert.equal(exported.questionnaire.version, v);
+    assert.equal(exported.respondents[0].management.groups.find(x => x.code === "individual").approximateShareOfWorkingTime, 10);
+    assert.ok(!("sharedReporting" in exported.respondents[0].management));
+    assert.equal(h.sqlite.prepare("SELECT version FROM tb_baseline_answer_copies WHERE participant_id=?").get(p.participant_id).version, v);
+    assert.equal(h.sqlite.prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?").get(h.collection.COLLECTION_VERSION).definition_json, oldDefinition);
+    assert.equal((await h.service.campaignRows(old.campaign)).participants[0].draft.version, h.collection.COLLECTION_VERSION);
+    assert.equal(h.state.emails.length, 0);
+  } finally { h.sqlite.close(); }
 });
