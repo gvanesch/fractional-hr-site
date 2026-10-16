@@ -1,6 +1,7 @@
 // Read-only production D1 inventory. Print schema names and counts only.
 import { readFile } from "node:fs/promises";
-import { hashRows } from "./reconcile-production.mjs";
+import { createHash } from "node:crypto";
+import { hashRows, normalizeValue } from "./reconcile-production.mjs";
 
 const expectedAccount = "73221f18acc676e4992c89fcbf2b2a8f";
 const expectedDb = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc";
@@ -70,7 +71,16 @@ for (let pass = 0; pass < 2; pass++) {
     const rows = await select(`SELECT * FROM "${name}" ORDER BY "${expected.key}"`);
     const match = rows.length === expected.count && hashRows(rows, columns, expected.key) === expected.hash;
     console.log(`${name}: full-row hash ${match ? "matches" : "DIFFERS"} (pass ${pass + 1})`);
-    if (!match) throw new Error(`Production data differs for ${name}; no writes performed.`);
+    if (!match) {
+      if (expected.columnHashes) {
+        const ordered = [...rows].sort((a,b) => String(a[expected.key]).localeCompare(String(b[expected.key])));
+        for (const column of columns) {
+          const hash = createHash("sha256").update(JSON.stringify(ordered.map(row => normalizeValue(column, row[column])))).digest("hex");
+          console.log(`${name}.${column}: aggregate column hash ${hash === expected.columnHashes[column] ? "matches" : "DIFFERS"}`);
+        }
+      }
+      throw new Error(`Production data differs for ${name}; no writes performed.`);
+    }
   }
 }
 console.log("All six production tables match the source snapshot across two reads. No writes performed.");
