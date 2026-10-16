@@ -15,5 +15,7 @@
     "0002_campaign_entities.sql": "6bad9025912e8f7380ff394b7e45a4e9b72705a069b9a6b8d44b208c475ef7c7",
     "0003_administration.sql": "6318f6e712af0c07b64d19469e36dfbb921cc00750aaebe587844dde6d783d41",
     "0004_reviewed_collection.sql": "18dbe7816a74dab5bbfb76b8eb11bb7ed431641b082c9d5a18e15553f75390e8"
-  }
+  },
+  "operation": "verify-and-seed",
+  "expectedVersionId": "c58bfff0-9fb1-48b9-8a02-716b1a18ef14"
 }

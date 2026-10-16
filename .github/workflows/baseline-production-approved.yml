@@ -23,11 +23,23 @@ jobs:
         with: {node-version: 24, cache: npm}
       - run: npm ci
       - run: npm run test:d1
+      - name: Select the approved operation
+        id: plan
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile,appendFile} from 'node:fs/promises';
+          const a=JSON.parse(await readFile('scripts/baseline/production-approval.json'));
+          if(!['deploy','verify-and-seed'].includes(a.operation??'deploy'))throw Error('Unsupported production operation');
+          await appendFile(process.env.GITHUB_OUTPUT,'operation='+(a.operation??'deploy')+'\n');
+          NODE
       - name: Validate exact production target, approval, bundle and no-email configuration
+        if: steps.plan.outputs.operation != 'verify-and-seed'
         run: node scripts/baseline/production-operations.mjs prepare
       - name: Apply only the four approved additive baseline migrations
+        if: steps.plan.outputs.operation != 'verify-and-seed'
         run: npx wrangler d1 migrations apply DB --remote
       - name: Download the tested immutable production bundle
+        if: steps.plan.outputs.operation != 'verify-and-seed'
         uses: actions/download-artifact@v4
         with:
           name: approved-d1-production-bundle
@@ -35,9 +47,14 @@ jobs:
           run-id: 38958649337
           github-token: ${{ github.token }}
       - name: Enable the production baseline with sending disabled
+        if: steps.plan.outputs.operation != 'verify-and-seed'
         run: npx opennextjs-cloudflare deploy
       - name: Verify production baseline and unrelated settings
+        if: steps.plan.outputs.operation != 'verify-and-seed'
         run: node scripts/baseline/production-operations.mjs verify
+      - name: Verify the expected deployed baseline without redeploying
+        if: steps.plan.outputs.operation == 'verify-and-seed'
+        run: node scripts/baseline/production-operations.mjs verify-live
       - name: Create and verify only 40 synthetic participant responses
         run: node scripts/baseline/production-operations.mjs seed
       - name: Retain recovery identifiers

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { validateProductionBaselineApproval, validateSyntheticIdentity } from './production-guard.mjs';
 import { verifyActivationBundle, bindingFingerprint, activationFlags } from '../d1/prepare-approved-production-activation.mjs';
 const require=createRequire(import.meta.url);
-const account='73221f18acc676e4992c89fcbf2b2a8f', database='b81b99d7-4b10-4f7e-a0c1-ada3adf596fc', worker='fractional-hr-site', site='https://vanesch.uk';
+const account='73221f18acc676e4992c89fcbf2b2a8f', database='b81b99d7-4b10-4f7e-a0c1-ada3adf596fc', worker='fractional-hr-site', site='https://vanesch.uk', apiSite='https://www.vanesch.uk';
 const campaign='55000040-2026-4016-8040-000000000040';
 const campaignName='[SYNTHETIC TEST] Production backend — 40 participants';
 const credential=process.env.CLOUDFLARE_API_TOKEN;
@@ -40,7 +40,20 @@ if(mode==='prepare'){
 }else if(mode==='verify'){
  const map=await settings();const saved=JSON.parse(await readFile(recoveryUrl));if(map.get('BASELINE_ENABLED')?.text!=='true'||map.get('BASELINE_MAIL_MODE')?.text!=='preview'||bindingFingerprint(omitBaseline(map))!==saved.bindingFingerprint)throw Error('Production baseline settings or unrelated bindings differ.');
  const history=await query('SELECT name FROM tb_baseline_migrations ORDER BY id');if(history.length!==4)throw Error('Dedicated baseline migration history differs.');
- const r=await fetch(site+'/api/baseline/response',{redirect:'manual',signal:AbortSignal.timeout(15000)});if(r.status!==401)throw Error('Anonymous production response boundary differs.');await r.body?.cancel();console.log('Production baseline enabled with four dedicated migrations; anonymous boundary and existing authentication preserved. Email disabled.');
+ const r=await fetch(apiSite+'/api/baseline/response',{redirect:'manual',signal:AbortSignal.timeout(15000)});if(r.status!==401)throw Error('Anonymous production response boundary differs.');await r.body?.cancel();console.log('Production baseline enabled with four dedicated migrations; anonymous boundary and existing authentication preserved. Email disabled.');
+}else if(mode==='verify-live'){
+ const map=await settings();
+ if(map.get('BASELINE_ENABLED')?.text!=='true'||map.get('BASELINE_MAIL_MODE')?.text!=='preview')throw Error('Production baseline is not in no-email test mode.');
+ const live=(await cf(`workers/scripts/${worker}/deployments`)).deployments?.[0];
+ if(live?.versions?.length!==1||live.versions[0].version_id!==approval.expectedVersionId||live.versions[0].percentage!==100)throw Error('The expected deployed baseline version differs.');
+ const history=await query('SELECT name FROM tb_baseline_migrations ORDER BY id');
+ if(JSON.stringify(history.map(x=>x.name))!==JSON.stringify(Object.keys(approval.sqlHashes).sort()))throw Error('Dedicated baseline migration history differs.');
+ for(const [path,expected] of [['/api/baseline/response',401],['/baseline/start',200]]){
+  const r=await fetch(apiSite+path,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+  if(r.status!==expected){await r.body?.cancel();throw Error(`Production baseline check ${path}: HTTP ${r.status}, expected ${expected}.`);}
+  await r.body?.cancel();
+ }
+ console.log('Deployed production baseline version, all four migrations, anonymous API boundary and participant entry verified on canonical www domain. Email disabled.');
 }else if(mode==='seed'){
  const map=await settings();if(map.get('BASELINE_ENABLED')?.text!=='true'||map.get('BASELINE_MAIL_MODE')?.text!=='preview')throw Error('Production baseline is not in no-email test mode.');
  const {fixtures}=require('./production-fixtures.cjs');const fixturesRows=await fixtures();
@@ -60,7 +73,7 @@ if(mode==='prepare'){
   if(f.targetStatus==='not_started')continue;
   const invite=randomUUID(),token=randomBytes(32).toString('hex'),session=randomBytes(32).toString('hex'),expires=new Date(Date.now()+2*3600000).toISOString();
   await query('INSERT INTO tb_baseline_invites VALUES(?,?,?,?,NULL,?)',[invite,id,hash(token),expires,stamp]);await query('INSERT INTO tb_baseline_sessions VALUES(?,?,?,?,?)',[hash(session),id,invite,expires,stamp]);
-  async function api(path,body,expected=200){const r=await fetch(site+'/api/baseline/'+path,{method:body?'POST':'GET',headers:{Origin:site,Cookie:'__Host-tb_baseline='+session,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,redirect:'manual',signal:AbortSignal.timeout(20000)});if(r.status!==expected){await r.body?.cancel();throw Error(`Synthetic participant ${f.index}: ${path} returned HTTP ${r.status}, expected ${expected}.`);}if(expected!==200){await r.body?.cancel();return null;}return r.json();}
+  async function api(path,body,expected=200){const r=await fetch(apiSite+'/api/baseline/'+path,{method:body?'POST':'GET',headers:{Origin:apiSite,Cookie:'__Host-tb_baseline='+session,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,redirect:'manual',signal:AbortSignal.timeout(20000)});if(r.status!==expected){await r.body?.cancel();throw Error(`Synthetic participant ${f.index}: ${path} returned HTTP ${r.status}, expected ${expected}.`);}if(expected!==200){await r.body?.cancel();return null;}return r.json();}
   try{await api('response');await api('save',{draft:f.draft,revision:0,progress:4});const resumed=await api('response');if(resumed.revision!==1||JSON.stringify(resumed.draft)!==JSON.stringify(f.draft))throw Error('Production synthetic resume differs.');await api('save',{draft:f.draft,revision:0,progress:4},409);
    if(f.targetStatus==='completed'){await api('submit',{draft:f.draft,revision:1,progress:8});await api('save',{draft:f.draft,revision:2,progress:4},409);}
    await api('logout',{});await api('response',undefined,401);
