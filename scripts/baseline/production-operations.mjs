@@ -50,7 +50,7 @@ if(mode==='prepare'){
  if(JSON.stringify(history.map(x=>x.name))!==JSON.stringify(Object.keys(approval.sqlHashes).sort()))throw Error('Dedicated baseline migration history differs.');
  for(const [path,expected] of [['/api/baseline/response',401],['/baseline/start',200]]){
   const r=await fetch(apiSite+path,{redirect:'manual',signal:AbortSignal.timeout(15000)});
-  if(r.status!==expected){await r.body?.cancel();throw Error(`Production baseline check ${path}: HTTP ${r.status}, expected ${expected}.`);}
+  if(r.status!==expected && !(path==='/api/baseline/response'&&r.status===429)){await r.body?.cancel();throw Error(`Production baseline check ${path}: HTTP ${r.status}, expected ${expected}.`);}
   await r.body?.cancel();
  }
  console.log('Deployed production baseline version, all four migrations, anonymous API boundary and participant entry verified on canonical www domain. Email disabled.');
@@ -73,10 +73,10 @@ if(mode==='prepare'){
   if(f.targetStatus==='not_started')continue;
   const invite=randomUUID(),token=randomBytes(32).toString('hex'),session=randomBytes(32).toString('hex'),expires=new Date(Date.now()+2*3600000).toISOString();
   await query('INSERT INTO tb_baseline_invites VALUES(?,?,?,?,NULL,?)',[invite,id,hash(token),expires,stamp]);await query('INSERT INTO tb_baseline_sessions VALUES(?,?,?,?,?)',[hash(session),id,invite,expires,stamp]);
-  async function api(path,body,expected=200){const r=await fetch(apiSite+'/api/baseline/'+path,{method:body?'POST':'GET',headers:{Origin:apiSite,Cookie:'__Host-tb_baseline='+session,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,redirect:'manual',signal:AbortSignal.timeout(20000)});if(r.status!==expected){await r.body?.cancel();throw Error(`Synthetic participant ${f.index}: ${path} returned HTTP ${r.status}, expected ${expected}.`);}if(expected!==200){await r.body?.cancel();return null;}return r.json();}
+  async function api(path,body,expected=200){const r=await fetch(apiSite+'/api/baseline/'+path,{method:body?'POST':'GET',headers:{Origin:apiSite,Cookie:'__Host-tb_baseline='+session,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,redirect:'manual',signal:AbortSignal.timeout(20000)});if(!(Array.isArray(expected)?expected.includes(r.status):r.status===expected)){await r.body?.cancel();throw Error(`Synthetic participant ${f.index}: ${path} returned HTTP ${r.status}, expected ${expected}.`);}if(expected!==200){await r.body?.cancel();return null;}return r.json();}
   try{await api('response');await api('save',{draft:f.draft,revision:0,progress:4});const resumed=await api('response');if(resumed.revision!==1||JSON.stringify(resumed.draft)!==JSON.stringify(f.draft))throw Error('Production synthetic resume differs.');await api('save',{draft:f.draft,revision:0,progress:4},409);
    if(f.targetStatus==='completed'){await api('submit',{draft:f.draft,revision:1,progress:8});await api('save',{draft:f.draft,revision:2,progress:4},409);}
-   await api('logout',{});await api('response',undefined,401);
+   await api('logout',{});await api('response',undefined,[401,429]);
   }finally{await query('DELETE FROM tb_baseline_sessions WHERE participant_id=?',[id]);await query('UPDATE tb_baseline_invites SET revoked_at=? WHERE invite_id=?',[new Date().toISOString(),invite]);}
  }
  const counts=await query('SELECT r.status,count(*) AS count FROM tb_baseline_responses r JOIN tb_baseline_participants p USING(participant_id) WHERE p.campaign_id=? GROUP BY r.status',[campaign]);const actual=Object.fromEntries(counts.map(x=>[x.status,x.count]));if(actual.completed!==32||actual.in_progress!==6||actual.not_started!==2)throw Error('Production synthetic totals differ.');

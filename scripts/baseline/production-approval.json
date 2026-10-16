@@ -17,5 +17,6 @@
     "0004_reviewed_collection.sql": "18dbe7816a74dab5bbfb76b8eb11bb7ed431641b082c9d5a18e15553f75390e8"
   },
   "operation": "verify-and-seed",
-  "expectedVersionId": "c58bfff0-9fb1-48b9-8a02-716b1a18ef14"
+  "expectedVersionId": "c58bfff0-9fb1-48b9-8a02-716b1a18ef14",
+  "verificationAttempt": 2
 }
