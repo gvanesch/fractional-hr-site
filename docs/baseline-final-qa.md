@@ -1,3 +1,7 @@
+## Current production checkpoint — 16 October 2026, 21:12 London
+
+Production data cutover, dedicated baseline schema and baseline deployment are now complete under Greg’s later explicit approval. All five production D1 flags are on. Supabase password login remains in place. The production baseline contains 40 clearly labelled synthetic participants: 32 completed, 6 in progress and 2 not started. [Final production verification](https://github.com/gvanesch/fractional-hr-site/actions/runs/38960175562) passed, including 83 automated tests and live API checks. Invitation and answer-copy sending remain disabled at Greg’s request; no email was sent. [Production checkpoint and review link](PRODUCTION_BASELINE_2026-10-16.md) supersede the historical no-go recommendation below.
+
 ## Recovery and frozen collection — 16 October 2026
 
 The approved 14 October revisions now have a separate saved collection version, `team-blue-baseline-v4`: direct payroll entry, management time percentages, optional local work example and no shared-reporting question. New projects use v4. Existing v2/v3 campaigns retain their original data and behaviour; their definitions are not rewritten.
