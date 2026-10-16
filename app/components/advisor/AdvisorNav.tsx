@@ -26,7 +26,11 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/advisor/projects",
     label: "Projects",
-    activePrefixes: ["/advisor/projects", "/advisor/project/", "/advisor/report/"],
+    activePrefixes: [
+      "/advisor/projects",
+      "/advisor/project/",
+      "/advisor/report/",
+    ],
   },
   {
     href: "/advisor/explorers",
@@ -98,8 +102,29 @@ export default function AdvisorNav() {
   return (
     <div className="w-full border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-5 px-6 py-4">
-        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Advisor">
-          {NAV_ITEMS.map((item) => {
+        <nav
+          className="flex flex-wrap items-center gap-x-6 gap-y-2"
+          aria-label="Advisor"
+        >
+          {[
+            ...NAV_ITEMS,
+            ...(process.env.NEXT_PUBLIC_APP_ENV === "qa"
+              ? [
+                  {
+                    href: "/advisor/baseline/create",
+                    label: "Create baseline project",
+                    activePrefixes: ["/advisor/baseline/create"],
+                    exact: true,
+                  },
+                  {
+                    href: "/advisor/baseline",
+                    label: "Baseline projects",
+                    activePrefixes: ["/advisor/baseline"],
+                    exact: true,
+                  },
+                ]
+              : []),
+          ].map((item) => {
             const active = isActive(item);
 
             return (

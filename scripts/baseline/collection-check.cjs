@@ -1,0 +1,312 @@
+const { chromium } = require(
+    process.env.BASELINE_PLAYWRIGHT_PATH || "playwright",
+  ),
+  esbuild = require("esbuild"),
+  fs = require("node:fs"),
+  assert = require("node:assert/strict"),
+  path = require("node:path");
+const root = path.resolve(__dirname, "../..");
+(async () => {
+  const model = await esbuild.build({
+    entryPoints: [root + "/lib/baseline/collection.ts"],
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    write: false,
+  });
+  const m = { exports: {} };
+  new Function("module", "exports", model.outputFiles[0].text)(m, m.exports);
+  const bundle = await esbuild.build({
+    stdin: {
+      contents:
+        'import React from "react";import{createRoot}from"react-dom/client";import Journey from"./app/baseline/start/collection-journey";createRoot(document.getElementById("root")).render(<Journey/>);',
+      resolveDir: root,
+      loader: "tsx",
+    },
+    bundle: true,
+    write: false,
+    format: "iife",
+    jsx: "automatic",
+    loader: { ".css": "empty" },
+    define: { "process.env.NODE_ENV": '"production"' },
+  });
+  const css =
+    "*,*::before,*::after{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif}h1,h2,h3,h4,p{margin:0}" +
+    [
+      "app/globals.css",
+      "app/baseline/start/style.css",
+      "app/advisor/baseline/prototype/prototype.css",
+    ]
+      .map((p) => fs.readFileSync(root + "/" + p, "utf8"))
+      .join("\n");
+  const emailBuild = await esbuild.build({
+    entryPoints: [root + "/lib/baseline/emails.ts"],
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    write: false,
+  });
+  const emailModule = { exports: {} };
+  new Function("module", "exports", emailBuild.outputFiles[0].text)(
+    emailModule,
+    emailModule.exports,
+  );
+  const browser = await chromium.launch({
+    channel: "chromium",
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  try {
+    for (const version of [m.exports.COLLECTION_VERSION, m.exports.FROZEN_COLLECTION_VERSION]) for (const mobile of [false, true]) {
+      const page = await browser.newPage({
+        viewport: mobile
+          ? { width: 390, height: 844 }
+          : { width: 1280, height: 900 },
+      });
+      let stored = m.exports.initialCollection(version),
+        revision = 0,
+        progress = 0,
+        status = "not_started",
+        saves = 0;
+      await page.route(
+        "https://collection.example.invalid/**",
+        async (route) => {
+          const request = route.request(),
+            url = new URL(request.url());
+          if (!url.pathname.includes("/api/"))
+            return route.fulfill({
+              contentType: "text/html",
+              body:
+                "<!doctype html><html><head><style>" +
+                css +
+                '</style></head><body><div id="root"></div><script>' +
+                bundle.outputFiles[0].text +
+                "</script></body></html>",
+            });
+          const action = url.pathname.split("/").pop(),
+            body = request.method() === "POST" ? request.postDataJSON() : null;
+          let result = {};
+          if (action === "invitation-info")
+            result = { version };
+          if (action === "request-code")
+            result = { challenge: "synthetic-challenge" };
+          if (action === "verify-code") {
+            assert.equal(body.code, "123456");
+            result = { success: true };
+          }
+          if (action === "response")
+            result = {
+              draft: stored,
+              revision,
+              progress,
+              status,
+              updatedAt: new Date().toISOString(),
+              campaign: {
+                name: "Synthetic reviewed campaign",
+                privacy:
+                  "We use these answers to understand current work and improve support. This is synthetic QA data.",
+                version,
+                closed: false,
+                manager: { isPeopleManager: false },
+              },
+            };
+          if (action === "save" || action === "submit") {
+            assert.equal(body.revision, revision);
+            stored = body.draft;
+            revision++;
+            progress = body.progress;
+            status = action === "submit" ? "completed" : "in_progress";
+            saves++;
+            result = {
+              revision,
+              status,
+              copyStatus:
+                action === "submit" && stored.answerCopy ? "preview" : null,
+            };
+          }
+          return route.fulfill({
+            contentType: "application/json",
+            body: JSON.stringify(result),
+          });
+        },
+      );
+      await page.goto(
+        "https://collection.example.invalid/baseline/start#" + "a".repeat(64),
+      );
+      await page
+        .getByRole("button", { name: "Send verification code", exact: true })
+        .click();
+      await page
+        .getByLabel("Verification code", { exact: true })
+        .fill("123456");
+      await page
+        .getByRole("button", { name: "Verify and continue", exact: true })
+        .click();
+      await page
+        .getByLabel("I understand how my answers will be used.", {
+          exact: true,
+        })
+        .check();
+      await page
+        .getByRole("button", { name: "Start assessment", exact: true })
+        .click();
+      await page
+        .getByRole("checkbox", {
+          name: "Reception, facilities and office support",
+          exact: true,
+        })
+        .check();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const saveWait = page.waitForResponse((r) =>
+        r.url().endsWith("/api/baseline/save"),
+      );
+      await page
+        .getByLabel("Time spent: Reception, facilities and office support", {
+          exact: true,
+        })
+        .fill("100");
+      await saveWait;
+      await page
+        .getByRole("status")
+        .filter({ hasText: "Saved securely" })
+        .waitFor();
+      assert.equal(stored.broad.time.office, 100);
+      assert.ok(saves > 0);
+      await page.reload();
+      assert.equal(
+        await page
+          .getByLabel("Time spent: Reception, facilities and office support", {
+            exact: true,
+          })
+          .inputValue(),
+        "100",
+      );
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page
+        .getByRole("checkbox", {
+          name: "Main contact routes: Work email (your own work address)",
+          exact: true,
+        })
+        .check();
+      await page
+        .getByLabel("Request share: Work email (your own work address)", {
+          exact: true,
+        })
+        .fill("100");
+      for (const [label, value] of [
+        ["Are these requests recorded so others can see their status?", "none"],
+        [
+          "How often does the same request reach more than one person or arrive through more than one route?",
+          "rarely",
+        ],
+        ["Do employees and managers generally use the same routes?", "same"],
+      ])
+        await page.getByLabel(label, { exact: true }).selectOption(value);
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const info = page.getByRole("button", {
+        name: "More information: Do you regularly support one business or more than one?",
+        exact: true,
+      });
+      await info.focus();
+      await page.getByRole("tooltip").waitFor();
+      await info.press("Escape");
+      await page
+        .getByLabel("Do you regularly support one business or more than one?", {
+          exact: true,
+        })
+        .selectOption("one");
+      if (version === m.exports.COLLECTION_VERSION) await page
+        .getByRole("checkbox", {
+          name: "Does any of your work need the following?: None of these",
+          exact: true,
+        })
+        .check();
+      await page
+        .getByRole("checkbox", {
+          name: "Systems and tools you use regularly: Excel",
+          exact: true,
+        })
+        .check();
+      await page
+        .getByRole("button", { name: "Review answers", exact: true })
+        .click();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            mobile ? "collection-mobile.png" : "collection-desktop.png",
+          ),
+          fullPage: true,
+        });
+      }
+      await page
+        .getByLabel(
+          "I would like a copy sent to the email address used for my invitation.",
+          { exact: true },
+        )
+        .check();
+      await page
+        .getByRole("button", { name: "Submit answers", exact: true })
+        .click();
+      await page
+        .getByRole("heading", {
+          name: "Thank you. Your answers have been submitted.",
+          exact: true,
+        })
+        .waitFor();
+      assert.equal(status, "completed");
+      assert.equal(stored.answerCopy, true);
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await page.reload();
+      await page
+        .getByRole("heading", {
+          name: "Thank you. Your answers have been submitted.",
+          exact: true,
+        })
+        .waitFor();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        const previewMessages = [
+          [
+            "invite",
+            emailModule.exports.invitationEmail(
+              "team.blue Current work baseline",
+              "https://assessment.example.invalid/start",
+              "2026-10-27T23:59:59Z",
+            ),
+          ],
+          [
+            "code",
+            emailModule.exports.verificationEmail(
+              "123456",
+              "https://collection.example.invalid/baseline/start#synthetic-preview",
+            ),
+          ],
+        ];
+        for (const [name, message] of previewMessages) {
+          await page.setContent(message.html);
+          await page.screenshot({
+            path: path.join(
+              process.env.BASELINE_SCREENSHOT_DIR,
+              `${name}-email-${mobile ? "mobile" : "desktop"}.png`,
+            ),
+            fullPage: true,
+          });
+        }
+      }
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  console.log(
+    "Reviewed collection desktop/mobile: verification UI, authoritative manager context, autosave/resume, accessible help, final submission and saved answer-copy preference passed. Mocked email only.",
+  );
+})().catch((e) => {
+  console.error(e.message);
+  process.exitCode = 1;
+});

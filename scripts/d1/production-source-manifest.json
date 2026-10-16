@@ -1,6 +1,6 @@
 {
   "source": "qxddddhhpfrrxbaunwfw",
-  "generatedAt": "2026-10-16T19:47:59.860Z",
+  "generatedAt": "2026-10-16T19:56:05.598Z",
   "tables": {
     "system_events": {
       "key": "event_id",
@@ -59,46 +59,7 @@
         "public_token"
       ],
       "count": 3,
-      "hash": "bdbdf2681c72cc1aa2fad903f14d443208368cde86e974e3e4deb4f971029d47",
-      "columnHashes": {
-        "abuse_token": "fe44a8cccd89edae70b54c5e58399979bd7d8b12643a8396ad62d089a781b692",
-        "advisor_brief": "cfef7140125687a540c85392321659863d6a55d1b9b53c44a29c1e2a32be5b33",
-        "answers": "f9b61514d5d30cca7ddc9626191ca26c9d76832f734d0e8f7b7c7f8c72427f10",
-        "band": "f8e11363107d3b39b5f34aa1c294a694d37dab43f9ad54bd07ccb70710a80f3d",
-        "change_resilience_score": "3192ae18a9714f39de63df8b0eac6e1a1234d5f1643d1aba40e12685f1dd5a0e",
-        "company_size": "ad788bc330acaca100ddd163f26d4223f882191566c556cc225f221e0c314f12",
-        "completed_at": "2ed51f46b64f19734fe0497cd4fc52a3755a6c14200c74355c644b2ef569a7ab",
-        "completion_version": "39715792dc195ce629a4e08aba5ed187759e2aa5c377183a1b56b32722b74b46",
-        "consistency_score": "e7d9c54d16bec9959dcd51e84902c6209df75505d5565223156777d9287d5b20",
-        "contact_company": "c6d887d4c2d096a0681034af93e533bbe81849504f142a53db317d7901320e76",
-        "contact_email": "7d73f0c5e36721dd5282558061e722ac959834dc4d5b288678ab7762343a3aa4",
-        "contact_message": "eba03f50c181cc9db1c5f6788c673da7647e323a17e9febb5705c68b7631f701",
-        "contact_name": "2c0125706f7010b58b2186359b15b0b4cc339b9fa2eca06ffbaa6cf36eb2010d",
-        "contact_source": "941ef1fe0733fb9327dbca5f296d27150d2f3bc9306258ccc7bb1f382d28dd9d",
-        "contact_submitted_at": "ea4d736fcdd11b887877d1bf9510c96336b3646c7605b5d61da39203d0e9cb9e",
-        "contact_topic": "ddce46e6ad44748c9e5509cecfe99131e9af2d2d195cc2fa27a16b444053bc79",
-        "country_region": "b6b7e01d9a9f5070bbe63978dda654620032e94cb6b1391bf804a85e24ef7481",
-        "created_at": "2d6f0774d11c9e2bc1a0b4474bcf226d7f707daa97df6534495c278d7171e6f5",
-        "data_handoffs_score": "e7d9c54d16bec9959dcd51e84902c6209df75505d5565223156777d9287d5b20",
-        "email": "56c446c76766632c2cd04ef5d6ed3238b7f0c6d217608cb9ac1907ade3719c6f",
-        "id": "63e0dee7dc8c8ecd4db71ceba79dc873a64d8c346aa9526cd784c37da6abc13e",
-        "industry": "09fdf1a7f80ba1abebf12802ded5637f65a6ff563bd3236b0d6b6e00a15da312",
-        "knowledge_self_service_score": "6fb2907c1804ea18a6585e37b744bf2ad83894a92bf6427e1d214491bea999ad",
-        "last_contacted_at": "fe44a8cccd89edae70b54c5e58399979bd7d8b12643a8396ad62d089a781b692",
-        "notes": "fe44a8cccd89edae70b54c5e58399979bd7d8b12643a8396ad62d089a781b692",
-        "onboarding_score": "3192ae18a9714f39de63df8b0eac6e1a1234d5f1643d1aba40e12685f1dd5a0e",
-        "operational_capacity_score": "e7d9c54d16bec9959dcd51e84902c6209df75505d5565223156777d9287d5b20",
-        "ownership_score": "6fb2907c1804ea18a6585e37b744bf2ad83894a92bf6427e1d214491bea999ad",
-        "process_clarity_score": "e7d9c54d16bec9959dcd51e84902c6209df75505d5565223156777d9287d5b20",
-        "public_token": "35da0d46f68a5e1093d365c24e0f50a358e7661b0d4733fc6b1dfc6b29347d42",
-        "role": "2aa24620588ac111c842dc51a8adf50f0f2ba475da71d3234832eddfe492379f",
-        "score": "ceaf2cd036cd7e997a0c0086645dd32603261769e54a9248b268acea3ba7ab2e",
-        "service_access_score": "e7d9c54d16bec9959dcd51e84902c6209df75505d5565223156777d9287d5b20",
-        "status": "abc14d5046225addde738219af9701ec0e3d64e6a4aa8e3711691f5d234442a0",
-        "submission_id": "eb267acae4a54c1f8aaf72bd8cbbb427cf1bbdc27ce31dbb97d4107fb4f08d81",
-        "submission_source": "69b9bc1db9c9de3bbe67e72a6f40f5e107027789779bb3ede10801446bcaeb38",
-        "technology_alignment_score": "6fb2907c1804ea18a6585e37b744bf2ad83894a92bf6427e1d214491bea999ad"
-      }
+      "hash": "2ccce70510603db26479f58e52de3c5b695a79252db9ac6ce05f8e813a0080e4"
     },
     "advisor_prospects": {
       "key": "prospect_id",
