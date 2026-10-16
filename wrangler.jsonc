@@ -9,11 +9,11 @@
     "global_fetch_strictly_public"
   ],
   "vars": {
-    "D1_SYSTEM_EVENTS_MODE": "off",
-    "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "off",
-    "D1_CRM_PROSPECTS_MODE": "off",
-    "D1_CLIENT_DIAGNOSTIC_MODE": "off",
-    "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "off"
+    "D1_SYSTEM_EVENTS_MODE": "d1",
+    "D1_DIAGNOSTIC_SUBMISSIONS_MODE": "d1",
+    "D1_CRM_PROSPECTS_MODE": "d1",
+    "D1_CLIENT_DIAGNOSTIC_MODE": "d1",
+    "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE": "d1"
   },
   "observability": {
     "logs": {

@@ -1,0 +1,19 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-baseline-and-40-synthetic-responses-no-email",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "participants": 40,
+  "sendEmail": false,
+  "confirmedAt": "2026-10-16T19:51:59Z",
+  "reviewedCommit": "8ba8d479829225349d96358aea6f8c209a53b9b7",
+  "expectedDeploymentId": "b4c36889-ce0d-4774-8ba5-b02645c25156",
+  "bundleRunId": 38958649337,
+  "bundleArtifactId": 12071632194,
+  "bundleDigest": "sha256:791d27f1db096d3afd7197769a4ad24899bb75edffdd1fc1ebf2cd34e798cccd",
+  "sqlHashes": {
+    "0001_baseline.sql": "d6c0f7f4fc62f4394e5e24792a021c7f079132c8c46535778edaa5b5be885b1a",
+    "0002_campaign_entities.sql": "6bad9025912e8f7380ff394b7e45a4e9b72705a069b9a6b8d44b208c475ef7c7",
+    "0003_administration.sql": "6318f6e712af0c07b64d19469e36dfbb921cc00750aaebe587844dde6d783d41",
+    "0004_reviewed_collection.sql": "18dbe7816a74dab5bbfb76b8eb11bb7ed431641b082c9d5a18e15553f75390e8"
+  }
+}

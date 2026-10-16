@@ -32,8 +32,8 @@ export function validate(config, ref) {
     "D1_CLIENT_DIAGNOSTIC_MODE",
     "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
   ];
-  if (flags.some((f) => config.vars[f] !== "off" || qa.vars[f] !== "d1"))
-    throw new Error("Production flags must remain off; QA flags must use D1.");
+  if (flags.some((f) => !["off", "d1"].includes(config.vars[f]) || qa.vars[f] !== "d1") || new Set(flags.map(f => config.vars[f])).size !== 1)
+    throw new Error("Production flags must be consistent; QA flags must use D1.");
   return qa;
 }
 if (
