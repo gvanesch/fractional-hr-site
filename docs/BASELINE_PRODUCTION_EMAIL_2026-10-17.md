@@ -16,11 +16,11 @@ The controlled production mail test is deployed. Only greg@vanesch.uk in campaig
 - No OTP email was requested by automation. Greg requests it from the invitation page when ready. The OTP expires ten minutes after that request.
 - A new code invalidates prior unconsumed challenges for the same invitation. OTPs and tokens are not logged.
 
-## Remaining live acceptance
+## Live acceptance completed
 
-Greg must open the production invitation, request a verification code, enter it on the website and confirm the questionnaire opens. Then verify the production audit records a code request followed by participant access. The production inbox-to-code journey is not yet signed off. Do not state that launch acceptance is complete.
+Read-only production audit verified one verification-code request, one successful verified access, and a completed test response at revision 66. Evidence: https://github.com/gvanesch/fractional-hr-site/actions/runs/39042555629 . The user successfully completed the inbox-to-code-to-submission journey. This read-only check sent no mail and read no OTPs, tokens, hashes or answer contents.
 
-A read-only status workflow is prepared. Trigger it by adding or updating scripts/baseline/production-mail-status-request.json on migration/d1. It reads only the fixed test identity, aggregate audit events and response status. It sends no mail and reads no codes, token hashes or answer contents. Do not reset the production test mail ledger or repeat the invitation automatically.
+Do not reset the production test mail ledger or repeat the invitation automatically. General production sending is still restricted to the pinned Greg test campaign. Real-launch campaign and roster preparation, participant-domain delivery and answer-copy delivery remain to be completed.
 
 ## Recovery and eventual launch
 
