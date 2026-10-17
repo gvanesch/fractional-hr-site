@@ -81,7 +81,7 @@ function validate(map, mail) {
     (map.get("ADVISOR_AUTH_MODE")?.text ?? "supabase") !== "supabase" ||
     !map.has("RESEND_API_KEY") ||
     !map.has("INVITE_RATE_LIMIT_SALT") ||
-    !map.get("CONTACT_FROM_EMAIL")?.text
+    !map.has("CONTACT_FROM_EMAIL")
   )
     throw Error(
       "Production bindings or existing email credential inventory differ.",
