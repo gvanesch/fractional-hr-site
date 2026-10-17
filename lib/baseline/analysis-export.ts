@@ -46,14 +46,14 @@ export function analysisTables(dataset:{campaign?:Obj;respondents:Obj[]}, genera
   // Different employee/manager routes can include routes outside the overall selected route list.
   for(const code of new Set([...employee,...managerRoutes]))if(!routes.some(r=>r.code===code))contact.rows.push([...b,str(code),label(CONTACT_ROUTES,code),null,employee.includes(code),managerRoutes.includes(code)]);
   for(const stage of array(pay.stages).map(object)){payroll.rows.push([...b,str(stage.code),label(PAYROLL_STAGES,stage.code),str(stage.mine),label(MY_PAYROLL_PART,stage.mine)]);for(const other of array(stage.others))parties.rows.push([...b,str(stage.code),label(PAYROLL_STAGES,stage.code),str(other),label(PAYROLL_PARTIES,other)]);}
-  for(const code of selectedSystems)systems.rows.push([...b,str(code),label(SYSTEMS,code)]);
+  for(const code of selectedSystems.filter(code=>code!=='other'||!array(p.otherSystemNames).length))systems.rows.push([...b,str(code),label(SYSTEMS,code)]);
   for(const name of array(p.otherSystemNames))systems.rows.push([...b,'custom:'+str(name),str(name)]);
   for(const t of array(tech.time).map(object))techTime.rows.push([...b,str(t.code),label(TECHNOLOGY_TIME,t.code),fraction(t.shareOfTechnologyTime),...measures(whole(t.shareOfTechnologyTime,'systems_data'))]);
   for(const s of array(tech.platforms).map(object)){const roles=array(s.roles);for(const r of roles.length?roles:[null])techRoles.rows.push([...b,str(s.code),str(s.label)||label(SYSTEMS,s.code),str(r),label(TECHNOLOGY_ROLES,r)]);}
   for(const code of array(tech.activities))techActivities.rows.push([...b,str(code),label(TECHNOLOGY_ACTIVITIES,code)]);
   for(const code of array(tech.partners))techPartners.rows.push([...b,str(code),label(TECHNOLOGY_PARTNERS,code)]);
   for(const g of array(mgr.groups).map(object))management.rows.push([...b,str(g.code),str(g.label)||label(MANAGEMENT_TIME_GROUPS,g.code),str(g.description),fraction(g.shareOfManagementTime),...measures(whole(g.shareOfManagementTime,'people_management'))]);
-  for(const code of array(mgr.activities))management.rows.push([...b,str(code),label(MANAGEMENT_ACTIVITIES,code),str(mgr.other),null,null,null,null]);
+  for(const code of array(mgr.activities))management.rows.push([...b,str(code),label(MANAGEMENT_ACTIVITIES,code),code==='other'?str(mgr.other):'',null,null,null,null]);
   const note=(code:string,question:string,value:unknown)=>{if(str(value).trim())comments.rows.push([...b,code,question,str(value)]);};
   for(const [code,q] of [['importantOccasionalWork','Important occasional or annual work'],['localNote','Work requiring local knowledge or presence'],['manualNote','Manual work or friction'],['strengths','What works well'],['missing','Anything missing'],['otherSystems','Other systems or tools']] as const)note(code,q,p[code]);
   note('contact.recordingNote','How requests are recorded',c.recordingNote);note('payroll.otherPayroll','Other payroll work',pay.otherPayroll);note('technology.note','Technology context',tech.note);note('technology.otherActivity','Other technology work',tech.otherActivity);note('technology.otherPartner','Other technology partners',tech.otherPartner);note('technology.otherPlatform','Other technology systems',tech.otherPlatform);note('management.note','Management context',mgr.note);note('management.other','Other management work',mgr.other);

@@ -78,7 +78,7 @@ const root = path.resolve(__dirname, "../..");
       const campaign = {
         campaign_id: "c1",
         name: "Synthetic campaign",
-        version: "team-blue-baseline-v2",
+        version: "team-blue-baseline-v4",
         status: "open",
         closes_at: "2026-12-31T23:59:59Z",
         privacy_notice:
@@ -547,7 +547,7 @@ const root = path.resolve(__dirname, "../..");
       await page.getByRole("button", { name: "Exports", exact: true }).click();
       assert.ok(
         await page
-          .getByRole("link", { name: "Respondent-level CSV", exact: true })
+          .getByRole("link", { name: "Raw respondent CSV", exact: true })
           .isVisible(),
       );
       assert.ok(
@@ -555,6 +555,9 @@ const root = path.resolve(__dirname, "../..");
           .getByRole("heading", { name: "Completion dashboard", exact: true })
           .isVisible()),
       );
+      const workbookLink = page.getByRole("link", {name: "Download Excel analysis workbook", exact:true});
+      assert.ok(await workbookLink.isVisible());
+      assert.match(await workbookLink.getAttribute("href"), /format=xlsx/);
       if (mobile) {
         assert.equal(positions[0].x, positions[1].x);
         assert.ok(positions[1].y > positions[0].y);
