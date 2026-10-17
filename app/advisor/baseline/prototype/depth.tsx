@@ -266,13 +266,13 @@ export default function Depth({
         )}
         {pick(
           "populationBasis",
-          "Basis for the employee population you regularly support",
+          "Is the number of employees you support based on records or an estimate?",
           NUMBER_BASIS,
         )}
         {known(d.populationBasis) &&
           num(
             "supportedEmployees",
-            "Approximate employee population you support",
+            "Approximately how many employees do you regularly support?",
             1e9,
           )}
         {text(
