@@ -48,6 +48,8 @@ jobs:
         run: node scripts/baseline/admin-check.cjs
       - name: Test reviewed collection save, resume and submission on desktop and mobile
         run: node scripts/baseline/collection-check.cjs
+      - name: Test detailed v5 questions and resume on desktop and mobile
+        run: node scripts/baseline/depth-check.cjs
       - name: Save synthetic QA visual checks
         uses: actions/upload-artifact@v4
         with:
@@ -71,3 +73,4 @@ jobs:
         run: |
           node scripts/baseline/hosted-reviewed.mjs
           BASELINE_COLLECTION_VERSION=team-blue-baseline-v4 node scripts/baseline/hosted-reviewed.mjs
+          BASELINE_COLLECTION_VERSION=team-blue-baseline-v5 node scripts/baseline/hosted-reviewed.mjs

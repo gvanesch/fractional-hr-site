@@ -32,7 +32,8 @@ new Function("module", "exports", built.outputFiles[0].text)(
 );
 const m = module.exports;
 const version = process.env.BASELINE_COLLECTION_VERSION || m.COLLECTION_VERSION;
-const frozen = version === m.FROZEN_COLLECTION_VERSION;
+const frozen = m.isRevisedCollection(version);
+const expanded = version === m.DEPTH_COLLECTION_VERSION;
 if (!m.isCollectionVersion(version)) throw Error("Unsupported QA collection version");
 async function query(sql, params = []) {
   const r = await fetch(
@@ -167,11 +168,13 @@ try {
   draft.broad.selected = frozen ? ["office", "people_management"] : ["office"];
   draft.broad.time = frozen ? { office: 80, people_management: 20 } : { office: 100 };
   if (frozen) draft.managementTime = { time: { coordination: 25, individual: 50, hiring: 15, administration: 10, other: 0 }, uncertain: false, other: "" };
+  if (expanded) require("./depth-fixture.cjs").fillDepth(draft);
   await api("save", { draft, revision: 0, progress: 1 });
   await api("save", { draft, revision: 0, progress: 1 }, 409);
   const resumed = await api("response");
   if (resumed.revision !== 1 || resumed.draft.broad.time.office !== (frozen ? 80 : 100))
     throw Error("Reviewed hosted autosave/resume failed");
+  if (expanded && JSON.stringify(resumed.draft.depth) !== JSON.stringify(draft.depth)) throw Error("Detailed evidence did not survive hosted save/resume");
   if (frozen && JSON.stringify(resumed.draft.managementTime) !== JSON.stringify(draft.managementTime))
     throw Error("Frozen management time did not survive hosted save/resume");
   Object.assign(draft.rich, {

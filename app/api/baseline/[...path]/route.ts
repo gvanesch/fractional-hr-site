@@ -45,10 +45,15 @@ export async function GET(request: Request, context: Context) {
         return json({ error: "Choose an export format." }, 400);
       if (format === "xlsx") {
         const bytes = await service.exportAnalysisWorkbook(actor, campaign);
-        return new NextResponse(new Uint8Array(bytes).buffer, { headers: { ...service.securityHeaders,
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": 'attachment; filename="baseline-analysis.xlsx"',
-        }});
+        return new NextResponse(new Uint8Array(bytes).buffer, {
+          headers: {
+            ...service.securityHeaders,
+            "Content-Type":
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition":
+              'attachment; filename="baseline-analysis.xlsx"',
+          },
+        });
       }
       const content = await service.exportDataset(actor, campaign, format);
       return new NextResponse(content, {
@@ -74,7 +79,9 @@ export async function POST(request: Request, context: Context) {
     const path = (await context.params).path.join("/");
     const body = await service.readBody(
       request,
-      ["admin/import", "admin/import-preview"].includes(path) ? 300000 : 75000,
+      ["admin/import", "admin/import-preview", "save", "submit"].includes(path)
+        ? 300000
+        : 75000,
     );
     if (path === "dashboard")
       return json(

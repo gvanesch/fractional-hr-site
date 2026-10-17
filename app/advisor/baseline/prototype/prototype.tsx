@@ -1,4 +1,6 @@
 "use client";
+import Depth, { DepthReview } from "./depth";
+import { emptyDepth, depthIssues } from "@/lib/baseline/depth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   emptyManagementTime,
@@ -17,6 +19,9 @@ import "@/app/baseline/start/style.css";
 import "./prototype.css";
 import {
   FROZEN_COLLECTION_VERSION,
+  DEPTH_COLLECTION_VERSION,
+  isRevisedCollection,
+  collectionSteps,
   type CollectionDraft,
 } from "@/lib/baseline/collection";
 import Info from "./info";
@@ -45,6 +50,9 @@ import {
   type ManagerRecord,
 } from "@/lib/baseline/management-prototype";
 const LABELS: Record<string, string> = {
+  coverage: "Countries and businesses supported",
+  work_detail: "Work activities and delivery",
+  role_capacity: "Responsibility, demand and capacity",
   areas: "Your work areas",
   time: "Time across your work",
   contact: "How people contact you or your team",
@@ -83,7 +91,17 @@ export default function Prototype({
       savedCollection?.draft.broad ?? emptyBroadDraft,
     ),
     [started, setStarted] = useState(savedCollection?.draft.started ?? false),
-    [stage, setStage] = useState(Math.min(savedCollection?.progress ?? 0, 7)),
+    [stage, setStage] = useState(() =>
+      savedCollection?.draft.version === DEPTH_COLLECTION_VERSION
+        ? Math.max(
+            0,
+            collectionSteps(
+              savedCollection.draft,
+              managerRecord ?? { isPeopleManager: false },
+            ).indexOf(savedCollection.draft.depth?.resumeStep ?? "areas"),
+          )
+        : Math.min(savedCollection?.progress ?? 0, 7),
+    ),
     [checked, setChecked] = useState(false),
     [reviewVisited, setReviewVisited] = useState(false);
   const areas = managerRecord?.isPeopleManager
@@ -96,8 +114,15 @@ export default function Prototype({
   const [management, setManagement] = useState(
     savedCollection?.draft.management ?? emptyManagement,
   );
-  const revised = !saveCollection || savedCollection?.draft.version === FROZEN_COLLECTION_VERSION;
-  const [managementTime, setManagementTime] = useState(savedCollection?.draft.managementTime ?? emptyManagementTime);
+  const revised =
+    !saveCollection || isRevisedCollection(savedCollection?.draft.version);
+  const expanded = savedCollection?.draft.version === DEPTH_COLLECTION_VERSION;
+  const [depth, setDepth] = useState(
+    savedCollection?.draft.depth ?? emptyDepth,
+  );
+  const [managementTime, setManagementTime] = useState(
+    savedCollection?.draft.managementTime ?? emptyManagementTime,
+  );
   const showManagement = managementVisible(managerRecord, draft.selected);
   const [rich, setRich] = useState(
     () =>
@@ -111,13 +136,19 @@ export default function Prototype({
   const steps = [
     "areas",
     "time",
+    ...(expanded ? ["coverage", "work_detail"] : []),
     "contact",
     ...(payrollVisible ? ["payroll"] : []),
     ...(showManagement ? ["management"] : []),
     "context",
     ...(showTechnology ? ["technology"] : []),
+    ...(expanded ? ["role_capacity"] : []),
     "review",
   ];
+  const resumeStep = String(steps[Math.min(stage, steps.length - 1)]);
+  const savedProgress = expanded
+    ? Math.round((Math.min(stage, steps.length - 1) * 8) / (steps.length - 1))
+    : Math.min(stage, steps.length - 1);
   const [answerCopy, setAnswerCopy] = useState(
       savedCollection?.draft.answerCopy ?? false,
     ),
@@ -135,6 +166,7 @@ export default function Prototype({
     () => ({
       version: savedCollection?.draft.version ?? FROZEN_COLLECTION_VERSION,
       ...(revised ? { managementTime } : {}),
+      ...(expanded ? { depth: { ...depth, resumeStep } } : {}),
       broad: draft,
       rich,
       technology,
@@ -142,7 +174,20 @@ export default function Prototype({
       started,
       answerCopy,
     }),
-    [draft, rich, technology, management, started, answerCopy, revised, managementTime, savedCollection?.draft.version],
+    [
+      draft,
+      rich,
+      technology,
+      management,
+      started,
+      answerCopy,
+      revised,
+      managementTime,
+      savedCollection?.draft.version,
+      expanded,
+      depth,
+      resumeStep,
+    ],
   );
   const persistedPayload = useRef(
     JSON.stringify(savedCollection?.draft ?? payload),
@@ -158,7 +203,7 @@ export default function Prototype({
       return;
     pendingSave.current = setTimeout(() => {
       setSaveState("Saving…");
-      void saveCollection(payload, currentStage)
+      void saveCollection(payload, savedProgress)
         .then(() => {
           persistedPayload.current = JSON.stringify(payload);
           setSaveState("Saved securely");
@@ -176,6 +221,7 @@ export default function Prototype({
     payload,
     started,
     currentStage,
+    savedProgress,
     submitted,
     saveCollection,
     savedCollection?.campaign.closed,
@@ -201,25 +247,27 @@ export default function Prototype({
   const active = broadSelected(draft, areas),
     total = broadTotal(draft, areas);
   const validate = (i: number) =>
-    i === 0
-      ? broadIssues(draft, 0, areas)
-      : i === 1
-        ? [
-            ...broadIssues(draft, 1, areas),
-            ...richIssues(rich, "time_nature", draft.selected),
-          ]
-        : steps[i] === "management"
-          ? revised
-            ? managementTimeIssues(managementTime)
-            : managementIssues(management)
-          : steps[i] === "technology"
-            ? technologyIssues(technology)
-            : richIssues(rich, steps[i], draft.selected).filter(
-                (issue) =>
-                  !revised ||
-                  steps[i] !== "context" ||
-                  issue !== "localNeeds",
-              );
+    expanded && ["coverage", "work_detail", "role_capacity"].includes(steps[i])
+      ? depthIssues(depth, draft.selected, steps[i])
+      : i === 0
+        ? broadIssues(draft, 0, areas)
+        : i === 1
+          ? [
+              ...broadIssues(draft, 1, areas),
+              ...richIssues(rich, "time_nature", draft.selected),
+            ]
+          : steps[i] === "management"
+            ? revised
+              ? managementTimeIssues(managementTime)
+              : managementIssues(management)
+            : steps[i] === "technology"
+              ? technologyIssues(technology)
+              : richIssues(rich, steps[i], draft.selected).filter(
+                  (issue) =>
+                    !revised ||
+                    steps[i] !== "context" ||
+                    issue !== "localNeeds",
+                );
   const issues = checked ? validate(currentStage) : [];
   function go(next: number) {
     const invalid =
@@ -298,7 +346,7 @@ export default function Prototype({
             setSaveState("Signing out…");
             void (
               started && saveCollection
-                ? saveCollection(payload, currentStage)
+                ? saveCollection(payload, savedProgress)
                 : Promise.resolve()
             )
               .then(() => {
@@ -325,7 +373,7 @@ export default function Prototype({
           <button
             onClick={() => {
               setSaveState("Saving…");
-              void saveCollection?.(payload, currentStage)
+              void saveCollection?.(payload, savedProgress)
                 .then(() => {
                   setSaveState("Saved securely");
                   setSaveError("");
@@ -377,9 +425,9 @@ export default function Prototype({
             </section>
           )}
           <p className="tb-estimate">
-            Most people will complete this in around 10–15 minutes. If your role
-            covers a broad range of People activities, it may take closer to
-            20–30 minutes.
+            {expanded
+              ? "Allow around 25–40 minutes for the detailed questions, and longer for a broad role. You can save and return. We will check this estimate during launch QA."
+              : "Most people will complete this in around 10–15 minutes. If your role covers a broad range of People activities, it may take closer to 20–30 minutes."}
           </p>
           {saveCollection && (
             <p>
@@ -612,6 +660,16 @@ export default function Prototype({
                 </label>
               </>
             )}
+            {expanded &&
+              ["coverage", "work_detail", "role_capacity"].includes(key) && (
+                <Depth
+                  step={key}
+                  draft={depth}
+                  selected={draft.selected}
+                  issues={issues}
+                  change={(patch) => setDepth({ ...depth, ...patch })}
+                />
+              )}
             {["contact", "payroll", "context"].includes(key) && (
               <Context
                 step={key}
@@ -684,6 +742,9 @@ export default function Prototype({
                   />
                 )}
                 {showTechnology && <TechnologyReview draft={technology} />}
+                {expanded && (
+                  <DepthReview draft={depth} selected={draft.selected} />
+                )}
                 {saveCollection ? (
                   <>
                     <p>Review your answers, then submit them.</p>

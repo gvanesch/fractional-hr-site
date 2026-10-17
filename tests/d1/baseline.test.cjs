@@ -1888,3 +1888,29 @@ test("Advisor Excel download preserves authentication, attachment metadata and v
     h.sqlite.close();
   }
 });
+
+test('Detailed v5 saves and resumes evidence, enforces completion, exports it and keeps submitted answers immutable', async()=>{
+ const h=harness();try{
+  const {campaign,p,token}=await reviewedSetup(h,'detailed@example.invalid',h.collection.DEPTH_COLLECTION_VERSION);
+  const code=await h.service.requestVerification(h.request({}),token,true);
+  const access=await h.service.verifyCode(h.request({}),token,code.challenge,code.code);
+  h.state.cookie=access.session;const identity=await h.service.participant(h.request({}));
+  const d={...reviewedComplete(h),version:h.collection.DEPTH_COLLECTION_VERSION,managementTime:{time:{},uncertain:false,other:''}};
+  require('../../scripts/baseline/depth-fixture.cjs').fillDepth(d);
+  d.depth.resumeStep='work_detail';
+  assert.equal(h.collection.collectionIssues(d,{isPeopleManager:false}).length,0);
+  const incomplete=structuredClone(d);incomplete.depth.work.office.taskTime.reception=10;
+  await assert.rejects(h.service.saveResponse(identity,incomplete,0,8,true));
+  await h.service.saveResponse(identity,d,0,4);
+  const resumed=await h.service.readResponse(identity);assert.deepEqual(JSON.parse(JSON.stringify(resumed.draft.depth)),d.depth);
+  assert.equal(resumed.progress,4);assert.equal(resumed.draft.depth.resumeStep,'work_detail');
+  await assert.rejects(h.service.saveResponse(identity,d,0,4),e=>e.status===409);
+  await h.service.saveResponse(identity,d,1,8,true);
+  const exported=JSON.parse(await h.service.exportDataset('admin@example.invalid',campaign,'json'));
+  assert.equal(exported.questionnaire.version,h.collection.DEPTH_COLLECTION_VERSION);
+  assert.equal(exported.respondents[0].depth.countries.find(c=>c.code==='custom:norway').shareOfWorkingTime,10);
+  assert.equal(exported.respondents[0].depth.work.find(w=>w.area==='office').tasks[0].shareOfAreaTime,60);
+  await assert.rejects(h.service.saveResponse(identity,d,2,4),e=>e.status===409);
+  assert.equal(h.sqlite.prepare('SELECT status FROM tb_baseline_responses WHERE participant_id=?').get(p.participant_id).status,'completed');
+ }finally{h.sqlite.close();}
+});

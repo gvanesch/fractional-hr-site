@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FROZEN_COLLECTION_VERSION as COLLECTION_VERSION, isCollectionVersion } from "@/lib/baseline/collection";
+import { CURRENT_COLLECTION_VERSION as COLLECTION_VERSION, isCollectionVersion } from "@/lib/baseline/collection";
 import Administration from "./administration";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
@@ -248,6 +248,7 @@ export default function AdminPanel({
                 Questionnaire: {current?.version ?? COLLECTION_VERSION}. The
                 version is fixed for this campaign.
               </p>
+              <p><Link href="/advisor/baseline/depth-preview">Preview the detailed questionnaire</Link></p>
               <label className="tb-field">
                 <span>Closing date (end of day, UTC)</span>
                 <input

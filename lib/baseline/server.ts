@@ -7,7 +7,7 @@ import {
   baselineSender,
 } from "./emails";
 import {
-  FROZEN_COLLECTION_VERSION,
+  isRevisedCollection,
   isCollectionVersion,
   collectionDefinitionFor,
   initialCollection,
@@ -687,8 +687,7 @@ export async function configureCampaign(
   if (
     status === "open" &&
     baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
-    (String(c.version) !== REVIEWED_COLLECTION_VERSION ||
-      FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
+    !isRevisedCollection(c.version)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production collection.",
@@ -874,8 +873,7 @@ export async function invite(
   if (
     send &&
     env.NEXT_PUBLIC_APP_ENV !== "qa" &&
-    (p.version !== REVIEWED_COLLECTION_VERSION ||
-      FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION)
+    !isRevisedCollection(p.version)
   )
     throw new BaselineError(
       "The reviewed questionnaire is not ready for production invitations.",
@@ -916,7 +914,7 @@ export async function invite(
       from: baselineSender(env.CONTACT_FROM_EMAIL),
       to: p.email,
       replyTo: "info@vanesch.uk",
-      ...invitationEmail(p.name, link, p.closes_at),
+      ...invitationEmail(p.name, link, p.closes_at, p.version),
     });
     if (result.error) {
       await audit(actor, "invitation_delivery_failed", campaign, participantId);
@@ -1101,7 +1099,6 @@ export async function exportDataset(
 }
 
 // Administration for the reviewed baseline. Launch is pinned to the saved collection version.
-const REVIEWED_COLLECTION_VERSION = FROZEN_COLLECTION_VERSION;
 export async function previewRoster(campaign: string, csv: string) {
   const data = await campaignRows(campaign);
   let rows: Partial<Profile>[];
@@ -1559,8 +1556,7 @@ export async function launchReadiness(campaign: string) {
     active = data.participants.filter((p) => Number(p.active) === 1),
     blockers: string[] = [];
   if (
-    data.campaign.version !== REVIEWED_COLLECTION_VERSION ||
-    FROZEN_COLLECTION_VERSION !== REVIEWED_COLLECTION_VERSION
+    !isRevisedCollection(data.campaign.version)
   )
     blockers.push(
       "The reviewed broad-work questionnaire still needs its versioned saving, submission and answer-copy flow. This campaign uses the earlier questionnaire.",
@@ -2216,7 +2212,7 @@ export async function qaTestInvitation(request: Request, token: string) {
     throw new BaselineError("Use the reviewed questionnaire for this QA test.");
   if (
     baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
-    p.version !== FROZEN_COLLECTION_VERSION
+    !isRevisedCollection(p.version)
   )
     throw new BaselineError(
       "Use the frozen production questionnaire for this test.",
@@ -2231,6 +2227,7 @@ export async function qaTestInvitation(request: Request, token: string) {
       p.name,
       site.replace(/\/$/, "") + "/baseline/start#" + token,
       p.closes_at,
+      p.version,
     ),
     undefined,
     p.campaign_id,
