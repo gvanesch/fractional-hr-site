@@ -147,7 +147,7 @@ export default function Prototype({
   ];
   const resumeStep = String(steps[Math.min(stage, steps.length - 1)]);
   const savedProgress = expanded
-    ? Math.round((Math.min(stage, steps.length - 1) * 8) / (steps.length - 1))
+    ? Math.round((Math.min(stage, steps.length - 1) * 7) / (steps.length - 1))
     : Math.min(stage, steps.length - 1);
   const [answerCopy, setAnswerCopy] = useState(
       savedCollection?.draft.answerCopy ?? false,
@@ -394,15 +394,22 @@ export default function Prototype({
       </header>
       {!started ? (
         <section className="tb-card">
-          <h1>A simple picture of your current work</h1>
+          <h1>
+            {expanded
+              ? "Your current work and delivery"
+              : "A simple picture of your current work"}
+          </h1>
           <p>
-            Choose the broad areas you work on, then estimate the time you spend
-            in each area.
+            {expanded
+              ? "Start with your work areas and time split. Then describe the activities you actually do, countries and businesses you support, local requirements, responsibilities and workload."
+              : "Choose the broad areas you work on, then estimate the time you spend in each area."}
           </p>
           <p>
             The examples help explain each area. Select an area when it
-            describes some of your regular work. Your answers describe broad
-            areas of work.
+            describes some of your regular work.{" "}
+            {expanded
+              ? "Later questions ask for detail only about the areas you select."
+              : "Your answers describe broad areas of work."}
           </p>
           {!saveCollection && (
             <p>
@@ -497,8 +504,9 @@ export default function Prototype({
                   <strong>
                     You only need to do some of the work described.
                   </strong>{" "}
-                  The examples are there to help you recognise the area. There
-                  are no individual tasks to select.
+                  {expanded
+                    ? "Select broad areas here. Later questions ask which activities you actually do within each area."
+                    : "The examples are there to help you recognise the area. There are no individual tasks to select."}
                 </p>
                 <div
                   className={
@@ -706,8 +714,9 @@ export default function Prototype({
             {key === "review" && (
               <>
                 <p>
-                  This is the broad picture of your work. Selecting an area does
-                  not mean you do every example listed within it.
+                  {expanded
+                    ? "Review your work areas, activities and delivery evidence. Selecting a broad area does not mean you do every example within it."
+                    : "This is the broad picture of your work. Selecting an area does not mean you do every example listed within it."}
                 </p>
                 <div className="tb-review">
                   {steps.slice(0, reviewStage).map((step, i) => (

@@ -115,7 +115,10 @@ const root = path.resolve(__dirname, "../..");
         else if (["save", "submit"].includes(action)) {
           const body = req.postDataJSON();
           assert.equal(body.revision, revision);
-          assert.ok(body.progress >= 0 && body.progress <= 8);
+          assert.ok(
+            body.progress >= 0 &&
+              body.progress <= (action === "submit" ? 8 : 7),
+          );
           stored = m.parseCollection(body.draft, { isPeopleManager: false });
           progress = body.progress;
           if (action === "submit") {

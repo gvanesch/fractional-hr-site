@@ -25,7 +25,7 @@ V5 workbooks add eight tables: Country coverage, Detailed activities, Local requ
 
 Country shares, work-area shares and within-area activity shares are separate views. Allocated hours/FTE use census contracted hours and working fraction; reported contractual hours remain separate for validation. Do not add across views. Uncommitted time is directly reported, not derived from a 100% allocation. Do not sum repeated provider costs, supported populations or repeated peak-month effort without reconciliation. Scope, records and estimates must be checked with accountable leaders before grading, relocating work, changing staffing or claiming savings.
 
-The v5 form persists its exact resume-step key in the draft while mapping navigation to the existing 0–8 completion scale. No database rebuild or response schema migration is required. Detailed payloads use a bounded 300KB save/submit limit, typed nested validation and the existing optimistic concurrency/security boundary.
+The v5 form persists its exact resume-step key in the draft while mapping drafts to 0–7 on the existing completion scale, with 8 reserved for submission. No database rebuild or response schema migration is required. Detailed payloads use a bounded 300KB save/submit limit, typed nested validation and the existing optimistic concurrency/security boundary.
 
 ## Launch
 
