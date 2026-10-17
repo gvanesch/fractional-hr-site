@@ -48,6 +48,8 @@ function formatDealStage(value: DashboardProspect["deal_stage"]): string {
       return "Meeting booked";
     case "in_conversation":
       return "In conversation";
+    case "health_check_completed":
+      return "Health Check completed";
     case "diagnostic_assessment_candidate":
       return "Assessment candidate";
     case "proposal_discussed":
@@ -186,7 +188,7 @@ function SectionError({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
       <p className="text-sm font-medium text-rose-700">
-        Unable to load this data from Supabase.
+        Unable to load this data.
       </p>
       <p className="mt-1 text-xs text-rose-600">{message}</p>
     </div>

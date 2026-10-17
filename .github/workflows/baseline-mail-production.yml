@@ -1,0 +1,50 @@
+name: Controlled production baseline email and OTP test
+on:
+  push:
+    branches: [migration/d1]
+    paths: [scripts/baseline/production-mail-approval.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+jobs:
+  mail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: https://qxddddhhpfrrxbaunwfw.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SITE_URL: https://vanesch.uk
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run test:d1
+      - run: npx tsc --noEmit
+      - name: Verify production target and reviewed QA evidence
+        run: node scripts/baseline/production-mail-release.mjs prepare
+      - name: Build restricted production mail test
+        run: npx opennextjs-cloudflare build
+      - name: Deploy Greg-only campaign restriction
+        run: npx opennextjs-cloudflare deploy
+      - name: Verify restricted settings and existing authentication
+        run: node scripts/baseline/production-mail-release.mjs verify
+      - name: Test negative OTP paths and send only the Greg invitation
+        run: node scripts/baseline/production-mail-release.mjs send-invitation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-production-mail-verification
+          path: |
+            baseline-mail-recovery.json
+            baseline-mail-verification.json
+          if-no-files-found: ignore
+          retention-days: 30

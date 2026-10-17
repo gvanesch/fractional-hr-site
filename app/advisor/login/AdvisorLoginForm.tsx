@@ -72,12 +72,8 @@ export default function AdvisorLoginForm({
         return;
       }
 
-// Force cookie propagation before navigation
-await wait(100);
-
-// Hard reload ensures middleware sees fresh cookies
-window.location.href = nextPath;
-
+      // Force cookie propagation before a hard navigation so middleware sees it.
+      await wait(100);
       window.location.assign(nextPath);
     } catch {
       setError("Something went wrong during login. Please try again.");

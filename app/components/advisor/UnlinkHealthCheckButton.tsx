@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type UnlinkHealthCheckResponse = {
+    success?: boolean;
+    error?: string;
+};
+
 export default function UnlinkHealthCheckButton({
     prospectId,
 }: {
@@ -34,10 +39,15 @@ export default function UnlinkHealthCheckButton({
                 },
             );
 
-            const data = await res.json();
+            const data =
+                (await res.json()) as UnlinkHealthCheckResponse;
 
-            if (!res.ok || !data.success) {
-                throw new Error(data.error || "Failed to unlink");
+            if (!res.ok || data.success !== true) {
+                throw new Error(
+                    typeof data.error === "string"
+                        ? data.error
+                        : "Failed to unlink",
+                );
             }
 
             router.refresh();

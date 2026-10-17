@@ -1,4 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { checkD1ClientDiagnosticInviteRateLimit } from "@/lib/d1/client-diagnostic-security";
+import { isD1ClientDiagnosticSecurityEnabled } from "@/lib/d1/database";
 
 type InviteRateLimitRpcResult = {
   blocked: boolean;
@@ -92,6 +94,14 @@ export async function checkClientDiagnosticInviteRateLimit(params: {
 
   const clientIp = getClientIp(requestHeaders);
   const ipHash = await hashClientIp(clientIp);
+
+  if (isD1ClientDiagnosticSecurityEnabled()) {
+    return checkD1ClientDiagnosticInviteRateLimit({
+      ipHash,
+      inviteToken,
+    });
+  }
+
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase.rpc(

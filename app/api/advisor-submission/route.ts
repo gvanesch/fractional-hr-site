@@ -1,13 +1,14 @@
 // ⚠️ LEGACY ROUTE - DO NOT USE FOR NEW DEVELOPMENT
 // This endpoint was previously used by advisor pages via server-side fetch.
-// The application now uses direct Supabase reads in server components instead.
+// The application now uses backend-selected reads in server components instead.
 //
 // This route is retained temporarily for backward compatibility (e.g. email links or manual access).
 //
 // If no external dependencies are confirmed, this route should be removed in a future cleanup.
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateAdvisorRequest } from "@/lib/advisor-auth";
+import { getD1Database, isD1DiagnosticSubmissionsEnabled } from "@/lib/d1/database";
 import {
   calculateDiagnosticResult,
   type DiagnosticAnswers,
@@ -87,38 +88,19 @@ type SuccessResponse = {
   advisorBrief: AdvisorBrief | null;
 };
 
-async function requireAdvisorSessionForApi() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  console.log("[api/advisor-submission] auth debug", {
-    hasSession: Boolean(session),
-    email: session?.user.email ?? null,
-    error: error?.message ?? null,
-  });
-
-  if (error || !session) {
-    return null;
-  }
-
-  const allowedEmails = (process.env.ADVISOR_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  const userEmail = session.user.email?.toLowerCase() ?? "";
-
-  if (!userEmail || !allowedEmails.includes(userEmail)) {
-    return null;
-  }
-
-  return session.user;
-}
-
 async function getSubmission(submissionId: string): Promise<SubmissionRow | null> {
+  if (isD1DiagnosticSubmissionsEnabled()) {
+    const row = await getD1Database().prepare(
+      "SELECT * FROM diagnostic_submissions WHERE submission_id = ?",
+    ).bind(submissionId).first<Omit<SubmissionRow, "answers" | "advisor_brief"> & {
+      answers: string | null; advisor_brief: string | null;
+    }>();
+    return row ? {
+      ...row,
+      answers: row.answers === null ? null : JSON.parse(row.answers),
+      advisor_brief: row.advisor_brief === null ? null : JSON.parse(row.advisor_brief),
+    } : null;
+  }
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -362,7 +344,7 @@ function buildCallOpener(score: number, submission: SubmissionRow): string {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const advisorUser = await requireAdvisorSessionForApi();
+    const advisorUser = await authenticateAdvisorRequest(request);
 
     if (!advisorUser) {
       return NextResponse.json<ErrorResponse>(

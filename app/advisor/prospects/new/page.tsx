@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type CreateProspectResponse = {
+    success?: boolean;
+    error?: string;
+    prospect_id?: string;
+};
+
 export default function NewProspectPage() {
     const router = useRouter();
 
@@ -35,10 +41,19 @@ export default function NewProspectPage() {
                 }),
             });
 
-            const payload = await response.json();
+            const payload =
+                (await response.json()) as CreateProspectResponse;
 
-            if (!response.ok || !payload.success) {
-                throw new Error(payload.error || "Unable to create prospect.");
+            if (
+                !response.ok ||
+                payload.success !== true ||
+                typeof payload.prospect_id !== "string"
+            ) {
+                throw new Error(
+                    typeof payload.error === "string"
+                        ? payload.error
+                        : "Unable to create prospect.",
+                );
             }
 
             router.push(`/advisor/prospects/${payload.prospect_id}`);

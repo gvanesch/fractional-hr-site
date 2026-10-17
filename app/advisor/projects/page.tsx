@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { listD1ClientProjects } from "@/lib/d1/client-projects";
+import { isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 
 export const metadata = {
   title: "Advisor Projects | Van Esch Advisory",
@@ -121,14 +123,26 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
   const status = getSafeStatus(resolvedSearchParams?.status);
   const sort = getSafeSort(resolvedSearchParams?.sort);
 
-  const supabase = createSupabaseAdminClient();
+  let projects: Project[] = [];
+  let loadError = false;
 
-  const { data, error } = await supabase
-    .from("client_projects")
-    .select("project_id, project_name, company_name, project_status, created_at")
-    .order("created_at", { ascending: sort === "oldest" });
+  if (isD1ClientDiagnosticEnabled()) {
+    try {
+      projects = await listD1ClientProjects(sort === "oldest");
+    } catch (error) {
+      console.error("Unable to load D1 client projects", error);
+      loadError = true;
+    }
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("client_projects")
+      .select("project_id, project_name, company_name, project_status, created_at")
+      .order("created_at", { ascending: sort === "oldest" });
 
-  const projects: Project[] = !error && data ? data : [];
+    projects = !error && data ? data : [];
+    loadError = Boolean(error);
+  }
 
   const openProjects = projects.filter((p) => p.project_status === "active");
   const closedProjects = projects.filter((p) => p.project_status === "closed");
@@ -163,13 +177,13 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
       </section>
 
       <div className="brand-container py-10">
-        {error ? (
+        {loadError ? (
           <section className="brand-surface-card p-6">
             <h2 className="text-lg font-semibold text-slate-900">
               Unable to load projects
             </h2>
             <p className="mt-4 text-sm text-rose-600">
-              There was a problem retrieving projects from Supabase.
+              There was a problem retrieving projects.
             </p>
           </section>
         ) : (

@@ -1,0 +1,620 @@
+import { depthAnalysisTables } from "./depth-export";
+import {
+  CONTACT_ROUTES,
+  SYSTEMS,
+  PAYROLL_STAGES,
+  PAYROLL_PARTIES,
+  MY_PAYROLL_PART,
+  LOCAL_NEEDS,
+  WORK_NATURE,
+} from "./prototype-enrichment";
+import {
+  TECHNOLOGY_ACTIVITIES,
+  TECHNOLOGY_ROLES,
+  TECHNOLOGY_PARTNERS,
+  TECHNOLOGY_TIME,
+} from "./technology-prototype";
+import { MANAGEMENT_ACTIVITIES } from "./management-prototype";
+import { MANAGEMENT_TIME_GROUPS } from "./management-time-preview";
+export type Cell = string | number | boolean | null;
+export type AnalysisTable = {
+  name: string;
+  columns: string[];
+  rows: Cell[][];
+  percentages?: string[];
+};
+type Obj = Record<string, unknown>;
+const object = (v: unknown): Obj =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Obj) : {};
+const array = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const str = (v: unknown) => (v == null ? "" : String(v));
+const num = (v: unknown): number | null =>
+  v !== "" && v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+const label = (options: string[][], v: unknown) =>
+  options.find((x) => x[0] === v)?.[1] ?? str(v);
+const fraction = (v: unknown) => (num(v) === null ? null : Number(v) / 100);
+const knownChoice = (values: unknown[], code: string): Cell =>
+  !values.length
+    ? null
+    : values.includes("unknown")
+      ? code === "unknown"
+        ? true
+        : null
+      : values.includes(code);
+const baseColumns = [
+  "Participant ID",
+  "Name",
+  "Status",
+  "Include in analysis",
+  "Country",
+  "Region",
+  "Entity",
+  "Work type",
+];
+const base = (p: Obj): Cell[] => [
+  str(p.participant_id),
+  str(p.name),
+  str(p.status),
+  p.status === "completed",
+  str(p.country),
+  str(p.region),
+  str(p.entity),
+  str(p.work_type),
+];
+const evidenceKeys = new Set([
+  "depth",
+  "version",
+  "designVersion",
+  "workAreas",
+  "importantOccasionalWork",
+  "contact",
+  "payroll",
+  "workNature",
+  "scope",
+  "localNeeds",
+  "localNote",
+  "systems",
+  "otherSystems",
+  "otherSystemNames",
+  "manualNote",
+  "strengths",
+  "missing",
+  "technology",
+  "management",
+  "answerCopyRequested",
+]);
+const heading: Record<string, string> = {
+  participant_id: "Participant ID",
+  campaign_id: "Campaign ID",
+  questionnaire_version: "Questionnaire version",
+  status: "Status",
+  progress: "Progress",
+  submitted_at: "Submitted at",
+  name: "Name",
+  email: "Email",
+  country: "Country",
+  region: "Region",
+  work_type: "Work type",
+  manages_people: "People manager",
+  direct_reports: "Direct reports",
+  entity: "Entity",
+  working_fraction: "Working fraction",
+  contracted_hours: "Contracted hours per week",
+  access_active: "Access active",
+  title: "Job title",
+  job_title: "Job title",
+  division: "Division",
+  team: "Team",
+  regional_leader_email: "Regional leader email",
+};
+const scopeLabel = (v: unknown) =>
+  ({
+    one: "One brand / entity",
+    several: "Several brands / entities",
+    group: "Group-wide",
+    unknown: "Not sure",
+  })[str(v)] ?? str(v);
+export function analysisTables(
+  dataset: { campaign?: Obj; respondents: Obj[] },
+  generatedAt = new Date().toISOString(),
+): AnalysisTable[] {
+  const people = dataset.respondents;
+  const make = (
+    name: string,
+    columns: string[],
+    percentages: string[] = [],
+  ): AnalysisTable => ({
+    name,
+    columns: [...baseColumns, ...columns],
+    rows: [],
+    percentages,
+  });
+  const work = make(
+    "Work allocation",
+    [
+      "Work area code",
+      "Work area",
+      "Share of working time",
+      "Hours per week",
+      "FTE allocation",
+      "Work nature code",
+      "Work nature",
+      "Work area note",
+    ],
+    ["Share of working time"],
+  );
+  const contact = make(
+    "Contact routes",
+    [
+      "Route code",
+      "Route",
+      "Share of requests",
+      "Employee route selected",
+      "Manager route selected",
+    ],
+    ["Share of requests"],
+  );
+  const payroll = make("Payroll stages", [
+    "Stage code",
+    "Payroll stage",
+    "My involvement code",
+    "My involvement",
+  ]);
+  const parties = make("Payroll parties", [
+    "Stage code",
+    "Payroll stage",
+    "Other party code",
+    "Other party",
+  ]);
+  const systems = make("Systems used", ["System code", "System"]);
+  const techTime = make(
+    "Technology time",
+    [
+      "Time group code",
+      "Time group",
+      "Share of technology time",
+      "Share of working time",
+      "Hours per week",
+      "FTE allocation",
+    ],
+    ["Share of technology time", "Share of working time"],
+  );
+  const techRoles = make("Technology systems", [
+    "System code",
+    "System",
+    "Role code",
+    "Role",
+  ]);
+  const techActivities = make(
+    "Technology activities",
+    [
+      "Activity code",
+      "Activity",
+      "Share of technology time",
+      "Share of working time",
+      "Hours per week",
+      "FTE allocation",
+    ],
+    ["Share of technology time", "Share of working time"],
+  );
+  const techPartners = make("Technology partners", ["Partner code", "Partner"]);
+  const management = make(
+    "Management time",
+    [
+      "Activity code",
+      "Activity",
+      "Activity description",
+      "Share of management time",
+      "Share of working time",
+      "Hours per week",
+      "FTE allocation",
+    ],
+    ["Share of management time", "Share of working time"],
+  );
+  const comments = make("Comments", ["Question code", "Question", "Answer"]);
+  const profileKeys = [
+    ...new Set(
+      people.flatMap((p) => Object.keys(p).filter((k) => !evidenceKeys.has(k))),
+    ),
+  ];
+  const respondent: AnalysisTable = {
+    name: "Respondents",
+    columns: [
+      ...profileKeys.map((k) => heading[k] ?? k.replaceAll("_", " ")),
+      "Include in analysis",
+      "Support scope code",
+      "Support scope",
+      "Recording coverage code",
+      "Requests recorded",
+      "Duplicate requests code",
+      "Duplicate requests",
+      "Employee and manager routes code",
+      "Employee and manager routes",
+      "Payroll involvement code",
+      "Payroll involvement",
+      "Payroll cycle code",
+      "Payroll cycle",
+      "Personal payroll days",
+      "Payroll days not known",
+      "Technology involvement code",
+      "Management time not known",
+      "Legacy shared reporting code",
+      "Answer copy requested",
+      ...SYSTEMS.map(([, l]) => "Uses: " + l),
+      ...LOCAL_NEEDS.map(([, l]) => "Legacy local need: " + l),
+    ],
+    rows: [],
+  };
+  for (const p of people) {
+    const b = base(p),
+      c = object(p.contact),
+      pay = object(p.payroll),
+      tech = object(p.technology),
+      mgr = object(p.management),
+      areas = array(p.workAreas).map(object),
+      nature = object(p.workNature);
+    const hours = num(p.contracted_hours),
+      fte = num(p.working_fraction),
+      routes = array(c.routes).map(object),
+      employee = array(c.employeeRoutes),
+      managerRoutes = array(c.managerRoutes);
+    const areaShare = (code: string) =>
+      num(areas.find((a) => a.code === code)?.percentage);
+    const whole = (share: unknown, area: string) =>
+      num(share) === null || areaShare(area) === null
+        ? null
+        : (Number(share) * Number(areaShare(area))) / 10000;
+    const measures = (share: number | null): Cell[] => [
+      share,
+      share === null || hours === null ? null : hours * share,
+      share === null || fte === null ? null : fte * share,
+    ];
+    const selectedSystems = array(p.systems),
+      local = array(p.localNeeds);
+    respondent.rows.push([
+      ...profileKeys.map((k) => {
+        const v = p[k];
+        if (v == null) return null;
+        if (
+          [
+            "direct_reports",
+            "working_fraction",
+            "contracted_hours",
+            "progress",
+          ].includes(k)
+        )
+          return num(v);
+        if (k === "access_active") return v === true || v === 1 || v === "1";
+        return typeof v === "object" ? str(v) : (v as Cell);
+      }),
+      p.status === "completed",
+      str(p.scope),
+      scopeLabel(p.scope),
+      str(c.recording),
+      label(
+        [
+          ["all", "All"],
+          ["most", "Most"],
+          ["some", "Some"],
+          ["none", "None"],
+          ["unknown", "Not sure"],
+        ],
+        c.recording,
+      ),
+      str(c.duplicateRequests),
+      label(
+        [
+          ["often", "Often"],
+          ["sometimes", "Sometimes"],
+          ["rarely", "Rarely"],
+          ["unknown", "Not sure"],
+        ],
+        c.duplicateRequests,
+      ),
+      str(c.sameEmployeeManagerRoutes),
+      label(
+        [
+          ["same", "Yes, broadly the same"],
+          ["different", "No, different routes"],
+          ["unknown", "Not sure"],
+        ],
+        c.sameEmployeeManagerRoutes,
+      ),
+      str(pay.involvement),
+      label(
+        [
+          ["yes", "Payroll-related work"],
+          ["no", "Benefits / pay work without payroll tasks"],
+          ["unknown", "Not sure"],
+        ],
+        pay.involvement,
+      ),
+      str(pay.cycle),
+      label(
+        [
+          ["weekly", "Weekly"],
+          ["fortnightly", "Fortnightly"],
+          ["four_weekly", "Every four weeks"],
+          ["monthly", "Monthly"],
+          ["varies", "Several cycles / it varies"],
+          ["other", "Other"],
+          ["unknown", "Not sure"],
+        ],
+        pay.cycle,
+      ),
+      num(pay.estimatedPersonalDays),
+      typeof pay.daysUnknown === "boolean" ? pay.daysUnknown : null,
+      str(tech.involvement),
+      typeof mgr.uncertain === "boolean" ? mgr.uncertain : null,
+      str(mgr.sharedReporting),
+      typeof p.answerCopyRequested === "boolean" ? p.answerCopyRequested : null,
+      ...SYSTEMS.map(([code]) => knownChoice(selectedSystems, code)),
+      ...LOCAL_NEEDS.map(([code]) => knownChoice(local, code)),
+    ]);
+    for (const a of areas) {
+      const share = fraction(a.percentage);
+      work.rows.push([
+        ...b,
+        str(a.code),
+        str(a.label),
+        ...measures(share),
+        str(nature[str(a.code)]),
+        label(WORK_NATURE, nature[str(a.code)]),
+        str(a.respondentNote),
+      ]);
+    }
+    for (const r of routes)
+      contact.rows.push([
+        ...b,
+        str(r.code),
+        label(CONTACT_ROUTES, r.code),
+        fraction(r.shareOfRequests),
+        c.sameEmployeeManagerRoutes === "different"
+          ? employee.includes(r.code)
+          : null,
+        c.sameEmployeeManagerRoutes === "different"
+          ? managerRoutes.includes(r.code)
+          : null,
+      ]);
+    // Different employee/manager routes can include routes outside the overall selected route list.
+    for (const code of new Set([...employee, ...managerRoutes]))
+      if (!routes.some((r) => r.code === code))
+        contact.rows.push([
+          ...b,
+          str(code),
+          label(CONTACT_ROUTES, code),
+          null,
+          employee.includes(code),
+          managerRoutes.includes(code),
+        ]);
+    for (const stage of array(pay.stages).map(object)) {
+      payroll.rows.push([
+        ...b,
+        str(stage.code),
+        label(PAYROLL_STAGES, stage.code),
+        str(stage.mine),
+        label(MY_PAYROLL_PART, stage.mine),
+      ]);
+      for (const other of array(stage.others))
+        parties.rows.push([
+          ...b,
+          str(stage.code),
+          label(PAYROLL_STAGES, stage.code),
+          str(other),
+          label(PAYROLL_PARTIES, other),
+        ]);
+    }
+    for (const code of selectedSystems.filter(
+      (code) => code !== "other" || !array(p.otherSystemNames).length,
+    ))
+      systems.rows.push([...b, str(code), label(SYSTEMS, code)]);
+    for (const name of array(p.otherSystemNames))
+      systems.rows.push([...b, "custom:" + str(name), str(name)]);
+    for (const t of array(tech.time).map(object))
+      techTime.rows.push([
+        ...b,
+        str(t.code),
+        label(TECHNOLOGY_TIME, t.code),
+        fraction(t.shareOfTechnologyTime),
+        ...measures(whole(t.shareOfTechnologyTime, "systems_data")),
+      ]);
+    for (const s of array(tech.platforms).map(object)) {
+      const roles = array(s.roles);
+      for (const r of roles.length ? roles : [null])
+        techRoles.rows.push([
+          ...b,
+          str(s.code),
+          str(s.label) || label(SYSTEMS, s.code),
+          str(r),
+          label(TECHNOLOGY_ROLES, r),
+        ]);
+    }
+    for (const code of array(tech.activities))
+      techActivities.rows.push([
+        ...b,
+        str(code),
+        label(TECHNOLOGY_ACTIVITIES, code),
+        fraction(
+          array(tech.activityAllocation)
+            .map(object)
+            .find((a) => a.code === code)?.shareOfTechnologyTime,
+        ),
+        ...measures(
+          whole(
+            array(tech.activityAllocation)
+              .map(object)
+              .find((a) => a.code === code)?.shareOfTechnologyTime,
+            "systems_data",
+          ),
+        ),
+      ]);
+    for (const code of array(tech.partners))
+      techPartners.rows.push([
+        ...b,
+        str(code),
+        label(TECHNOLOGY_PARTNERS, code),
+      ]);
+    for (const g of array(mgr.groups).map(object))
+      management.rows.push([
+        ...b,
+        str(g.code),
+        str(g.label) || label(MANAGEMENT_TIME_GROUPS, g.code),
+        str(g.description),
+        fraction(g.shareOfManagementTime),
+        ...measures(whole(g.shareOfManagementTime, "people_management")),
+      ]);
+    for (const code of array(mgr.activities))
+      management.rows.push([
+        ...b,
+        str(code),
+        label(MANAGEMENT_ACTIVITIES, code),
+        code === "other" ? str(mgr.other) : "",
+        null,
+        null,
+        null,
+        null,
+      ]);
+    const note = (code: string, question: string, value: unknown) => {
+      if (str(value).trim())
+        comments.rows.push([...b, code, question, str(value)]);
+    };
+    for (const [code, q] of [
+      ["importantOccasionalWork", "Important occasional or annual work"],
+      ["localNote", "Work requiring local knowledge or presence"],
+      ["manualNote", "Manual work or friction"],
+      ["strengths", "What works well"],
+      ["missing", "Anything missing"],
+      ["otherSystems", "Other systems or tools"],
+    ] as const)
+      note(code, q, p[code]);
+    note("contact.recordingNote", "How requests are recorded", c.recordingNote);
+    note("payroll.otherPayroll", "Other payroll work", pay.otherPayroll);
+    note("technology.note", "Technology context", tech.note);
+    note(
+      "technology.otherActivity",
+      "Other technology work",
+      tech.otherActivity,
+    );
+    note(
+      "technology.otherPartner",
+      "Other technology partners",
+      tech.otherPartner,
+    );
+    note(
+      "technology.otherPlatform",
+      "Other technology systems",
+      tech.otherPlatform,
+    );
+    note("management.note", "Management context", mgr.note);
+    note("management.other", "Other management work", mgr.other);
+  }
+  const complete = people.filter((p) => p.status === "completed").length;
+  const guide: AnalysisTable = {
+    name: "Read me",
+    columns: ["Item", "Guidance"],
+    rows: [
+      ["Campaign", str(dataset.campaign?.name)],
+      ["Exported at", generatedAt],
+      ["Respondents", people.length],
+      ["Completed", complete],
+      ["In progress", people.filter((p) => p.status === "in_progress").length],
+      ["Not started", people.filter((p) => p.status === "not_started").length],
+      [
+        "Default analysis",
+        "Filter Include in analysis to TRUE. Drafts are retained for operational review.",
+      ],
+      [
+        "Joining tables",
+        "Participant ID links all tables. Count people from Respondents, not from repeated detail rows.",
+      ],
+      [
+        "Percentages",
+        "Numeric fractions with percentage formatting. Contact = share of requests; technology/management = share within that work area, plus share of total working time.",
+      ],
+      [
+        "Hours per week",
+        "Actual contracted weekly hours × share of total working time. Do not multiply contracted hours by working fraction again. Missing capacity stays blank.",
+      ],
+      [
+        "FTE allocation",
+        "Working fraction × share of total working time. No full-time-hours assumption is used.",
+      ],
+      [
+        "Blank and zero",
+        "Blank = missing, unknown or not applicable; FALSE/zero = explicitly unselected/zero where the choice is known.",
+      ],
+      [
+        "Different contact routes",
+        "Employee/manager selections are independent; a route may have no overall request percentage.",
+      ],
+      [
+        "Synthetic campaign",
+        str(dataset.campaign?.name).includes("SYNTHETIC")
+          ? "This entire campaign is synthetic. Exclude it from programme reporting."
+          : "Confirm campaign population before reporting.",
+      ],
+      [
+        "V5 country and activity allocations",
+        "Country percentages are shares of all working time; detailed activity percentages are shares within the named work area. These are alternative views, never additive across tables.",
+      ],
+      [
+        "V5 capacity",
+        "Uncommitted hours are respondent-reported, not derived from a 100% allocation. Potential delivery elsewhere is a conditional work-design estimate, not spare capacity or a saving.",
+      ],
+      [
+        "V5 figures",
+        "Records, estimates, unknown and not applicable are distinct. Allocated hours/FTE use census contracted hours/working fraction. Reported hours remain separate for reconciliation.",
+      ],
+      [
+        "V5 service and provider evidence",
+        "Validate service figures and cost scope with the named source. Supported employee populations may overlap across respondents. Several respondents may refer to the same provider fee: do not sum without reconciling the contract/service. Peak rows repeat the same peak effort across selected months: do not sum repeated values.",
+      ],
+      [
+        "Raw record",
+        "Existing CSV and complete JSON exports remain available for reconciliation.",
+      ],
+    ],
+  };
+  const tables = [
+    respondent,
+    work,
+    contact,
+    payroll,
+    parties,
+    systems,
+    techTime,
+    techRoles,
+    techActivities,
+    techPartners,
+    management,
+    comments,
+    ...depthAnalysisTables(people, baseColumns, base),
+  ];
+  const dictionary: AnalysisTable = {
+    name: "Field guide",
+    columns: ["Table", "Column", "Meaning"],
+    rows: tables.flatMap((t) =>
+      t.columns.map(
+        (c) =>
+          [
+            t.name,
+            c,
+            t.percentages?.includes(c)
+              ? "Numeric fraction; displayed as a percentage. Denominator is named in the column."
+              : c === "Participant ID"
+                ? "Stable respondent join key."
+                : c === "Include in analysis"
+                  ? "TRUE for completed responses only."
+                  : c === "Hours per week"
+                    ? "Contracted weekly hours multiplied by share of total working time."
+                    : c === "FTE allocation"
+                      ? "Working fraction multiplied by share of total working time."
+                      : c.endsWith(" code")
+                        ? "Stable stored code; accompanying label is for display."
+                        : "One value per cell; table grain is indicated by its name.",
+          ] as Cell[],
+      ),
+    ),
+  };
+  return [guide, ...tables, dictionary];
+}
