@@ -210,3 +210,16 @@ test("known per-item time retains a required unit even when volumes are unknown"
   assert.equal(evidence.work[0].volumeUnit, "Employee requests");
   assert.equal(evidence.work[0].handlingMinutes, 15);
 });
+
+test("changing contractual hours to unknown does not constrain availability using a hidden old value", async () => {
+  const { m, d } = await fixture();
+  d.depth.weeklyHours = 10;
+  d.depth.hoursBasis = "unknown";
+  d.depth.availableHours = 20;
+  d.depth.fixedOnsiteHours = 0;
+  assert.deepEqual(m.depthIssues(d.depth, ["lifecycle"], "role_capacity"), []);
+  assert.equal(
+    m.depthEvidence(d.depth, ["lifecycle"]).capacity.weeklyHours,
+    null,
+  );
+});

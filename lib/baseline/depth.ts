@@ -506,6 +506,7 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
     if (d.fixedOnsiteHours !== null)
       need(number(d.fixedOnsiteHours, 168), "fixedOnsiteHours");
     if (
+      known(d.hoursBasis) &&
       d.weeklyHours !== null &&
       d.availableHours !== null &&
       known(d.availableBasis)
