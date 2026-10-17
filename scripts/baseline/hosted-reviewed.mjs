@@ -174,7 +174,7 @@ try {
   const resumed = await api("response");
   if (resumed.revision !== 1 || resumed.draft.broad.time.office !== (frozen ? 80 : 100))
     throw Error("Reviewed hosted autosave/resume failed");
-  if (expanded && JSON.stringify(resumed.draft.depth) !== JSON.stringify(draft.depth)) throw Error("Detailed evidence did not survive hosted save/resume");
+  if (expanded && !require("node:util").isDeepStrictEqual(resumed.draft.depth, draft.depth)) throw Error("Detailed evidence did not survive hosted save/resume");
   if (frozen && JSON.stringify(resumed.draft.managementTime) !== JSON.stringify(draft.managementTime))
     throw Error("Frozen management time did not survive hosted save/resume");
   Object.assign(draft.rich, {
