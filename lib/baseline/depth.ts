@@ -436,7 +436,6 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
       );
       if (known(w.volumeBasis)) {
         need(number(w.volume, 1e9), p + "volume");
-        need(text(w.volumeUnit), p + "volumeUnit");
         need(
           ["week", "month", "year"].includes(w.volumePeriod),
           p + "volumePeriod",
@@ -446,6 +445,12 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
         NUMBER_BASIS.some((o) => o[0] === w.handlingBasis),
         p + "handlingBasis",
       );
+      if (
+        known(w.volumeBasis) ||
+        known(w.handlingBasis) ||
+        known(w.reworkBasis)
+      )
+        need(text(w.volumeUnit), p + "volumeUnit");
       if (known(w.handlingBasis))
         need(number(w.handlingMinutes, 100000), p + "handlingMinutes");
       need(
@@ -688,7 +693,10 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
         handoffNote: w.handoffNote,
         volumeBasis: w.volumeBasis,
         volume: known(w.volumeBasis) ? w.volume : null,
-        volumeUnit: known(w.volumeBasis) ? w.volumeUnit : "",
+        volumeUnit:
+          known(w.volumeBasis) || known(w.handlingBasis) || known(w.reworkBasis)
+            ? w.volumeUnit
+            : "",
         volumePeriod: known(w.volumeBasis) ? w.volumePeriod : "",
         handlingBasis: w.handlingBasis,
         handlingMinutes: known(w.handlingBasis) ? w.handlingMinutes : null,
@@ -730,7 +738,7 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
       description: ["seasonal", "events"].includes(d.peakPattern)
         ? d.peakDescription
         : "",
-      basis: d.peakBasis,
+      basis: ["seasonal", "events"].includes(d.peakPattern) ? d.peakBasis : "",
       extraWeeklyHours:
         ["seasonal", "events"].includes(d.peakPattern) && known(d.peakBasis)
           ? d.peakExtraHours

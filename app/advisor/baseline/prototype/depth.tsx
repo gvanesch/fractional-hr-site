@@ -443,11 +443,6 @@ export default function Depth({
               {known(w.volumeBasis) && (
                 <>
                   {n("volume", "Typical personal volume", 1e9)}
-                  {txt(
-                    "volumeUnit",
-                    "What is being counted?",
-                    "For example joiners, leavers, contracts, cases, tickets or payroll employee records. Count your own work, not the whole team's workload.",
-                  )}
                   {pk("volumePeriod", "Volume period", [
                     ["week", "Per typical week"],
                     ["month", "Per typical month"],
@@ -455,6 +450,14 @@ export default function Depth({
                   ])}
                 </>
               )}
+              {(known(w.volumeBasis) ||
+                known(w.handlingBasis) ||
+                known(w.reworkBasis)) &&
+                txt(
+                  "volumeUnit",
+                  "What is being counted?",
+                  "For example joiners, leavers, contracts, cases, tickets or payroll employee records. Count your own work, not the whole team's workload.",
+                )}
               {pk("handlingBasis", "Basis for time per item", NUMBER_BASIS)}
               {known(w.handlingBasis) &&
                 n("handlingMinutes", "Average active minutes per item", 100000)}
@@ -833,6 +836,9 @@ export function DepthReview({
                 .join(", ")}
             </p>
             {w.handoffNote && <p>{w.handoffNote}</p>}
+            {(known(w.volumeBasis) ||
+              known(w.handlingBasis) ||
+              known(w.reworkBasis)) && <p>Item definition: {w.volumeUnit}</p>}
             <p>
               Volume:{" "}
               {known(w.volumeBasis)

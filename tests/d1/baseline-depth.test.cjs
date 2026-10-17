@@ -192,3 +192,21 @@ test("v5 exports separate evidence tables, correct denominators, zero vs unknown
     !tables.find((t) => t.name === "Respondents").columns.includes("depth"),
   );
 });
+
+test("known per-item time retains a required unit even when volumes are unknown", async () => {
+  const { m, d } = await fixture();
+  const w = d.depth.work.lifecycle;
+  w.volumeBasis = "unknown";
+  w.volumeUnit = "";
+  assert.ok(
+    m
+      .depthIssues(d.depth, ["lifecycle"], "work_detail")
+      .includes("lifecycle_volumeUnit"),
+  );
+  w.volumeUnit = "Employee requests";
+  assert.deepEqual(m.depthIssues(d.depth, ["lifecycle"], "work_detail"), []);
+  const evidence = m.depthEvidence(d.depth, ["lifecycle"]);
+  assert.equal(evidence.work[0].volume, null);
+  assert.equal(evidence.work[0].volumeUnit, "Employee requests");
+  assert.equal(evidence.work[0].handlingMinutes, 15);
+});
