@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-17T16:31:38.986Z",
-  "reviewedCommit": "576cfcf085d9d1d0c79e27d9e93ba639c3964d88",
-  "expectedVersionId": "e7597687-c112-4632-9941-840e171ea230",
-  "qaRunId": 39049770689,
-  "instruction": "Expand questionnaire to substantiate HRD deck claims; include project countries and Other; preserve previous responses and no deletion/retention expiry; no launch invitation sending."
+  "confirmedAt": "2026-10-17T18:52:57.180Z",
+  "reviewedCommit": "c731fb780184d0f8ceb7c2211368780bd84cb033",
+  "expectedVersionId": "883e8b3a-bb77-455a-8928-c3fc36cdf0f1",
+  "qaRunId": 39060012054,
+  "instruction": "Clarify the employee-population evidence question and following employee-count label only. Preserve all answers, retention policy and email restrictions."
 }
