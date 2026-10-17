@@ -1310,7 +1310,11 @@ test("Invitation extension keeps the link, respects campaign closing and prevent
   }
 });
 
-async function reviewedSetup(h, email = "reviewed@example.invalid", version = h.collection.COLLECTION_VERSION) {
+async function reviewedSetup(
+  h,
+  email = "reviewed@example.invalid",
+  version = h.collection.COLLECTION_VERSION,
+) {
   const c = await h.service.createCampaign("admin@example.invalid", {
     questionnaireVersion: version,
     name: "Reviewed synthetic baseline",
@@ -1478,6 +1482,127 @@ test("Reviewed OTPs are hashed, expire, bind to invitations, limit guesses and c
     h.sqlite.close();
   }
 });
+test("A new verification code invalidates the prior challenge and leaves no plaintext code response in production", async () => {
+  const h = harness();
+  try {
+    const greg = await reviewedSetup(
+      h,
+      "greg@vanesch.uk",
+      h.collection.FROZEN_COLLECTION_VERSION,
+    );
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    h.env.BASELINE_MAIL_MODE = "greg-only";
+    h.env.BASELINE_TEST_CAMPAIGN_ID = greg.campaign;
+    h.env.RESEND_API_KEY = "synthetic-production-mail";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <mail@example.invalid>";
+    const a = await h.service.requestVerification(h.request({}), greg.token);
+    const codeA = h.state.emails.at(-1).text.match(/\b\d{6}\b/)[0];
+    assert.equal("code" in a, false);
+    const b = await h.service.requestVerification(h.request({}), greg.token);
+    const codeB = h.state.emails.at(-1).text.match(/\b\d{6}\b/)[0];
+    assert.notEqual(a.challenge, b.challenge);
+    await assert.rejects(
+      h.service.verifyCode(h.request({}), greg.token, a.challenge, codeA),
+      (e) => e.status === 403,
+    );
+    const response = await h.route.POST(
+      h.request({ token: greg.token, challenge: b.challenge, code: codeB }),
+      { params: Promise.resolve({ path: ["verify-code"] }) },
+    );
+    assert.equal(response.status, 200);
+    const cookie = response.headers.get("set-cookie");
+    assert.match(cookie, /HttpOnly/i);
+    assert.match(cookie, /Secure/i);
+    assert.match(cookie, /SameSite=Strict/i);
+    await assert.rejects(
+      h.service.verifyCode(h.request({}), greg.token, b.challenge, codeB),
+      (e) => e.status === 403,
+    );
+    assert.equal(h.state.emails.length, 2);
+    assert.ok(
+      h.state.emails.every(
+        (m) => m.to === "greg@vanesch.uk" && m.replyTo === "info@vanesch.uk",
+      ),
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
+test("Production test email requires both the exact recipient and the pinned campaign, while general invitations and answer copies stay blocked", async () => {
+  const h = harness();
+  try {
+    const ordinary = await reviewedSetup(
+      h,
+      "ordinary@example.invalid",
+      h.collection.FROZEN_COLLECTION_VERSION,
+    );
+    const otherGreg = await reviewedSetup(
+      h,
+      "greg@vanesch.uk",
+      h.collection.FROZEN_COLLECTION_VERSION,
+    );
+    const greg = await reviewedSetup(
+      h,
+      "greg@vanesch.uk",
+      h.collection.FROZEN_COLLECTION_VERSION,
+    );
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    h.env.BASELINE_MAIL_MODE = "greg-only";
+    h.env.BASELINE_TEST_CAMPAIGN_ID = greg.campaign;
+    h.env.RESEND_API_KEY = "synthetic-production-mail";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <mail@example.invalid>";
+    for (const f of [ordinary, otherGreg]) {
+      await assert.rejects(
+        h.service.requestVerification(h.request({}), f.token),
+        (e) => e.status === 403,
+      );
+      await assert.rejects(
+        h.service.qaTestInvitation(h.request({}), f.token),
+        (e) => e.status === 403,
+      );
+      await assert.rejects(
+        h.service.invite(
+          "admin@example.invalid",
+          f.campaign,
+          f.p.participant_id,
+          true,
+        ),
+      );
+      assert.equal((await h.service.launchReadiness(f.campaign)).ready, false);
+    }
+    assert.equal(h.state.emails.length, 0);
+    await h.service.qaTestInvitation(h.request({}), greg.token);
+    await assert.rejects(
+      h.service.qaTestInvitation(h.request({}), greg.token),
+      (e) => e.status === 409,
+    );
+    assert.equal(h.state.emails.length, 1);
+    assert.equal((await h.service.launchReadiness(greg.campaign)).ready, true);
+    h.env.BASELINE_MAIL_MODE = "preview";
+    await assert.rejects(
+      h.service.requestVerification(h.request({}), greg.token),
+      (e) => e.status === 403,
+    );
+  } finally {
+    h.sqlite.close();
+  }
+});
 test("QA actual mail is exact-recipient restricted and once-only for invite and code", async () => {
   const h = harness();
   try {
@@ -1598,54 +1723,168 @@ test("Frozen v4 persists manager shares, preserves v3, enforces version and expo
   const h = harness();
   try {
     const old = await reviewedSetup(h);
-    const oldDefinition = h.sqlite.prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?").get(h.collection.COLLECTION_VERSION).definition_json;
+    const oldDefinition = h.sqlite
+      .prepare(
+        "SELECT definition_json FROM tb_baseline_versions WHERE version=?",
+      )
+      .get(h.collection.COLLECTION_VERSION).definition_json;
     const v = h.collection.FROZEN_COLLECTION_VERSION;
-    const { campaign, p, token } = await reviewedSetup(h, "frozen@example.invalid", v);
-    const profile = JSON.parse(h.sqlite.prepare("SELECT profile_json FROM tb_baseline_participants WHERE participant_id=?").get(p.participant_id).profile_json);
-    profile.manages_people = "yes"; profile.direct_reports = "3";
-    h.sqlite.prepare("UPDATE tb_baseline_participants SET profile_json=? WHERE participant_id=?").run(JSON.stringify(profile), p.participant_id);
-    await assert.rejects(h.service.redeem(h.request({}), token), e => e.status === 403);
-    const code = await h.service.requestVerification(h.request({}), token, true);
-    const verified = await h.route.POST(h.request({ token, challenge: code.challenge, code: code.code }), { params: Promise.resolve({ path: ["verify-code"] }) });
+    const { campaign, p, token } = await reviewedSetup(
+      h,
+      "frozen@example.invalid",
+      v,
+    );
+    const profile = JSON.parse(
+      h.sqlite
+        .prepare(
+          "SELECT profile_json FROM tb_baseline_participants WHERE participant_id=?",
+        )
+        .get(p.participant_id).profile_json,
+    );
+    profile.manages_people = "yes";
+    profile.direct_reports = "3";
+    h.sqlite
+      .prepare(
+        "UPDATE tb_baseline_participants SET profile_json=? WHERE participant_id=?",
+      )
+      .run(JSON.stringify(profile), p.participant_id);
+    await assert.rejects(
+      h.service.redeem(h.request({}), token),
+      (e) => e.status === 403,
+    );
+    const code = await h.service.requestVerification(
+      h.request({}),
+      token,
+      true,
+    );
+    const verified = await h.route.POST(
+      h.request({ token, challenge: code.challenge, code: code.code }),
+      { params: Promise.resolve({ path: ["verify-code"] }) },
+    );
     assert.equal(verified.status, 200);
     const identity = await h.service.participant(h.request({}));
     let response = await h.service.readResponse(identity);
     assert.equal(response.draft.version, v);
-    const d = { ...reviewedComplete(h), version: v, managementTime: { time: { coordination: 25, individual: 50, hiring: 15, administration: 10, other: 0 }, uncertain: false, other: "" } };
+    const d = {
+      ...reviewedComplete(h),
+      version: v,
+      managementTime: {
+        time: {
+          coordination: 25,
+          individual: 50,
+          hiring: 15,
+          administration: 10,
+          other: 0,
+        },
+        uncertain: false,
+        other: "",
+      },
+    };
     d.broad.selected = ["office", "people_management"];
     d.broad.time = { office: 80, people_management: 20 };
-    d.rich.localNeeds = []; d.management.sharedReporting = "";
-    assert.equal(h.collection.collectionIssues(d, { isPeopleManager: true }).length, 0);
-    await assert.rejects(h.service.saveResponse(identity, reviewedComplete(h), 0, 2));
+    d.rich.localNeeds = [];
+    d.management.sharedReporting = "";
+    assert.equal(
+      h.collection.collectionIssues(d, { isPeopleManager: true }).length,
+      0,
+    );
+    await assert.rejects(
+      h.service.saveResponse(identity, reviewedComplete(h), 0, 2),
+    );
     await h.service.saveResponse(identity, d, 0, 4);
     response = await h.service.readResponse(identity);
-    assert.deepEqual(JSON.parse(JSON.stringify(response.draft.managementTime)), d.managementTime);
-    await assert.rejects(h.service.saveResponse(identity, d, 0, 4), e => e.status === 409);
-    const bad = structuredClone(d); bad.managementTime.time.individual = 10;
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(response.draft.managementTime)),
+      d.managementTime,
+    );
+    await assert.rejects(
+      h.service.saveResponse(identity, d, 0, 4),
+      (e) => e.status === 409,
+    );
+    const bad = structuredClone(d);
+    bad.managementTime.time.individual = 10;
     await assert.rejects(h.service.saveResponse(identity, bad, 1, 8, true));
-    const uncertain = structuredClone(bad); uncertain.managementTime.uncertain = true;
-    assert.equal(h.collection.collectionEvidence(uncertain, { isPeopleManager: true }).management.groups.length, 0);
+    const uncertain = structuredClone(bad);
+    uncertain.managementTime.uncertain = true;
+    assert.equal(
+      h.collection.collectionEvidence(uncertain, { isPeopleManager: true })
+        .management.groups.length,
+      0,
+    );
     d.answerCopy = true;
     await h.service.saveResponse(identity, d, 1, 8, true);
-    await assert.rejects(h.service.saveResponse(identity, d, 2, 4), e => e.status === 409);
-    const exported = JSON.parse(await h.service.exportDataset("admin@example.invalid", campaign, "json"));
+    await assert.rejects(
+      h.service.saveResponse(identity, d, 2, 4),
+      (e) => e.status === 409,
+    );
+    const exported = JSON.parse(
+      await h.service.exportDataset("admin@example.invalid", campaign, "json"),
+    );
     assert.equal(exported.questionnaire.version, v);
-    assert.equal(exported.respondents[0].management.groups.find(x => x.code === "individual").approximateShareOfWorkingTime, 10);
+    assert.equal(
+      exported.respondents[0].management.groups.find(
+        (x) => x.code === "individual",
+      ).approximateShareOfWorkingTime,
+      10,
+    );
     assert.ok(!("sharedReporting" in exported.respondents[0].management));
-    assert.equal(h.sqlite.prepare("SELECT version FROM tb_baseline_answer_copies WHERE participant_id=?").get(p.participant_id).version, v);
-    assert.equal(h.sqlite.prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?").get(h.collection.COLLECTION_VERSION).definition_json, oldDefinition);
-    assert.equal((await h.service.campaignRows(old.campaign)).participants[0].draft.version, h.collection.COLLECTION_VERSION);
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT version FROM tb_baseline_answer_copies WHERE participant_id=?",
+        )
+        .get(p.participant_id).version,
+      v,
+    );
+    assert.equal(
+      h.sqlite
+        .prepare(
+          "SELECT definition_json FROM tb_baseline_versions WHERE version=?",
+        )
+        .get(h.collection.COLLECTION_VERSION).definition_json,
+      oldDefinition,
+    );
+    assert.equal(
+      (await h.service.campaignRows(old.campaign)).participants[0].draft
+        .version,
+      h.collection.COLLECTION_VERSION,
+    );
     assert.equal(h.state.emails.length, 0);
-  } finally { h.sqlite.close(); }
+  } finally {
+    h.sqlite.close();
+  }
 });
 
-test('Advisor Excel download preserves authentication, attachment metadata and versioned responses', async()=>{
- const h=harness();try{
- const {campaign}=await reviewedSetup(h,'excel@example.invalid',h.collection.FROZEN_COLLECTION_VERSION);
- const request=()=>new Request('https://qa.example.invalid/advisor/baseline/api/export?campaign='+campaign+'&format=xlsx');
- const context={params:Promise.resolve({path:['export']})};
- h.state.admin=false;assert.equal((await h.adminRoute.GET(request(),context)).status,403);
- h.state.admin=true;const response=await h.adminRoute.GET(request(),context);assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/spreadsheetml/);assert.match(response.headers.get('content-disposition'),/baseline-analysis.xlsx/);
- const bytes=new Uint8Array(await response.arrayBuffer());assert.equal(bytes[0],80);assert.equal(bytes[1],75);assert.equal(h.state.emails.length,0);
- }finally{h.sqlite.close();}
+test("Advisor Excel download preserves authentication, attachment metadata and versioned responses", async () => {
+  const h = harness();
+  try {
+    const { campaign } = await reviewedSetup(
+      h,
+      "excel@example.invalid",
+      h.collection.FROZEN_COLLECTION_VERSION,
+    );
+    const request = () =>
+      new Request(
+        "https://qa.example.invalid/advisor/baseline/api/export?campaign=" +
+          campaign +
+          "&format=xlsx",
+      );
+    const context = { params: Promise.resolve({ path: ["export"] }) };
+    h.state.admin = false;
+    assert.equal((await h.adminRoute.GET(request(), context)).status, 403);
+    h.state.admin = true;
+    const response = await h.adminRoute.GET(request(), context);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /spreadsheetml/);
+    assert.match(
+      response.headers.get("content-disposition"),
+      /baseline-analysis.xlsx/,
+    );
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    assert.equal(bytes[0], 80);
+    assert.equal(bytes[1], 75);
+    assert.equal(h.state.emails.length, 0);
+  } finally {
+    h.sqlite.close();
+  }
 });

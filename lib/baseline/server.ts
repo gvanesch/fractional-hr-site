@@ -51,6 +51,7 @@ import {
 type Env = CloudflareEnv & {
   BASELINE_ENABLED?: string;
   BASELINE_MAIL_MODE?: string;
+  BASELINE_TEST_CAMPAIGN_ID?: string;
   BASELINE_QA_EMAIL_TESTS?: string;
   BASELINE_QA_RESEND_API_KEY?: string;
   NEXT_PUBLIC_APP_ENV?: string;
@@ -567,10 +568,9 @@ export async function createCampaign(
     );
   const id = randomUUID(),
     stamp = now(),
-    selectedVersion =
-      isCollectionVersion(body.questionnaireVersion)
-        ? body.questionnaireVersion
-        : VERSION,
+    selectedVersion = isCollectionVersion(body.questionnaireVersion)
+      ? body.questionnaireVersion
+      : VERSION,
     definition = JSON.stringify(
       isCollectionVersion(selectedVersion)
         ? collectionDefinitionFor(selectedVersion)
@@ -820,7 +820,9 @@ export async function importRoster(
           "not_started",
           randomUUID(),
           JSON.stringify(
-            isCollectionVersion(c.version) ? initialCollection(c.version) : draft,
+            isCollectionVersion(c.version)
+              ? initialCollection(c.version)
+              : draft,
           ),
           stamp,
         ),
@@ -884,10 +886,7 @@ export async function invite(
       "The reviewed questionnaire is not ready for production invitations.",
       409,
     );
-  if (
-    send &&
-    (env.NEXT_PUBLIC_APP_ENV === "qa" || env.BASELINE_MAIL_MODE !== "send")
-  )
+  if (send && !productionMailAllowed(p.email, campaign))
     throw new BaselineError(
       "Email is disabled in QA. Generate a test link instead.",
     );
@@ -962,7 +961,10 @@ export async function revoke(
 }
 export async function exportAnalysisWorkbook(actor: string, campaign: string) {
   const data = await campaignRows(campaign);
-  if (!isCollectionVersion(data.campaign.version)) throw new BaselineError("The Excel analysis workbook is available for versioned baseline collections.");
+  if (!isCollectionVersion(data.campaign.version))
+    throw new BaselineError(
+      "The Excel analysis workbook is available for versioned baseline collections.",
+    );
   const dataset = JSON.parse(await exportDataset(actor, campaign, "json"));
   return analysisXlsx(analysisTables(dataset));
 }
@@ -1572,7 +1574,7 @@ export async function launchReadiness(campaign: string) {
   if (String(data.campaign.closes_at) <= now())
     blockers.push("Set a future closing date.");
   if (
-    env.BASELINE_MAIL_MODE !== "send" ||
+    active.some((p) => !productionMailAllowed(p.email, campaign)) ||
     !env.RESEND_API_KEY ||
     !env.CONTACT_FROM_EMAIL
   )
@@ -1764,7 +1766,10 @@ async function collectionDefinition(version: string) {
     .prepare("SELECT definition_json FROM tb_baseline_versions WHERE version=?")
     .bind(version)
     .first<{ definition_json: string }>();
-  if (definition?.definition_json !== JSON.stringify(collectionDefinitionFor(version)))
+  if (
+    definition?.definition_json !==
+    JSON.stringify(collectionDefinitionFor(version))
+  )
     throw new BaselineError(
       "This questionnaire version needs an update from the organiser. Your saved answers are retained.",
       409,
@@ -1841,7 +1846,8 @@ async function saveCollectionResponse(
   let draft: CollectionDraft;
   try {
     draft = parseCollection(input, manager);
-    if (draft.version !== p.version) throw Error("This answer belongs to a different questionnaire version.");
+    if (draft.version !== p.version)
+      throw Error("This answer belongs to a different questionnaire version.");
   } catch (e) {
     throw new BaselineError(
       e instanceof Error ? e.message : "Check your answers.",
@@ -2104,13 +2110,24 @@ function verificationHash(id: string, code: string) {
     .update(id + ":" + code)
     .digest("hex");
 }
-function canTestMail(email: string) {
+function canTestMail(email: string, campaign?: string) {
   const env = baselineEnv();
   return (
-    env.NEXT_PUBLIC_APP_ENV === "qa" &&
-    env.BASELINE_MAIL_MODE === "preview" &&
-    env.BASELINE_QA_EMAIL_TESTS === "greg-only" &&
-    email.trim().toLowerCase() === "greg@vanesch.uk"
+    email.trim().toLowerCase() === "greg@vanesch.uk" &&
+    ((env.NEXT_PUBLIC_APP_ENV === "qa" &&
+      env.BASELINE_MAIL_MODE === "preview" &&
+      env.BASELINE_QA_EMAIL_TESTS === "greg-only") ||
+      (env.NEXT_PUBLIC_APP_ENV === "production" &&
+        env.BASELINE_MAIL_MODE === "greg-only" &&
+        !!campaign &&
+        campaign === env.BASELINE_TEST_CAMPAIGN_ID))
+  );
+}
+function productionMailAllowed(email: string, campaign: string) {
+  const env = baselineEnv();
+  return (
+    env.NEXT_PUBLIC_APP_ENV !== "qa" &&
+    (env.BASELINE_MAIL_MODE === "send" || canTestMail(email, campaign))
   );
 }
 async function sendGregTest(
@@ -2123,15 +2140,18 @@ async function sendGregTest(
     invite: string;
     campaign: string;
   },
+  campaign = binding?.campaign,
 ) {
   const env = baselineEnv();
-  if (!canTestMail(email))
+  if (!canTestMail(email, campaign))
     throw new BaselineError(
       "QA email delivery is restricted to the authorised test recipient.",
       403,
     );
   const credential = (
-    env.BASELINE_QA_RESEND_API_KEY ?? env.RESEND_API_KEY
+    env.NEXT_PUBLIC_APP_ENV === "qa"
+      ? (env.BASELINE_QA_RESEND_API_KEY ?? env.RESEND_API_KEY)
+      : env.RESEND_API_KEY
   )?.trim();
   if (!credential || !env.CONTACT_FROM_EMAIL)
     throw new BaselineError("QA email credentials are unavailable.", 503);
@@ -2162,7 +2182,13 @@ async function sendGregTest(
         replyTo: "info@vanesch.uk",
         ...message,
       },
-      { idempotencyKey: "baseline-qa-greg-" + kind },
+      {
+        idempotencyKey:
+          "baseline-" +
+          (env.NEXT_PUBLIC_APP_ENV === "qa" ? "qa" : "production") +
+          "-greg-" +
+          kind,
+      },
     );
     if (result.error) throw Error("Delivery failed");
     await db()
@@ -2186,8 +2212,21 @@ async function sendGregTest(
 }
 export async function qaTestInvitation(request: Request, token: string) {
   const p = await invitationForVerification(request, token);
+  if (!canTestMail(p.email, p.campaign_id))
+    throw new BaselineError(
+      "Test email delivery is restricted to the authorised recipient and campaign.",
+      403,
+    );
   if (!isCollectionVersion(p.version))
     throw new BaselineError("Use the reviewed questionnaire for this QA test.");
+  if (
+    baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa" &&
+    p.version !== FROZEN_COLLECTION_VERSION
+  )
+    throw new BaselineError(
+      "Use the frozen production questionnaire for this test.",
+      409,
+    );
   const site = baselineEnv().NEXT_PUBLIC_SITE_URL;
   if (!site) throw new BaselineError("QA site is not configured.", 503);
   await sendGregTest(
@@ -2198,6 +2237,8 @@ export async function qaTestInvitation(request: Request, token: string) {
       site.replace(/\/$/, "") + "/baseline/start#" + token,
       p.closes_at,
     ),
+    undefined,
+    p.campaign_id,
   );
   await audit(
     p.participant_id,
@@ -2226,14 +2267,18 @@ export async function requestVerification(
     );
   if (
     !preview &&
-    !canTestMail(p.email) &&
-    !(env.NEXT_PUBLIC_APP_ENV !== "qa" && env.BASELINE_MAIL_MODE === "send")
+    !canTestMail(p.email, p.campaign_id) &&
+    !productionMailAllowed(p.email, p.campaign_id)
   )
     throw new BaselineError(
       "Email verification is in QA preview mode. Ask the organiser for a synthetic test access code.",
       403,
     );
-  if (!preview && env.NEXT_PUBLIC_APP_ENV === "qa" && canTestMail(p.email)) {
+  if (
+    !preview &&
+    env.NEXT_PUBLIC_APP_ENV === "qa" &&
+    canTestMail(p.email, p.campaign_id)
+  ) {
     const prior = await db()
       .prepare(
         "SELECT status,updated_at FROM tb_baseline_qa_mail_tests WHERE kind='code'",
@@ -2278,16 +2323,22 @@ export async function requestVerification(
   const challenge = randomUUID(),
     code = String(randomInt(0, 1000000)).padStart(6, "0"),
     stamp = now();
-  await db()
-    .prepare("INSERT INTO tb_baseline_verifications VALUES(?,?,?,?,0,NULL,?)")
-    .bind(
-      challenge,
-      p.invite_id,
-      verificationHash(challenge, code),
-      new Date(Date.now() + 600000).toISOString(),
-      stamp,
-    )
-    .run();
+  await db().batch([
+    db()
+      .prepare(
+        "UPDATE tb_baseline_verifications SET consumed_at=? WHERE invite_id=? AND consumed_at IS NULL",
+      )
+      .bind(stamp, p.invite_id),
+    db()
+      .prepare("INSERT INTO tb_baseline_verifications VALUES(?,?,?,?,0,NULL,?)")
+      .bind(
+        challenge,
+        p.invite_id,
+        verificationHash(challenge, code),
+        new Date(Date.now() + 600000).toISOString(),
+        stamp,
+      ),
+  ]);
   if (!preview) {
     if (env.NEXT_PUBLIC_APP_ENV === "qa")
       await sendGregTest(
