@@ -761,15 +761,20 @@ export function DepthReview({
         Cover: {draft.backup}; unmet work: {draft.unmetWork}
       </p>
       <p>
-        Peaks: {draft.peakPattern};{" "}
-        {draft.peakMonths
-          .map((c) => MONTHS.find((o) => o[0] === c)?.[1] ?? c)
-          .join(", ")}
-        ; {draft.peakDescription}; extra hours:{" "}
-        {known(draft.peakBasis)
-          ? draft.peakExtraHours
-          : "Not known / not applicable"}{" "}
-        ({draft.peakBasis})
+        Peaks: {draft.peakPattern}
+        {["seasonal", "events"].includes(draft.peakPattern) && (
+          <>
+            ;{" "}
+            {draft.peakMonths
+              .map((c) => MONTHS.find((o) => o[0] === c)?.[1] ?? c)
+              .join(", ")}
+            ; {draft.peakDescription}; extra hours:{" "}
+            {known(draft.peakBasis)
+              ? draft.peakExtraHours
+              : "Not known / not applicable"}{" "}
+            ({draft.peakBasis})
+          </>
+        )}
       </p>
       <p>Improvement opportunities: {draft.improvements}</p>
       <p>
@@ -808,7 +813,10 @@ export function DepthReview({
                   (c) => LOCAL_REQUIREMENTS.find((o) => o[0] === c)?.[1] ?? c,
                 )
                 .join(", ")}
-              . {w.localNote}
+              .{" "}
+              {w.local.some((c) => !["none", "unknown"].includes(c))
+                ? w.localNote
+                : ""}
             </p>
             <p>
               Accountability: {OWNERSHIP.find((o) => o[0] === w.ownership)?.[1]}

@@ -426,7 +426,7 @@ export default function Prototype({
           )}
           <p className="tb-estimate">
             {expanded
-              ? "Allow around 25–40 minutes for the detailed questions, and longer for a broad role. You can save and return. We will check this estimate during launch QA."
+              ? "Allow around 25–40 minutes for the detailed questions, and longer for a broad role. You can save and return."
               : "Most people will complete this in around 10–15 minutes. If your role covers a broad range of People activities, it may take closer to 20–30 minutes."}
           </p>
           {saveCollection && (
@@ -758,8 +758,9 @@ export default function Prototype({
                       invitation.
                     </label>
                     <p className="tb-compact-text">
-                      QA records this preference. Answer-copy delivery remains
-                      in preview mode.
+                      {savedCollection?.campaign.copyPreview === false
+                        ? "Your copy will go to the email address used for this invitation."
+                        : "This test records your preference; answer-copy delivery remains in preview mode."}
                     </p>
                     <button
                       className="tb-primary"

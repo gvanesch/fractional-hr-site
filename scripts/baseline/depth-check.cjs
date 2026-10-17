@@ -275,6 +275,12 @@ const root = path.resolve(__dirname, "../..");
           { exact: true },
         )
         .selectOption("unknown");
+      await page
+        .getByLabel(
+          "Are there predictable peaks or major event-driven demands?",
+          { exact: true },
+        )
+        .selectOption("none");
       await button("Review answers").click();
       await page
         .getByRole("heading", { name: "Review", exact: true })
@@ -284,6 +290,20 @@ const root = path.resolve(__dirname, "../..");
           .depthEvidence(stored.depth, stored.broad.selected)
           .work.find((w) => w.area === "office").localNote,
         "",
+      );
+      const reviewedOffice = page
+        .getByRole("heading", { name: office, exact: true })
+        .locator("..");
+      assert.ok(
+        !(await reviewedOffice.textContent()).includes("Helsinki office cover"),
+      );
+      assert.equal(
+        await page
+          .getByText("Annual review cycle adds two weeks of checks.", {
+            exact: true,
+          })
+          .count(),
+        0,
       );
       assert.ok(
         await page.evaluate(
@@ -301,6 +321,8 @@ const root = path.resolve(__dirname, "../..");
       const evidence = m.collectionEvidence(stored, { isPeopleManager: false });
       assert.equal(evidence.depth.metrics.actual, "");
       assert.equal(evidence.depth.costs.amount, null);
+      assert.equal(evidence.depth.peaks.extraWeeklyHours, null);
+      assert.deepEqual(evidence.depth.peaks.months, []);
       assert.equal(
         evidence.depth.countries.find((c) => c.code === "custom:canada")
           .shareOfWorkingTime,
