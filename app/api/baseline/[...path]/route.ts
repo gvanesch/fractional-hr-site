@@ -41,8 +41,15 @@ export async function GET(request: Request, context: Context) {
     }
     if (path === "admin/export") {
       const format = url.searchParams.get("format") ?? "json";
-      if (!["respondents", "activities", "json"].includes(format))
+      if (!["respondents", "activities", "json", "xlsx"].includes(format))
         return json({ error: "Choose an export format." }, 400);
+      if (format === "xlsx") {
+        const bytes = await service.exportAnalysisWorkbook(actor, campaign);
+        return new NextResponse(new Uint8Array(bytes).buffer, { headers: { ...service.securityHeaders,
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": 'attachment; filename="baseline-analysis.xlsx"',
+        }});
+      }
       const content = await service.exportDataset(actor, campaign, format);
       return new NextResponse(content, {
         headers: {

@@ -1,3 +1,5 @@
+import { analysisTables } from "./analysis-export";
+import { analysisXlsx } from "./analysis-xlsx";
 import {
   invitationEmail,
   verificationEmail,
@@ -958,6 +960,13 @@ export async function revoke(
   ]);
   return { success: true };
 }
+export async function exportAnalysisWorkbook(actor: string, campaign: string) {
+  const data = await campaignRows(campaign);
+  if (!isCollectionVersion(data.campaign.version)) throw new BaselineError("The Excel analysis workbook is available for versioned baseline collections.");
+  const dataset = JSON.parse(await exportDataset(actor, campaign, "json"));
+  return analysisXlsx(analysisTables(dataset));
+}
+
 export async function exportDataset(
   actor: string,
   campaign: string,

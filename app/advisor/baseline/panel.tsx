@@ -713,6 +713,7 @@ export default function AdminPanel({
                   Draft answers are clearly marked; do not treat them as
                   completed responses.
                 </p>
+                {isCollectionVersion(current.version) && <p><a style={{ display: "inline-block", padding: 12, fontWeight: 700, textDecoration: "underline" }} href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=xlsx`}>Download Excel analysis workbook</a><br/>Separate filterable tables, one answer per cell, numeric percentages, and a field guide. Filter Include in analysis to TRUE for completed responses.</p>}
                 {(["respondents", "activities", "json"] as const).map(
                   (format) => (
                     <a
@@ -725,9 +726,9 @@ export default function AdminPanel({
                       href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=${format}`}
                     >
                       {format === "respondents"
-                        ? "Respondent-level CSV"
+                        ? "Raw respondent CSV"
                         : format === "activities"
-                          ? "Work-area-level CSV"
+                          ? "Raw work-area CSV"
                           : "Complete structured JSON"}
                     </a>
                   ),

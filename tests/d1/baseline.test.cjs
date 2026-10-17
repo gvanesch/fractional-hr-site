@@ -1638,3 +1638,14 @@ test("Frozen v4 persists manager shares, preserves v3, enforces version and expo
     assert.equal(h.state.emails.length, 0);
   } finally { h.sqlite.close(); }
 });
+
+test('Advisor Excel download preserves authentication, attachment metadata and versioned responses', async()=>{
+ const h=harness();try{
+ const {campaign}=await reviewedSetup(h,'excel@example.invalid',h.collection.FROZEN_COLLECTION_VERSION);
+ const request=()=>new Request('https://qa.example.invalid/advisor/baseline/api/export?campaign='+campaign+'&format=xlsx');
+ const context={params:Promise.resolve({path:['export']})};
+ h.state.admin=false;assert.equal((await h.adminRoute.GET(request(),context)).status,403);
+ h.state.admin=true;const response=await h.adminRoute.GET(request(),context);assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/spreadsheetml/);assert.match(response.headers.get('content-disposition'),/baseline-analysis.xlsx/);
+ const bytes=new Uint8Array(await response.arrayBuffer());assert.equal(bytes[0],80);assert.equal(bytes[1],75);assert.equal(h.state.emails.length,0);
+ }finally{h.sqlite.close();}
+});
