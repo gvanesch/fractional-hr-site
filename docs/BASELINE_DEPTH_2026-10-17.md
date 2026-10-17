@@ -32,3 +32,13 @@ The v5 form persists its exact resume-step key in the draft while mapping drafts
 Collection remains planned for 21–30 October 2026, with data kept without automatic expiry. Use a new v5 campaign for the final roster; do not repurpose the completed Greg test or synthetic 40-person campaign. General invitations remain restricted to the pinned Greg test campaign until the launch release. A human timing/comprehension pilot is still needed: this questionnaire is more detailed than v4; the form and v5 invitation now advise 25–40 minutes, longer for broad roles, with save/resume.
 
 Advisor-only preview: /advisor/baseline/depth-preview (add ?manager=yes for the manager branch). Preview answers are not saved and no email is sent.
+
+## Release verification
+
+Source: 576cfcf085d9d1d0c79e27d9e93ba639c3964d88. Full QA: https://github.com/gvanesch/fractional-hr-site/actions/runs/39049770689 — 97 automated tests, types, lint, seven desktop/mobile suites and hosted legacy/v3/v4/v5 contracts passed. Hosted v5 confirms that expanded evidence survives save/resume and submission; stale saves and post-submission edits are rejected. Unknown and hidden values remain distinct from zero.
+
+Production: https://github.com/gvanesch/fractional-hr-site/actions/runs/39050093098 — build, code deployment and post-deployment verification passed. Advisor-only preview and protected export boundaries verified. D1 flags/database, Supabase password login and Greg-only mail restrictions preserved through binding fingerprint verification. No baseline data migrations, deletes, response resets, retention expiry or mail sends were performed.
+
+Live advisor preview: https://www.vanesch.uk/advisor/baseline/depth-preview . A new campaign created through the admin UI now selects v5. Existing completed Greg and synthetic v4 campaigns retain their versions and answers.
+
+The first hosted check compared JSON strings and incorrectly treated property order as data loss. The corrected check compares semantic objects; both local normalisation and hosted v5 persistence passed. Earlier superseded source runs are not the release evidence. No production deployment occurred from a failing QA run.
