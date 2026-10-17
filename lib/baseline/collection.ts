@@ -248,6 +248,7 @@ export function parseCollection(
     d.technology.time,
     TECHNOLOGY_TIME.map((o) => o[0]),
   );
+  if (d.technology.activityTime !== undefined) numberMap(d.technology.activityTime, TECHNOLOGY_ACTIVITIES.filter(([code]) => code !== "unknown").map(([code]) => code));
   for (const [k, value] of Object.entries(object(d.technology.roles))) {
     if (!SYSTEMS.some((o) => o[0] === k) && !k.startsWith("custom:"))
       throw Error("Check the system involvement answers.");

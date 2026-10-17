@@ -517,7 +517,8 @@ export async function campaignRows(campaign: string) {
       status: String(c.status),
       closes_at: String(c.closes_at),
       privacy_notice: String(c.privacy_notice),
-      retention_days: Number(c.retention_days),
+      retention_days: null,
+      retention_policy: "keep",
       version: String(c.version),
       entities: JSON.parse(String(c.entities_json)) as EntityOption[],
     },
@@ -551,20 +552,17 @@ export async function createCampaign(
   const name = String(body.name ?? "").trim(),
     notice = String(body.privacy ?? PRIVACY).trim(),
     closes = new Date(String(body.closesAt ?? "")),
-    retention = Number(body.retentionDays ?? 90);
+    retention = 90; // Legacy schema placeholder only; no retention deadline or deletion policy.
   if (
     !name ||
     name.length > 150 ||
     notice.length < 50 ||
     notice.length > 4000 ||
     !Number.isFinite(closes.getTime()) ||
-    closes.getTime() < Date.now() ||
-    !Number.isInteger(retention) ||
-    retention < 30 ||
-    retention > 730
+    closes.getTime() < Date.now()
   )
     throw new BaselineError(
-      "Add a campaign name, future closing date, data-use notice and retention period (30–730 days).",
+      "Add a campaign name, future closing date and data-use notice.",
     );
   const id = randomUUID(),
     stamp = now(),
@@ -674,7 +672,7 @@ export async function configureCampaign(
   const status = String(body.status ?? c.status),
     privacy = String(body.privacy ?? c.privacy_notice),
     closes = new Date(String(body.closesAt ?? c.closes_at)),
-    retention = Number(body.retentionDays ?? c.retention_days);
+    retention = Number(c.retention_days); // Preserve legacy metadata; it never schedules deletion.
   const entities =
     body.entityList === undefined
       ? JSON.parse(String(c.entities_json))
@@ -683,10 +681,7 @@ export async function configureCampaign(
     !["draft", "open", "closed"].includes(status) ||
     privacy.length < 50 ||
     privacy.length > 4000 ||
-    !Number.isFinite(closes.getTime()) ||
-    !Number.isInteger(retention) ||
-    retention < 30 ||
-    retention > 730
+    !Number.isFinite(closes.getTime())
   )
     throw new BaselineError("Check the campaign settings.");
   if (
@@ -736,7 +731,7 @@ export async function configureCampaign(
         campaign,
         JSON.stringify({
           status,
-          retentionDays: retention,
+          retentionPolicy: "keep",
           privacyHash: hashToken(privacy),
           entityChoicesHash: hashToken(JSON.stringify(entities)),
         }),

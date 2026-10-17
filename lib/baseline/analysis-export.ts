@@ -27,7 +27,7 @@ export function analysisTables(dataset:{campaign?:Obj;respondents:Obj[]}, genera
  const systems=make('Systems used',['System code','System']);
  const techTime=make('Technology time',['Time group code','Time group','Share of technology time','Share of working time','Hours per week','FTE allocation'],['Share of technology time','Share of working time']);
  const techRoles=make('Technology systems',['System code','System','Role code','Role']);
- const techActivities=make('Technology activities',['Activity code','Activity']);
+ const techActivities=make('Technology activities',['Activity code','Activity','Share of technology time','Share of working time','Hours per week','FTE allocation'],['Share of technology time','Share of working time']);
  const techPartners=make('Technology partners',['Partner code','Partner']);
  const management=make('Management time',['Activity code','Activity','Activity description','Share of management time','Share of working time','Hours per week','FTE allocation'],['Share of management time','Share of working time']);
  const comments=make('Comments',['Question code','Question','Answer']);
@@ -50,7 +50,7 @@ export function analysisTables(dataset:{campaign?:Obj;respondents:Obj[]}, genera
   for(const name of array(p.otherSystemNames))systems.rows.push([...b,'custom:'+str(name),str(name)]);
   for(const t of array(tech.time).map(object))techTime.rows.push([...b,str(t.code),label(TECHNOLOGY_TIME,t.code),fraction(t.shareOfTechnologyTime),...measures(whole(t.shareOfTechnologyTime,'systems_data'))]);
   for(const s of array(tech.platforms).map(object)){const roles=array(s.roles);for(const r of roles.length?roles:[null])techRoles.rows.push([...b,str(s.code),str(s.label)||label(SYSTEMS,s.code),str(r),label(TECHNOLOGY_ROLES,r)]);}
-  for(const code of array(tech.activities))techActivities.rows.push([...b,str(code),label(TECHNOLOGY_ACTIVITIES,code)]);
+  for(const code of array(tech.activities))techActivities.rows.push([...b,str(code),label(TECHNOLOGY_ACTIVITIES,code),fraction(array(tech.activityAllocation).map(object).find(a=>a.code===code)?.shareOfTechnologyTime),...measures(whole(array(tech.activityAllocation).map(object).find(a=>a.code===code)?.shareOfTechnologyTime,'systems_data'))]);
   for(const code of array(tech.partners))techPartners.rows.push([...b,str(code),label(TECHNOLOGY_PARTNERS,code)]);
   for(const g of array(mgr.groups).map(object))management.rows.push([...b,str(g.code),str(g.label)||label(MANAGEMENT_TIME_GROUPS,g.code),str(g.description),fraction(g.shareOfManagementTime),...measures(whole(g.shareOfManagementTime,'people_management'))]);
   for(const code of array(mgr.activities))management.rows.push([...b,str(code),label(MANAGEMENT_ACTIVITIES,code),code==='other'?str(mgr.other):'',null,null,null,null]);

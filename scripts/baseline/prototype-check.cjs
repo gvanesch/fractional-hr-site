@@ -206,12 +206,13 @@ const root = path.resolve(__dirname, "../..");
         0,
       );
       await check("Main contact routes: Work email (your own work address)");
-      await check("Main contact routes: Ticket / service portal");
       await page
         .getByLabel("Request share: Work email (your own work address)", {
           exact: true,
         })
         .fill("60");
+      await check("Main contact routes: Ticket / service portal");
+      assert.equal(await page.getByLabel("Request share: Work email (your own work address)", {exact:true}).inputValue(), "60");
       await page
         .getByLabel("Request share: Ticket / service portal", { exact: true })
         .fill("20");

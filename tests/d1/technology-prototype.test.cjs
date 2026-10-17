@@ -155,3 +155,23 @@ test("Feedback activities stay within the existing broad work categories", () =>
     /termination, dismissal and redundancy case management/,
   );
 });
+
+test("Late technology selections preserve entered shares, require new shares and exclude hidden values", () => {
+  const d = m.emptyTechnology();
+  Object.assign(d, { involvement: "yes", activities: ["integrations"], activityTime: {integrations:100}, time:{run:100,improve:0,deliver:0}, platforms:["unknown"], partners:["none"] });
+  assert.deepEqual(m.technologyIssues(d), []);
+  d.activities.push("automation");
+  assert.equal(d.activityTime.integrations,100);
+  assert.ok(m.technologyIssues(d).includes("activityTime_automation"));
+  d.activityTime = {integrations:80,automation:20};
+  assert.equal(m.technologyActivityTotal(d),100);
+  assert.deepEqual(m.technologyIssues(d), []);
+  d.activities = ["integrations"];
+  assert.equal(m.technologyActivityTotal(d),80);
+  assert.deepEqual(m.technologyEvidence(d,true).activityAllocation,[{code:"integrations",shareOfTechnologyTime:80}]);
+  d.activities.push("automation");
+  assert.equal(d.activityTime.automation,20);
+  assert.deepEqual(m.technologyIssues(d), []);
+  d.activityTime.automation=NaN;
+  assert.ok(m.technologyIssues(d).includes("activityTime_automation"));
+});

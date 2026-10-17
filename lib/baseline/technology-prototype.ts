@@ -132,6 +132,7 @@ export type TechnologyDraft = {
   involvement: string;
   activities: string[];
   otherActivity: string;
+  activityTime?: Record<string, number>;
   time: Record<string, number>;
   platforms: string[];
   otherPlatform: string;
@@ -144,6 +145,7 @@ export const emptyTechnology = (): TechnologyDraft => ({
   involvement: "",
   activities: [],
   otherActivity: "",
+  activityTime: undefined,
   time: {},
   platforms: [],
   otherPlatform: "",
@@ -186,6 +188,8 @@ export const technologyTotal = (d: TechnologyDraft) =>
       0,
     ) * 100,
   ) / 100;
+export const technologyActivities = (d: TechnologyDraft) => TECHNOLOGY_ACTIVITIES.filter(([code]) => code !== "unknown" && d.activities.includes(code));
+export const technologyActivityTotal = (d: TechnologyDraft) => Math.round(technologyActivities(d).reduce((sum, [code]) => sum + (Number.isFinite(d.activityTime?.[code]) ? d.activityTime![code] : 0), 0) * 100) / 100;
 export function technologyIssues(d: TechnologyDraft) {
   if (!["yes", "no", "unknown"].includes(d.involvement)) return ["involvement"];
   if (d.involvement !== "yes") return [];
@@ -193,6 +197,10 @@ export function technologyIssues(d: TechnologyDraft) {
   if (!valid(d.activities, TECHNOLOGY_ACTIVITIES)) issues.push("activities");
   if (d.activities.includes("other") && !d.otherActivity.trim())
     issues.push("otherActivity");
+  if (d.activityTime !== undefined && technologyActivities(d).length) {
+    const missing = technologyActivities(d).filter(([code]) => !Number.isFinite(d.activityTime?.[code]) || d.activityTime![code] < 0 || d.activityTime![code] > 100);
+    issues.push(...(missing.length ? missing : technologyActivityTotal(d) < 98 || technologyActivityTotal(d) > 102 ? technologyActivities(d) : []).map(([code]) => "activityTime_" + code));
+  }
   const bad = TECHNOLOGY_TIME.filter(
     ([c]) => !Number.isFinite(d.time[c]) || d.time[c] < 0 || d.time[c] > 100,
   ).map(([c]) => "time_" + c);
@@ -224,6 +232,7 @@ export function technologyEvidence(d: TechnologyDraft, visible: boolean) {
     version: "technology-preview-v2",
     involvement: d.involvement,
     activities: d.activities,
+    ...(d.activityTime !== undefined ? { activityAllocation: technologyActivities(d).map(([code]) => ({ code, shareOfTechnologyTime: d.activityTime![code] ?? null })) } : {}),
     ...(d.activities.includes("other")
       ? { otherActivity: d.otherActivity }
       : {}),

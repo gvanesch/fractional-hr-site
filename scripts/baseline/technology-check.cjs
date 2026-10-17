@@ -149,6 +149,15 @@ const root = path.resolve(__dirname, "../..");
           { exact: true },
         )
         .waitFor();
+      await page.getByLabel("Technology activity time: Integrations", {exact:true}).fill("100");
+      await check("Technology work you regularly do: Workflows and automation");
+      assert.equal(await page.getByLabel("Technology activity time: Integrations", {exact:true}).inputValue(), "100");
+      await page.getByLabel("Technology activity time: Workflows and automation", {exact:true}).fill("20");
+      await page.getByLabel("Technology activity time: Integrations", {exact:true}).fill("80");
+      await page.getByRole("checkbox", {name:"Technology work you regularly do: Workflows and automation",exact:true}).uncheck();
+      assert.equal(await page.getByLabel("Technology activity time: Workflows and automation", {exact:true}).count(), 0);
+      await check("Technology work you regularly do: Workflows and automation");
+      assert.equal(await page.getByLabel("Technology activity time: Workflows and automation", {exact:true}).inputValue(), "20");
       for (const [label, value] of [
         ["Running and supporting existing systems", "30"],
         ["Improving existing systems", "30"],

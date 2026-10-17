@@ -23,7 +23,7 @@ type Campaign = {
   status: string;
   closes_at: string;
   privacy_notice: string;
-  retention_days: number;
+  retention_days: number | null;
   version: string;
   participants: number;
   entities: EntityOption[];
@@ -75,9 +75,8 @@ export default function AdminPanel({
     [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
     [people, setPeople] = useState<Person[]>([]),
     [name, setName] = useState("team.blue People Operations Baseline — QA"),
-    [date, setDate] = useState(""),
+    [date, setDate] = useState("2026-10-30"),
     [notice, setNotice] = useState(PRIVACY),
-    [retention, setRetention] = useState(90),
     [entityList, setEntityList] = useState(""),
     [csv, setCsv] = useState(""),
     [preview, setPreview] = useState<{
@@ -106,7 +105,6 @@ export default function AdminPanel({
       setPeople(data.participants);
       setDate(data.campaign.closes_at.slice(0, 10));
       setNotice(data.campaign.privacy_notice);
-      setRetention(data.campaign.retention_days);
       setEntityList(
         (data.campaign.entities ?? []).map((e) => e.label).join("\n"),
       );
@@ -258,21 +256,7 @@ export default function AdminPanel({
                   onChange={(e) => setDate(e.target.value)}
                 />
               </label>
-              <label className="tb-field">
-                <span>Planned retention in days</span>
-                <input
-                  type="number"
-                  min={30}
-                  max={730}
-                  value={retention}
-                  onChange={(e) => setRetention(Number(e.target.value))}
-                />
-                <small>
-                  QA placeholder. Confirm controller, access, lawful use and
-                  retention before real employee collection. No automatic
-                  deletion runs.
-                </small>
-              </label>
+              <p>Collection window: 21–30 October 2026. Keep baseline data without an automatic deletion date. Closing collection does not delete answers.</p>
               <label className="tb-field">
                 <span>Data-use statement shown before starting</span>
                 <textarea
@@ -315,7 +299,6 @@ export default function AdminPanel({
                         name,
                         closesAt: date + "T23:59:59.000Z",
                         privacy: notice,
-                        retentionDays: retention,
                         entityList,
                       });
                       router.push(
@@ -335,8 +318,7 @@ export default function AdminPanel({
                           campaign: id,
                           privacy: notice,
                           closesAt: date + "T23:59:59.000Z",
-                          retentionDays: retention,
-                          entityList,
+                            entityList,
                         });
                         await refresh();
                         setMessage("Campaign settings saved.");

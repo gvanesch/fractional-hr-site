@@ -7,6 +7,8 @@ import {
   TECHNOLOGY_PARTNERS,
   TECHNOLOGY_SYSTEMS,
   technologyTotal,
+  technologyActivities,
+  technologyActivityTotal,
   technologyPlatforms,
   type TechnologyDraft,
 } from "@/lib/baseline/technology-prototype";
@@ -150,14 +152,22 @@ export default function Technology({
             values={d.activities}
             options={TECHNOLOGY_ACTIVITIES}
             invalid={bad("activities")}
-            change={(activities) => change({ activities })}
+            change={(activities) => change({ activities, activityTime: { ...d.activityTime } })}
           />
           {d.activities.includes("other") &&
             text("otherActivity", "Other technology work")}
+          {technologyActivities(d).length > 0 && <section>
+            <h2>Time across your technology activities</h2>
+            <p>Split your technology time across the activities you selected. Count each piece of work once. Adding an activity adds a percentage box; your existing entries stay in place.</p>
+            <div className="tb-total" aria-live="polite">Activity total: {technologyActivityTotal(d)}%<small>Aim for 100% of your technology time.</small></div>
+            {technologyActivities(d).map(([code, label]) => <label className="tb-field" key={code}>
+              <span>{label}</span><div className="tb-percentage"><input type="number" min={0} max={100} step="any" inputMode="decimal" aria-label={"Technology activity time: " + label} aria-invalid={bad("activityTime_" + code)} value={Number.isFinite(d.activityTime?.[code]) ? d.activityTime![code] : ""} onChange={e => change({ activityTime: { ...d.activityTime, [code]: e.target.value === "" ? NaN : Number(e.target.value) } })}/><span>%</span></div>
+            </label>)}
+          </section>}
           <h2>How is your technology time split?</h2>
           <p>
             Think only about the time you spend on systems, data and
-            improvement. Split that time across these three groups. Do not add
+            improvement. Now view the same time across running, improving and delivering. This is a separate split of the same technology time. Do not add
             it to your earlier time total. Enter 0 if you do not do a type of
             work.
           </p>
@@ -270,6 +280,7 @@ export function TechnologyReview({ draft: d }: { draft: TechnologyDraft }) {
         <>
           <p>{labels(d.activities, TECHNOLOGY_ACTIVITIES)}</p>
           {d.activities.includes("other") && <p>{d.otherActivity}</p>}
+          {d.activityTime !== undefined && technologyActivities(d).map(([code, label]) => <p key={code}>{label}: {d.activityTime![code]}% of technology time</p>)}
           {TECHNOLOGY_TIME.map(([c, l]) => (
             <p key={c}>
               {l}: {d.time[c]}% of technology time
