@@ -22,6 +22,7 @@ type Saved = {
   progress: number;
   status: string;
   updatedAt: string;
+  copyStatus?: string | null;
 };
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const r = await fetch("/api/baseline/" + path, {
@@ -55,6 +56,19 @@ export default function CollectionJourney() {
     if (!isCollectionVersion(data.campaign.version)) {
       setLegacy(true);
       return;
+    }
+    // Resume an explicitly requested copy that was previously blocked before
+    // dispatch. Failed deliveries require a deliberate retry below.
+    if (data.status === "completed" && data.copyStatus === "pending") {
+      try {
+        const result = await api<{ copyStatus: string | null }>(
+          "answer-copy",
+          {},
+        );
+        data.copyStatus = result.copyStatus;
+      } catch {
+        data.copyStatus = "unavailable";
+      }
     }
     revision.current = data.revision;
     last.current = JSON.stringify({
@@ -141,6 +155,10 @@ export default function CollectionJourney() {
         managerRecord={saved.campaign.manager}
         savedCollection={saved}
         saveCollection={save}
+        retryAnswerCopy={async () =>
+          (await api<{ copyStatus: string | null }>("answer-copy", {}))
+            .copyStatus
+        }
         endCollectionSession={async () => {
           await api("logout", {});
           setSaved(null);
@@ -155,7 +173,6 @@ export default function CollectionJourney() {
     <main className="tb-shell tb-prototype">
       <header className="tb-header">
         <span>team.blue · Current work baseline</span>
-        <small>Hosted by Van Esch Advisory</small>
       </header>
       <section className="tb-card">
         <h1>Verify access</h1>

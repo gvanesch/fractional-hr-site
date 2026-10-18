@@ -68,6 +68,7 @@ export default function Prototype({
   managerRecord,
   savedCollection,
   saveCollection,
+  retryAnswerCopy,
   endCollectionSession,
 }: {
   tester?: string;
@@ -81,6 +82,7 @@ export default function Prototype({
     copyStatus?: string | null;
   };
   endCollectionSession?: () => Promise<void>;
+  retryAnswerCopy?: () => Promise<string | null>;
   saveCollection?: (
     draft: CollectionDraft,
     progress: number,
@@ -158,6 +160,7 @@ export default function Prototype({
     ),
     [saveState, setSaveState] = useState("Saved securely"),
     [saveError, setSaveError] = useState(""),
+    [copyRetrying, setCopyRetrying] = useState(false),
     [copyDelivery, setCopyDelivery] = useState<string | null>(
       savedCollection?.copyStatus ?? null,
     );
@@ -293,7 +296,6 @@ export default function Prototype({
       <main className="tb-shell tb-prototype">
         <header className="tb-header">
           <span>team.blue · Current work baseline</span>
-          <small className="tb-hosted-by">Hosted by Van Esch Advisory</small>
         </header>
         <section className="tb-card">
           <h1>
@@ -319,9 +321,38 @@ export default function Prototype({
                 ? "Your answer-copy preference has been saved. QA email delivery remains in preview mode."
                 : copyDelivery === "sent"
                   ? "A copy has been emailed to the address used for your invitation."
-                  : "Your answer copy is queued for delivery."}
+                  : copyDelivery === "disabled"
+                    ? "Your answers are saved. Email delivery is not enabled for this questionnaire. Please contact the programme organiser for your copy."
+                    : copyDelivery === "delivering"
+                      ? "Your answers are saved. Your copy is being sent; delivery has not yet been confirmed."
+                      : copyDelivery === "pending"
+                        ? "Your answers are saved. Your requested copy has not yet been sent."
+                        : "Your answers are saved, but we could not confirm delivery of your copy. Please try again or contact the programme organiser."}
             </p>
           )}
+          {submitted &&
+            answerCopy &&
+            retryAnswerCopy &&
+            savedCollection?.campaign.copyPreview === false &&
+            !["sent", "disabled", "delivering"].includes(
+              copyDelivery ?? "",
+            ) && (
+              <button
+                disabled={copyRetrying}
+                onClick={async () => {
+                  setCopyRetrying(true);
+                  try {
+                    setCopyDelivery(await retryAnswerCopy());
+                  } catch {
+                    setCopyDelivery("unavailable");
+                  } finally {
+                    setCopyRetrying(false);
+                  }
+                }}
+              >
+                {copyRetrying ? "Sending copy…" : "Retry email copy"}
+              </button>
+            )}
           {broadEvidence(draft, areas).workAreas.map((a) => (
             <p key={a.code}>
               {a.label}: {a.percentage}%
@@ -387,7 +418,6 @@ export default function Prototype({
       )}
       <header className="tb-header">
         <span>team.blue · Current work baseline</span>
-        <small className="tb-hosted-by">Hosted by Van Esch Advisory</small>
         <p>
           Understand current work, protect strengths and improve how we work.
         </p>

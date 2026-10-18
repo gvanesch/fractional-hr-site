@@ -4,7 +4,7 @@ import { baselineEnv } from "@/lib/baseline/server";
 import AdminPanel from "../panel";
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Create baseline project | Van Esch Advisory",
+  title: { absolute: "team.blue | Create baseline project" },
   robots: { index: false, follow: false },
 };
 export default async function Page() {

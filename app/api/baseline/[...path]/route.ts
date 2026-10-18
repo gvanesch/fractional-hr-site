@@ -140,6 +140,10 @@ export async function POST(request: Request, context: Context) {
       });
       return response;
     }
+    if (path === "answer-copy")
+      return json(
+        await service.requestAnswerCopy(await service.participant(request)),
+      );
     if (path === "save" || path === "submit") {
       const p = await service.participant(request);
       return json(

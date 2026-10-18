@@ -1536,7 +1536,7 @@ test("A new verification code invalidates the prior challenge and leaves no plai
     h.sqlite.close();
   }
 });
-test("Production test email requires both the exact recipient and the pinned campaign, while general invitations and answer copies stay blocked", async () => {
+test("Production test email requires both the exact recipient and the pinned campaign, while general invitations stay blocked", async () => {
   const h = harness();
   try {
     const ordinary = await reviewedSetup(
@@ -1655,6 +1655,128 @@ test("QA actual mail is exact-recipient restricted and once-only for invite and 
   }
 });
 
+test("Requested copy recovery is participant-authenticated, campaign-restricted and once-only", async () => {
+  const h = harness();
+  try {
+    const identities = [];
+    for (const email of [
+      "ordinary@example.invalid",
+      "greg@vanesch.uk",
+      "greg@vanesch.uk",
+    ]) {
+      const setup = await reviewedSetup(h, "identity-" + identities.length + "@example.invalid");
+      const code = await h.service.requestVerification(
+        h.request({}),
+        setup.token,
+        true,
+      );
+      const access = await h.service.verifyCode(
+        h.request({}),
+        setup.token,
+        code.challenge,
+        code.code,
+      );
+      h.state.cookie = access.session;
+      h.sqlite.prepare("UPDATE tb_baseline_participants SET email=? WHERE participant_id=?").run(email, setup.p.participant_id);
+      identities.push({
+        ...setup,
+        identity: await h.service.participant(h.request({})),
+        session: access.session,
+      });
+    }
+    const greg = identities[2];
+    h.env.NEXT_PUBLIC_APP_ENV = "production";
+    for (const flag of [
+      "D1_SYSTEM_EVENTS_MODE",
+      "D1_CRM_PROSPECTS_MODE",
+      "D1_DIAGNOSTIC_SUBMISSIONS_MODE",
+      "D1_CLIENT_DIAGNOSTIC_MODE",
+      "D1_CLIENT_DIAGNOSTIC_SECURITY_MODE",
+    ])
+      h.env[flag] = "d1";
+    h.env.BASELINE_MAIL_MODE = "preview";
+    h.env.BASELINE_TEST_CAMPAIGN_ID = greg.campaign;
+    h.env.RESEND_API_KEY = "synthetic-production-mail";
+    h.env.CONTACT_FROM_EMAIL = "Synthetic <sender@example.invalid>";
+    for (const f of identities) {
+      const draft = reviewedComplete(h);
+      draft.answerCopy = true;
+      assert.equal(
+        (await h.service.saveResponse(f.identity, draft, 0, 8, true))
+          .copyStatus,
+        "disabled",
+      );
+      assert.equal(
+        (await h.service.readResponse(f.identity)).copyStatus,
+        "disabled",
+      );
+    }
+    assert.equal(h.state.emails.length, 0);
+    h.env.BASELINE_MAIL_MODE = "greg-only";
+    for (const f of identities.slice(0, 2)) {
+      assert.equal(
+        (await h.service.requestAnswerCopy(f.identity)).copyStatus,
+        "disabled",
+      );
+      assert.equal(
+        h.sqlite
+          .prepare(
+            "SELECT attempts FROM tb_baseline_answer_copies WHERE participant_id=?",
+          )
+          .get(f.p.participant_id).attempts,
+        0,
+      );
+    }
+    assert.equal(
+      (await h.service.readResponse(greg.identity)).copyStatus,
+      "pending",
+    );
+    h.state.cookie = "";
+    assert.equal(
+      (
+        await h.route.POST(h.request({}), {
+          params: Promise.resolve({ path: ["answer-copy"] }),
+        })
+      ).status,
+      401,
+    );
+    h.state.cookie = greg.session;
+    const result = await h.route.POST(
+      h.request({ recipient: "other@example.invalid" }),
+      { params: Promise.resolve({ path: ["answer-copy"] }) },
+    );
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).copyStatus, "sent");
+    assert.equal(
+      (await h.service.readResponse(greg.identity)).copyStatus,
+      "sent",
+    );
+    assert.equal(h.state.emails.length, 1);
+    assert.equal(h.state.emails[0].to, "greg@vanesch.uk");
+    assert.equal(
+      h.state.emails[0].from,
+      "team.blue baseline <sender@example.invalid>",
+    );
+    assert.doesNotMatch(
+      h.state.emails[0].html + h.state.emails[0].text,
+      /Van Esch Advisory/,
+    );
+    await h.service.requestAnswerCopy(greg.identity);
+    assert.equal(h.state.emails.length, 1);
+    h.sqlite
+      .prepare(
+        "UPDATE tb_baseline_answer_copies SET status='failed',attempts=3 WHERE participant_id=?",
+      )
+      .run(greg.p.participant_id);
+    assert.equal(
+      (await h.service.requestAnswerCopy(greg.identity)).copyStatus,
+      "failed",
+    );
+    assert.equal(h.state.emails.length, 1);
+  } finally {
+    h.sqlite.close();
+  }
+});
 test("Requested copies remain preview-only in QA and production retries keep the invite email snapshot", async () => {
   const h = harness();
   try {

@@ -1555,9 +1555,7 @@ export async function launchReadiness(campaign: string) {
     env = baselineEnv(),
     active = data.participants.filter((p) => Number(p.active) === 1),
     blockers: string[] = [];
-  if (
-    !isRevisedCollection(data.campaign.version)
-  )
+  if (!isRevisedCollection(data.campaign.version))
     blockers.push(
       "The reviewed broad-work questionnaire still needs its versioned saving, submission and answer-copy flow. This campaign uses the earlier questionnaire.",
     );
@@ -1797,15 +1795,7 @@ async function readCollectionResponse(p: Identity) {
       manager: await savedCollectionManager(p),
     },
     draft: JSON.parse(row.draft_json) as CollectionDraft,
-    copyStatus:
-      (
-        await db()
-          .prepare(
-            "SELECT status FROM tb_baseline_answer_copies WHERE participant_id=?",
-          )
-          .bind(p.participant_id)
-          .first<{ status: string }>()
-      )?.status ?? null,
+    copyStatus: await answerCopyStatus(p.participant_id),
     revision: row.revision,
     progress: row.progress,
     status: row.status,
@@ -2181,7 +2171,7 @@ async function sendGregTest(
           kind,
       },
     );
-    if (result.error) throw Error("Delivery failed");
+    if (result.error || !result.data?.id) throw Error("Delivery failed");
     await db()
       .prepare(
         "UPDATE tb_baseline_qa_mail_tests SET status='sent',provider_id=?,updated_at=? WHERE kind=?",
@@ -2425,13 +2415,63 @@ export async function verifyCode(
   return redeem(request, token, true);
 }
 
-// Requested answer copies are preview-only in QA. Production requires explicit mail activation.
+type AnswerCopyState = {
+  status: string;
+  attempts: number;
+  active: number;
+  recipient_email: string;
+  campaign_id: string;
+};
+function visibleAnswerCopyStatus(row: AnswerCopyState) {
+  if (row.status === "sent") return "sent";
+  const env = baselineEnv();
+  if (env.NEXT_PUBLIC_APP_ENV === "qa") return "preview";
+  if (
+    !row.active ||
+    !productionMailAllowed(row.recipient_email, row.campaign_id)
+  )
+    return "disabled";
+  if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL) return "unavailable";
+  if (row.status === "delivering") return "delivering";
+  if (row.attempts >= 3) return "failed";
+  return row.status;
+}
+async function answerCopyStatus(participantId: string) {
+  const row = await db()
+    .prepare(
+      "SELECT a.*,p.active,p.campaign_id FROM tb_baseline_answer_copies a JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=?",
+    )
+    .bind(participantId)
+    .first<AnswerCopyState>();
+  return row ? visibleAnswerCopyStatus(row) : null;
+}
+// Only the authenticated participant can retry their existing requested copy.
+// The outbox preserves the original recipient; the caller cannot supply an address.
+export async function requestAnswerCopy(p: Identity) {
+  if (!isCollectionVersion(p.version))
+    throw new BaselineError(
+      "Answer copies are unavailable for this questionnaire.",
+    );
+  const row = await db()
+    .prepare(
+      "SELECT status,draft_json FROM tb_baseline_responses WHERE participant_id=?",
+    )
+    .bind(p.participant_id)
+    .first<{ status: string; draft_json: string }>();
+  if (row?.status !== "completed" || !JSON.parse(row.draft_json).answerCopy)
+    throw new BaselineError(
+      "Submit your answers and request a copy first.",
+      409,
+    );
+  return { copyStatus: await deliverAnswerCopy(p.participant_id) };
+}
+// QA remains preview-only. Production uses the same recipient/campaign gate as OTP mail.
 async function deliverAnswerCopy(participantId: string) {
   const env = baselineEnv();
   if (env.NEXT_PUBLIC_APP_ENV === "qa") return "preview";
   const row = await db()
     .prepare(
-      "SELECT a.*,r.draft_json,p.profile_json,p.active FROM tb_baseline_answer_copies a JOIN tb_baseline_responses r USING(participant_id) JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=? AND r.status='completed'",
+      "SELECT a.*,r.draft_json,p.profile_json,p.active,p.campaign_id FROM tb_baseline_answer_copies a JOIN tb_baseline_responses r USING(participant_id) JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=? AND r.status='completed'",
     )
     .bind(participantId)
     .first<{
@@ -2441,22 +2481,19 @@ async function deliverAnswerCopy(participantId: string) {
       draft_json: string;
       profile_json: string;
       active: number;
+      campaign_id: string;
     }>();
   if (!row || row.status === "sent") return row?.status ?? null;
-  if (
-    !row.active ||
-    env.BASELINE_MAIL_MODE !== "send" ||
-    !env.RESEND_API_KEY ||
-    !env.CONTACT_FROM_EMAIL
-  )
-    return "pending";
+  const visible = visibleAnswerCopyStatus(row);
+  if (!["pending", "failed"].includes(visible) || row.attempts >= 3)
+    return visible;
   const claimed = await db()
     .prepare(
       "UPDATE tb_baseline_answer_copies SET status='delivering',attempts=attempts+1,updated_at=? WHERE participant_id=? AND status IN ('pending','failed') AND attempts=? AND attempts<3",
     )
     .bind(now(), participantId, row.attempts)
     .run();
-  if (claimed.meta.changes !== 1) return "pending";
+  if (claimed.meta.changes !== 1) return answerCopyStatus(participantId);
   try {
     const manager = await savedCollectionManager({
         participant_id: participantId,
@@ -2466,7 +2503,7 @@ async function deliverAnswerCopy(participantId: string) {
     const message = answerCopyEmail(evidence);
     const result = await new Resend(env.RESEND_API_KEY).emails.send(
       {
-        from: baselineSender(env.CONTACT_FROM_EMAIL),
+        from: baselineSender(env.CONTACT_FROM_EMAIL!),
         to: row.recipient_email,
         replyTo: "info@vanesch.uk",
         ...message,

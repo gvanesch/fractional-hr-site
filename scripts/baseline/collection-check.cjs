@@ -300,6 +300,35 @@ const root = path.resolve(__dirname, "../..");
       }
       await page.close();
     }
+    for (const mobile of [false, true]) for (const copyStatus of ["pending", "disabled", "failed", "sent"]) {
+      const page = await browser.newPage({viewport: mobile ? {width:390,height:844} : {width:1280,height:900}});
+      let copies = 0;
+      const draft = m.exports.initialCollection(); draft.answerCopy = true;
+      await page.route("https://copy.example.invalid/**", async route => {
+        const action = new URL(route.request().url()).pathname.split("/").pop();
+        if (action === "response") return route.fulfill({json: {draft, revision:1, progress:8, status:"completed", copyStatus, campaign:{name:"team.blue",privacy:"Synthetic QA",closed:false,copyPreview:false,version:draft.version,manager:{isPeopleManager:false}}}});
+        if (action === "answer-copy") { assert.equal(route.request().method(), "POST"); copies++; return route.fulfill({json:{copyStatus:"sent"}}); }
+        return route.fulfill({contentType:"text/html",body:'<div id="root"></div><script>'+bundle.outputFiles[0].text+'</script>'});
+      });
+      await page.goto("https://copy.example.invalid/baseline/start");
+      await page.getByRole("heading",{name:"Thank you. Your answers have been submitted.",exact:true}).waitFor();
+      assert.doesNotMatch(await page.locator("body").innerText(), /Van Esch Advisory|queued for delivery/);
+      if (copyStatus === "disabled") {
+        await page.getByText(/Email delivery is not enabled/).waitFor();
+        assert.equal(await page.getByRole("button",{name:"Retry email copy"}).count(),0);
+        assert.equal(copies,0);
+      } else if (copyStatus === "failed") {
+        await page.getByText(/could not confirm delivery/).waitFor();
+        await page.getByRole("button",{name:"Retry email copy"}).click();
+        await page.getByText("A copy has been emailed to the address used for your invitation.",{exact:true}).waitFor();
+        assert.equal(copies,1);
+      } else {
+        await page.getByText("A copy has been emailed to the address used for your invitation.",{exact:true}).waitFor();
+        assert.equal(copies,copyStatus === "pending" ? 1 : 0);
+      }
+      await page.close();
+    }
+    for (const email of [emailModule.exports.invitationEmail("team.blue", "https://example.invalid", "2026-10-30T23:59:59Z"), emailModule.exports.verificationEmail("123456"), emailModule.exports.answerCopyEmail({workAreas:[]})]) assert.doesNotMatch(email.text + email.html, /Van Esch Advisory/);
   } finally {
     await browser.close();
   }
