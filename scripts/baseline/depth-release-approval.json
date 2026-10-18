@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-17T18:52:57.180Z",
-  "reviewedCommit": "c731fb780184d0f8ceb7c2211368780bd84cb033",
-  "expectedVersionId": "883e8b3a-bb77-455a-8928-c3fc36cdf0f1",
-  "qaRunId": 39060012054,
-  "instruction": "Clarify the employee-population evidence question and following employee-count label only. Preserve all answers, retention policy and email restrictions."
+  "confirmedAt": "2026-10-18T08:08:31.038Z",
+  "reviewedCommit": "1cc9b5c954a50da8e1e276630c17a6d15995446d",
+  "expectedVersionId": "765bd5db-36a5-4df9-98f1-638623436b61",
+  "qaRunId": 39110071254,
+  "instruction": "Apply the requested team.blue branding and answer-copy delivery repair. Preserve all saved answers, retention policy, authentication, and existing Greg-only email configuration. This code deployment sends no email; an authenticated participant may recover their previously requested copy without resubmitting."
 }
