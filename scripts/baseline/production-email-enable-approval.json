@@ -1,0 +1,14 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-enable-email-and-greg-teamblue-invite",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "recipient": "Greg.vanesch@team.blue",
+  "campaignId": "55000003-2026-4019-8040-000000000001",
+  "sendEmail": true,
+  "sendBulkEmail": false,
+  "confirmedAt": "2026-10-19T16:51:51.491Z",
+  "reviewedCommit": "78eb1c9015b029d3d532bfe8077641f41ce50594",
+  "expectedVersionId": "30cd7532-37ec-4d78-bb8d-0d29012e453d",
+  "qaRunId": 39288424379,
+  "instruction": "Greg explicitly requested enabling production email sending and one email to Greg.vanesch@team.blue. Activate normal baseline sending, send one current-questionnaire invitation in a separate test campaign, generate an OTP only on his request, and send no bulk or other invitations."
+}
