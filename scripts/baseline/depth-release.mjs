@@ -9,8 +9,12 @@ import { verifyProductionPublicKey } from "../d1/verify-production-public-key.mj
 const account = "73221f18acc676e4992c89fcbf2b2a8f",
   db = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   worker = "fractional-hr-site";
+const itTest = process.env.BASELINE_RELEASE_KIND === "it-test";
+const approvalFile = itTest
+  ? "production-it-test-approval.json"
+  : "depth-release-approval.json";
 const a = JSON.parse(
-  await readFile(new URL("./depth-release-approval.json", import.meta.url)),
+  await readFile(new URL("./" + approvalFile, import.meta.url)),
 );
 const age = Date.now() - Date.parse(a.confirmedAt);
 if (
@@ -19,9 +23,16 @@ if (
   process.env.CLOUDFLARE_ACCOUNT_ID !== account ||
   !process.env.CLOUDFLARE_API_TOKEN ||
   a.approvedBy !== "Greg van Esch" ||
-  a.scope !== "production-baseline-v5-depth-no-email" ||
+  a.scope !==
+    (itTest
+      ? "production-toni-email-and-otp-test"
+      : "production-baseline-v5-depth-no-email") ||
   a.databaseId !== db ||
-  a.sendEmail !== false ||
+  a.sendEmail !== itTest ||
+  (itTest &&
+    (a.recipient !== "antoni.serra@team.blue" ||
+      a.campaignId !== "55000002-2026-4019-8040-000000000001" ||
+      a.sendBulkEmail !== false)) ||
   age < 0 ||
   age > 86400000 ||
   !Number.isFinite(age)
@@ -35,7 +46,7 @@ const changed = execFileSync("git", ["diff", "--name-only", "HEAD^", "HEAD"], {
 }).trim();
 if (
   parent !== a.reviewedCommit ||
-  changed !== "scripts/baseline/depth-release-approval.json"
+  changed !== "scripts/baseline/" + approvalFile
 )
   throw Error(
     "V5 release approval must be the only change above the reviewed implementation.",

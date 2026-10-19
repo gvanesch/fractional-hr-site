@@ -1,4 +1,5 @@
 import { analysisTables } from "./analysis-export";
+import { IT_DELIVERY_TEST, isITDeliveryTest } from "./it-delivery-test";
 import { analysisXlsx } from "./analysis-xlsx";
 import {
   invitationEmail,
@@ -2108,8 +2109,80 @@ function productionMailAllowed(email: string, campaign: string) {
   const env = baselineEnv();
   return (
     env.NEXT_PUBLIC_APP_ENV !== "qa" &&
-    (env.BASELINE_MAIL_MODE === "send" || canTestMail(email, campaign))
+    (env.BASELINE_MAIL_MODE === "send" ||
+      canTestMail(email, campaign) ||
+      itTestMailAllowed(email, campaign))
   );
+}
+function itTestMailAllowed(email: string, campaign?: string) {
+  const env = baselineEnv();
+  return (
+    env.NEXT_PUBLIC_APP_ENV === "production" &&
+    env.BASELINE_MAIL_MODE === "greg-only" &&
+    env.BASELINE_TEST_CAMPAIGN_ID === "55000001-2026-4017-8040-000000000001" &&
+    isITDeliveryTest(email, campaign)
+  );
+}
+async function sendITTestInvitation(
+  p: { email: string; campaign_id: string; participant_id: string },
+  message: ReturnType<typeof invitationEmail>,
+) {
+  const env = baselineEnv();
+  if (
+    !itTestMailAllowed(p.email, p.campaign_id) ||
+    p.participant_id !== IT_DELIVERY_TEST.participant
+  )
+    throw new BaselineError("This IT test recipient is not authorised.", 403);
+  if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
+    throw new BaselineError("Email credentials are unavailable.", 503);
+  const claim = await db()
+    .prepare("INSERT OR IGNORE INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
+    .bind(
+      IT_DELIVERY_TEST.invitationEvent,
+      p.campaign_id,
+      "it-delivery-test",
+      "it_test_invitation",
+      p.participant_id,
+      JSON.stringify({ status: "reserved" }),
+      now(),
+    )
+    .run();
+  if (claim.meta.changes !== 1)
+    throw new BaselineError(
+      "This IT invitation was already attempted. Review its delivery status before resending.",
+      409,
+    );
+  try {
+    const result = await new Resend(env.RESEND_API_KEY).emails.send(
+      {
+        from: baselineSender(env.CONTACT_FROM_EMAIL),
+        to: p.email,
+        replyTo: "info@vanesch.uk",
+        ...message,
+      },
+      { idempotencyKey: "baseline-it-invite-" + p.participant_id },
+    );
+    if (result.error || !result.data?.id) throw Error("Delivery failed");
+    await db()
+      .prepare("UPDATE tb_baseline_audit SET metadata_json=? WHERE event_id=?")
+      .bind(
+        JSON.stringify({ status: "sent", providerId: result.data.id }),
+        IT_DELIVERY_TEST.invitationEvent,
+      )
+      .run();
+  } catch {
+    await db()
+      .prepare("UPDATE tb_baseline_audit SET metadata_json=? WHERE event_id=?")
+      .bind(
+        JSON.stringify({ status: "failed" }),
+        IT_DELIVERY_TEST.invitationEvent,
+      )
+      .run();
+    throw new BaselineError(
+      "The IT invitation could not be confirmed as sent. Review delivery before retrying.",
+      502,
+    );
+  }
 }
 async function sendGregTest(
   kind: "invite" | "code",
@@ -2193,7 +2266,10 @@ async function sendGregTest(
 }
 export async function qaTestInvitation(request: Request, token: string) {
   const p = await invitationForVerification(request, token);
-  if (!canTestMail(p.email, p.campaign_id))
+  if (
+    !canTestMail(p.email, p.campaign_id) &&
+    !itTestMailAllowed(p.email, p.campaign_id)
+  )
     throw new BaselineError(
       "Test email delivery is restricted to the authorised recipient and campaign.",
       403,
@@ -2210,6 +2286,18 @@ export async function qaTestInvitation(request: Request, token: string) {
     );
   const site = baselineEnv().NEXT_PUBLIC_SITE_URL;
   if (!site) throw new BaselineError("QA site is not configured.", 503);
+  if (itTestMailAllowed(p.email, p.campaign_id)) {
+    await sendITTestInvitation(
+      p,
+      invitationEmail(
+        p.name,
+        site.replace(/\/$/, "") + "/baseline/start#" + token,
+        p.closes_at,
+        p.version,
+      ),
+    );
+    return { success: true };
+  }
   await sendGregTest(
     "invite",
     p.email,
