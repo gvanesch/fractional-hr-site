@@ -1,5 +1,5 @@
 import { analysisTables } from "./analysis-export";
-import { IT_DELIVERY_TEST, isITDeliveryTest } from "./it-delivery-test";
+import { IT_DELIVERY_TEST, deliveryTestFor } from "./it-delivery-test";
 import { analysisXlsx } from "./analysis-xlsx";
 import {
   invitationEmail,
@@ -2118,9 +2118,9 @@ function itTestMailAllowed(email: string, campaign?: string) {
   const env = baselineEnv();
   return (
     env.NEXT_PUBLIC_APP_ENV === "production" &&
-    env.BASELINE_MAIL_MODE === "greg-only" &&
+    ["greg-only", "send"].includes(env.BASELINE_MAIL_MODE ?? "") &&
     env.BASELINE_TEST_CAMPAIGN_ID === "55000001-2026-4017-8040-000000000001" &&
-    isITDeliveryTest(email, campaign)
+    !!deliveryTestFor(email, campaign)
   );
 }
 async function sendITTestInvitation(
@@ -2128,9 +2128,11 @@ async function sendITTestInvitation(
   message: ReturnType<typeof invitationEmail>,
 ) {
   const env = baselineEnv();
+  const test = deliveryTestFor(p.email, p.campaign_id);
   if (
     !itTestMailAllowed(p.email, p.campaign_id) ||
-    p.participant_id !== IT_DELIVERY_TEST.participant
+    !test ||
+    p.participant_id !== test.participant
   )
     throw new BaselineError("This IT test recipient is not authorised.", 403);
   if (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL)
@@ -2138,10 +2140,12 @@ async function sendITTestInvitation(
   const claim = await db()
     .prepare("INSERT OR IGNORE INTO tb_baseline_audit VALUES(?,?,?,?,?,?,?)")
     .bind(
-      IT_DELIVERY_TEST.invitationEvent,
+      test.invitationEvent,
       p.campaign_id,
       "it-delivery-test",
-      "it_test_invitation",
+      test === IT_DELIVERY_TEST
+        ? "it_test_invitation"
+        : "production_test_invitation",
       p.participant_id,
       JSON.stringify({ status: "reserved" }),
       now(),
@@ -2167,16 +2171,13 @@ async function sendITTestInvitation(
       .prepare("UPDATE tb_baseline_audit SET metadata_json=? WHERE event_id=?")
       .bind(
         JSON.stringify({ status: "sent", providerId: result.data.id }),
-        IT_DELIVERY_TEST.invitationEvent,
+        test.invitationEvent,
       )
       .run();
   } catch {
     await db()
       .prepare("UPDATE tb_baseline_audit SET metadata_json=? WHERE event_id=?")
-      .bind(
-        JSON.stringify({ status: "failed" }),
-        IT_DELIVERY_TEST.invitationEvent,
-      )
+      .bind(JSON.stringify({ status: "failed" }), test.invitationEvent)
       .run();
     throw new BaselineError(
       "The IT invitation could not be confirmed as sent. Review delivery before retrying.",

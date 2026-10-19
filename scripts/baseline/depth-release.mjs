@@ -10,9 +10,12 @@ const account = "73221f18acc676e4992c89fcbf2b2a8f",
   db = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   worker = "fractional-hr-site";
 const itTest = process.env.BASELINE_RELEASE_KIND === "it-test";
-const approvalFile = itTest
-  ? "production-it-test-approval.json"
-  : "depth-release-approval.json";
+const enableEmail = process.env.BASELINE_RELEASE_KIND === "enable-email";
+const approvalFile = enableEmail
+  ? "production-email-enable-approval.json"
+  : itTest
+    ? "production-it-test-approval.json"
+    : "depth-release-approval.json";
 const a = JSON.parse(
   await readFile(new URL("./" + approvalFile, import.meta.url)),
 );
@@ -24,11 +27,17 @@ if (
   !process.env.CLOUDFLARE_API_TOKEN ||
   a.approvedBy !== "Greg van Esch" ||
   a.scope !==
-    (itTest
-      ? "production-toni-email-and-otp-test"
-      : "production-baseline-v5-depth-no-email") ||
+    (enableEmail
+      ? "production-enable-email-and-greg-teamblue-invite"
+      : itTest
+        ? "production-toni-email-and-otp-test"
+        : "production-baseline-v5-depth-no-email") ||
   a.databaseId !== db ||
-  a.sendEmail !== itTest ||
+  a.sendEmail !== (itTest || enableEmail) ||
+  (enableEmail &&
+    (a.recipient !== "Greg.vanesch@team.blue" ||
+      a.campaignId !== "55000003-2026-4019-8040-000000000001" ||
+      a.sendBulkEmail !== false)) ||
   (itTest &&
     (a.recipient !== "antoni.serra@team.blue" ||
       a.campaignId !== "55000002-2026-4019-8040-000000000001" ||
@@ -66,11 +75,20 @@ async function get(path) {
 }
 const settings = await get("settings"),
   bindings = new Map(settings.bindings.map((b) => [b.name, b]));
+const mailMode = bindings.get("BASELINE_MAIL_MODE")?.text;
+const fingerprint = (map) =>
+  bindingFingerprint(
+    enableEmail
+      ? new Map([...map].filter(([name]) => name !== "BASELINE_MAIL_MODE"))
+      : map,
+  );
 if (
   (bindings.get("DB")?.id ?? bindings.get("DB")?.database_id) !== db ||
   activationFlags.some((n) => bindings.get(n)?.text !== "d1") ||
   bindings.get("BASELINE_ENABLED")?.text !== "true" ||
-  bindings.get("BASELINE_MAIL_MODE")?.text !== "greg-only" ||
+  !["greg-only", "send"].includes(mailMode) ||
+  (enableEmail &&
+    mailMode !== (process.argv[2] === "prepare" ? "greg-only" : "send")) ||
   (bindings.get("ADVISOR_AUTH_MODE")?.text ?? "supabase") !== "supabase"
 )
   throw Error(
@@ -123,7 +141,8 @@ if (process.argv[2] === "prepare") {
       {
         deploymentId: deployment.id,
         versions: deployment.versions,
-        bindingFingerprint: bindingFingerprint(bindings),
+        bindingFingerprint: fingerprint(bindings),
+        mailMode,
       },
       null,
       2,
@@ -133,7 +152,7 @@ if (process.argv[2] === "prepare") {
   config.account_id = account;
   Object.assign(config.vars, {
     BASELINE_ENABLED: "true",
-    BASELINE_MAIL_MODE: "greg-only",
+    BASELINE_MAIL_MODE: enableEmail ? "send" : mailMode,
     NEXT_PUBLIC_APP_ENV: "production",
     NEXT_PUBLIC_SITE_URL: "https://vanesch.uk",
     NEXT_PUBLIC_SUPABASE_URL: "https://qxddddhhpfrrxbaunwfw.supabase.co",
@@ -146,7 +165,7 @@ if (process.argv[2] === "prepare") {
   const prior = JSON.parse(await readFile(recovery));
   if (
     deployment.id === prior.deploymentId ||
-    bindingFingerprint(bindings) !== prior.bindingFingerprint
+    fingerprint(bindings) !== prior.bindingFingerprint
   )
     throw Error(
       "Deployment did not change or unrelated production bindings changed.",
@@ -166,6 +185,6 @@ if (process.argv[2] === "prepare") {
     throw Error("Excel download administrator boundary differs.");
   await r.body?.cancel();
   console.log(
-    "Production export release verified; D1, baseline, password login and Greg-only email restrictions preserved. Administrator download boundary verified.",
+    "Production baseline release verified; D1, password login and approved email configuration verified. Administrator download boundary verified.",
   );
 } else throw Error("Choose prepare or verify.");

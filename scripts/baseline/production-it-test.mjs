@@ -12,19 +12,29 @@ const account = "73221f18acc676e4992c89fcbf2b2a8f",
   database = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   worker = "fractional-hr-site",
   site = "https://www.vanesch.uk";
-const approvalPath = "scripts/baseline/production-it-test-approval.json";
+const enableEmail = process.env.BASELINE_RELEASE_KIND === "enable-email";
+const approvalPath = enableEmail
+  ? "scripts/baseline/production-email-enable-approval.json"
+  : "scripts/baseline/production-it-test-approval.json";
 const a = JSON.parse(await readFile(approvalPath, "utf8"));
 const age = Date.now() - Date.parse(a.confirmedAt);
 if (
   process.env.GITHUB_REPOSITORY !== "gvanesch/fractional-hr-site" ||
   process.env.GITHUB_REF !== "refs/heads/migration/d1" ||
   process.env.CLOUDFLARE_ACCOUNT_ID !== account ||
-  process.env.BASELINE_RELEASE_KIND !== "it-test" ||
+  !["it-test", "enable-email"].includes(process.env.BASELINE_RELEASE_KIND) ||
   !process.env.CLOUDFLARE_API_TOKEN ||
   a.approvedBy !== "Greg van Esch" ||
-  a.scope !== "production-toni-email-and-otp-test" ||
-  a.recipient !== "antoni.serra@team.blue" ||
-  a.campaignId !== "55000002-2026-4019-8040-000000000001" ||
+  a.scope !==
+    (enableEmail
+      ? "production-enable-email-and-greg-teamblue-invite"
+      : "production-toni-email-and-otp-test") ||
+  a.recipient !==
+    (enableEmail ? "Greg.vanesch@team.blue" : "antoni.serra@team.blue") ||
+  a.campaignId !==
+    (enableEmail
+      ? "55000003-2026-4019-8040-000000000001"
+      : "55000002-2026-4019-8040-000000000001") ||
   a.sendEmail !== true ||
   a.sendBulkEmail !== false ||
   !Number.isFinite(age) ||
@@ -71,19 +81,26 @@ const settings = await cf(`workers/scripts/${worker}/settings`),
 const recovery = JSON.parse(
   await readFile("baseline-depth-recovery.json", "utf8"),
 );
+const fingerprint = (map) =>
+  bindingFingerprint(
+    enableEmail
+      ? new Map([...map].filter(([name]) => name !== "BASELINE_MAIL_MODE"))
+      : map,
+  );
 const live = (await cf(`workers/scripts/${worker}/deployments`))
   .deployments?.[0];
 if (
   (bindings.get("DB")?.id ?? bindings.get("DB")?.database_id) !== database ||
   activationFlags.some((n) => bindings.get(n)?.text !== "d1") ||
   bindings.get("BASELINE_ENABLED")?.text !== "true" ||
-  bindings.get("BASELINE_MAIL_MODE")?.text !== "greg-only" ||
+  bindings.get("BASELINE_MAIL_MODE")?.text !==
+    (enableEmail ? "send" : recovery.mailMode) ||
   bindings.get("BASELINE_TEST_CAMPAIGN_ID")?.text !==
     "55000001-2026-4017-8040-000000000001" ||
   bindings.get("NEXT_PUBLIC_APP_ENV")?.text !== "production" ||
   !bindings.has("RESEND_API_KEY") ||
   !bindings.has("CONTACT_FROM_EMAIL") ||
-  bindingFingerprint(bindings) !== recovery.bindingFingerprint ||
+  fingerprint(bindings) !== recovery.bindingFingerprint ||
   live.id === recovery.deploymentId ||
   live.versions?.length !== 1 ||
   live.versions[0].percentage !== 100
@@ -108,7 +125,7 @@ new Function("module", "exports", built.outputFiles[0].text)(
   module.exports,
 );
 const m = module.exports,
-  t = m.IT_DELIVERY_TEST;
+  t = enableEmail ? m.GREG_DELIVERY_TEST : m.IT_DELIVERY_TEST;
 if (
   t.email !== a.recipient ||
   t.campaign !== a.campaignId ||
@@ -122,7 +139,7 @@ for (const [sql, params] of [
     [t.campaign],
   ],
   [
-    "SELECT participant_id FROM tb_baseline_participants WHERE participant_id=? OR email=?",
+    "SELECT participant_id FROM tb_baseline_participants WHERE participant_id=? OR lower(email)=lower(?)",
     [t.participant, t.email],
   ],
   [
@@ -161,7 +178,9 @@ const statements = [
     sql: "INSERT INTO tb_baseline_campaigns VALUES(?,?,?,?,?,?,?,?,?)",
     params: [
       t.campaign,
-      "[IT DELIVERY TEST] team.blue baseline",
+      enableEmail
+        ? "[PRODUCTION EMAIL TEST] team.blue baseline"
+        : "[IT DELIVERY TEST] team.blue baseline",
       m.DEPTH_COLLECTION_VERSION,
       "open",
       t.closes,
@@ -178,7 +197,9 @@ const statements = [
       t.campaign,
       t.email,
       JSON.stringify({
-        name: "Toni — IT delivery test",
+        name: enableEmail
+          ? "Greg — production email test"
+          : "Toni — IT delivery test",
         email: t.email,
         country: "",
         region: "IT test only",
@@ -272,7 +293,11 @@ const verification = {
   questionnaireVersion: m.DEPTH_COLLECTION_VERSION,
   invitation: "provider-accepted",
   providerId: delivery.providerId,
-  otp: "not sent; awaiting Toni's request",
+  otp: "not sent; awaiting recipient request",
+  emailSending:
+    bindings.get("BASELINE_MAIL_MODE")?.text === "send"
+      ? "enabled"
+      : "test-only",
   expiresAt: t.closes,
   bulkSending: false,
   verifiedAt: new Date().toISOString(),

@@ -1,4 +1,4 @@
-// Greg's explicit 19 October approval: one IT tester, isolated from programme responses.
+// Explicitly approved production delivery tests, isolated from programme responses.
 export const IT_DELIVERY_TEST = {
   email: "antoni.serra@team.blue",
   campaign: "55000002-2026-4019-8040-000000000001",
@@ -6,6 +6,20 @@ export const IT_DELIVERY_TEST = {
   invitationEvent: "55000002-2026-4019-8040-000000000003",
   closes: "2026-10-30T23:59:59.000Z",
 } as const;
+export const GREG_DELIVERY_TEST = {
+  email: "Greg.vanesch@team.blue",
+  campaign: "55000003-2026-4019-8040-000000000001",
+  participant: "55000003-2026-4019-8040-000000000002",
+  invitationEvent: "55000003-2026-4019-8040-000000000003",
+  closes: "2026-10-30T23:59:59.000Z",
+} as const;
+export function deliveryTestFor(email: string, campaign?: string) {
+  return [IT_DELIVERY_TEST, GREG_DELIVERY_TEST].find(
+    (t) =>
+      t.email.toLowerCase() === email.trim().toLowerCase() &&
+      t.campaign === campaign,
+  );
+}
 export function isITDeliveryTest(email: string, campaign?: string) {
   return (
     email.trim().toLowerCase() === IT_DELIVERY_TEST.email &&

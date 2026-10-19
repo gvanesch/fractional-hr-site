@@ -1702,6 +1702,37 @@ test("Toni IT invitation is once-only, production-only and exact recipient/campa
     await assert.rejects(h.service.requestVerification(h.request({}),token),e=>e.status===403);
   } finally {h.sqlite.close();}
 });
+test("Normal production sending permits Greg's team.blue invitation and OTP, with no automatic invitations to other recipients", async () => {
+  const h=harness();
+  try {
+    const base=await reviewedSetup(h,"synthetic@example.invalid",h.collection.FROZEN_COLLECTION_VERSION);
+    const ordinary=await reviewedSetup(h,"ordinary@example.invalid",h.collection.FROZEN_COLLECTION_VERSION);
+    const campaign="55000003-2026-4019-8040-000000000001",person="55000003-2026-4019-8040-000000000002",token=require("node:crypto").randomBytes(32).toString("hex");
+    h.sqlite.prepare("INSERT INTO tb_baseline_campaigns SELECT ?,name,version,status,closes_at,privacy_notice,retention_days,created_at,entities_json FROM tb_baseline_campaigns WHERE campaign_id=?").run(campaign,base.campaign);
+    h.sqlite.prepare("INSERT INTO tb_baseline_participants SELECT ?,?,email,profile_json,active,created_at FROM tb_baseline_participants WHERE participant_id=?").run(person,campaign,base.p.participant_id);
+    h.sqlite.prepare("UPDATE tb_baseline_participants SET email=? WHERE participant_id=?").run("Greg.vanesch@team.blue",person);
+    h.sqlite.prepare("INSERT INTO tb_baseline_responses SELECT ?,version,status,progress,revision,mutation_id,draft_json,updated_at,submitted_at FROM tb_baseline_responses WHERE participant_id=?").run(person,base.p.participant_id);
+    h.sqlite.prepare("INSERT INTO tb_baseline_invites VALUES(?,?,?,?,NULL,?)").run(require("node:crypto").randomUUID(),person,h.service.hashToken(token),new Date(Date.now()+86400000).toISOString(),new Date().toISOString());
+    await assert.rejects(h.service.qaTestInvitation(h.request({}),token),e=>e.status===403);
+    h.env.NEXT_PUBLIC_APP_ENV="production";
+    for(const flag of ["D1_SYSTEM_EVENTS_MODE","D1_CRM_PROSPECTS_MODE","D1_DIAGNOSTIC_SUBMISSIONS_MODE","D1_CLIENT_DIAGNOSTIC_MODE","D1_CLIENT_DIAGNOSTIC_SECURITY_MODE"])h.env[flag]="d1";
+    h.env.BASELINE_MAIL_MODE="send";
+    h.env.BASELINE_TEST_CAMPAIGN_ID="55000001-2026-4017-8040-000000000001";
+    h.env.RESEND_API_KEY="synthetic-mail";h.env.CONTACT_FROM_EMAIL="Synthetic <notifications@example.invalid>";
+    assert.equal(h.state.emails.length,0);
+    assert.equal((await h.service.launchReadiness(ordinary.campaign)).ready,true);
+    assert.equal(h.state.emails.length,0);
+    await h.service.qaTestInvitation(h.request({}),token);
+    await assert.rejects(h.service.qaTestInvitation(h.request({}),token),e=>e.status===409);
+    assert.equal(h.state.emails.length,1);assert.equal(h.state.emails[0].to,"Greg.vanesch@team.blue");
+    const code=await h.service.requestVerification(h.request({}),token);
+    assert.equal("code" in code,false);assert.equal(h.state.emails.length,2);
+    assert.ok(h.state.emails.every(m=>m.to==="Greg.vanesch@team.blue"));
+    const access=await h.service.verifyCode(h.request({}),token,code.challenge,h.state.emails[1].text.match(/\b\d{6}\b/)[0]);
+    h.state.cookie=access.session;
+    assert.equal((await h.service.readResponse(await h.service.participant(h.request({})))).status,"not_started");
+  } finally {h.sqlite.close();}
+});
 test("Requested copy recovery is participant-authenticated, campaign-restricted and once-only", async () => {
   const h = harness();
   try {
