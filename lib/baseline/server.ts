@@ -1,4 +1,5 @@
 import { analysisTables } from "./analysis-export";
+import { participantPrivacyNotice } from "./copy";
 import { IT_DELIVERY_TEST, deliveryTestFor } from "./it-delivery-test";
 import { analysisXlsx } from "./analysis-xlsx";
 import { answerCopyDocx } from "./answer-document";
@@ -325,7 +326,7 @@ export async function readResponse(p: Identity) {
   return {
     campaign: {
       name: p.name,
-      privacy: p.privacy_notice,
+      privacy: participantPrivacyNotice(p.privacy_notice, PRIVACY),
       version: p.version,
       entities: JSON.parse(p.entities_json) as EntityOption[],
       closed: p.status !== "open" || p.closes_at <= now(),
@@ -1790,7 +1791,7 @@ async function readCollectionResponse(p: Identity) {
   return {
     campaign: {
       name: p.name,
-      privacy: p.privacy_notice,
+      privacy: participantPrivacyNotice(p.privacy_notice, PRIVACY),
       version: p.version,
       closed: p.status !== "open" || p.closes_at <= now(),
       copyPreview: baselineEnv().NEXT_PUBLIC_APP_ENV === "qa",

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useId, useRef } from "react";
 import { Pick } from "./context";
-import Info from "./info";
 import { toggleOption } from "@/lib/baseline/prototype-enrichment";
 import { BROAD_AREAS } from "@/lib/baseline/broad-prototype";
 import { MANAGEMENT_AREA } from "@/lib/baseline/management-prototype";
@@ -40,10 +39,7 @@ function Checks({
 }) {
   return (
     <fieldset className={"tb-process" + (invalid ? " tb-invalid" : "")}>
-      <legend>
-        {label}
-        {help && <Info label={label}>{help}</Info>}
-      </legend>
+      <legend>{label}</legend>
       {help && <p className="tb-compact-text">{help}</p>}
       <div className="tb-options">
         {options.map(([code, text]) => (
@@ -302,8 +298,8 @@ export default function Depth({
       <>
         <p>
           Open each work area you selected. Choose the activities you do. You do
-          not need another percentage split here. Examples and the i buttons
-          explain the questions.
+          not need another percentage split here. Read the short examples below
+          each question for guidance.
         </p>
         {selected.map((area) => {
           const w = d.work[area] ?? emptyWorkDetail(),
@@ -324,9 +320,12 @@ export default function Depth({
             />
           );
           const nextOptions = q.nextStep
-            ? handoffOptions(area, "passes").filter((o) =>
-                q.nextStep![2].includes(o[0]),
-              )
+            ? handoffOptions(area, "passes")
+                .filter((o) => q.nextStep![2].includes(o[0]))
+                .map(([code, text]) => [
+                  code,
+                  code === "none" ? "No other team needed" : text,
+                ])
             : [];
           return (
             <AreaPanel

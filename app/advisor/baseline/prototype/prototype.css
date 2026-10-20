@@ -183,8 +183,19 @@
 }
 .tb-info {
   display: inline-flex;
+  margin-inline-start: 0.5rem;
   position: relative;
   flex-shrink: 0;
+}
+.tb-question-label > .tb-info {
+  margin-inline-start: 0;
+}
+.tb-guidance-note {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .tb-prototype .tb-info-button {
   width: 28px;

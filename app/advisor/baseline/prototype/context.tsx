@@ -72,7 +72,7 @@ export function Pick({
         id={id + "-select"}
         aria-label={label}
         aria-invalid={invalid}
-        aria-describedby={questionHelp || help ? id : undefined}
+        aria-describedby={help && help !== questionHelp ? id : undefined}
         value={value}
         onChange={(e) => change(e.target.value)}
       >
@@ -83,9 +83,9 @@ export function Pick({
           </option>
         ))}
       </select>
-      {(questionHelp || help) && (
+      {help && help !== questionHelp && (
         <small id={id} className="tb-definition">
-          {questionHelp || help}
+          {help}
         </small>
       )}
     </div>
@@ -557,11 +557,6 @@ export default function Context({
           label="What works well and should we keep? (optional)"
           value={d.strengths}
           change={(strengths) => change({ strengths })}
-        />
-        <Text
-          label="Anything important about your work we have missed? (optional)"
-          value={d.missing}
-          change={(missing) => change({ missing })}
         />
       </section>
     </>

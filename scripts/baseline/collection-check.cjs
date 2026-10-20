@@ -180,6 +180,7 @@ const root = path.resolve(__dirname, "../..");
           .check();
         assert.equal(await start.isEnabled(), true);
         await start.click();
+        assert.equal(await page.locator(".tb-guidance-note").count(), 1);
         await page
           .getByRole("checkbox", {
             name: "Reception, facilities and office support",
@@ -192,6 +193,7 @@ const root = path.resolve(__dirname, "../..");
         const saveWait = page.waitForResponse((r) =>
           r.url().endsWith("/api/baseline/save"),
         );
+        await page.getByText(/If you work part time:/).waitFor();
         await page
           .getByLabel("Time spent: Reception, facilities and office support", {
             exact: true,
@@ -273,9 +275,22 @@ const root = path.resolve(__dirname, "../..");
             exact: true,
           })
           .check();
+        const closingQuestion =
+          "Anything important about your work we have missed? (optional)";
+        assert.equal(
+          await page.getByLabel(closingQuestion, { exact: true }).count(),
+          0,
+        );
         await page
           .getByRole("button", { name: "Review answers", exact: true })
           .click();
+        assert.equal(
+          await page.locator("textarea").last().getAttribute("aria-label"),
+          closingQuestion,
+        );
+        await page
+          .getByLabel(closingQuestion, { exact: true })
+          .fill("A final detail after all selected work areas.");
         if (process.env.BASELINE_SCREENSHOT_DIR) {
           fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, {
             recursive: true,
@@ -305,6 +320,10 @@ const root = path.resolve(__dirname, "../..");
           .waitFor();
         assert.equal(status, "completed");
         assert.equal(stored.answerCopy, true);
+        assert.equal(
+          stored.rich.missing,
+          "A final detail after all selected work areas.",
+        );
         assert.ok(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= innerWidth,

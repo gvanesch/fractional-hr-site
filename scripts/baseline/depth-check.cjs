@@ -229,6 +229,18 @@ const root = path.resolve(__dirname, "../..");
       }
       const office = "Reception, facilities and office support";
       await page.locator("summary").filter({ hasText: office }).click();
+      const dependency =
+        office +
+        ": Whose action or approval do you need to complete an office or facilities request?";
+      const dependencyGroup = page.getByRole("group", {
+        name: dependency,
+        exact: true,
+      });
+      assert.equal(await dependencyGroup.locator(".tb-info").count(), 0);
+      assert.equal(await dependencyGroup.locator("p").count(), 1);
+      await page
+        .getByLabel(dependency + ": No other team needed", { exact: true })
+        .check();
       assert.equal(
         await page
           .getByText(
@@ -366,6 +378,16 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Review", exact: true })
         .waitFor();
+      const closingQuestion =
+        "Anything important about your work we have missed? (optional)";
+      assert.equal(
+        await page.locator("textarea").last().getAttribute("aria-label"),
+        closingQuestion,
+      );
+      await fill(
+        closingQuestion,
+        "A final detail after the capacity and technology sections.",
+      );
       assert.equal(
         model
           .depthEvidence(stored.depth, stored.broad.selected)
@@ -475,11 +497,9 @@ const root = path.resolve(__dirname, "../..");
           planning_development: "People planning, performance and development",
           systems_data: "People systems, data and improvement",
         };
-        const panel = page
-          .locator("details")
-          .filter({
-            has: page.locator("summary").filter({ hasText: labels[area] }),
-          });
+        const panel = page.locator("details").filter({
+          has: page.locator("summary").filter({ hasText: labels[area] }),
+        });
         await panel.locator("summary").click();
         assert.equal(
           await panel.locator('input[type="number"],select').count(),

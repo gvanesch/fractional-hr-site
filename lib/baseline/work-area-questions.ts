@@ -39,8 +39,8 @@ export const AREA_QUESTIONS: Record<string, AreaQuestions> = {
       "For example, prepare contracts in Finnish or apply a country's leave rules. Describe the requirement, not individual employee cases.",
     ],
     nextStep: [
-      "Who must take a next step for these employee changes?",
-      "A hand-off means another person or team must act before the change is complete. For example, a manager confirms a leaving date, Payroll updates pay, or IT removes access. Do not select someone only because they benefit from the service. Choose No hand-off if you complete the work yourself.",
+      "Whose action or approval do you need to complete an employee change?",
+      "Select the teams you rely on when handling a joiner, leaver or contract change. For example, a manager confirms the leaving date, Payroll updates final pay, or IT removes system access. Select all that apply across your usual work. Choose No other team needed if you can complete it without anyone else taking action or giving approval.",
       choices("finance", "it", "legal"),
     ],
     collaboration: [
@@ -200,8 +200,8 @@ export const AREA_QUESTIONS: Record<string, AreaQuestions> = {
       "For example, provide reception cover in Milan 3 days a week, support 2 offices, or arrange regular building maintenance. If useful, give a typical number of visitors, deliveries or supplier requests.",
     ],
     nextStep: [
-      "Who must act on an office or facilities request?",
-      "For example, a building supplier repairs a fault, IT handles equipment, or Finance approves a purchase you arrange. Visitors using reception are service users, not a hand-off.",
+      "Whose action or approval do you need to complete an office or facilities request?",
+      "Select the teams you rely on for a request you handle or arrange. For example, IT sets up equipment, Finance approves spending, or a building supplier carries out a repair. Select all that apply across your usual work. Choose No other team needed if you can complete requests without anyone else taking action or giving approval.",
       choices("it", "finance", "provider"),
     ],
     collaboration: [

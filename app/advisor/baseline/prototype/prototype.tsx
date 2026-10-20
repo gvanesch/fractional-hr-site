@@ -29,7 +29,6 @@ import {
   collectionSteps,
   type CollectionDraft,
 } from "@/lib/baseline/collection";
-import Info from "./info";
 import Context, { Pick } from "./context";
 import ContextReview from "./review";
 import {
@@ -62,11 +61,23 @@ const LABELS: Record<string, string> = {
   time: "Time across your work",
   contact: "How people contact you or your team",
   payroll: "Payroll responsibilities",
-  context: "A few final questions",
+  context: "Systems and ways of working",
   technology: "Your technology work",
   management: "Managing your team",
   review: "Review",
 };
+function AreaExamples({ examples }: { examples: string }) {
+  const note =
+    "Record mandatory or compliance training under Policies and local requirements.";
+  return examples.endsWith(note) ? (
+    <>
+      {examples.slice(0, -note.length).trim()}
+      <strong className="tb-guidance-note">{note}</strong>
+    </>
+  ) : (
+    <>{examples}</>
+  );
+}
 export default function Prototype({
   tester,
   technologyPreview = false,
@@ -576,7 +587,9 @@ export default function Prototype({
                       />
                       <span>
                         <strong>{a.label}</strong>
-                        <small className="tb-activity-help">{a.examples}</small>
+                        <small className="tb-activity-help">
+                          <AreaExamples examples={a.examples} />
+                        </small>
                       </span>
                     </label>
                   ))}
@@ -596,16 +609,15 @@ export default function Prototype({
                 </p>
                 <p>
                   This does not need to be exact. Think about an average month.
-                  About one day each week is 20%. Count each piece of work once.
+                  Count each piece of work once. If you work five equal days a
+                  week, one day is 20%.
                 </p>
-                <div className="tb-question-label">
-                  <span>Estimating your time</span>
-                  <Info label="Estimating your time">
-                    Think about an average month. One day each week is about
-                    20%. Count each activity once, in the area that best
-                    describes it.
-                  </Info>
-                </div>
+                <p className="tb-compact-text">
+                  <strong>If you work part time:</strong> use your own working
+                  hours as 100%, not a full-time week. For example, if you work
+                  three equal days a week, one day is about 33% of your time.
+                  Your percentages should still add up to 100%.
+                </p>
                 <div className="tb-total" aria-live="polite">
                   Total: {total}%
                   <progress
@@ -623,7 +635,9 @@ export default function Prototype({
                     }
                   >
                     <h2>{a.label}</h2>
-                    <p className="tb-compact-text">{a.examples}</p>
+                    <p className="tb-compact-text">
+                      <AreaExamples examples={a.examples} />
+                    </p>
                     <label className="tb-field">
                       <span>Time spent: {a.label}</span>
                       <div className="tb-percentage">
@@ -807,6 +821,23 @@ export default function Prototype({
                 {expanded && (
                   <DepthReview draft={depth} selected={draft.selected} />
                 )}
+                <section className="tb-process">
+                  <h2>One final question</h2>
+                  <label className="tb-field">
+                    <span>
+                      Anything important about your work we have missed?
+                      (optional)
+                    </span>
+                    <textarea
+                      aria-label="Anything important about your work we have missed? (optional)"
+                      maxLength={2000}
+                      value={rich.missing}
+                      onChange={(e) =>
+                        setRich({ ...rich, missing: e.target.value })
+                      }
+                    />
+                  </label>
+                </section>
                 {saveCollection ? (
                   <>
                     <p>Review your answers, then submit them.</p>
