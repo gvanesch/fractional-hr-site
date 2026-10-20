@@ -698,7 +698,6 @@ if (!["qa", "production"].includes(environment))
         await page
           .getByLabel("Select respondent: " + person.email, { exact: true })
           .check();
-        page.once("dialog", (dialog) => dialog.accept());
         await page
           .getByRole("button", {
             name: "Send selected invitations / reminders (1/20)",
