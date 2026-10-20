@@ -1,6 +1,7 @@
 import { analysisTables } from "./analysis-export";
 import { IT_DELIVERY_TEST, deliveryTestFor } from "./it-delivery-test";
 import { analysisXlsx } from "./analysis-xlsx";
+import { answerCopyDocx } from "./answer-document";
 import {
   invitationEmail,
   verificationEmail,
@@ -2565,7 +2566,7 @@ async function deliverAnswerCopy(participantId: string) {
   if (env.NEXT_PUBLIC_APP_ENV === "qa") return "preview";
   const row = await db()
     .prepare(
-      "SELECT a.*,r.draft_json,p.profile_json,p.active,p.campaign_id FROM tb_baseline_answer_copies a JOIN tb_baseline_responses r USING(participant_id) JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=? AND r.status='completed'",
+      "SELECT a.*,r.draft_json,r.submitted_at,p.profile_json,p.active,p.campaign_id FROM tb_baseline_answer_copies a JOIN tb_baseline_responses r USING(participant_id) JOIN tb_baseline_participants p USING(participant_id) WHERE a.participant_id=? AND r.status='completed'",
     )
     .bind(participantId)
     .first<{
@@ -2573,6 +2574,7 @@ async function deliverAnswerCopy(participantId: string) {
       status: string;
       attempts: number;
       draft_json: string;
+      submitted_at: string | null;
       profile_json: string;
       active: number;
       campaign_id: string;
@@ -2603,8 +2605,12 @@ async function deliverAnswerCopy(participantId: string) {
         ...message,
         attachments: [
           {
-            filename: "current-work-baseline-answers.json",
-            content: Buffer.from(JSON.stringify(evidence, null, 2), "utf8"),
+            filename: "current-work-baseline-answers.docx",
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            content: Buffer.from(answerCopyDocx(evidence, {
+              profile: JSON.parse(row.profile_json),
+              submittedAt: row.submitted_at,
+            })),
           },
         ],
       },

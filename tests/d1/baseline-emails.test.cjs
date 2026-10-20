@@ -13,6 +13,10 @@ new Function("module", "exports", built.outputFiles[0].text)(
   emailModule,
   emailModule.exports,
 );
+test("Answer-copy email names the readable Word attachment in HTML and plain text", () => {
+  const email = emailModule.exports.answerCopyEmail({workAreas:[{label:"Employee engagement and experience",percentage:100}]});
+  for (const content of [email.text,email.html]) assert.match(content,/Word document, organised by questionnaire section/);
+});
 test("Invitations show the actual UTC deadline and agreed completion guidance in HTML and plain text", () => {
   for (const version of [
     "team-blue-baseline-v3",

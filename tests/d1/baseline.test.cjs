@@ -1926,8 +1926,13 @@ test("Requested copies remain preview-only in QA and production retries keep the
     assert.equal(h.state.emails.at(-1).to, "reviewed@example.invalid");
     assert.equal(
       h.state.emails.at(-1).attachments[0].filename,
-      "current-work-baseline-answers.json",
+      "current-work-baseline-answers.docx",
     );
+    const attachment = h.state.emails.at(-1).attachments[0];
+    assert.equal(attachment.contentType, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    assert.equal(Buffer.from(attachment.content).subarray(0, 2).toString(), "PK");
+    assert.ok(Buffer.from(attachment.content).includes(Buffer.from("word/document.xml")));
+    assert.match(h.state.emails.at(-1).text, /Word document/);
     const calls = h.state.emails.length;
     await h.service.retryAnswerCopies("admin@example.invalid", campaign);
     assert.equal(h.state.emails.length, calls);

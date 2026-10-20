@@ -70,10 +70,10 @@ export function answerCopyEmail(evidence: {
     text:
       "Thank you for completing your current work baseline.\n\nHere is your time allocation:\n\n" +
       summary +
-      "\n\nYour complete answers are attached. Keep this copy private.\n\nteam.blue · Current work baseline. Reply to this email for help.",
+      "\n\nYour answers are attached as a Word document, organised by questionnaire section. Keep this copy private.\n\nteam.blue · Current work baseline. Reply to this email for help.",
     html: frame(
       "Your baseline answers",
-      "<p>Thank you for completing your current work baseline.</p><p>Your complete answers are attached. Keep this copy private.</p><ul>" +
+      "<p>Thank you for completing your current work baseline.</p><p>Your answers are attached as a Word document, organised by questionnaire section. Keep this copy private.</p><ul>" +
         evidence.workAreas
           .map(
             (a) =>
