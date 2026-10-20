@@ -164,14 +164,22 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Verify and continue", exact: true })
           .click();
+        const start = page.getByRole("button", {
+          name: "Start questionnaire",
+          exact: true,
+        });
+        assert.equal(await start.isDisabled(), true);
+        await page.getByText(/This questionnaire is not anonymous/).waitFor();
         await page
-          .getByLabel("I understand how my answers will be used.", {
-            exact: true,
-          })
+          .getByLabel(
+            "I understand how my answers will be used and that my name and personal information will be visible with my responses.",
+            {
+              exact: true,
+            },
+          )
           .check();
-        await page
-          .getByRole("button", { name: "Start assessment", exact: true })
-          .click();
+        assert.equal(await start.isEnabled(), true);
+        await start.click();
         await page
           .getByRole("checkbox", {
             name: "Reception, facilities and office support",

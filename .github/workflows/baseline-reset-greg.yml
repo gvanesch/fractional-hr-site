@@ -1,0 +1,25 @@
+name: Reset Greg test answers only
+on:
+  push:
+    branches: [migration/d1]
+    paths: [scripts/baseline/reset-greg-approval.json]
+permissions:
+  contents: read
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 2}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: node --test tests/d1/baseline-reset.test.cjs
+      - name: Verify Greg identity and reset only his test answers without sending mail
+        run: node scripts/baseline/reset-greg-response.mjs

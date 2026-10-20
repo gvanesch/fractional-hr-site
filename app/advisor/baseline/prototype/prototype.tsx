@@ -434,12 +434,12 @@ export default function Prototype({
         <section className="tb-card">
           <h1>
             {expanded
-              ? "Your current work and delivery"
+              ? "People Operations baseline"
               : "A simple picture of your current work"}
           </h1>
           <p>
             {expanded
-              ? "Start with your work areas and time split. Then describe the activities you actually do, countries and businesses you support, local requirements, responsibilities and workload."
+              ? "Help team.blue understand the work you do, the people and countries you support, and what helps you deliver it. This questionnaire describes your current role and workload. It is not a performance assessment."
               : "Choose the broad areas you work on, then estimate the time you spend in each area."}
           </p>
           <p>
@@ -458,6 +458,17 @@ export default function Prototype({
           {saveCollection && (
             <section className="tb-process">
               <h2>How your answers will be used</h2>
+              <p>
+                Your answers will help team.blue understand current
+                responsibilities, workload and how People Operations services
+                are delivered.
+              </p>
+              <p>
+                This questionnaire is not anonymous. Your name, job title and
+                other personal information in your profile will be visible
+                alongside your responses to the authorised people reviewing this
+                baseline.
+              </p>
               <p>{savedCollection?.campaign.privacy}</p>
               <label className="tb-check">
                 <input
@@ -465,7 +476,8 @@ export default function Prototype({
                   checked={accepted}
                   onChange={(e) => setAccepted(e.target.checked)}
                 />
-                I understand how my answers will be used.
+                I understand how my answers will be used and that my name and
+                personal information will be visible with my responses.
               </label>
             </section>
           )}
@@ -473,7 +485,10 @@ export default function Prototype({
           {saveCollection && (
             <p>
               Your answers save as you go. Use your private invitation to return
-              later.
+              later. You will receive a new verification code when you return.
+              Answer about your own work. Approximate figures are fine where you
+              do not have an exact number. Do not include sensitive details
+              about individual employees in your examples.
             </p>
           )}
           <button
@@ -481,7 +496,9 @@ export default function Prototype({
             disabled={Boolean(saveCollection) && !accepted}
             onClick={() => setStarted(true)}
           >
-            {saveCollection ? "Start assessment" : "Start with empty answers"}
+            {saveCollection
+              ? "Start questionnaire"
+              : "Start with empty answers"}
           </button>
           {!saveCollection && (
             <button
