@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T14:40:36.710Z",
-  "reviewedCommit": "7fb8b9150347bae0e06c86c553ee4c75e720c2db",
-  "expectedVersionId": "fc76cbf5-c3a7-4c21-9b85-9b726cf8b8c5",
-  "qaRunId": 39440772170,
-  "instruction": "Greg requested a fully production-ready opening page with acknowledgement that personal information is visible with responses. Publish the revised launch introduction and required named-response acknowledgement, completion guidance and return instructions. Preserve saved responses, existing email sending, authentication, campaign definitions and all retention settings. This code-only deployment sends no email. Greg separately authorised clearing his own test answers; the reviewed guarded one-off reset workflow will run only with its separate exact-target approval after deployment."
+  "confirmedAt": "2026-10-20T14:47:35.390Z",
+  "reviewedCommit": "7108aa2796015120b085214608a345aa90f4d454",
+  "expectedVersionId": "ae54b5ff-3122-40d0-8f36-10d220936a85",
+  "qaRunId": 39441728085,
+  "instruction": "Complete Greg's authorised fresh test reset: give each fresh submission a new answer-copy delivery identifier while retries remain idempotent. The launch introduction and required named-response acknowledgement are already published. Preserve responses, mail configuration, authentication and retention settings during this code-only deployment; send no email. Reset only Greg's two fixed test identities through the separately guarded reviewed reset operation after deployment."
 }
