@@ -1,5 +1,6 @@
 import {
   emptyDepth,
+  CURRENT_DEPTH_FORM_REVISION,
   parseDepth,
   depthIssues,
   depthEvidence,
@@ -386,7 +387,10 @@ export function collectionIssues(d: CollectionDraft, manager: ManagerRecord) {
     ...richIssues(d.rich, "time_nature", selected),
     ...richIssues(d.rich, "contact", selected),
     ...richIssues(d.rich, "context", selected).filter(
-      (issue) => !isRevisedCollection(d.version) || issue !== "localNeeds",
+      (issue) =>
+        (d.depth?.formRevision !== CURRENT_DEPTH_FORM_REVISION ||
+          issue !== "scope") &&
+        (!isRevisedCollection(d.version) || issue !== "localNeeds"),
     ),
     ...(selected.includes("pay_benefits")
       ? richIssues(d.rich, "payroll", selected)
@@ -412,6 +416,9 @@ export function collectionEvidence(d: CollectionDraft, manager: ManagerRecord) {
     ),
     ...(isRevisedCollection(d.version)
       ? { localNeeds: [], designVersion: d.version }
+      : {}),
+    ...(d.depth?.formRevision === CURRENT_DEPTH_FORM_REVISION
+      ? { scope: "", localNote: "" }
       : {}),
     technology: technologyEvidence(
       d.technology,

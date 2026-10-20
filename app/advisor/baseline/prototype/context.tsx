@@ -47,30 +47,32 @@ export function Pick({
   options,
   change,
   invalid = false,
+  help: suppliedHelp,
 }: {
   label: string;
   value: string;
   options: string[][];
   change: (v: string) => void;
   invalid?: boolean;
+  help?: string;
 }) {
   const id = useId();
   const help =
     value === "none" && !label.startsWith("Your part:")
       ? undefined
       : HELP[value];
+  const questionHelp = suppliedHelp || QUESTION_HELP[label];
   return (
-    <label className="tb-field">
+    <div className="tb-field">
       <span className="tb-question-label">
-        <span>{label}</span>
-        {QUESTION_HELP[label] && (
-          <Info label={label}>{QUESTION_HELP[label]}</Info>
-        )}
+        <label htmlFor={id + "-select"}>{label}</label>
+        {questionHelp && <Info label={label}>{questionHelp}</Info>}
       </span>
       <select
+        id={id + "-select"}
         aria-label={label}
         aria-invalid={invalid}
-        aria-describedby={help ? id : undefined}
+        aria-describedby={questionHelp || help ? id : undefined}
         value={value}
         onChange={(e) => change(e.target.value)}
       >
@@ -81,12 +83,12 @@ export function Pick({
           </option>
         ))}
       </select>
-      {help && (
+      {(questionHelp || help) && (
         <small id={id} className="tb-definition">
-          {help}
+          {questionHelp || help}
         </small>
       )}
-    </label>
+    </div>
   );
 }
 export function Checks({
@@ -175,8 +177,10 @@ export default function Context({
   issues,
   directPayroll = false,
   focusedLocalContext = false,
+  streamlined = false,
 }: {
   focusedLocalContext?: boolean;
+  streamlined?: boolean;
   directPayroll?: boolean;
   step: string;
   draft: RichDraft;
@@ -470,47 +474,51 @@ export default function Context({
     );
   return (
     <>
-      <p>
-        Tell us which businesses you support. You can also give one example of
-        work that needs local knowledge or your presence at an office. Do not
-        include names or details of individual employee cases.
-      </p>
-      <Pick
-        label="Do you regularly support one business or more than one?"
-        value={d.scope}
-        options={[
-          ["one", "One brand / entity"],
-          ["several", "Several brands / entities"],
-          ["group", "Group / all team.blue"],
-          ["unknown", "Not sure"],
-        ]}
-        invalid={bad("scope")}
-        change={(scope) => change({ scope })}
-      />
-      {!focusedLocalContext && (
-        <Checks
-          label="Does any of your work need the following?"
-          values={d.localNeeds}
-          options={LOCAL_NEEDS}
-          exclusive={["none", "unknown"]}
-          invalid={bad("localNeeds")}
-          change={(localNeeds) => change({ localNeeds })}
-        />
+      {!streamlined && (
+        <>
+          <p>
+            Tell us which businesses you support. You can also give one example
+            of work that needs local knowledge or your presence at an office. Do
+            not include names or details of individual employee cases.
+          </p>
+          <Pick
+            label="Do you regularly support one business or more than one?"
+            value={d.scope}
+            options={[
+              ["one", "One brand / entity"],
+              ["several", "Several brands / entities"],
+              ["group", "Group / all team.blue"],
+              ["unknown", "Not sure"],
+            ]}
+            invalid={bad("scope")}
+            change={(scope) => change({ scope })}
+          />
+          {!focusedLocalContext && (
+            <Checks
+              label="Does any of your work need the following?"
+              values={d.localNeeds}
+              options={LOCAL_NEEDS}
+              exclusive={["none", "unknown"]}
+              invalid={bad("localNeeds")}
+              change={(localNeeds) => change({ localNeeds })}
+            />
+          )}
+          <Text
+            label={
+              focusedLocalContext
+                ? "Which parts of your current work need local knowledge or your presence at an office? Give one example. (optional)"
+                : "Anything important about these local requirements? (optional)"
+            }
+            help={
+              focusedLocalContext
+                ? "For example: local employment rules, country payroll requirements or reception duties at an office. A short answer is enough."
+                : undefined
+            }
+            value={d.localNote}
+            change={(localNote) => change({ localNote })}
+          />
+        </>
       )}
-      <Text
-        label={
-          focusedLocalContext
-            ? "Which parts of your current work need local knowledge or your presence at an office? Give one example. (optional)"
-            : "Anything important about these local requirements? (optional)"
-        }
-        help={
-          focusedLocalContext
-            ? "For example: local employment rules, country payroll requirements or reception duties at an office. A short answer is enough."
-            : undefined
-        }
-        value={d.localNote}
-        change={(localNote) => change({ localNote })}
-      />
       <section className="tb-process">
         <h3>Systems and tools</h3>
         <p>

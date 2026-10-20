@@ -1,45 +1,50 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Pick } from "./context";
+import Info from "./info";
 import { toggleOption } from "@/lib/baseline/prototype-enrichment";
 import { BROAD_AREAS } from "@/lib/baseline/broad-prototype";
 import { MANAGEMENT_AREA } from "@/lib/baseline/management-prototype";
+import { areaQuestions, asksRework } from "@/lib/baseline/work-area-questions";
 import {
   PROJECT_COUNTRIES,
   COUNTRY_OPTIONS,
-  LOCAL_REQUIREMENTS,
-  handoffOptions,
-  visibleHandoffs,
-  OWNERSHIP,
   TASKS,
-  MONTHS,
   CAPACITY,
-  NUMBER_BASIS,
   AUTONOMY,
   emptyWorkDetail,
   coverageCountries,
   sumShares,
   depthIssues,
+  depthEvidence,
+  contributionsFor,
+  handoffOptions,
   type DepthDraft,
   type WorkDetail,
 } from "@/lib/baseline/depth";
-const known = (v: string) => ["records", "estimate"].includes(v);
+
 function Checks({
   label,
   values,
   options,
   change,
   invalid = false,
+  help = "",
 }: {
   label: string;
   values: string[];
   options: string[][];
   change: (v: string[]) => void;
   invalid?: boolean;
+  help?: string;
 }) {
   return (
     <fieldset className={"tb-process" + (invalid ? " tb-invalid" : "")}>
-      <legend>{label}</legend>
+      <legend>
+        {label}
+        {help && <Info label={label}>{help}</Info>}
+      </legend>
+      {help && <p className="tb-compact-text">{help}</p>}
       <div className="tb-options">
         {options.map(([code, text]) => (
           <label key={code}>
@@ -73,18 +78,21 @@ function Text({
   invalid?: boolean;
   help?: string;
 }) {
+  const id = useId();
   return (
-    <label className="tb-field">
-      <span>{label}</span>
+    <div className="tb-field">
+      <label htmlFor={id}>{label}</label>
       <textarea
+        id={id}
         aria-label={label}
         aria-invalid={invalid}
+        aria-describedby={help ? id + "-help" : undefined}
         value={value}
         maxLength={2000}
         onChange={(e) => change(e.target.value)}
       />
-      {help && <small>{help}</small>}
-    </label>
+      {help && <small id={id + "-help"}>{help}</small>}
+    </div>
   );
 }
 function NumberField({
@@ -93,17 +101,21 @@ function NumberField({
   change,
   invalid = false,
   max = 100,
+  help = "",
 }: {
   label: string;
   value: number | null | undefined;
   change: (v: number | null) => void;
   invalid?: boolean;
   max?: number;
+  help?: string;
 }) {
+  const id = useId();
   return (
-    <label className="tb-field">
-      <span>{label}</span>
+    <div className="tb-field">
+      <label htmlFor={id}>{label}</label>
       <input
+        id={id}
         type="number"
         min={0}
         max={max}
@@ -111,12 +123,14 @@ function NumberField({
         inputMode="decimal"
         aria-label={label}
         aria-invalid={invalid}
+        aria-describedby={help ? id + "-help" : undefined}
         value={typeof value === "number" && Number.isFinite(value) ? value : ""}
         onChange={(e) =>
           change(e.target.value === "" ? null : Number(e.target.value))
         }
       />
-    </label>
+      {help && <small id={id + "-help"}>{help}</small>}
+    </div>
   );
 }
 function AreaPanel({
@@ -132,11 +146,12 @@ function AreaPanel({
   useEffect(() => {
     if (invalid && panel.current) panel.current.open = true;
   }, [invalid]);
+  // Leave open/closed state with the browser. Autosave must not reset a panel
+  // that the respondent has just opened.
   return (
     <details
       ref={panel}
       className={"tb-process" + (invalid ? " tb-invalid" : "")}
-      open={invalid || undefined}
     >
       <summary>{label}</summary>
       {children}
@@ -156,7 +171,7 @@ export default function Depth({
   step: string;
   issues: string[];
 }) {
-  const bad = (k: string) => issues.includes(k);
+  const bad = (key: string) => issues.includes(key);
   const text = (key: keyof DepthDraft, label: string, help = "") => (
     <Text
       label={label}
@@ -166,19 +181,26 @@ export default function Depth({
       change={(v) => change({ [key]: v })}
     />
   );
-  const pick = (key: keyof DepthDraft, label: string, options: string[][]) => (
+  const pick = (
+    key: keyof DepthDraft,
+    label: string,
+    options: string[][],
+    help = "",
+  ) => (
     <Pick
       label={label}
       value={String(d[key] ?? "")}
       invalid={bad(key)}
       options={options}
+      help={help}
       change={(v) => change({ [key]: v })}
     />
   );
-  const num = (key: keyof DepthDraft, label: string, max = 168) => (
+  const num = (key: keyof DepthDraft, label: string, max = 168, help = "") => (
     <NumberField
       label={label}
       max={max}
+      help={help}
       value={d[key] as number | null}
       invalid={bad(key)}
       change={(v) => change({ [key]: v })}
@@ -188,15 +210,14 @@ export default function Depth({
     return (
       <>
         <p>
-          Keep where you work separate from the countries and businesses you
-          support. Include contractors and services delivered from outside the
-          core countries.
+          Tell us where you work and which countries and businesses you support.
+          These may be different.
         </p>
         {pick(
           "basedCountry",
           "Which country are you normally based in for work?",
           [
-            ...PROJECT_COUNTRIES.map(([c, l]) => [c, l]),
+            ...PROJECT_COUNTRIES.map(([code, label]) => [code, label]),
             ["other", "Other country"],
             ["unknown", "Not sure"],
           ],
@@ -208,22 +229,21 @@ export default function Depth({
           values={d.countries}
           options={COUNTRY_OPTIONS}
           invalid={bad("countries")}
+          help="Include countries you support remotely. Choose Group-wide for shared Group work that you cannot link to individual countries."
           change={(countries) => change({ countries })}
         />
         {d.countries.includes("other") &&
           text(
             "otherCountries",
             "Other countries you support",
-            "Name each country. If more than one, put one country per line.",
+            "Enter one country per line. Include countries outside the core list if relevant.",
           )}
         {!d.countries.includes("unknown") && d.countries.length > 0 && (
           <>
             <h2>Time supporting each country</h2>
             <p>
-              This is another view of your total working time, separate from the
-              work-area split. Count each hour once. Use Group-wide for
-              genuinely shared work rather than repeating it under every
-              country.
+              This describes the same working time as your work-area split,
+              viewed by country. Count each hour once. Aim for 100%.
             </p>
             <label className="tb-check">
               <input
@@ -238,19 +258,19 @@ export default function Depth({
             {!d.countryTimeUnknown && (
               <>
                 <div className="tb-total" aria-live="polite">
-                  Country total:{" "}
+                  Country time total:{" "}
                   {sumShares(
                     coverageCountries(d).map((c) => c.code),
                     d.countryTime,
                   )}
-                  %<small>Aim for 100% of total working time.</small>
+                  %
                 </div>
                 {coverageCountries(d).map(({ code, label }) => (
                   <NumberField
                     key={code}
                     label={"Country time: " + label + " (%)"}
-                    invalid={bad("countryTime_" + code)}
                     value={d.countryTime[code]}
+                    invalid={bad("countryTime_" + code)}
                     change={(v) =>
                       change({ countryTime: { ...d.countryTime, [code]: v } })
                     }
@@ -263,7 +283,7 @@ export default function Depth({
         {text(
           "businesses",
           "Which brands, businesses or legal entities do you regularly support?",
-          "List the names. Write Group-wide if applicable, or Not sure. This is service coverage, not just your employing entity.",
+          "List the names, or write Group-wide. Include businesses you support in addition to your employing business.",
         )}
         {num(
           "supportedEmployees",
@@ -273,7 +293,7 @@ export default function Depth({
         {text(
           "languages",
           "Which languages can you use to deliver this work, and at what working level?",
-          "For example English — professional; Finnish — everyday employee support. Include restrictions or write Not sure.",
+          "For example: English — professional; Finnish — everyday employee support. Write Not sure if needed.",
         )}
       </>
     );
@@ -281,17 +301,17 @@ export default function Depth({
     return (
       <>
         <p>
-          Open each selected work area. Estimate the split within that area,
-          then describe ownership, local requirements, demand and hand-offs.
-          Work volume and rework figures are optional estimates of your own
-          work.
+          Open each work area you selected. Choose the activities you do. You do
+          not need another percentage split here. Examples and the i buttons
+          explain the questions.
         </p>
         {selected.map((area) => {
           const w = d.work[area] ?? emptyWorkDetail(),
-            p = area + "_",
-            label =
-              [...BROAD_AREAS, MANAGEMENT_AREA].find((a) => a.code === area)
-                ?.label ?? area;
+            q = areaQuestions(area),
+            p = area + "_";
+          const label =
+            [...BROAD_AREAS, MANAGEMENT_AREA].find((a) => a.code === area)
+              ?.label ?? area;
           const update = (patch: Partial<WorkDetail>) =>
             change({ work: { ...d.work, [area]: { ...w, ...patch } } });
           const txt = (key: keyof WorkDetail, title: string, help = "") => (
@@ -303,178 +323,121 @@ export default function Depth({
               change={(v) => update({ [key]: v })}
             />
           );
-          const pk = (
-            key: keyof WorkDetail,
-            title: string,
-            options: string[][],
-          ) => (
-            <Pick
-              label={label + ": " + title}
-              value={String(w[key] ?? "")}
-              invalid={bad(p + key)}
-              options={options}
-              change={(v) => update({ [key]: v })}
-            />
-          );
-          const n = (key: keyof WorkDetail, title: string, max = 100) => (
-            <NumberField
-              label={label + ": " + title}
-              max={max}
-              value={w[key] as number | null}
-              invalid={bad(p + key)}
-              change={(v) => update({ [key]: v })}
-            />
-          );
-          const checks = (
-            key: "local" | "receives" | "passes",
-            title: string,
-            options: string[][],
-          ) => (
-            <Checks
-              label={label + ": " + title}
-              values={
-                key === "local" ? w[key] : visibleHandoffs(area, key, w[key])
-              }
-              options={options}
-              invalid={bad(p + key)}
-              change={(v) => update({ [key]: v })}
-            />
-          );
-          if (area === "other")
-            return (
-              <AreaPanel
-                key={area}
-                label={label}
-                invalid={issues.some((i) => i.startsWith(p))}
-              >
-                {txt(
-                  "taskNote",
-                  "Describe the other work you do",
-                  "Explain the purpose, examples of the work and how often it arises. Include anything important that the named work areas do not cover.",
-                )}
-                {txt(
-                  "handoffNote",
-                  "Who requests this work, what do you provide, and who receives it? (optional)",
-                  "Describe the people or teams involved and anything else that helps explain this work.",
-                )}
-              </AreaPanel>
-            );
+          const nextOptions = q.nextStep
+            ? handoffOptions(area, "passes").filter((o) =>
+                q.nextStep![2].includes(o[0]),
+              )
+            : [];
           return (
             <AreaPanel
               key={area}
               label={label}
               invalid={issues.some((i) => i.startsWith(p))}
             >
-              {TASKS[area] && (
+              <p>{q.intro}</p>
+              {area === "other" ? (
                 <>
-                  <Checks
-                    label={label + ": Work you actually do"}
-                    values={w.tasks}
-                    options={[...TASKS[area], ["unknown", "Not sure"]]}
-                    invalid={bad(p + "tasks")}
-                    change={(tasks) => update({ tasks })}
-                  />
-                  {!w.tasks.includes("unknown") && w.tasks.length > 0 && (
+                  {txt(
+                    "taskNote",
+                    "Describe the other work you do",
+                    "Explain the purpose, examples and how often the work arises. A few sentences are enough.",
+                  )}
+                  {txt(
+                    "handoffNote",
+                    "Who requests this work, what do you provide, and who receives it? (optional)",
+                    "Use team or role names. Explain anything else that helps describe this work.",
+                  )}
+                </>
+              ) : (
+                <>
+                  {TASKS[area] && (
                     <>
-                      <label className="tb-check">
-                        <input
-                          type="checkbox"
-                          checked={w.taskTimeUnknown}
-                          onChange={(e) =>
-                            update({ taskTimeUnknown: e.target.checked })
-                          }
-                        />
-                        I cannot reasonably estimate this activity split
-                      </label>
-                      {!w.taskTimeUnknown && (
+                      <Checks
+                        label={label + ": Work you actually do"}
+                        values={w.tasks}
+                        options={[...TASKS[area], ["unknown", "Not sure"]]}
+                        help="Select all that apply to your own work. You can choose several activities. No percentages are needed."
+                        invalid={bad(p + "tasks")}
+                        change={(tasks) => update({ tasks })}
+                      />
+                      {w.tasks.includes("other") &&
+                        txt(
+                          "taskNote",
+                          "Describe the other activity",
+                          "Describe an activity in this work area that the list does not cover.",
+                        )}
+                    </>
+                  )}
+                  {q.contributions && (
+                    <Checks
+                      label={label + ": How are you involved?"}
+                      values={contributionsFor(w)}
+                      options={q.contributions}
+                      invalid={bad(p + "contributions")}
+                      help="Select all that apply. Work and leadership can be shared with colleagues or the team lead. You do not need to be the only person responsible."
+                      change={(contributions) => update({ contributions })}
+                    />
+                  )}
+                  {q.scope && txt("scopeNote", ...q.scope)}
+                  {q.local && txt("localNote", ...q.local)}
+                  {q.nextStep && (
+                    <Checks
+                      label={label + ": " + q.nextStep[0]}
+                      options={nextOptions}
+                      values={w.passes.filter((code) =>
+                        nextOptions.some((o) => o[0] === code),
+                      )}
+                      invalid={bad(p + "passes")}
+                      help={q.nextStep[1] + " This question is optional."}
+                      change={(passes) => update({ passes })}
+                    />
+                  )}
+                  {q.collaboration && txt("handoffNote", ...q.collaboration)}
+                  {q.volume && (
+                    <>
+                      <NumberField
+                        label={label + ": " + q.volume[0]}
+                        max={1e9}
+                        value={w.volume}
+                        invalid={bad(p + "volume")}
+                        help={q.volume[1]}
+                        change={(volume) => update({ volume })}
+                      />
+                      {w.volume !== null && (
                         <>
-                          <div className="tb-total" aria-live="polite">
-                            {label} activity total:{" "}
-                            {sumShares(w.tasks, w.taskTime)}%
-                            <small>
-                              100% of this work area, not your whole working
-                              time.
-                            </small>
-                          </div>
-                          {w.tasks.map((code) => (
-                            <NumberField
-                              key={code}
-                              label={
-                                label +
-                                " activity time: " +
-                                (TASKS[area].find((o) => o[0] === code)?.[1] ??
-                                  code) +
-                                " (%)"
-                              }
-                              invalid={bad(p + "taskTime_" + code)}
-                              value={w.taskTime[code]}
-                              change={(v) =>
-                                update({
-                                  taskTime: { ...w.taskTime, [code]: v },
-                                })
-                              }
-                            />
-                          ))}
+                          <Pick
+                            label={label + ": Period for this number"}
+                            value={w.volumePeriod}
+                            invalid={bad(p + "volumePeriod")}
+                            options={[
+                              ["week", "Per typical week"],
+                              ["month", "Per typical month"],
+                              ["year", "Per year"],
+                            ]}
+                            change={(volumePeriod) => update({ volumePeriod })}
+                          />
+                          {txt(
+                            "volumeUnit",
+                            "What did you count?",
+                            "For example: joiners, leavers, contract changes or absence updates. Use the type of item that matches the number above.",
+                          )}
                         </>
                       )}
                     </>
                   )}
-                  {w.tasks.includes("other") &&
-                    txt("taskNote", "Describe the other work")}
+                  {asksRework(area, w.tasks) && (
+                    <NumberField
+                      label={
+                        label +
+                        ": Share of document or record updates needing correction (%, optional estimate)"
+                      }
+                      value={w.reworkPercent}
+                      invalid={bad(p + "reworkPercent")}
+                      help="For example, 5 out of 100 updates need a missing detail added or an incorrect entry fixed: enter 5. Leave blank if you cannot estimate."
+                      change={(reworkPercent) => update({ reworkPercent })}
+                    />
+                  )}
                 </>
-              )}
-              {checks(
-                "local",
-                "Local delivery requirements",
-                LOCAL_REQUIREMENTS,
-              )}
-              {w.local.some((c) => !["none", "unknown"].includes(c)) &&
-                txt(
-                  "localNote",
-                  "Which countries, languages or sites need this, and why?",
-                  "Describe the country, language, site or service-hour requirements that apply to your current work.",
-                )}
-              {pk("ownership", "Your main accountability", OWNERSHIP)}
-              {w.ownership !== "accountable" &&
-                txt(
-                  "ownerTeam",
-                  "Who is accountable for the whole process / service?",
-                  "Give a team or role, not a personal name. If not known, write Not sure.",
-                )}
-              {checks(
-                "receives",
-                "Work or information received from",
-                handoffOptions(area, "receives"),
-              )}
-              {checks(
-                "passes",
-                "Work or approval passed to",
-                handoffOptions(area, "passes"),
-              )}
-              {txt(
-                "handoffNote",
-                "Hand-off details or recurring delays (optional)",
-                "Name the step, team or system and where work waits, duplicates or returns for correction.",
-              )}
-              {n("volume", "Typical personal volume (optional estimate)", 1e9)}
-              {w.volume !== null && (
-                <>
-                  {pk("volumePeriod", "Volume period", [
-                    ["week", "Per typical week"],
-                    ["month", "Per typical month"],
-                    ["year", "Per year"],
-                  ])}
-                </>
-              )}
-              {w.volume !== null &&
-                txt(
-                  "volumeUnit",
-                  "What is being counted?",
-                  "For example joiners, leavers, contracts, cases, tickets or payroll employee records. Count your own work, not the whole team's workload.",
-                )}
-              {n(
-                "reworkPercent",
-                "Share of items needing rework / correction (%, optional estimate)",
               )}
             </AreaPanel>
           );
@@ -484,192 +447,117 @@ export default function Depth({
   if (step === "role_capacity")
     return (
       <>
-        <h2>Your responsibility and judgement</h2>
+        <h2>Your decisions</h2>
         {pick(
           "autonomy",
-          "Which description best matches your usual decision-making?",
+          "How do you usually make decisions in your work?",
           AUTONOMY,
+          "Think about your usual work. Working independently can still include discussing options with colleagues. Asking for advice is different from needing approval.",
         )}
-        {pick("complexity", "What kind of problems do you usually resolve?", [
-          ["standard", "Mostly standard tasks with known answers"],
-          ["varied", "Varied situations within established practice"],
-          ["complex", "Complex exceptions requiring specialist judgement"],
+        {pick(
+          "complexity",
+          "What kind of problems do you usually resolve?",
           [
-            "novel",
-            "New / cross-business problems without established answers",
+            ["standard", "Mostly standard tasks with known answers"],
+            ["varied", "Different situations, using established guidance"],
+            ["complex", "Complex exceptions needing specialist judgement"],
+            ["novel", "New problems without established answers"],
+            ["unknown", "Not sure"],
           ],
-          ["unknown", "Not sure"],
-        ])}
+          "For example: follow a standard process, choose how to handle an unusual request, or design an approach for a new situation.",
+        )}
         {pick(
           "impact",
-          "What is the normal reach of decisions you are accountable for?",
+          "Who is usually affected by decisions you make?",
           [
-            ["individual", "Individual requests or cases"],
-            ["team", "A team / local service"],
+            ["individual", "An individual request or case"],
+            ["team", "A team or local service"],
             ["country", "A country or business"],
-            ["regional", "Several countries / a region"],
+            ["regional", "Several countries or a region"],
             ["group", "Group-wide services or policy"],
             ["unknown", "Not sure"],
           ],
+          "Choose the usual reach of your own decisions, rather than the size of the audience you support. For example, arranging one training session is different from setting Group learning policy.",
         )}
         {text(
           "decisionExample",
-          "Give one example of a decision you make independently",
-          "Explain what you decide, the boundaries, who is affected and what would happen if it went wrong. Use role or team names; no employee case details. If you do not make independent decisions, explain the review you need.",
+          "One example of a decision you make (optional)",
+          "Briefly explain the decision and any limits. Use role or team names. Do not include personal employee details.",
         )}
         {text(
           "escalation",
-          "Which decisions need approval, and who approves them?",
-          "For example employment-law exceptions, pay, budget, policy changes, system access or service priorities. Name the approving role or team.",
+          "When do you need someone else's approval? (optional)",
+          "For example, a budget exception, a change to policy or new system access. Name the approving role or team, or write No regular approvals needed.",
         )}
-        <h2>Demand and available time</h2>
+        <h2>Your workload</h2>
         <p>
-          Use a typical week in your current contracted working pattern.
-          Available time means uncommitted time after current work, required
-          cover and other commitments. It is not the same as time that might be
-          released by redesign. Estimates will be validated with your manager.
+          Think about a typical week. Estimates are enough. You can leave
+          optional numbers blank if you cannot give a useful estimate.
         </p>
         {pick(
           "capacity",
           "How does current demand compare with your available time?",
           CAPACITY,
+          "Think about whether you can complete your usual work in your normal working pattern. Include fixed cover and planned work as well as incoming requests.",
         )}
-        {pick(
-          "hoursBasis",
-          "Basis for your contracted weekly hours",
-          NUMBER_BASIS,
-        )}
-        {known(d.hoursBasis) &&
-          num("weeklyHours", "Your contracted hours per week")}
         {num(
           "overtimeHours",
           "Typical additional hours worked per week (optional)",
+          168,
+          "Hours worked beyond your normal working pattern. For example, enter 2 for about two extra hours in a typical week.",
         )}
-        {pick(
-          "availableBasis",
-          "Basis for uncommitted time available now",
-          NUMBER_BASIS,
-        )}
-        {known(d.availableBasis) &&
-          num("availableHours", "Uncommitted hours in a typical week")}
         {num(
-          "fixedOnsiteHours",
-          "Hours per week committed to physical site / reception cover (optional)",
+          "availableHours",
+          "Uncommitted hours in a typical week (optional estimate)",
+          168,
+          "Time that is usually free after your current work and required cover. Enter 0 if none. Do not include time that could only become free after changing a process.",
         )}
+        {selected.includes("office") &&
+          num(
+            "fixedOnsiteHours",
+            "Hours per week committed to physical site / reception cover (optional)",
+            168,
+            "Include hours when you must be available at the site, even if visitor numbers vary. These hours are a commitment, not free time.",
+          )}
         {text(
           "unmetWork",
-          "Work delayed, unmet demand or backlog (optional)",
-          "Name the work, approximate age / volume and service impact. Say when the pressure occurs.",
+          "Work that is regularly delayed or left unfinished (optional)",
+          "Name the type of work and when the pressure occurs. For example, benefit questions wait during payroll week, or reporting tasks wait during a system launch.",
         )}
         {pick(
           "backup",
-          "Is trained cover available for your main responsibilities?",
+          "Could someone cover your main work if you were away?",
           [
-            ["full", "Yes, for all main work"],
-            ["partial", "For some work only"],
+            ["full", "Yes, all main work"],
+            ["partial", "Some work only"],
             ["none", "No trained cover"],
             ["unknown", "Not sure"],
           ],
+          "Cover means someone with the knowledge and access needed to do the work. It does not mean they already have spare time.",
         )}
-        <h2>Workload peaks</h2>
         {pick(
           "peakPattern",
           "Are there predictable peaks or major event-driven demands?",
           [
             ["none", "No significant peaks"],
-            ["seasonal", "Predictable seasonal / annual peaks"],
-            ["events", "Event-driven peaks / projects"],
+            ["seasonal", "Regular annual or seasonal peaks"],
+            ["events", "Peaks linked to events or projects"],
             ["unknown", "Not sure"],
           ],
+          "For example, annual performance reviews, salary reviews, a survey, a recruitment campaign, an office move or a systems launch. Choose what applies to your work.",
         )}
         {["seasonal", "events"].includes(d.peakPattern) && (
           <>
-            <Checks
-              label="Peak months"
-              options={MONTHS}
-              values={d.peakMonths}
-              invalid={bad("peakMonths")}
-              change={(peakMonths) => change({ peakMonths })}
-            />
             {text(
               "peakDescription",
-              "What drives the peaks and how long do they last?",
-              "Include annual cycles, deadlines, office moves or implementations, duration in weeks and what other work is deferred.",
+              "What causes the peaks, and when do they happen?",
+              "Include the months or event, how long the busy period lasts and any work you postpone. For example: annual performance reviews in November, lasting about three weeks.",
             )}
-            {pick(
-              "peakBasis",
-              "Basis for additional peak effort",
-              NUMBER_BASIS,
-            )}
-            {known(d.peakBasis) &&
-              num(
-                "peakExtraHours",
-                "Additional work hours required per peak week",
-              )}
-          </>
-        )}
-        {text(
-          "improvements",
-          "Where could work be simplified, automated or shared? (optional)",
-          "Describe the specific work, recurring friction and any tools, dependencies or safeguards needed. Do not assume all of the time would be saved.",
-        )}
-        <h2>Existing service measures and provider costs</h2>
-        <p>
-          Only report figures you know. Do not guess or enter personal salary
-          details. These figures describe your stated scope and will be checked
-          against source records.
-        </p>
-        {pick(
-          "serviceMetrics",
-          "Do you have agreed service targets or measured outcomes?",
-          [
-            ["yes", "Yes"],
-            ["no", "No"],
-            ["unknown", "Not sure"],
-          ],
-        )}
-        {d.serviceMetrics === "yes" && (
-          <>
-            {text("metricName", "Which service, measure and unit?")}
-            {text(
-              "metricTarget",
-              "What is the agreed target?",
-              "If there is no formal target, say No formal target.",
-            )}
-            {text(
-              "metricActual",
-              "What was the latest actual result?",
-              "Write Not available if the result is not recorded.",
-            )}
-            {text("metricPeriod", "Which reporting period does it cover?")}
-            {text(
-              "metricSource",
-              "Which system / report or role can verify the figure?",
-            )}
-          </>
-        )}
-        {pick(
-          "costKnowledge",
-          "Do you know a recurring external provider cost for work you support?",
-          [
-            ["known", "Yes, I have a figure and source"],
-            ["unknown", "Not known"],
-            ["na", "Not applicable"],
-          ],
-        )}
-        {d.costKnowledge === "known" && (
-          <>
-            {num("providerCost", "External provider cost amount", 1e12)}
-            {text("costCurrency", "Cost currency (for example EUR)")}
-            {text(
-              "costPeriod",
-              "Cost period and service scope",
-              "For example monthly payroll provider fee for 200 employees in Finland. Do not report a per-item fee as the total cost.",
-            )}
-            {text(
-              "costSource",
-              "Cost source / validating team",
-              "Give a report, contract or responsible team. Do not attach contracts or personal pay details.",
+            {num(
+              "peakExtraHours",
+              "Additional work hours required per peak week (optional estimate)",
+              168,
+              "Extra hours of work needed in a busy week compared with a typical week. Leave blank if you cannot estimate.",
             )}
           </>
         )}
@@ -677,6 +565,7 @@ export default function Depth({
     );
   return null;
 }
+
 export function DepthReview({
   draft,
   selected,
@@ -684,9 +573,10 @@ export function DepthReview({
   draft: DepthDraft;
   selected: string[];
 }) {
+  const e = depthEvidence(draft, selected);
   return (
     <section className="tb-process">
-      <h2>Detailed work and delivery evidence</h2>
+      <h2>Your work, coverage and workload</h2>
       <p>
         Work base:{" "}
         {draft.basedCountry === "other"
@@ -694,163 +584,102 @@ export function DepthReview({
           : (PROJECT_COUNTRIES.find((c) => c[0] === draft.basedCountry)?.[1] ??
             draft.basedCountry)}
       </p>
+      <p>Businesses: {e.businesses}</p>
+      <p>Working languages: {e.languages}</p>
       <p>
-        Countries supported:{" "}
-        {draft.countries
-          .map((c) => COUNTRY_OPTIONS.find((o) => o[0] === c)?.[1] ?? c)
-          .join(", ")}
-        {draft.countries.includes("other") ? " — " + draft.otherCountries : ""}
+        Supported employee population: {e.supportedEmployees ?? "Not given"}
       </p>
-      {coverageCountries(draft).map((c) => (
+      {e.countries.map((c) => (
         <p key={c.code}>
           {c.label}:{" "}
-          {draft.countryTimeUnknown || c.code === "unknown"
-            ? "Time not known"
-            : String(draft.countryTime[c.code] ?? "") +
-              "% of total working time"}
+          {c.shareOfWorkingTime === null
+            ? "Time not estimated"
+            : c.shareOfWorkingTime + "% of total working time"}
         </p>
       ))}
-      <p>Businesses: {draft.businesses}</p>
-      <p>Working languages: {draft.languages}</p>
-      <p>
-        Supported employee population: {draft.supportedEmployees ?? "Not given"}
-      </p>
-      <p>
-        Responsibility: {AUTONOMY.find((o) => o[0] === draft.autonomy)?.[1]}
-      </p>
-      <p>
-        Problem complexity: {draft.complexity}; decision reach: {draft.impact}
-      </p>
-      <p>Decision example: {draft.decisionExample}</p>
-      <p>Escalation / approvals: {draft.escalation}</p>
-      <p>
-        Capacity: {CAPACITY.find((o) => o[0] === draft.capacity)?.[1]};
-        available hours:{" "}
-        {known(draft.availableBasis)
-          ? draft.availableHours
-          : "Not known / not applicable"}
-      </p>
-      <p>
-        Contracted hours:{" "}
-        {known(draft.hoursBasis)
-          ? draft.weeklyHours
-          : "Not known / not applicable"}{" "}
-        ({draft.hoursBasis}); overtime: {draft.overtimeHours ?? "Not given"};
-        fixed site cover: {draft.fixedOnsiteHours ?? "Not given"}
-      </p>
-      <p>
-        Cover: {draft.backup}; unmet work: {draft.unmetWork}
-      </p>
-      <p>
-        Peaks: {draft.peakPattern}
-        {["seasonal", "events"].includes(draft.peakPattern) && (
-          <>
-            ;{" "}
-            {draft.peakMonths
-              .map((c) => MONTHS.find((o) => o[0] === c)?.[1] ?? c)
-              .join(", ")}
-            ; {draft.peakDescription}; extra hours:{" "}
-            {known(draft.peakBasis)
-              ? draft.peakExtraHours
-              : "Not known / not applicable"}{" "}
-            ({draft.peakBasis})
-          </>
-        )}
-      </p>
-      <p>Improvement opportunities: {draft.improvements}</p>
-      <p>
-        Service measures: {draft.serviceMetrics}
-        {draft.serviceMetrics === "yes"
-          ? ` — ${draft.metricName}; target: ${draft.metricTarget}; actual: ${draft.metricActual}; period: ${draft.metricPeriod}; source: ${draft.metricSource}`
-          : ""}
-      </p>
-      <p>
-        Provider costs: {draft.costKnowledge}
-        {draft.costKnowledge === "known"
-          ? ` — ${draft.providerCost} ${draft.costCurrency}; period / scope: ${draft.costPeriod}; source: ${draft.costSource}`
-          : ""}
-      </p>
-      {selected.map((area) => {
-        const w = draft.work[area] ?? emptyWorkDetail();
-        if (area === "other")
-          return (
-            <section className="tb-process" key={area}>
-              <h3>Other work</h3>
-              <p>{w.taskNote}</p>
-              {w.handoffNote && <p>{w.handoffNote}</p>}
-            </section>
-          );
+      {e.work.map((w) => {
+        const q = areaQuestions(w.area),
+          label =
+            [...BROAD_AREAS, MANAGEMENT_AREA].find((a) => a.code === w.area)
+              ?.label ?? w.area;
         return (
-          <section className="tb-process" key={area}>
-            <h3>
-              {[...BROAD_AREAS, MANAGEMENT_AREA].find((a) => a.code === area)
-                ?.label ?? area}
-            </h3>
-            {w.tasks.map((code) => (
-              <p key={code}>
-                {TASKS[area]?.find((o) => o[0] === code)?.[1] ?? code}:{" "}
-                {w.taskTimeUnknown || code === "unknown"
-                  ? "Time not known"
-                  : String(w.taskTime[code] ?? "") + "% of this area"}
+          <section className="tb-process" key={w.area}>
+            <h3>{label}</h3>
+            {!!w.tasks.length && (
+              <p>Activities: {w.tasks.map((t) => t.label).join(", ")}</p>
+            )}
+            {w.taskNote && <p>{w.taskNote}</p>}
+            {!!w.contributions?.length && (
+              <p>
+                Your involvement:{" "}
+                {w.contributions
+                  .map(
+                    (code) =>
+                      q.contributions?.find((o) => o[0] === code)?.[1] ?? code,
+                  )
+                  .join(", ")}
               </p>
-            ))}
-            {w.tasks.includes("other") && <p>{w.taskNote}</p>}
-            <p>
-              Local requirements:{" "}
-              {w.local
-                .map(
-                  (c) => LOCAL_REQUIREMENTS.find((o) => o[0] === c)?.[1] ?? c,
-                )
-                .join(", ")}
-              .{" "}
-              {w.local.some((c) => !["none", "unknown"].includes(c))
-                ? w.localNote
-                : ""}
-            </p>
-            <p>
-              Accountability: {OWNERSHIP.find((o) => o[0] === w.ownership)?.[1]}
-              {w.ownership !== "accountable" && (
-                <>; process owner: {w.ownerTeam}</>
-              )}
-            </p>
-            <p>
-              Receives from:{" "}
-              {visibleHandoffs(area, "receives", w.receives)
-                .map(
-                  (c) =>
-                    handoffOptions(area, "receives").find(
-                      (o) => o[0] === c,
-                    )?.[1] ?? c,
-                )
-                .join(", ")}
-              . Passes to:{" "}
-              {visibleHandoffs(area, "passes", w.passes)
-                .map(
-                  (c) =>
-                    handoffOptions(area, "passes").find(
-                      (o) => o[0] === c,
-                    )?.[1] ?? c,
-                )
-                .join(", ")}
-            </p>
+            )}
+            {w.scopeNote && <p>{w.scopeNote}</p>}
+            {w.localNote && <p>{w.localNote}</p>}
+            {q.nextStep && !!w.passes.length && (
+              <p>
+                Next step or approval:{" "}
+                {w.passes
+                  .map(
+                    (code) =>
+                      handoffOptions(w.area, "passes").find(
+                        (o) => o[0] === code,
+                      )?.[1] ?? code,
+                  )
+                  .join(", ")}
+              </p>
+            )}
             {w.handoffNote && <p>{w.handoffNote}</p>}
-            <p>
-              Volume:{" "}
-              {w.volume !== null
-                ? `${w.volume} ${w.volumeUnit} per ${w.volumePeriod} (estimate)`
-                : "Not given"}
-              . Rework:{" "}
-              {w.reworkPercent !== null
-                ? w.reworkPercent + "% (estimate)"
-                : "Not given"}
-            </p>
+            {w.volume !== null && (
+              <p>
+                Personal volume: {w.volume} {w.volumeUnit} per {w.volumePeriod}{" "}
+                (estimate)
+              </p>
+            )}
+            {w.reworkPercent !== null && (
+              <p>
+                Document or record corrections: {w.reworkPercent}% (estimate)
+              </p>
+            )}
           </section>
         );
       })}
-      <p>Use the edit buttons to review all entries before submitting.</p>
+      <p>
+        Decision-making: {AUTONOMY.find((o) => o[0] === e.role.autonomy)?.[1]}
+      </p>
+      <p>
+        Problem types: {e.role.complexity}; reach of decisions: {e.role.impact}
+      </p>
+      {e.role.decisionExample && <p>Example: {e.role.decisionExample}</p>}
+      {e.role.escalation && <p>Approvals needed: {e.role.escalation}</p>}
+      <p>Workload: {CAPACITY.find((o) => o[0] === e.capacity.capacity)?.[1]}</p>
+      <p>
+        Additional weekly hours: {e.capacity.overtimeHours ?? "Not given"};
+        uncommitted hours: {e.capacity.availableHours ?? "Not given"}
+      </p>
+      {e.capacity.fixedOnsiteHours !== null && (
+        <p>Site cover: {e.capacity.fixedOnsiteHours} hours per week</p>
+      )}
+      {e.capacity.unmetWork && <p>Delayed work: {e.capacity.unmetWork}</p>}
+      <p>
+        Cover: {e.capacity.backup}; workload peaks: {e.peaks.pattern}
+      </p>
+      {e.peaks.description && <p>{e.peaks.description}</p>}
+      {e.peaks.extraWeeklyHours !== null && (
+        <p>Additional peak hours: {e.peaks.extraWeeklyHours} (estimate)</p>
+      )}
+      <p>
+        Use the edit buttons if you want to change an answer before submitting.
+      </p>
       {["coverage", "work_detail", "role_capacity"].some(
         (step) => depthIssues(draft, selected, step).length > 0,
-      ) && <p role="alert">Some detailed work answers need attention.</p>}
+      ) && <p role="alert">Some answers need attention.</p>}
     </section>
   );
 }

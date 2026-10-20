@@ -14,8 +14,10 @@ const labels = (codes: string[], options: string[][]) =>
 export default function ContextReview({
   evidence: e,
   focusedLocalContext = false,
+  streamlined = false,
 }: {
   focusedLocalContext?: boolean;
+  streamlined?: boolean;
   evidence: ReturnType<typeof richEvidence>;
 }) {
   return (
@@ -136,27 +138,31 @@ export default function ContextReview({
       )}
       <section className="tb-process">
         <h2>A few final questions</h2>
-        <p>
-          Support scope:{" "}
-          {
-            {
-              one: "One brand / entity",
-              several: "Several brands / entities",
-              group: "Group / all team.blue",
-              unknown: "Not sure",
-            }[e.scope]
-          }
-        </p>
-        {!focusedLocalContext && (
-          <p>Local requirements: {labels(e.localNeeds, LOCAL_NEEDS)}</p>
-        )}
-        {e.localNote && (
-          <p>
-            {focusedLocalContext
-              ? "Work needing local knowledge or presence: "
-              : ""}
-            {e.localNote}
-          </p>
+        {!streamlined && (
+          <>
+            <p>
+              Support scope:{" "}
+              {
+                {
+                  one: "One brand / entity",
+                  several: "Several brands / entities",
+                  group: "Group / all team.blue",
+                  unknown: "Not sure",
+                }[e.scope]
+              }
+            </p>
+            {!focusedLocalContext && (
+              <p>Local requirements: {labels(e.localNeeds, LOCAL_NEEDS)}</p>
+            )}
+            {e.localNote && (
+              <p>
+                {focusedLocalContext
+                  ? "Work needing local knowledge or presence: "
+                  : ""}
+                {e.localNote}
+              </p>
+            )}
+          </>
         )}
         {e.systems.length > 0 && <p>Systems: {labels(e.systems, SYSTEMS)}</p>}
         {e.otherSystems && <p>Other tools: {e.otherSystems}</p>}

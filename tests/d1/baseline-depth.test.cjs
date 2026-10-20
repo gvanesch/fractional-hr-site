@@ -26,7 +26,7 @@ async function fixture() {
 test("Simplified revision keeps headcount and estimates without removed basis or transfer questions", async () => {
   const { c, m, d } = await fixture();
   const originalKeys = Object.keys(m.emptyDepth());
-  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.formRevision = m.PREVIOUS_DEPTH_FORM_REVISION;
   d.depth.populationBasis = "";
   const w = d.depth.work.lifecycle;
   w.ownership = "accountable";
@@ -68,7 +68,7 @@ test("Simplified revision keeps headcount and estimates without removed basis or
 });
 test("Manager advice handoffs are relevant and stale hidden choices cannot count as answers", async () => {
   const { m, d } = await fixture();
-  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.formRevision = m.PREVIOUS_DEPTH_FORM_REVISION;
   for (const direction of ["receives", "passes"]) {
     const codes = m.handoffOptions("advice_cases", direction).map((o) => o[0]);
     for (const excluded of ["it", "finance", "provider"])
@@ -109,6 +109,173 @@ test("Other work uses open narratives and exports them without requiring standar
   assert.deepEqual(m.depthIssues(d.depth, ["other"], "work_detail"), [
     "other_taskNote",
   ]);
+});
+test("Context review uses relevant questions for every work area and preserves legacy drafts", async () => {
+  const { c, m, d } = await fixture();
+  const q = await load("lib/baseline/work-area-questions.ts");
+  const canonicalBefore = JSON.stringify(c.DEPTH_COLLECTION_DEFINITION);
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  const saved = { ...d.depth.work.lifecycle };
+  for (const [area, config] of Object.entries(q.AREA_QUESTIONS)) {
+    const task = (m.TASKS[area] ?? [])[0]?.[0];
+    d.depth.work[area] = {
+      ...m.emptyWorkDetail(),
+      tasks: task ? [task] : [],
+      taskTime: {},
+      contributions: config.contributions
+        ? ["accountable", "coordinate", "deliver"]
+        : [],
+      scopeNote: "Synthetic scope for " + area,
+      taskNote: area === "other" ? "Other work narrative" : "",
+      // Deliberately retain previously entered generic answers.
+      ownership: "accountable",
+      ownerTeam: "Old owner",
+      local: ["onsite"],
+      localNote: "Old local context",
+      receives: ["employees", "finance"],
+      passes: ["employees", "finance", "it"],
+      handoffNote: "Synthetic collaboration",
+      volume: config.volume ? 5 : 100,
+      volumeUnit: "joiners",
+      volumePeriod: "month",
+      volumeBasis: "unknown",
+      handlingBasis: "records",
+      handlingMinutes: 123,
+      reworkBasis: "estimate",
+      reworkPercent: 75,
+      transferable: "yes",
+      transferPercent: 50,
+      transferNote: "Old transfer note",
+    };
+    assert.deepEqual(m.depthIssues(d.depth, [area], "work_detail"), [], area);
+    const parsed = m.parseDepth(d.depth, Object.keys(q.AREA_QUESTIONS));
+    const w = m.depthEvidence(parsed, [area]).work[0];
+    assert.equal(w.ownerTeam, "", area);
+    assert.equal(w.ownership, "", area);
+    assert.equal(w.handlingMinutes, null, area);
+    assert.equal(w.transferPercent, null, area);
+    assert.ok(
+      w.tasks.every((t) => t.shareOfAreaTime === null),
+      area,
+    );
+    if (!config.volume) assert.equal(w.volume, null, area);
+    if (!q.asksRework(area, parsed.work[area].tasks))
+      assert.equal(w.reworkPercent, null, area);
+    if (!config.local) assert.equal(w.localNote, "", area);
+    if (!config.nextStep) assert.deepEqual(w.passes, [], area);
+    assert.deepEqual(w.receives, [], area);
+    assert.equal(
+      parsed.work[area].ownerTeam,
+      "Old owner",
+      "Raw answers stay saved",
+    );
+  }
+  assert.ok(!q.AREA_QUESTIONS.experience.nextStep);
+  assert.ok(!q.AREA_QUESTIONS.systems_data.local);
+  assert.ok(!q.AREA_QUESTIONS.systems_data.contributions);
+  assert.match(
+    q.AREA_QUESTIONS.planning_development.scope[1],
+    /performance|talent|learning/i,
+  );
+  assert.doesNotMatch(
+    q.AREA_QUESTIONS.planning_development.scope[1],
+    /joiners|leavers|contracts|payroll/i,
+  );
+  assert.equal(JSON.stringify(c.DEPTH_COLLECTION_DEFINITION), canonicalBefore);
+  assert.equal(q.asksRework("lifecycle", ["documents"]), true);
+  assert.equal(q.asksRework("experience", ["events"]), false);
+  d.depth.work.lifecycle = saved;
+});
+test("Context review removes HRIS hours, all basis requirements, service metrics and provider costs", async () => {
+  const { c, m, d } = await fixture();
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.hoursBasis = d.depth.availableBasis = d.depth.peakBasis = "";
+  d.depth.weeklyHours = 1; // Hidden historic value must not limit an estimate.
+  d.depth.availableHours = 5;
+  d.depth.decisionExample = d.depth.escalation = "";
+  d.depth.serviceMetrics = d.depth.costKnowledge = "";
+  d.depth.peakMonths = [];
+  assert.deepEqual(
+    m.depthIssues(d.depth, d.broad.selected, "role_capacity"),
+    [],
+  );
+  const e = m.depthEvidence(d.depth, d.broad.selected);
+  assert.equal(e.capacity.weeklyHours, null);
+  assert.equal(e.capacity.hoursBasis, "");
+  assert.equal(e.capacity.availableHours, 5);
+  assert.equal(e.capacity.availableBasis, "estimate");
+  assert.equal(e.capacity.fixedOnsiteHours, null);
+  assert.equal(e.peaks.extraWeeklyHours, 10);
+  assert.equal(e.peaks.basis, "estimate");
+  assert.equal(e.metrics.actual, "");
+  assert.equal(e.costs.amount, null);
+  d.depth.availableHours = 169;
+  assert.ok(
+    m
+      .depthIssues(d.depth, d.broad.selected, "role_capacity")
+      .includes("availableHours"),
+  );
+  d.depth.availableHours = null;
+  assert.deepEqual(
+    m.depthIssues(d.depth, d.broad.selected, "role_capacity"),
+    [],
+  );
+  d.rich.scope = "";
+  assert.ok(
+    !c.collectionIssues(d, { isPeopleManager: false }).includes("scope"),
+  );
+});
+test("Context contributions and scope survive parsing and appear in analysis without implying sole ownership", async () => {
+  const { c, m, d } = await fixture();
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.work.lifecycle.contributions = ["accountable", "coordinate"];
+  d.depth.work.lifecycle.scopeNote = "Preserved older narrative";
+  const parsed = c.parseCollection(d, { isPeopleManager: false });
+  const e = c.collectionEvidence(parsed, { isPeopleManager: false });
+  assert.deepEqual(e.depth.work[0].contributions, [
+    "accountable",
+    "coordinate",
+  ]);
+  assert.equal(e.depth.work[0].scopeNote, ""); // No unasked field in current evidence.
+  assert.equal(
+    parsed.depth.work.lifecycle.scopeNote,
+    "Preserved older narrative",
+  );
+  assert.throws(() =>
+    m.parseDepth(
+      {
+        ...d.depth,
+        work: {
+          lifecycle: { ...d.depth.work.lifecycle, contributions: ["injected"] },
+        },
+      },
+      ["lifecycle"],
+    ),
+  );
+  assert.throws(() =>
+    m.parseDepth(
+      {
+        ...d.depth,
+        work: { lifecycle: { ...d.depth.work.lifecycle, scopeNote: 123 } },
+      },
+      ["lifecycle"],
+    ),
+  );
+  const a = await load("lib/baseline/analysis-export.ts");
+  const tables = a.analysisTables({ respondents: [
+    {
+      participant_id: "synthetic",
+      status: "completed",
+      questionnaire_version: d.version,
+      ...e,
+    },
+  ] });
+  const table = tables.find((t) => t.name === "Delivery evidence");
+  assert.ok(table);
+  const value = table.rows[0][table.columns.indexOf("Personal involvement")];
+  assert.match(value, /Lead the lifecycle service/);
+  assert.match(value, /Coordinate work/);
+  assert.equal(table.rows[0][table.columns.indexOf("Whole process owner")], "");
 });
 test("v5 requires depth while historic collection versions preserve their definitions and steps", async () => {
   const { c, m, d } = await fixture();

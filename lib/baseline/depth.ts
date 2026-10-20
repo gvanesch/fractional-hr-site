@@ -1,3 +1,4 @@
+import { areaQuestions, asksRework } from "./work-area-questions";
 // Current-work evidence for the v5 collection. Country region is a working project register, not a reporting-line inference.
 export const PROJECT_COUNTRIES = [
   ["DK", "Denmark", "Northern Europe"],
@@ -63,7 +64,14 @@ export const OWNERSHIP = [
   ["unknown", "Not sure"],
 ];
 // Keep the original option vocabulary and definition stable for saved campaigns.
-export const CURRENT_DEPTH_FORM_REVISION = "2026-10-20";
+export const PREVIOUS_DEPTH_FORM_REVISION = "2026-10-20";
+export const CURRENT_DEPTH_FORM_REVISION = "2026-10-20-context";
+export const isSimplifiedDepth = (d: { formRevision?: string }) =>
+  [PREVIOUS_DEPTH_FORM_REVISION, CURRENT_DEPTH_FORM_REVISION].includes(
+    d.formRevision ?? "",
+  );
+export const contributionsFor = (w: WorkDetail) =>
+  w.contributions ?? (w.ownership ? [w.ownership] : []);
 export function handoffOptions(area: string, direction: "receives" | "passes") {
   const people = [
     "employees",
@@ -229,6 +237,8 @@ export const AUTONOMY = [
   ["unknown", "Not sure"],
 ];
 export type WorkDetail = {
+  contributions?: string[];
+  scopeNote?: string;
   tasks: string[];
   taskTime: Record<string, number | null>;
   taskTimeUnknown: boolean;
@@ -277,7 +287,9 @@ export const emptyWorkDetail = (): WorkDetail => ({
   transferNote: "",
 });
 export type DepthDraft = {
-  formRevision?: typeof CURRENT_DEPTH_FORM_REVISION;
+  formRevision?:
+    | typeof CURRENT_DEPTH_FORM_REVISION
+    | typeof PREVIOUS_DEPTH_FORM_REVISION;
   resumeStep: string;
   basedCountry: string;
   basedOther: string;
@@ -430,7 +442,8 @@ const splitIssues = (
   ).map((c) => prefix + c);
 };
 export function depthIssues(d: DepthDraft, selected: string[], step: string) {
-  const current = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
+  const current = isSimplifiedDepth(d);
+  const contextual = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
   const issues: string[] = [];
   const need = (condition: boolean, key: string) => {
     if (!condition) issues.push(key);
@@ -475,6 +488,41 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
         p = area + "_";
       if (current && area === "other") {
         need(text(w.taskNote), p + "taskNote");
+        continue;
+      }
+      if (contextual) {
+        const q = areaQuestions(area);
+        if (TASKS[area]) {
+          need(
+            chosen(w.tasks, [...TASKS[area], ["unknown", "Not sure"]]),
+            p + "tasks",
+          );
+          if (w.tasks.includes("other")) need(text(w.taskNote), p + "taskNote");
+        }
+        if (q.contributions)
+          need(
+            chosen(contributionsFor(w), q.contributions),
+            p + "contributions",
+          );
+        if (q.nextStep) {
+          const options = handoffOptions(area, "passes").filter((o) =>
+            q.nextStep![2].includes(o[0]),
+          );
+          const visible = w.passes.filter((code) =>
+            options.some((o) => o[0] === code),
+          );
+          if (visible.length) need(chosen(visible, options), p + "passes");
+        }
+        if (q.volume && w.volume !== null) {
+          need(number(w.volume, 1e9), p + "volume");
+          need(
+            ["week", "month", "year"].includes(w.volumePeriod),
+            p + "volumePeriod",
+          );
+          need(text(w.volumeUnit), p + "volumeUnit");
+        }
+        if (asksRework(area, w.tasks) && w.reworkPercent !== null)
+          need(number(w.reworkPercent), p + "reworkPercent");
         continue;
       }
       if (TASKS[area]) {
@@ -563,6 +611,48 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
       }
     }
   if (step === "role_capacity") {
+    if (contextual) {
+      need(
+        AUTONOMY.some((o) => o[0] === d.autonomy),
+        "autonomy",
+      );
+      need(
+        CAPACITY.some((o) => o[0] === d.capacity),
+        "capacity",
+      );
+      need(
+        ["standard", "varied", "complex", "novel", "unknown"].includes(
+          d.complexity,
+        ),
+        "complexity",
+      );
+      need(
+        [
+          "individual",
+          "team",
+          "country",
+          "regional",
+          "group",
+          "unknown",
+        ].includes(d.impact),
+        "impact",
+      );
+      for (const key of ["overtimeHours", "availableHours"] as const)
+        if (d[key] !== null) need(number(d[key], 168), key);
+      if (selected.includes("office") && d.fixedOnsiteHours !== null)
+        need(number(d.fixedOnsiteHours, 168), "fixedOnsiteHours");
+      need(
+        ["none", "seasonal", "events", "unknown"].includes(d.peakPattern),
+        "peakPattern",
+      );
+      if (["seasonal", "events"].includes(d.peakPattern)) {
+        need(text(d.peakDescription), "peakDescription");
+        if (d.peakExtraHours !== null)
+          need(number(d.peakExtraHours, 168), "peakExtraHours");
+      }
+      need(["full", "partial", "none", "unknown"].includes(d.backup), "backup");
+      return issues;
+    }
     for (const [key, options] of [
       ["autonomy", AUTONOMY],
       ["capacity", CAPACITY],
@@ -702,7 +792,8 @@ export function parseDepth(value: unknown, areaCodes: string[]): DepthDraft {
   const { formRevision, ...fields } = object(value);
   if (
     formRevision !== undefined &&
-    formRevision !== CURRENT_DEPTH_FORM_REVISION
+    formRevision !== CURRENT_DEPTH_FORM_REVISION &&
+    formRevision !== PREVIOUS_DEPTH_FORM_REVISION
   )
     throw Error("Check the detailed work form version.");
   const raw = shape(fields, emptyDepth());
@@ -727,9 +818,22 @@ export function parseDepth(value: unknown, areaCodes: string[]): DepthDraft {
     throw Error("Check the detailed work areas.");
   d.work = {};
   for (const [area, value] of Object.entries(work)) {
-    const x = shape(value, emptyWorkDetail());
+    const { contributions, scopeNote, ...storedFields } = object(value);
+    const x = shape(storedFields, emptyWorkDetail());
     checkTypes(x, emptyWorkDetail());
     const w = { ...emptyWorkDetail(), ...x } as WorkDetail;
+    if (contributions !== undefined) {
+      list(
+        contributions,
+        OWNERSHIP.map((o) => o[0]),
+      );
+      w.contributions = contributions as string[];
+    }
+    if (scopeNote !== undefined) {
+      if (typeof scopeNote !== "string" || scopeNote.length > 2000)
+        throw Error("Keep each detailed answer under 2,000 characters.");
+      w.scopeNote = scopeNote;
+    }
     list(w.tasks, [...(TASKS[area] ?? []).map((o) => o[0]), "unknown"]);
     map(
       w.taskTime,
@@ -752,13 +856,14 @@ export function parseDepth(value: unknown, areaCodes: string[]): DepthDraft {
   return d;
 }
 export function depthEvidence(d: DepthDraft, selected: string[]) {
-  const current = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
+  const current = isSimplifiedDepth(d);
+  const contextual = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
   const pct = (n: number | null | undefined) =>
     typeof n === "number" && Number.isFinite(n) ? n : null;
   const countryUnknown =
     d.countryTimeUnknown || d.countries.includes("unknown");
   return {
-    ...(current ? { formRevision: CURRENT_DEPTH_FORM_REVISION } : {}),
+    ...(current ? { formRevision: d.formRevision } : {}),
     basedCountry: d.basedCountry,
     basedOther: d.basedCountry === "other" ? d.basedOther : "",
     businesses: d.businesses,
@@ -774,7 +879,30 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
       shareOfWorkingTime: countryUnknown ? null : pct(d.countryTime[code]),
     })),
     work: selected.map((area) => {
-      const saved = d.work[area] ?? emptyWorkDetail();
+      const raw = d.work[area] ?? emptyWorkDetail();
+      const q = areaQuestions(area);
+      const saved = !contextual
+        ? raw
+        : {
+            ...raw,
+            taskTimeUnknown: true,
+            ownership: "",
+            ownerTeam: "",
+            local: [],
+            localNote: q.local ? raw.localNote : "",
+            receives: [],
+            passes: q.nextStep
+              ? visibleHandoffs(area, "passes", raw.passes).filter((code) =>
+                  q.nextStep![2].includes(code),
+                )
+              : [],
+            handoffNote:
+              q.collaboration || area === "other" ? raw.handoffNote : "",
+            volume: q.volume ? raw.volume : null,
+            reworkPercent: asksRework(area, raw.tasks)
+              ? raw.reworkPercent
+              : null,
+          };
       const w = !current
         ? saved
         : area === "other"
@@ -801,6 +929,12 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
             };
       return {
         area,
+        ...(contextual
+          ? {
+              contributions: q.contributions ? contributionsFor(raw) : [],
+              scopeNote: q.scope ? (raw.scopeNote ?? "") : "",
+            }
+          : {}),
         tasks: (TASKS[area] ? w.tasks : []).map((code) => ({
           code,
           label: TASKS[area]?.find((o) => o[0] === code)?.[1] ?? code,
@@ -812,9 +946,11 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
         taskTimeUnknown: w.taskTimeUnknown,
         taskNote: w.tasks.includes("other") ? w.taskNote : "",
         local: w.local,
-        localNote: w.local.some((c) => !["none", "unknown"].includes(c))
+        localNote: contextual
           ? w.localNote
-          : "",
+          : w.local.some((c) => !["none", "unknown"].includes(c))
+            ? w.localNote
+            : "",
         ownership: w.ownership,
         ownerTeam: w.ownerTeam,
         receives: w.receives,
@@ -849,44 +985,60 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
     },
     capacity: {
       capacity: d.capacity,
-      hoursBasis: d.hoursBasis,
-      weeklyHours: known(d.hoursBasis) ? d.weeklyHours : null,
+      hoursBasis: contextual ? "" : d.hoursBasis,
+      weeklyHours: !contextual && known(d.hoursBasis) ? d.weeklyHours : null,
       overtimeHours: d.overtimeHours,
-      availableBasis: d.availableBasis,
-      availableHours: known(d.availableBasis) ? d.availableHours : null,
-      fixedOnsiteHours: d.fixedOnsiteHours,
+      availableBasis: contextual
+        ? d.availableHours !== null
+          ? "estimate"
+          : ""
+        : d.availableBasis,
+      availableHours:
+        contextual || known(d.availableBasis) ? d.availableHours : null,
+      fixedOnsiteHours:
+        contextual && !selected.includes("office") ? null : d.fixedOnsiteHours,
       unmetWork: d.unmetWork,
       backup: d.backup,
-      improvements: d.improvements,
+      improvements: contextual ? "" : d.improvements,
     },
     peaks: {
       pattern: d.peakPattern,
-      months: ["seasonal", "events"].includes(d.peakPattern)
-        ? d.peakMonths
-        : [],
+      months:
+        !contextual && ["seasonal", "events"].includes(d.peakPattern)
+          ? d.peakMonths
+          : [],
       description: ["seasonal", "events"].includes(d.peakPattern)
         ? d.peakDescription
         : "",
-      basis: ["seasonal", "events"].includes(d.peakPattern) ? d.peakBasis : "",
+      basis: ["seasonal", "events"].includes(d.peakPattern)
+        ? contextual
+          ? d.peakExtraHours !== null
+            ? "estimate"
+            : ""
+          : d.peakBasis
+        : "",
       extraWeeklyHours:
-        ["seasonal", "events"].includes(d.peakPattern) && known(d.peakBasis)
+        ["seasonal", "events"].includes(d.peakPattern) &&
+        (contextual || known(d.peakBasis))
           ? d.peakExtraHours
           : null,
     },
     metrics: {
-      status: d.serviceMetrics,
-      name: d.serviceMetrics === "yes" ? d.metricName : "",
-      target: d.serviceMetrics === "yes" ? d.metricTarget : "",
-      actual: d.serviceMetrics === "yes" ? d.metricActual : "",
-      period: d.serviceMetrics === "yes" ? d.metricPeriod : "",
-      source: d.serviceMetrics === "yes" ? d.metricSource : "",
+      status: contextual ? "" : d.serviceMetrics,
+      name: !contextual && d.serviceMetrics === "yes" ? d.metricName : "",
+      target: !contextual && d.serviceMetrics === "yes" ? d.metricTarget : "",
+      actual: !contextual && d.serviceMetrics === "yes" ? d.metricActual : "",
+      period: !contextual && d.serviceMetrics === "yes" ? d.metricPeriod : "",
+      source: !contextual && d.serviceMetrics === "yes" ? d.metricSource : "",
     },
     costs: {
-      status: d.costKnowledge,
-      amount: d.costKnowledge === "known" ? d.providerCost : null,
-      currency: d.costKnowledge === "known" ? d.costCurrency : "",
-      period: d.costKnowledge === "known" ? d.costPeriod : "",
-      source: d.costKnowledge === "known" ? d.costSource : "",
+      status: contextual ? "" : d.costKnowledge,
+      amount:
+        !contextual && d.costKnowledge === "known" ? d.providerCost : null,
+      currency:
+        !contextual && d.costKnowledge === "known" ? d.costCurrency : "",
+      period: !contextual && d.costKnowledge === "known" ? d.costPeriod : "",
+      source: !contextual && d.costKnowledge === "known" ? d.costSource : "",
     },
   };
 }

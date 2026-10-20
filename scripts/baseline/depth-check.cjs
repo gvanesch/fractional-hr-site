@@ -201,11 +201,16 @@ const root = path.resolve(__dirname, "../..");
       await fill("Country time: Canada (%)", "0");
       await saved;
       assert.equal(stored.depth.countryTime["custom:canada"], 0);
-      await page.getByRole("status").filter({ hasText: "Saved securely" }).waitFor();
-      assert.deepEqual(model.depthIssues(stored.depth, stored.broad.selected, "coverage"), [], "Saved coverage must be valid before continuing");
-      await page.evaluate(() => { window.__coverageClicks = []; document.addEventListener("click", e => window.__coverageClicks.push({ tag: e.target.tagName, text: e.target.textContent }), true); });
+      await page
+        .getByRole("status")
+        .filter({ hasText: "Saved securely" })
+        .waitFor();
+      assert.deepEqual(
+        model.depthIssues(stored.depth, stored.broad.selected, "coverage"),
+        [],
+        "Saved coverage must be valid before continuing",
+      );
       await button("Continue").click();
-      console.log("Coverage navigation diagnostic", JSON.stringify({ mobile, clicks: await page.evaluate(() => window.__coverageClicks), revision: stored.depth.formRevision, heading: await page.locator("h1").allTextContents(), invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
       await page
         .getByRole("heading", {
           name: "Work activities and delivery",
@@ -214,7 +219,13 @@ const root = path.resolve(__dirname, "../..");
         .waitFor();
       if (process.env.BASELINE_SCREENSHOT_DIR) {
         fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
-        await page.screenshot({ path: path.join(process.env.BASELINE_SCREENSHOT_DIR, mobile ? "depth-work-mobile.png" : "depth-work-desktop.png"), fullPage: true });
+        await page.screenshot({
+          path: path.join(
+            process.env.BASELINE_SCREENSHOT_DIR,
+            mobile ? "depth-work-mobile.png" : "depth-work-desktop.png",
+          ),
+          fullPage: true,
+        });
       }
       const office = "Reception, facilities and office support";
       await page.locator("summary").filter({ hasText: office }).click();
@@ -226,45 +237,38 @@ const root = path.resolve(__dirname, "../..");
           .count(),
         0,
       );
-      const ownership = page.getByLabel(office + ": Your main accountability", {
-        exact: true,
-      });
-      const owner = page.getByLabel(
-        office + ": Who is accountable for the whole process / service?",
-        { exact: true },
+      assert.equal(
+        await page
+          .getByLabel(office + ": Your main accountability", { exact: true })
+          .count(),
+        0,
       );
-      await ownership.selectOption("accountable");
-      assert.equal(await owner.count(), 0);
-      await ownership.selectOption("steps");
-      assert.equal(await owner.inputValue(), "Regional People Operations lead");
+      const officePanel = page
+        .locator("details")
+        .filter({ has: page.locator("summary").filter({ hasText: office }) });
+      await check(
+        office + ": How are you involved?: Lead office or facilities services",
+      );
+      await check(
+        office + ": How are you involved?: Coordinate work with other people",
+      );
       await check(office + ": Work you actually do: Fleet or company cars");
       assert.equal(
-        await page
-          .getByLabel(
-            office + " activity time: Reception, visitors and deliveries (%)",
-            { exact: true },
-          )
-          .inputValue(),
-        "60",
-      );
-      assert.equal(
-        await page
-          .getByLabel(office + " activity time: Fleet or company cars (%)", {
-            exact: true,
-          })
-          .inputValue(),
-        "",
-      );
-      await fill(office + " activity time: Fleet or company cars (%)", "10");
-      await fill(
-        office + " activity time: Facilities, repairs and building access (%)",
-        "30",
+        await officePanel.locator('input[type="number"]').count(),
+        0,
       );
       const save2 = page.waitForResponse((r) => r.url().endsWith("/save"));
-      await check(
-        office + ": Local delivery requirements: No specific local requirement",
+      await fill(
+        office +
+          ": Which offices or services do you cover, and how often? (optional)",
+        "Reception in two offices three days a week.",
       );
       await save2;
+      await page
+        .getByRole("status")
+        .filter({ hasText: "Saved securely" })
+        .waitFor();
+      assert.equal(await officePanel.getAttribute("open"), "");
       assert.equal(stored.depth.resumeStep, "work_detail");
       await page.reload();
       await page
@@ -274,14 +278,16 @@ const root = path.resolve(__dirname, "../..");
         })
         .waitFor();
       await page.locator("summary").filter({ hasText: office }).click();
-      assert.equal(
+      assert.ok(
         await page
-          .getByLabel(office + " activity time: Fleet or company cars (%)", {
+          .getByRole("checkbox", {
+            name: office + ": Work you actually do: Fleet or company cars",
             exact: true,
           })
-          .inputValue(),
-        "10",
+          .isChecked(),
       );
+      assert.ok(stored.depth.work.office.contributions.includes("accountable"));
+      assert.ok(stored.depth.work.office.contributions.includes("coordinate"));
       assert.equal(stored.depth.countryTime["custom:norway"], 20);
       await button("Continue").click();
       await button("Continue").click();
@@ -292,27 +298,64 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .waitFor();
-      await fill("Uncommitted hours in a typical week", "40");
+      const availableLabel =
+        "Uncommitted hours in a typical week (optional estimate)";
+      // A select must retain its DOM node and focus while autosave updates status.
+      const capacity = page.getByLabel(
+        "How does current demand compare with your available time?",
+        { exact: true },
+      );
+      await capacity.evaluate((node) => {
+        window.__capacitySelect = node;
+      });
+      const stableSave = page.waitForResponse((r) => r.url().endsWith("/save"));
+      await fill(availableLabel, "2");
+      await capacity.focus();
+      await stableSave;
+      await page
+        .getByRole("status")
+        .filter({ hasText: "Saved securely" })
+        .waitFor();
+      assert.ok(
+        await capacity.evaluate(
+          (node) =>
+            node === window.__capacitySelect && document.activeElement === node,
+        ),
+      );
+      const info = page.getByRole("button", {
+        name: "More information: How does current demand compare with your available time?",
+        exact: true,
+      });
+      await info.click();
+      assert.equal(await info.getAttribute("aria-expanded"), "true");
+      assert.equal(
+        await page.locator("label").filter({ has: info }).count(),
+        0,
+      );
+      await page.keyboard.press("Escape");
+      assert.equal(await info.getAttribute("aria-expanded"), "false");
+      await capacity.focus();
+      await page.keyboard.press("Home");
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+      assert.ok(await capacity.inputValue());
+      await fill(availableLabel, "169");
       await button("Review answers").click();
       assert.equal(
         await page
-          .getByLabel("Uncommitted hours in a typical week", { exact: true })
+          .getByLabel(availableLabel, { exact: true })
           .getAttribute("aria-invalid"),
         "true",
       );
-      await fill("Uncommitted hours in a typical week", "1");
-      await page
-        .getByLabel(
-          "Do you have agreed service targets or measured outcomes?",
-          { exact: true },
-        )
-        .selectOption("no");
-      await page
-        .getByLabel(
-          "Do you know a recurring external provider cost for work you support?",
-          { exact: true },
-        )
-        .selectOption("unknown");
+      await fill(availableLabel, "1");
+      assert.equal(
+        await page
+          .getByText(
+            /Basis for|contracted hours per week|Existing service measures|provider cost|validated with your manager/,
+          )
+          .count(),
+        0,
+      );
       await page
         .getByLabel(
           "Are there predictable peaks or major event-driven demands?",
@@ -369,8 +412,17 @@ const root = path.resolve(__dirname, "../..");
       // A separate resumed state exercises the bespoke Other panel and advice handoffs.
       stored = m.initialCollection(m.DEPTH_COLLECTION_VERSION);
       stored.started = true;
-      stored.broad.selected = ["advice_cases", "other"];
-      stored.broad.time = { advice_cases: 50, other: 50 };
+      const configs = (await load("lib/baseline/work-area-questions.ts"))
+        .AREA_QUESTIONS;
+      stored.broad.selected = Object.keys(configs).filter(
+        (area) => area !== "people_management",
+      );
+      stored.broad.time = Object.fromEntries(
+        stored.broad.selected.map((area) => [
+          area,
+          100 / stored.broad.selected.length,
+        ]),
+      );
       require("./depth-fixture.cjs").fillDepth(stored);
       stored.depth.resumeStep = "work_detail";
       status = "in_progress";
@@ -381,11 +433,9 @@ const root = path.resolve(__dirname, "../..");
           exact: true,
         })
         .waitFor();
-      const advice = page
-        .locator("details")
-        .filter({
-          has: page.locator("summary").filter({ hasText: "Manager advice" }),
-        });
+      const advice = page.locator("details").filter({
+        has: page.locator("summary").filter({ hasText: "Manager advice" }),
+      });
       await advice.locator("summary").click();
       for (const irrelevant of [
         /Work or information received from: Finance/,
@@ -399,11 +449,9 @@ const root = path.resolve(__dirname, "../..");
           await advice.getByRole("checkbox", { name: irrelevant }).count(),
           0,
         );
-      const otherPanel = page
-        .locator("details")
-        .filter({
-          has: page.locator("summary").filter({ hasText: /^Other work$/ }),
-        });
+      const otherPanel = page.locator("details").filter({
+        has: page.locator("summary").filter({ hasText: /^Other work$/ }),
+      });
       await otherPanel.locator("summary").click();
       assert.equal(await otherPanel.locator("textarea").count(), 2);
       assert.equal(
@@ -417,13 +465,59 @@ const root = path.resolve(__dirname, "../..");
           .getByLabel(/Describe the other work you do/)
           .inputValue(),
       );
+      for (const area of [
+        "experience",
+        "planning_development",
+        "systems_data",
+      ]) {
+        const labels = {
+          experience: "Employee engagement and experience",
+          planning_development: "People planning, performance and development",
+          systems_data: "People systems, data and improvement",
+        };
+        const panel = page
+          .locator("details")
+          .filter({
+            has: page.locator("summary").filter({ hasText: labels[area] }),
+          });
+        await panel.locator("summary").click();
+        assert.equal(
+          await panel.locator('input[type="number"],select').count(),
+          0,
+        );
+        assert.equal(
+          await panel
+            .getByText(
+              /rework|Work or approval passed to|Local delivery requirements/,
+            )
+            .count(),
+          0,
+        );
+        if (area === "systems_data")
+          assert.equal(
+            await panel.locator('input[type="checkbox"]').count(),
+            0,
+          );
+        const note = page.waitForResponse((r) => r.url().endsWith("/save"));
+        await panel
+          .getByLabel(labels[area] + ": " + configs[area].scope[0], {
+            exact: true,
+          })
+          .fill("Synthetic context for " + area);
+        await note;
+        await page
+          .getByRole("status")
+          .filter({ hasText: "Saved securely" })
+          .waitFor();
+        assert.equal(await panel.getAttribute("open"), "");
+      }
       await page.close();
     }
   } finally {
     await browser.close();
   }
   console.log(
-    "Detailed v5 desktop/mobile: late countries/custom countries/tasks, preserved shares, missing/invalid values, exact-step resume, conditional evidence, final submission and no overflow passed. Synthetic only; no email.",
+    "Contextual v5 desktop/mobile: country shares, relevant work-area prompts, shared contributions, persistent panels, stable selects across autosave, accessible help, hidden evidence, save/resume and submission passed. Synthetic only; no email.",
   );
 })().catch((e) => {
   console.error(e.stack);

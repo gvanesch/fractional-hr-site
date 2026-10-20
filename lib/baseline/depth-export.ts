@@ -6,11 +6,13 @@ import {
   WORK_PARTIES,
   handoffOptions,
   CURRENT_DEPTH_FORM_REVISION,
+  PREVIOUS_DEPTH_FORM_REVISION,
   OWNERSHIP,
   AUTONOMY,
   CAPACITY,
   MONTHS,
 } from "./depth";
+import { areaQuestions } from "./work-area-questions";
 type Obj = Record<string, unknown>;
 const object = (v: unknown): Obj =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Obj) : {};
@@ -115,6 +117,9 @@ export function depthAnalysisTables(
       "Potential FTE allocation",
       "Conditions for delivery elsewhere",
       "Hand-off context",
+      "Personal involvement",
+      "Work scope and frequency",
+      "Country or site context",
     ],
     [
       "Share of items needing rework",
@@ -231,7 +236,10 @@ export function depthAnalysisTables(
             direction,
             s(code),
             label(
-              d.formRevision === CURRENT_DEPTH_FORM_REVISION
+              [
+                CURRENT_DEPTH_FORM_REVISION,
+                PREVIOUS_DEPTH_FORM_REVISION,
+              ].includes(s(d.formRevision))
                 ? handoffOptions(
                     s(w.area),
                     direction === "Received from" ? "receives" : "passes",
@@ -260,6 +268,13 @@ export function depthAnalysisTables(
         ...alloc(whole(w.transferPercent, w.area)),
         s(w.transferNote),
         s(w.handoffNote),
+        array(w.contributions)
+          .map((code) =>
+            label(areaQuestions(s(w.area)).contributions ?? [], code),
+          )
+          .join("; "),
+        s(w.scopeNote),
+        s(w.localNote),
       ]);
     }
     role.rows.push([

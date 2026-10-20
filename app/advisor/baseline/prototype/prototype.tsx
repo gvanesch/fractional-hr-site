@@ -124,7 +124,7 @@ export default function Prototype({
   const revised =
     !saveCollection || isRevisedCollection(savedCollection?.draft.version);
   const expanded = savedCollection?.draft.version === DEPTH_COLLECTION_VERSION;
-  const [depth, setDepth] = useState(() => ({
+  const [depth, setDepth] = useState<ReturnType<typeof emptyDepth>>(() => ({
     ...(savedCollection?.draft.depth ?? emptyDepth()),
     formRevision:
       CURRENT_DEPTH_FORM_REVISION as typeof CURRENT_DEPTH_FORM_REVISION,
@@ -274,9 +274,10 @@ export default function Prototype({
               ? technologyIssues(technology)
               : richIssues(rich, steps[i], draft.selected).filter(
                   (issue) =>
-                    !revised ||
-                    steps[i] !== "context" ||
-                    issue !== "localNeeds",
+                    (!expanded || issue !== "scope") &&
+                    (!revised ||
+                      steps[i] !== "context" ||
+                      issue !== "localNeeds"),
                 );
   const issues = checked ? validate(currentStage) : [];
   function go(next: number) {
@@ -713,6 +714,7 @@ export default function Prototype({
               )}
             {["contact", "payroll", "context"].includes(key) && (
               <Context
+                streamlined={expanded}
                 step={key}
                 directPayroll={revised}
                 focusedLocalContext={revised}
@@ -773,6 +775,7 @@ export default function Prototype({
                   </section>
                 )}
                 <ContextReview
+                  streamlined={expanded}
                   focusedLocalContext={revised}
                   evidence={richEvidence(rich, draft.selected, payrollVisible)}
                 />
