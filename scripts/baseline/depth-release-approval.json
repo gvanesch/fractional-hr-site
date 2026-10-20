@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T13:41:36.846Z",
-  "reviewedCommit": "d97788f9cbb0e2ff9972fdafa8d1e1a7ff5516bd",
-  "expectedVersionId": "b475e12a-da66-4174-a14f-032e27c88414",
-  "qaRunId": 39432129304,
-  "instruction": "Greg requested a detailed review and simplification of every questionnaire section and confirmed to continue. Tailor questions, examples and hand-offs to each work area; distinguish beneficiaries from people who must act; allow shared contributions; remove unsuitable rework and local questions, particularly from engagement and Group systems work. Remove contracted-hours questions, remaining basis dropdowns, service measures/provider costs and any claims that answers will be validated or checked by a manager. Reduce repetition and extra activity percentages while retaining the overall work-area split and dedicated technology/management detail. Improve accessible help, separate information buttons from dropdown labels and preserve open panels through autosave. Preserve saved data, previous revisions, frozen campaign dictionaries, production email settings and campaign dates. This release sends no invitations or test emails and adds no deletion or retention criteria."
+  "confirmedAt": "2026-10-20T14:22:08.491Z",
+  "reviewedCommit": "52fe0127294c79423df00e6f5a3b6c37d57ec60e",
+  "expectedVersionId": "cb09442c-98b9-4ac5-84de-13b60f7c813c",
+  "qaRunId": 39437941852,
+  "instruction": "Greg requested replacing the JSON answers attachment sent to employees with an Excel or Word document. Provide a readable Word DOCX organised by questionnaire section, with human-readable labels, percentages and written answers. Build from the same visibility-filtered submitted evidence so removed and deselected fields are excluded from current copies; preserve historic questionnaire labels. Update attachment filename and MIME type and explain the Word format in the email. Preserve recipient restrictions, original-recipient snapshot, opt-in, delivery status, retry/idempotency controls, saved responses, questionnaire definitions, enabled production email and existing Excel analysis exports. This code-only release sends no emails or invitations, changes no authentication settings and adds no deletion or retention criteria."
 }
