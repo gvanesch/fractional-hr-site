@@ -6,6 +6,7 @@ import {
   CAPACITY,
   LOCAL_REQUIREMENTS,
   OWNERSHIP,
+  WORK_PARTIES,
   NUMBER_BASIS,
   MONTHS,
   PROJECT_COUNTRIES,
@@ -219,14 +220,14 @@ export function answerDocumentSections(
       if (array(w.receives).length)
         answer(
           "Work or information received from",
-          labels(handoffOptions(area, "receives"), w.receives),
+          labels(depth.formRevision ? handoffOptions(area, "receives") : WORK_PARTIES, w.receives),
         );
       if (array(w.passes).length)
         answer(
           contextual && q.nextStep
             ? q.nextStep[0]
             : "Work or approval passed to",
-          labels(handoffOptions(area, "passes"), w.passes),
+          labels(depth.formRevision ? handoffOptions(area, "passes") : WORK_PARTIES, w.passes),
         );
       answer(
         area === "other"

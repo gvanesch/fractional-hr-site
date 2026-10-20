@@ -108,3 +108,12 @@ test("Word copy excludes removed and deselected answers while preserving histori
     assert.doesNotMatch(old, /Countries and businesses supported/);
   }
 });
+test("Historic v5 hand-off answers keep their original labels rather than current filtered options", async () => {
+  const f = await documentFixture(), c = await load("lib/baseline/collection.ts");
+  const {answerDocumentSections} = await load("lib/baseline/answer-document.ts");
+  delete f.draft.depth.formRevision;
+  f.draft.broad.selected = ["advice_cases"];
+  f.draft.depth.work.advice_cases = {...f.draft.depth.work.lifecycle,tasks:["advice"],taskTime:{advice:100},receives:["finance"],passes:["it"]};
+  const text = JSON.stringify(answerDocumentSections(c.collectionEvidence(f.draft,f.manager)));
+  assert.match(text,/Finance \/ Payroll/); assert.match(text,/IT \/ People Technology/);
+});
