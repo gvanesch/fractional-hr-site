@@ -884,7 +884,7 @@ export async function invite(
     );
   if (send && !productionMailAllowed(p.email, campaign))
     throw new BaselineError(
-      "Email is disabled in QA. Generate a test link instead.",
+      env.NEXT_PUBLIC_APP_ENV === "qa" ? "Email is disabled in QA. Generate a test link instead." : "Email delivery is unavailable for this campaign. Check the production email configuration.",
     );
   if (send && (!env.RESEND_API_KEY || !env.CONTACT_FROM_EMAIL))
     throw new BaselineError("Email is not configured.", 503);
@@ -1571,28 +1571,31 @@ export async function launchReadiness(campaign: string) {
     !env.CONTACT_FROM_EMAIL
   )
     blockers.push(
-      "Invitation email delivery is disabled or not configured. QA must remain in preview mode.",
+      env.NEXT_PUBLIC_APP_ENV === "qa" ? "Invitation email delivery is disabled or not configured. QA must remain in preview mode." : "Invitation email delivery is disabled or not configured. Check production email settings before launch.",
     );
   if (
     active.some(
       (p) =>
-        !p.profile.manages_people || !p.profile.country || !p.profile.region,
+        !["yes", "no"].includes(p.profile.manages_people) || !p.profile.country || !p.profile.region ||
+        (p.profile.manages_people === "yes" && !/^\d+$/.test(p.profile.direct_reports)),
     )
   )
     blockers.push(
-      "Complete country, region and formal manager status for all active respondents.",
+      "Complete country, region and yes/no formal manager status for all active respondents. Include a direct-report count for managers.",
     );
   const missingCapacity = active.filter(
     (p) => !p.roster.contracted_hours && !p.roster.working_fraction,
   ).length;
+  const warnings: string[] = [];
+  if (missingCapacity) warnings.push(`${missingCapacity} respondents have no contracted hours or working fraction. Capacity comparisons will be limited.`);
+  const unassigned = active.filter(p => !p.roster.regional_leader_email).length;
+  if (unassigned) warnings.push(`${unassigned} respondents have no regional leader email. They will appear on the full-campaign dashboard but not on an assigned regional-leader dashboard.`);
+  const missingProfile = active.filter(p => !p.profile.job_title || !p.profile.entity || !p.roster.job_level || !p.roster.location || !p.roster.manager_name).length;
+  if (missingProfile) warnings.push(`${missingProfile} respondents have incomplete reporting details. Complete current job title, TB grade, entity, location and line manager where applicable.`);
   return {
     ready: !blockers.length,
     blockers,
-    warnings: missingCapacity
-      ? [
-          `${missingCapacity} respondents have no contracted hours or working fraction. Capacity comparisons will be limited.`,
-        ]
-      : [],
+    warnings,
     active: active.length,
     toInvite: active.filter((p) => !Number(p.invited)).length,
     questionnaireVersion: data.campaign.version,

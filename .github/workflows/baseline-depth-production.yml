@@ -39,6 +39,8 @@ jobs:
         run: node scripts/baseline/depth-release.mjs verify
       - name: Verify all production advisor workspace page and API authentication boundaries
         run: node scripts/baseline/advisor-production-boundary.mjs
+      - name: Verify unrestricted production email configuration and workspace storage without sending mail
+        run: node scripts/baseline/launch-production-readiness.mjs
       - name: Retain synthetic workbook and recovery identifiers
         if: always()
         uses: actions/upload-artifact@v4

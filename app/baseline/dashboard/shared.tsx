@@ -1,13 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Dashboard from "@/app/advisor/baseline/dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
 import "@/app/baseline/start/style.css";
 export default function SharedDashboard() {
   const [data, setData] = useState<CompletionDashboard | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [hasLink, setHasLink] = useState(false);
+  const refresh = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false,
+      sequence = 0;
     const key = "tb-baseline-dashboard",
       fragment = location.hash.slice(1);
     let token = fragment;
@@ -19,7 +23,10 @@ export default function SharedDashboard() {
       setError("Open the private dashboard link provided by the organiser.");
       return;
     }
+    setHasLink(true);
     async function load() {
+      const request = ++sequence;
+      setBusy(true);
       try {
         const r = await fetch("/api/baseline/dashboard", {
           method: "POST",
@@ -30,20 +37,32 @@ export default function SharedDashboard() {
         const result = (await r.json()) as CompletionDashboard & {
           error?: string;
         };
-        if (!r.ok)
+        if (cancelled || request !== sequence) return;
+        if (!r.ok) {
+          if ([401, 403].includes(r.status)) {
+            try {
+              sessionStorage.removeItem(key);
+            } catch {}
+          }
           throw new Error(result.error ?? "Unable to load this dashboard.");
-        if (cancelled) return;
+        }
         try {
           sessionStorage.setItem(key, token);
         } catch {}
         setData(result);
+        setError("");
       } catch (e) {
-        if (!cancelled)
+        if (!cancelled && request === sequence) {
+          setData(null);
           setError(
             e instanceof Error ? e.message : "Unable to load this dashboard.",
           );
+        }
+      } finally {
+        if (!cancelled && request === sequence) setBusy(false);
       }
     }
+    refresh.current = load;
     void load();
     const timer = setInterval(() => void load(), 60000);
     return () => {
@@ -58,6 +77,15 @@ export default function SharedDashboard() {
           <p className="brand-section-kicker">team.blue baseline</p>
           <span>team.blue · Baseline completion</span>
           <p>Private, read-only dashboard</p>
+          {hasLink && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void refresh.current()}
+            >
+              {busy ? "Refreshing…" : "Refresh dashboard"}
+            </button>
+          )}
         </header>
         {error ? (
           <p role="alert" className="tb-error">

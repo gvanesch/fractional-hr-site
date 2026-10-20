@@ -517,7 +517,11 @@ test("Roster template downloads require advisor access and contain the supported
     assert.match(response.headers.get("content-type"),/text\/csv/);
     assert.match(response.headers.get("content-disposition"),/baseline-roster-template.csv/);
     const fields=(await response.text()).trim().split(",");
-    for(const field of ["name","email","country","region","manages_people","direct_reports","job_level","manager_name","contracted_hours","working_fraction"])assert.ok(fields.includes(field));
+    for(const field of ["name","email","country","region","manages_people","direct_reports","job_level","manager_name","regional_leader_email","working_fraction"])assert.ok(fields.includes(field));
+    assert.equal(fields.length,16);
+    assert.equal(fields.includes("contracted_hours"),false);
+    const full=await h.adminRoute.GET(new Request("https://qa.example.invalid/advisor/baseline/api/roster-template?full=1"),context);
+    assert.ok((await full.text()).includes("contracted_hours"));
     assert.equal(h.state.emails.length,0);
   } finally {h.sqlite.close();}
 });
@@ -1190,6 +1194,46 @@ test("Named dashboards show small groups and bind regional visibility to CSV lea
   } finally {
     h.sqlite.close();
   }
+});
+test("Shared dashboards follow reassignment and reject expired links", async () => {
+  const h = harness();
+  try {
+    const { campaign } = await h.setup();
+    const people = (await h.service.campaignRows(campaign)).participants;
+    const assign = (person, email) => h.sqlite.prepare("UPDATE tb_baseline_roster_details SET metadata_json=? WHERE participant_id=?").run(JSON.stringify({ regional_leader_email: email }), person.participant_id);
+    assign(people[0], "a@example.invalid");
+    assign(people[1], "b@example.invalid");
+    const make = async (email) => h.service.createDashboardShare("admin@example.invalid", campaign, { label: email, scope: { role: "regional_lead", regionalLeaderEmail: email }, days: 1 });
+    const a = await make("a@example.invalid"), b = await make("b@example.invalid");
+    const get = async (link) => h.service.sharedDashboard(h.request({}), link.split("#")[1]);
+    assert.equal((await get(a.link)).participants.length, 1);
+    assign(people[0], "b@example.invalid");
+    assert.equal((await get(a.link)).participants.length, 0);
+    const moved = await get(b.link);
+    assert.equal(moved.participants.length, 2);
+    for (const person of moved.participants) for (const key of ["draft", "draft_json", "profile_json", "answers", "metadata_json", "salary"]) assert.equal(key in person, false);
+    h.sqlite.prepare("UPDATE tb_baseline_dashboard_shares SET expires_at='2000-01-01T00:00:00.000Z' WHERE label='b@example.invalid'").run();
+    await assert.rejects(get(b.link), e => e.status === 403);
+  } finally { h.sqlite.close(); }
+});
+test("Launch checks flag incomplete manager counts and absent dashboard assignments", async () => {
+  const h = harness();
+  try {
+    const { campaign } = await h.setup();
+    const people = (await h.service.campaignRows(campaign)).participants;
+    for (const p of people) h.sqlite.prepare("UPDATE tb_baseline_participants SET profile_json=? WHERE participant_id=?").run(JSON.stringify({...p.profile, manages_people:"no", direct_reports:"0"}),p.participant_id);
+    const person = people[0];
+    const profile = { ...person.profile, manages_people: "yes", direct_reports: "" };
+    const update = () => h.sqlite.prepare("UPDATE tb_baseline_participants SET profile_json=? WHERE participant_id=?").run(JSON.stringify(profile), person.participant_id);
+    update();
+    let ready = await h.service.launchReadiness(campaign);
+    assert.ok(ready.blockers.some(b => b.includes("direct-report count")));
+    assert.ok(ready.warnings.some(w => w.includes("regional leader email")));
+    profile.direct_reports = "3";
+    update();
+    ready = await h.service.launchReadiness(campaign);
+    assert.equal(ready.blockers.some(b => b.includes("direct-report count")), false);
+  } finally { h.sqlite.close(); }
 });
 test("Launch preflight blocks the preview questionnaire and QA delivery before any email or campaign mutation", async () => {
   const h = harness();

@@ -7,10 +7,11 @@ import {
   isCollectionVersion,
 } from "@/lib/baseline/collection";
 import Administration from "./administration";
+import RosterGuide from "./roster-guide";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
 import "./admin.css";
-import { ROSTER_FIELDS } from "@/lib/baseline/roster-fields";
+import { LAUNCH_ROSTER_FIELDS } from "@/lib/baseline/roster-fields";
 import {
   PRIVACY,
   WORK_TYPES,
@@ -137,7 +138,7 @@ export default function AdminPanel({
     }
   }
   const template = () => {
-    const blob = new Blob([ROSTER_FIELDS.join(",") + "\n"], {
+    const blob = new Blob([LAUNCH_ROSTER_FIELDS.join(",") + "\n"], {
       type: "text/csv",
     });
     const url = URL.createObjectURL(blob),
@@ -412,6 +413,7 @@ export default function AdminPanel({
               >
                 <p className="brand-section-kicker">Participant roster</p>
                 <h2>CSV roster import</h2>
+                <RosterGuide />
                 <p>
                   Import a CSV with name and email. Optional columns: job_title,
                   country, region, entity, work_type, manages_people,

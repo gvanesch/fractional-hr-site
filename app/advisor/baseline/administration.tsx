@@ -220,7 +220,7 @@ export default function Administration({
               </button>
               <p>
                 Launch opens collection. Emails are sent separately to the
-                selected roster batch. QA sending remains disabled.
+                selected roster batch.
               </p>
             </>
           )}

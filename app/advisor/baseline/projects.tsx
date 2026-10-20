@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import RosterGuide from "./roster-guide";
 import "@/app/baseline/start/style.css";
 import "./admin.css";
 type Project = {
@@ -54,7 +55,13 @@ export default function ProjectList() {
             workspace.
           </p>
           <div className="tb-hero-actions">
-            <a className="brand-button-outline" href="/advisor/baseline/api/roster-template" download="baseline-roster-template.csv">Download CSV template</a>
+            <a
+              className="brand-button-outline"
+              href="/advisor/baseline/api/roster-template"
+              download="baseline-roster-template.csv"
+            >
+              Download CSV template
+            </a>
             <Link className="brand-button-dark" href="/advisor/baseline/create">
               Create baseline project
             </Link>
@@ -62,6 +69,7 @@ export default function ProjectList() {
         </div>
       </section>
       <div className="brand-container tb-shell tb-workspace-body">
+        <RosterGuide />
         <section className="tb-card">
           <p className="brand-section-kicker">Project directory</p>
           <h2>Your projects</h2>
@@ -111,7 +119,12 @@ export default function ProjectList() {
                     </div>
                     <p>
                       {p.participants} respondents · Closes{" "}
-                      {new Date(p.closes_at).toLocaleDateString("en-GB")}
+                      {new Date(p.closes_at).toLocaleString("en-GB", {
+                        timeZone: "UTC",
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}{" "}
+                      UTC
                     </p>
                     <Link
                       className="brand-button-primary"

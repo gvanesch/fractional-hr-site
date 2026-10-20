@@ -27,6 +27,24 @@ export const EXTRA_ROSTER_FIELDS = [
   "working_fraction",
 ];
 export const ROSTER_FIELDS = [...CORE_ROSTER_FIELDS, ...EXTRA_ROSTER_FIELDS];
+export const LAUNCH_ROSTER_FIELDS = [
+  "name",
+  "email",
+  "job_title",
+  "job_level",
+  "country",
+  "region",
+  "entity",
+  "team",
+  "location",
+  "manages_people",
+  "direct_reports",
+  "manager_name",
+  "manager_email",
+  "regional_leader_name",
+  "regional_leader_email",
+  "working_fraction",
+];
 export const FIELD_LABELS: Record<string, string> = {
   name: "Name",
   email: "Work email",
@@ -48,7 +66,7 @@ export const FIELD_LABELS: Record<string, string> = {
   leader_email: "Responsible leader work email",
   regional_leader_name: "Regional leader name",
   regional_leader_email: "Regional leader work email",
-  job_level: "Current job level",
+  job_level: "Current TB grade",
   contracted_hours: "Contracted hours per week",
   full_time_hours: "Full-time hours per week",
   working_fraction: "Working fraction (0 to 1)",

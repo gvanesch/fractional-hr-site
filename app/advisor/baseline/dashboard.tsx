@@ -47,7 +47,12 @@ export default function Dashboard({
       <h2>Completion dashboard</h2>
       <p>
         {d.campaign.name} · {d.campaign.status} · Closes{" "}
-        {new Date(d.campaign.closesAt).toLocaleDateString("en-GB")}
+        {new Date(d.campaign.closesAt).toLocaleString("en-GB", {
+          timeZone: "UTC",
+          dateStyle: "medium",
+          timeStyle: "short",
+        })}{" "}
+        UTC
       </p>
       <div
         style={{

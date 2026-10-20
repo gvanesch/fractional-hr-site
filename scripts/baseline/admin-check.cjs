@@ -86,7 +86,7 @@ if (!["qa", "production"].includes(environment))
         status: "open",
         closes_at: "2026-12-31T23:59:59Z",
         privacy_notice:
-          "Synthetic data use statement for isolated QA testing only.",
+          "Synthetic data use statement for isolated workflow testing only.",
         retention_days: 90,
         entities: [],
       };
@@ -199,7 +199,9 @@ if (!["qa", "production"].includes(environment))
               ? []
               : [
                   "The reviewed questionnaire still needs versioned saving.",
-                  "Email is disabled in QA.",
+                  environment === "qa"
+                    ? "Email is disabled in QA."
+                    : "Email is not configured.",
                 ],
             warnings: [],
             active: person.active,

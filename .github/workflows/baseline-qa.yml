@@ -50,6 +50,8 @@ jobs:
         run: node scripts/baseline/admin-check.cjs
       - name: Test production advisor workspace and launch on desktop and mobile with synthetic API responses
         run: BASELINE_ADMIN_ENV=production node scripts/baseline/admin-check.cjs
+      - name: Test shared dashboard refresh, recovery, scope changes and withdrawn access
+        run: node scripts/baseline/shared-dashboard-check.cjs
       - name: Test reviewed collection save, resume and submission on desktop and mobile
         run: node scripts/baseline/collection-check.cjs
       - name: Save synthetic QA visual checks
