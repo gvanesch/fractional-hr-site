@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as service from "@/lib/baseline/server";
+import { ROSTER_FIELDS } from "@/lib/baseline/roster-fields";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
 const json = (value: unknown, status = 200) =>
@@ -26,6 +27,15 @@ export async function GET(request: Request, context: Context) {
     const actor = await service.admin(),
       url = new URL(request.url),
       campaign = url.searchParams.get("campaign") ?? "";
+    if (path === "admin/roster-template")
+      return new NextResponse(ROSTER_FIELDS.join(",") + "\n", {
+        headers: {
+          ...service.securityHeaders,
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition":
+            'attachment; filename="baseline-roster-template.csv"',
+        },
+      });
     if (path === "admin/campaigns")
       return json({ campaigns: await service.campaigns() });
     if (path === "admin/dashboard")

@@ -118,6 +118,7 @@ const root = path.resolve(__dirname, "../..");
           };
         if (op === "create")
           data = { campaignId: "11111111-1111-4111-8111-111111111111" };
+        if (op === "configure" && body.closesAt) campaign.closes_at = body.closesAt;
         if (op === "campaign")
           data = {
             campaign,
@@ -305,6 +306,12 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Launch readiness", exact: true })
         .waitFor();
+      assert.equal(await page.getByLabel("Closing time (UTC)",{exact:true}).inputValue(), "23:59");
+      await page.getByLabel("Closing time (UTC)",{exact:true}).fill("18:00");
+      await page.getByRole("button",{name:"Save settings",exact:true}).click();
+      await page.getByText("Campaign settings saved.",{exact:true}).waitFor();
+      assert.ok(requests.some(r=>r.op==="configure" && r.body.closesAt === "2026-12-31T18:00:00.000Z"));
+      assert.equal(await page.getByLabel("Closing time (UTC)",{exact:true}).inputValue(), "18:00");
       assert.ok(
         await page
           .getByRole("button", { name: "Launch campaign", exact: true })
@@ -650,8 +657,9 @@ const root = path.resolve(__dirname, "../..");
             .getByLabel("Campaign name", { exact: true })
             .fill("New synthetic project");
           await page
-            .getByLabel("Closing date (end of day, UTC)", { exact: true })
+            .getByLabel("Closing date (UTC)", { exact: true })
             .fill("2026-12-31");
+          assert.equal(await page.getByLabel("Closing time (UTC)", {exact:true}).inputValue(), "18:00");
           await page
             .getByRole("button", { name: "Create project", exact: true })
             .click();
@@ -661,7 +669,7 @@ const root = path.resolve(__dirname, "../..");
           assert.ok(
             requests.some(
               (r) =>
-                r.op === "create" && r.body.name === "New synthetic project",
+                r.op === "create" && r.body.name === "New synthetic project" && r.body.closesAt === "2026-12-31T18:00:00.000Z",
             ),
           );
         }

@@ -76,6 +76,7 @@ export default function AdminPanel({
     [people, setPeople] = useState<Person[]>([]),
     [name, setName] = useState("team.blue People Operations Baseline — QA"),
     [date, setDate] = useState("2026-10-30"),
+    [closingTime, setClosingTime] = useState("18:00"),
     [notice, setNotice] = useState(PRIVACY),
     [entityList, setEntityList] = useState(""),
     [csv, setCsv] = useState(""),
@@ -104,6 +105,7 @@ export default function AdminPanel({
       setCurrent(data.campaign);
       setPeople(data.participants);
       setDate(data.campaign.closes_at.slice(0, 10));
+      setClosingTime(new Date(data.campaign.closes_at).toISOString().slice(11, 16));
       setNotice(data.campaign.privacy_notice);
       setEntityList(
         (data.campaign.entities ?? []).map((e) => e.label).join("\n"),
@@ -250,12 +252,16 @@ export default function AdminPanel({
               </p>
               <p><Link href="/advisor/baseline/depth-preview">Preview the detailed questionnaire</Link></p>
               <label className="tb-field">
-                <span>Closing date (end of day, UTC)</span>
+                <span>Closing date (UTC)</span>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                 />
+              </label>
+              <label className="tb-field">
+                <span>Closing time (UTC)</span>
+                <input type="time" value={closingTime} onChange={(e) => setClosingTime(e.target.value)} required />
               </label>
               <p>Collection window: 21–30 October 2026. Keep baseline data without an automatic deletion date. Closing collection does not delete answers.</p>
               <label className="tb-field">
@@ -298,7 +304,7 @@ export default function AdminPanel({
                       const result = await api("create", {
                         questionnaireVersion: COLLECTION_VERSION,
                         name,
-                        closesAt: date + "T23:59:59.000Z",
+                        closesAt: date + "T" + closingTime + ":00.000Z",
                         privacy: notice,
                         entityList,
                       });
@@ -318,7 +324,7 @@ export default function AdminPanel({
                         await api("configure", {
                           campaign: id,
                           privacy: notice,
-                          closesAt: date + "T23:59:59.000Z",
+                          closesAt: date + "T" + closingTime + ":00.000Z",
                             entityList,
                         });
                         await refresh();

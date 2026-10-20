@@ -1,4 +1,5 @@
 "use client";
+import { BASELINE_COMPLETION_GUIDANCE } from "@/lib/baseline/copy";
 import { useEffect, useRef, useState } from "react";
 import {
   AREAS,
@@ -512,7 +513,7 @@ export default function BaselineJourney() {
             <section className="tb-card">
               <h1>{saved.campaign.name}</h1>
               <p className="tb-estimate">
-                About 20–25 minutes · Save and return at any time
+                {BASELINE_COMPLETION_GUIDANCE}
               </p>
               <h2>Before you start</h2>
               <p>{saved.campaign.privacy}</p>

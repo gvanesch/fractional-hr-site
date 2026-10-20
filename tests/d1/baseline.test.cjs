@@ -503,6 +503,23 @@ function harness() {
     complete,
   };
 }
+test("Roster template downloads require advisor access and contain the supported import headers", async () => {
+  const h=harness();
+  try {
+    const request=()=>new Request("https://qa.example.invalid/advisor/baseline/api/roster-template");
+    const context={params:Promise.resolve({path:["roster-template"]})};
+    h.state.admin=false;
+    assert.equal((await h.adminRoute.GET(request(),context)).status,403);
+    h.state.admin=true;
+    const response=await h.adminRoute.GET(request(),context);
+    assert.equal(response.status,200);
+    assert.match(response.headers.get("content-type"),/text\/csv/);
+    assert.match(response.headers.get("content-disposition"),/baseline-roster-template.csv/);
+    const fields=(await response.text()).trim().split(",");
+    for(const field of ["name","email","country","region","manages_people","direct_reports","job_level","manager_name","contracted_hours","working_fraction"])assert.ok(fields.includes(field));
+    assert.equal(h.state.emails.length,0);
+  } finally {h.sqlite.close();}
+});
 test("Baseline activity choices cover hybrid roles and map reception/facilities to Operations", () => {
   const h = harness(),
     m = h.model;

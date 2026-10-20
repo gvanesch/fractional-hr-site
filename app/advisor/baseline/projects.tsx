@@ -54,6 +54,7 @@ export default function ProjectList() {
             workspace.
           </p>
           <div className="tb-hero-actions">
+            <a className="brand-button-outline" href="/advisor/baseline/api/roster-template" download="baseline-roster-template.csv">Download CSV template</a>
             <Link className="brand-button-dark" href="/advisor/baseline/create">
               Create baseline project
             </Link>

@@ -1,3 +1,4 @@
+import { BASELINE_COMPLETION_GUIDANCE } from "./copy";
 export function baselineSender(configured: string) {
   const address =
     configured.match(/<([^>]+)>/)?.[1]?.trim() ?? configured.trim();
@@ -20,7 +21,8 @@ export function invitationEmail(
   name: string,
   link: string,
   closes: string,
-  version?: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Preserve the API for versioned invitation callers.
+  _version?: string,
 ) {
   const date = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -28,17 +30,21 @@ export function invitationEmail(
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(closes));
-  const timing =
-    version === "team-blue-baseline-v5"
-      ? "Allow around 25–40 minutes for the detailed questions, and longer for a broad role. You can save and return."
-      : "Most people will take around 10–15 minutes. A broad role may take closer to 20–30 minutes.";
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  }).format(new Date(closes));
+  const deadline = `${date} at ${time} UTC`;
+  const timing = BASELINE_COMPLETION_GUIDANCE;
   const subject = "team.blue | Your current work baseline";
   return {
     subject,
-    text: `team.blue — Current work baseline\n\nYou are invited to ${name}.\n\nPlease describe the work you do today and how you spend your time. Your answers will help us strengthen support and improve how we work.\n\n1. Open your assessment using the link below.\n2. Verify access using the code sent to your invitation email address.\n3. Complete the questions by ${date} (UTC). You can save your progress and return later.\n\n${timing}\n\n${link}\n\nKeep your link and verification code private.\n\nteam.blue · Current work baseline. Reply to this email for help.`,
+    text: `team.blue — Current work baseline\n\nYou are invited to ${name}.\n\nPlease describe the work you do today and how you spend your time. Your answers will help us strengthen support and improve how we work.\n\n1. Open your assessment using the link below.\n2. Verify access using the code sent to your invitation email address.\n3. Complete the questions by ${deadline}. You can save your progress and return later.\n\n${timing}\n\n${link}\n\nKeep your link and verification code private.\n\nteam.blue · Current work baseline. Reply to this email for help.`,
     html: frame(
       "Your current work baseline",
-      `<p>You are invited to ${escape(name)}.</p><p>Please describe the work you do today and how you spend your time. Your answers will help us strengthen support and improve how we work.</p><ol style="line-height:1.7"><li>Open your assessment.</li><li>Verify access using the code sent to your invitation email address.</li><li>Complete the questions by <strong>${escape(date)} (UTC)</strong>. You can save your progress and return later.</li></ol><p>${timing}</p><p><a href="${escape(link)}" style="display:inline-block;background:#1e6fd9;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px">Open your assessment</a></p><p style="font-size:13px;color:#475569">Keep your link and verification code private.</p>`,
+      `<p>You are invited to ${escape(name)}.</p><p>Please describe the work you do today and how you spend your time. Your answers will help us strengthen support and improve how we work.</p><ol style="line-height:1.7"><li>Open your assessment.</li><li>Verify access using the code sent to your invitation email address.</li><li>Complete the questions by <strong>${escape(deadline)}</strong>. You can save your progress and return later.</li></ol><p>${timing}</p><p><a href="${escape(link)}" style="display:inline-block;background:#1e6fd9;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px">Open your assessment</a></p><p style="font-size:13px;color:#475569">Keep your link and verification code private.</p>`,
     ),
   };
 }

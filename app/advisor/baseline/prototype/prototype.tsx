@@ -1,4 +1,5 @@
 "use client";
+import { BASELINE_COMPLETION_GUIDANCE } from "@/lib/baseline/copy";
 import Depth, { DepthReview } from "./depth";
 import { emptyDepth, depthIssues } from "@/lib/baseline/depth";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -462,9 +463,7 @@ export default function Prototype({
             </section>
           )}
           <p className="tb-estimate">
-            {expanded
-              ? "Allow around 25–40 minutes for the detailed questions, and longer for a broad role. You can save and return."
-              : "Most people will complete this in around 10–15 minutes. If your role covers a broad range of People activities, it may take closer to 20–30 minutes."}
+            {BASELINE_COMPLETION_GUIDANCE}
           </p>
           {saveCollection && (
             <p>
