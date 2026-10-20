@@ -37,6 +37,8 @@ jobs:
         run: npx opennextjs-cloudflare deploy
       - name: Verify production bindings and protected download
         run: node scripts/baseline/depth-release.mjs verify
+      - name: Verify all production advisor workspace page and API authentication boundaries
+        run: node scripts/baseline/advisor-production-boundary.mjs
       - name: Retain synthetic workbook and recovery identifiers
         if: always()
         uses: actions/upload-artifact@v4

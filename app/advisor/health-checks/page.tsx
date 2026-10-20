@@ -905,12 +905,12 @@ export default async function AdvisorHealthChecksPage({
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <a
+                  <Link
                     href="/advisor/health-checks"
                     className={`${buttonClassName} border border-slate-300 text-slate-700 hover:bg-slate-50`}
                   >
                     Reset
-                  </a>
+                  </Link>
                   <button
                     type="submit"
                     className={`${buttonClassName} bg-[#1E6FD9] text-white hover:bg-[#1859ad]`}

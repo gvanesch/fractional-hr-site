@@ -6,11 +6,14 @@ const { chromium } = require(
   fs = require("node:fs"),
   path = require("node:path");
 const root = path.resolve(__dirname, "../..");
+const environment = process.env.BASELINE_ADMIN_ENV || "qa";
+if (!["qa", "production"].includes(environment))
+  throw Error("Unsupported admin test environment");
 (async () => {
   const build = await esbuild.build({
     stdin: {
       contents:
-        'import React from "react";import {createRoot} from "react-dom/client";import AdminPanel from "./app/advisor/baseline/panel";import ProjectList from "./app/advisor/baseline/projects";import {AppRouterContext} from "next/dist/shared/lib/app-router-context.shared-runtime";createRoot(document.getElementById("root")).render(<AppRouterContext.Provider value={{push:(url)=>window.location.assign(url)}}>{window.BASELINE_SCREEN === "list" ? <ProjectList/> : window.BASELINE_SCREEN === "create" ? <AdminPanel mode="create"/> : <AdminPanel initialCampaign="c1"/>}</AppRouterContext.Provider>);',
+        'import React from "react";import {createRoot} from "react-dom/client";import AdminPanel from "./app/advisor/baseline/panel";import ProjectList from "./app/advisor/baseline/projects";import AdvisorNav from "./app/components/advisor/AdvisorNav";import {PathnameContext} from "next/dist/shared/lib/hooks-client-context.shared-runtime";import {AppRouterContext} from "next/dist/shared/lib/app-router-context.shared-runtime";createRoot(document.getElementById("root")).render(<PathnameContext.Provider value={location.pathname}><AppRouterContext.Provider value={{push:(url)=>window.location.assign(url)}}><AdvisorNav/>{window.BASELINE_SCREEN === "list" ? <ProjectList/> : window.BASELINE_SCREEN === "create" ? <AdminPanel mode="create"/> : <AdminPanel initialCampaign="c1"/>}</AppRouterContext.Provider></PathnameContext.Provider>);',
       resolveDir: root,
       loader: "tsx",
     },
@@ -21,7 +24,7 @@ const root = path.resolve(__dirname, "../..");
     loader: { ".css": "empty" },
     define: {
       "process.env.NODE_ENV": '"production"',
-      "process.env.NEXT_PUBLIC_APP_ENV": '"qa"',
+      "process.env.NEXT_PUBLIC_APP_ENV": JSON.stringify(environment),
     },
   });
   const browser = await chromium.launch({
@@ -72,7 +75,8 @@ const root = path.resolve(__dirname, "../..");
         allocation: {},
         version: "team-blue-baseline-v2",
       };
-      let expandedRoster = false;
+      let expandedRoster = false,
+        launchReady = false;
       let shares = [],
         requests = [];
       const campaign = {
@@ -118,7 +122,8 @@ const root = path.resolve(__dirname, "../..");
           };
         if (op === "create")
           data = { campaignId: "11111111-1111-4111-8111-111111111111" };
-        if (op === "configure" && body.closesAt) campaign.closes_at = body.closesAt;
+        if (op === "configure" && body.closesAt)
+          campaign.closes_at = body.closesAt;
         if (op === "campaign")
           data = {
             campaign,
@@ -189,16 +194,24 @@ const root = path.resolve(__dirname, "../..");
           };
         if (op === "readiness")
           data = {
-            ready: false,
-            blockers: [
-              "The reviewed questionnaire still needs versioned saving.",
-              "Email is disabled in QA.",
-            ],
+            ready: launchReady,
+            blockers: launchReady
+              ? []
+              : [
+                  "The reviewed questionnaire still needs versioned saving.",
+                  "Email is disabled in QA.",
+                ],
             warnings: [],
             active: person.active,
             toInvite: person.active,
             questionnaireVersion: campaign.version,
           };
+        if (op === "launch") {
+          campaign.status = "open";
+          data = { success: true };
+        }
+        if (op === "invite-batch")
+          data = { sent: body.participantIds, failed: [] };
         if (op === "shares") data = { shares };
         if (op === "import-preview")
           data = {
@@ -279,6 +292,49 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Completion dashboard", exact: true })
         .waitFor();
+      const nav = page.getByRole("navigation", {
+        name: "Advisor",
+        exact: true,
+      });
+      await nav
+        .getByRole("link", { name: "Baseline projects", exact: true })
+        .waitFor();
+      await nav
+        .getByRole("link", { name: "Create baseline project", exact: true })
+        .waitFor();
+      if (environment === "production") {
+        assert.equal(
+          await page.getByText(/QA workspace · Synthetic roster data/).count(),
+          0,
+        );
+        assert.equal(
+          await page
+            .getByRole("button", {
+              name: "Create synthetic QA verification code",
+              exact: true,
+            })
+            .count(),
+          0,
+        );
+        assert.equal(
+          await page
+            .getByRole("button", {
+              name: "Open project for QA testing",
+              exact: true,
+            })
+            .count(),
+          0,
+        );
+      }
+      assert.equal(
+        await page
+          .getByRole("link", {
+            name: "Review the current questionnaire preview",
+            exact: true,
+          })
+          .getAttribute("href"),
+        "/advisor/baseline/depth-preview",
+      );
       assert.equal(
         await page.getByLabel("Choose a campaign", { exact: true }).count(),
         0,
@@ -306,12 +362,34 @@ const root = path.resolve(__dirname, "../..");
       await page
         .getByRole("heading", { name: "Launch readiness", exact: true })
         .waitFor();
-      assert.equal(await page.getByLabel("Closing time (UTC)",{exact:true}).inputValue(), "23:59");
-      await page.getByLabel("Closing time (UTC)",{exact:true}).fill("18:00");
-      await page.getByRole("button",{name:"Save settings",exact:true}).click();
-      await page.getByText("Campaign settings saved.",{exact:true}).waitFor();
-      assert.ok(requests.some(r=>r.op==="configure" && r.body.closesAt === "2026-12-31T18:00:00.000Z"));
-      assert.equal(await page.getByLabel("Closing time (UTC)",{exact:true}).inputValue(), "18:00");
+      assert.equal(
+        await page
+          .getByLabel("Closing time (UTC)", { exact: true })
+          .inputValue(),
+        "23:59",
+      );
+      await page
+        .getByLabel("Closing time (UTC)", { exact: true })
+        .fill("18:00");
+      await page
+        .getByRole("button", { name: "Save settings", exact: true })
+        .click();
+      await page
+        .getByText("Campaign settings saved.", { exact: true })
+        .waitFor();
+      assert.ok(
+        requests.some(
+          (r) =>
+            r.op === "configure" &&
+            r.body.closesAt === "2026-12-31T18:00:00.000Z",
+        ),
+      );
+      assert.equal(
+        await page
+          .getByLabel("Closing time (UTC)", { exact: true })
+          .inputValue(),
+        "18:00",
+      );
       assert.ok(
         await page
           .getByRole("button", { name: "Launch campaign", exact: true })
@@ -562,7 +640,10 @@ const root = path.resolve(__dirname, "../..");
           .getByRole("heading", { name: "Completion dashboard", exact: true })
           .isVisible()),
       );
-      const workbookLink = page.getByRole("link", {name: "Download Excel analysis workbook", exact:true});
+      const workbookLink = page.getByRole("link", {
+        name: "Download Excel analysis workbook",
+        exact: true,
+      });
       assert.ok(await workbookLink.isVisible());
       assert.match(await workbookLink.getAttribute("href"), /format=xlsx/);
       if (mobile) {
@@ -580,6 +661,58 @@ const root = path.resolve(__dirname, "../..");
           .length,
         0,
       );
+      if (environment === "production") {
+        launchReady = true;
+        await page
+          .getByRole("button", { name: "Settings and launch", exact: true })
+          .click();
+        await page
+          .getByRole("button", { name: "Save settings", exact: true })
+          .click();
+        await page
+          .getByText("Campaign settings saved.", { exact: true })
+          .waitFor();
+        await page
+          .getByLabel("Confirm campaign name to launch", { exact: true })
+          .fill(campaign.name);
+        const launch = page.getByRole("button", {
+          name: "Launch campaign",
+          exact: true,
+        });
+        await launch.click();
+        await page
+          .getByText(
+            "Campaign launched. Review the roster and send invitations in batches.",
+            { exact: true },
+          )
+          .waitFor();
+        assert.equal(requests.filter((r) => r.op === "launch").length, 1);
+        assert.equal(
+          requests.filter((r) => r.op === "invite-batch").length,
+          0,
+          "Launching does not send invitations",
+        );
+        await page
+          .getByRole("button", { name: "Respondents", exact: true })
+          .click();
+        await page
+          .getByLabel("Select respondent: " + person.email, { exact: true })
+          .check();
+        page.once("dialog", (dialog) => dialog.accept());
+        await page
+          .getByRole("button", {
+            name: "Send selected invitations / reminders (1/20)",
+            exact: true,
+          })
+          .click();
+        await page
+          .getByText(
+            "1 emails sent. 0 failed; only failed rows remain selected.",
+            { exact: true },
+          )
+          .waitFor();
+        assert.equal(requests.filter((r) => r.op === "invite-batch").length, 1);
+      }
       assert.ok(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -659,7 +792,12 @@ const root = path.resolve(__dirname, "../..");
           await page
             .getByLabel("Closing date (UTC)", { exact: true })
             .fill("2026-12-31");
-          assert.equal(await page.getByLabel("Closing time (UTC)", {exact:true}).inputValue(), "18:00");
+          assert.equal(
+            await page
+              .getByLabel("Closing time (UTC)", { exact: true })
+              .inputValue(),
+            "18:00",
+          );
           await page
             .getByRole("button", { name: "Create project", exact: true })
             .click();
@@ -669,7 +807,9 @@ const root = path.resolve(__dirname, "../..");
           assert.ok(
             requests.some(
               (r) =>
-                r.op === "create" && r.body.name === "New synthetic project" && r.body.closesAt === "2026-12-31T18:00:00.000Z",
+                r.op === "create" &&
+                r.body.name === "New synthetic project" &&
+                r.body.closesAt === "2026-12-31T18:00:00.000Z",
             ),
           );
         }
@@ -680,7 +820,9 @@ const root = path.resolve(__dirname, "../..");
     await browser.close();
   }
   console.log(
-    "Baseline admin desktop/mobile: CSV preview/confirmation, individual add/edit/remove/reinstate, launch block and scoped share creation/revocation passed. Mocked data only.",
+    "Baseline admin " +
+      environment +
+      " desktop/mobile: navigation, directory/create, CSV preview/import, respondent edits, launch controls, scoped shares and exports passed. Mocked data and emails only.",
   );
 })().catch((e) => {
   console.error(e.message);

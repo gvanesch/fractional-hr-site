@@ -33,6 +33,20 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    href: "/advisor/baseline/create",
+    label: "Create baseline project",
+    activePrefixes: ["/advisor/baseline/create"],
+    exact: true,
+  },
+  {
+    href: "/advisor/baseline",
+    label: "Baseline projects",
+    activePrefixes: [
+      "/advisor/baseline/project/",
+      "/advisor/baseline/depth-preview",
+    ],
+  },
+  {
     href: "/advisor/explorers",
     label: "Explorers",
     activePrefixes: ["/advisor/explorers", "/advisor/explore/"],
@@ -59,7 +73,10 @@ export default function AdvisorNav() {
       return pathname === item.href;
     }
 
-    return item.activePrefixes.some((prefix) => pathname.startsWith(prefix));
+    return (
+      pathname === item.href ||
+      item.activePrefixes.some((prefix) => pathname.startsWith(prefix))
+    );
   }
 
   async function handleLogout() {
@@ -106,25 +123,7 @@ export default function AdvisorNav() {
           className="flex flex-wrap items-center gap-x-6 gap-y-2"
           aria-label="Advisor"
         >
-          {[
-            ...NAV_ITEMS,
-            ...(process.env.NEXT_PUBLIC_APP_ENV === "qa"
-              ? [
-                  {
-                    href: "/advisor/baseline/create",
-                    label: "Create baseline project",
-                    activePrefixes: ["/advisor/baseline/create"],
-                    exact: true,
-                  },
-                  {
-                    href: "/advisor/baseline",
-                    label: "Baseline projects",
-                    activePrefixes: ["/advisor/baseline"],
-                    exact: true,
-                  },
-                ]
-              : []),
-          ].map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active = isActive(item);
 
             return (

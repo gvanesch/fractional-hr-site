@@ -137,7 +137,9 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from("client_projects")
-      .select("project_id, project_name, company_name, project_status, created_at")
+      .select(
+        "project_id, project_name, company_name, project_status, created_at",
+      )
       .order("created_at", { ascending: sort === "oldest" });
 
     projects = !error && data ? data : [];
@@ -170,8 +172,16 @@ export default async function AdvisorProjectsPage({ searchParams }: PageProps) {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <WorkspaceStat label="Total" value={String(projects.length)} />
               <WorkspaceStat label="Open" value={String(openProjects.length)} />
-              <WorkspaceStat label="Closed" value={String(closedProjects.length)} />
+              <WorkspaceStat
+                label="Closed"
+                value={String(closedProjects.length)}
+              />
             </div>
+            <p className="mt-6">
+              <Link className="brand-button-outline" href="/advisor/baseline">
+                Open baseline projects
+              </Link>
+            </p>
           </div>
         </div>
       </section>

@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CURRENT_COLLECTION_VERSION as COLLECTION_VERSION, isCollectionVersion } from "@/lib/baseline/collection";
+import {
+  CURRENT_COLLECTION_VERSION as COLLECTION_VERSION,
+  isCollectionVersion,
+} from "@/lib/baseline/collection";
 import Administration from "./administration";
 import Dashboard from "./dashboard";
 import type { CompletionDashboard } from "@/lib/baseline/admin-types";
@@ -12,7 +15,6 @@ import {
   PRIVACY,
   WORK_TYPES,
   countryLabel,
-  VERSION,
   type Draft,
   type EntityOption,
 } from "@/lib/baseline/model";
@@ -68,13 +70,16 @@ export default function AdminPanel({
   mode = "workspace",
 }: { initialCampaign?: string; mode?: "create" | "workspace" } = {}) {
   const router = useRouter();
+  const isQa = process.env.NEXT_PUBLIC_APP_ENV === "qa";
   const id = initialCampaign;
   const [tab, setTab] = useState("overview"),
     [editParticipantId, setEditParticipantId] = useState<string | null>(null),
     [current, setCurrent] = useState<Campaign | null>(null),
     [dashboard, setDashboard] = useState<CompletionDashboard | null>(null),
     [people, setPeople] = useState<Person[]>([]),
-    [name, setName] = useState("team.blue People Operations Baseline — QA"),
+    [name, setName] = useState(
+      "team.blue People Operations Baseline" + (isQa ? " — QA" : ""),
+    ),
     [date, setDate] = useState("2026-10-30"),
     [closingTime, setClosingTime] = useState("18:00"),
     [notice, setNotice] = useState(PRIVACY),
@@ -105,7 +110,9 @@ export default function AdminPanel({
       setCurrent(data.campaign);
       setPeople(data.participants);
       setDate(data.campaign.closes_at.slice(0, 10));
-      setClosingTime(new Date(data.campaign.closes_at).toISOString().slice(11, 16));
+      setClosingTime(
+        new Date(data.campaign.closes_at).toISOString().slice(11, 16),
+      );
       setNotice(data.campaign.privacy_notice);
       setEntityList(
         (data.campaign.entities ?? []).map((e) => e.label).join("\n"),
@@ -155,12 +162,12 @@ export default function AdminPanel({
               className="tb-status"
               data-status={current?.status ?? "draft"}
             >
-              {current?.status ?? "QA preview"}
+              {current?.status ?? "draft"}
             </span>
           </div>
           <p className="brand-subheading">
             {mode === "create"
-              ? "Set up a new assessment project. Add respondents after creating it."
+              ? "Set up a new baseline project. Add respondents after creating it."
               : "team.blue · People Operations Baseline"}
           </p>
           <div className="tb-hero-actions">
@@ -169,7 +176,7 @@ export default function AdminPanel({
             </Link>
             <Link
               className="brand-button-dark"
-              href="/advisor/baseline/prototype"
+              href="/advisor/baseline/depth-preview"
             >
               Review the current questionnaire preview
             </Link>
@@ -204,10 +211,12 @@ export default function AdminPanel({
         </nav>
       )}
       <div className="brand-container tb-shell tb-workspace-body">
-        <div className="tb-qa-notice">
-          QA workspace · Synthetic roster data. Production collection is not
-          authorised.
-        </div>
+        {isQa && (
+          <div className="tb-qa-notice">
+            QA workspace · Synthetic roster data. Production collection is not
+            authorised.
+          </div>
+        )}
         {error && (
           <div role="alert" className="tb-error">
             {error}
@@ -250,7 +259,11 @@ export default function AdminPanel({
                 Questionnaire: {current?.version ?? COLLECTION_VERSION}. The
                 version is fixed for this campaign.
               </p>
-              <p><Link href="/advisor/baseline/depth-preview">Preview the detailed questionnaire</Link></p>
+              <p>
+                <Link href="/advisor/baseline/depth-preview">
+                  Preview the detailed questionnaire
+                </Link>
+              </p>
               <label className="tb-field">
                 <span>Closing date (UTC)</span>
                 <input
@@ -261,9 +274,18 @@ export default function AdminPanel({
               </label>
               <label className="tb-field">
                 <span>Closing time (UTC)</span>
-                <input type="time" value={closingTime} onChange={(e) => setClosingTime(e.target.value)} required />
+                <input
+                  type="time"
+                  value={closingTime}
+                  onChange={(e) => setClosingTime(e.target.value)}
+                  required
+                />
               </label>
-              <p>Collection window: 21–30 October 2026. Keep baseline data without an automatic deletion date. Closing collection does not delete answers.</p>
+              <p>
+                Collection window: 21–30 October 2026. Keep baseline data
+                without an automatic deletion date. Closing collection does not
+                delete answers.
+              </p>
               <label className="tb-field">
                 <span>Data-use statement shown before starting</span>
                 <textarea
@@ -283,7 +305,8 @@ export default function AdminPanel({
                 />
                 <small>
                   Use the supplied team.blue list. Choices are fixed once
-                  invitations are created. Leave blank for the initial QA test.
+                  invitations are created. Leave blank if a business list is not
+                  needed.
                 </small>
               </label>
               {current && current.version !== COLLECTION_VERSION && (
@@ -325,7 +348,7 @@ export default function AdminPanel({
                           campaign: id,
                           privacy: notice,
                           closesAt: date + "T" + closingTime + ":00.000Z",
-                            entityList,
+                          entityList,
                         });
                         await refresh();
                         setMessage("Campaign settings saved.");
@@ -334,25 +357,30 @@ export default function AdminPanel({
                   >
                     Save settings
                   </button>
-                  <button
-                    disabled={
-                      current?.version !== VERSION ||
-                      process.env.NEXT_PUBLIC_APP_ENV !== "qa"
-                    }
-                    className="tb-primary"
-                    onClick={() =>
-                      void action(async () => {
-                        await api("configure", {
-                          campaign: id,
-                          status: "open",
-                        });
-                        await refresh();
-                        setMessage("Campaign opened.");
-                      })
-                    }
-                  >
-                    Open project for QA testing
-                  </button>
+                  {isQa && (
+                    <button
+                      disabled={busy}
+                      className="tb-primary"
+                      onClick={() =>
+                        void action(async () => {
+                          await api("configure", {
+                            campaign: id,
+                            status: "open",
+                          });
+                          await refresh();
+                          setMessage("Campaign opened.");
+                        })
+                      }
+                    >
+                      Open project for QA testing
+                    </button>
+                  )}
+                  {!isQa && (
+                    <p>
+                      Use Launch readiness below to open this project. Launching
+                      does not send invitations.
+                    </p>
+                  )}
                   <button
                     onClick={() =>
                       void action(async () => {
@@ -478,11 +506,13 @@ export default function AdminPanel({
                     </button>
                   </div>
                 )}
-                <p>
-                  QA email sending is disabled. Generate private test links to
-                  exercise the journey. A new link revokes the previous link and
-                  its sessions; saved answers remain.
-                </p>
+                {isQa && (
+                  <p>
+                    QA email sending is disabled. Generate private test links to
+                    exercise the journey. A new link revokes the previous link
+                    and its sessions; saved answers remain.
+                  </p>
+                )}
                 {link && (
                   <div className="tb-detail">
                     <p role="status">
@@ -510,7 +540,7 @@ export default function AdminPanel({
                     >
                       Hide link
                     </button>
-                    {isCollectionVersion(current.version) && (
+                    {isQa && isCollectionVersion(current.version) && (
                       <>
                         <button
                           disabled={busy}
@@ -562,7 +592,11 @@ export default function AdminPanel({
                   />
                 </label>
                 <details>
-                  <summary>Private test access and saved responses</summary>
+                  <summary>
+                    {isQa
+                      ? "Private test access and saved responses"
+                      : "Saved responses"}
+                  </summary>
                   <div className="tb-roster">
                     {people
                       .filter((p) =>
@@ -585,44 +619,48 @@ export default function AdminPanel({
                               ? countryLabel(p.profile.country)
                               : "Country not recorded"}
                           </p>
-                          <button
-                            disabled={busy || !p.active}
-                            onClick={() =>
-                              void action(async () => {
-                                const result = await api("invite", {
-                                  campaign: id,
-                                  participantId: p.participant_id,
-                                  send: false,
-                                });
-                                setLink(result.link);
-                                setQaCode("");
-                                await refresh();
-                                setMessage(
-                                  "Private test link created. No email was sent.",
-                                );
-                              })
-                            }
-                          >
-                            {p.invited
-                              ? "Generate replacement link"
-                              : "Generate test invitation"}
-                          </button>
-                          <button
-                            disabled={busy || !p.active}
-                            onClick={() =>
-                              void action(async () => {
-                                await api("invite", {
-                                  campaign: id,
-                                  participantId: p.participant_id,
-                                  send: true,
-                                });
-                                await refresh();
-                                setMessage("Invitation sent.");
-                              })
-                            }
-                          >
-                            Send / resend email
-                          </button>
+                          {isQa && (
+                            <>
+                              <button
+                                disabled={busy || !p.active}
+                                onClick={() =>
+                                  void action(async () => {
+                                    const result = await api("invite", {
+                                      campaign: id,
+                                      participantId: p.participant_id,
+                                      send: false,
+                                    });
+                                    setLink(result.link);
+                                    setQaCode("");
+                                    await refresh();
+                                    setMessage(
+                                      "Private test link created. No email was sent.",
+                                    );
+                                  })
+                                }
+                              >
+                                {p.invited
+                                  ? "Generate replacement link"
+                                  : "Generate test invitation"}
+                              </button>
+                              <button
+                                disabled={busy || !p.active}
+                                onClick={() =>
+                                  void action(async () => {
+                                    await api("invite", {
+                                      campaign: id,
+                                      participantId: p.participant_id,
+                                      send: true,
+                                    });
+                                    await refresh();
+                                    setMessage("Invitation sent.");
+                                  })
+                                }
+                              >
+                                Send / resend email
+                              </button>
+                            </>
+                          )}
                           <button onClick={() => setView(p)}>
                             View response
                           </button>
@@ -671,9 +709,9 @@ export default function AdminPanel({
                 {isCollectionVersion(current.version) && (
                   <>
                     <p>
-                      Requested answer-copy emails stay in preview mode in QA.
-                      Failed production deliveries can be retried after
-                      production mail is approved.
+                      {isQa
+                        ? "Requested answer-copy emails stay in preview mode in QA."
+                        : "Retry delivery of Word copies requested by respondents whose previous delivery failed."}
                     </p>
                     <button
                       disabled={
@@ -702,7 +740,25 @@ export default function AdminPanel({
                   Draft answers are clearly marked; do not treat them as
                   completed responses.
                 </p>
-                {isCollectionVersion(current.version) && <p><a style={{ display: "inline-block", padding: 12, fontWeight: 700, textDecoration: "underline" }} href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=xlsx`}>Download Excel analysis workbook</a><br/>Separate filterable tables, one answer per cell, numeric percentages, and a field guide. Filter Include in analysis to TRUE for completed responses.</p>}
+                {isCollectionVersion(current.version) && (
+                  <p>
+                    <a
+                      style={{
+                        display: "inline-block",
+                        padding: 12,
+                        fontWeight: 700,
+                        textDecoration: "underline",
+                      }}
+                      href={`/advisor/baseline/api/export?campaign=${encodeURIComponent(id)}&format=xlsx`}
+                    >
+                      Download Excel analysis workbook
+                    </a>
+                    <br />
+                    Separate filterable tables, one answer per cell, numeric
+                    percentages, and a field guide. Filter Include in analysis
+                    to TRUE for completed responses.
+                  </p>
+                )}
                 {(["respondents", "activities", "json"] as const).map(
                   (format) => (
                     <a
