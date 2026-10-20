@@ -201,6 +201,7 @@ const root = path.resolve(__dirname, "../..");
       await fill("Country time: Canada (%)", "0");
       await saved;
       assert.equal(stored.depth.countryTime["custom:canada"], 0);
+      await page.getByRole("status").filter({ hasText: "Saved securely" }).waitFor();
       if (process.env.BASELINE_SCREENSHOT_DIR) {
         fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
         await page.screenshot({
@@ -213,7 +214,7 @@ const root = path.resolve(__dirname, "../..");
       }
       assert.deepEqual(model.depthIssues(stored.depth, stored.broad.selected, "coverage"), [], "Saved coverage must be valid before continuing");
       await button("Continue").click();
-      console.log("Coverage navigation diagnostic", JSON.stringify({ revision: stored.depth.formRevision, invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
+      console.log("Coverage navigation diagnostic", JSON.stringify({ mobile, revision: stored.depth.formRevision, heading: await page.locator("h1").allTextContents(), invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
       await page
         .getByRole("heading", {
           name: "Work activities and delivery",

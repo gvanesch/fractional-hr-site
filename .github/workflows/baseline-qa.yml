@@ -36,6 +36,8 @@ jobs:
           "$RUNNER_TEMP/baseline-browser/node_modules/.bin/playwright" install --with-deps chromium
           echo "BASELINE_PLAYWRIGHT_PATH=$RUNNER_TEMP/baseline-browser/node_modules/playwright" >> "$GITHUB_ENV"
           echo "BASELINE_SCREENSHOT_DIR=$RUNNER_TEMP/baseline-visuals" >> "$GITHUB_ENV"
+      - name: Test detailed v5 questions and resume on desktop and mobile
+        run: node scripts/baseline/depth-check.cjs
       - name: Test desktop and mobile assessment journey
         run: node scripts/baseline/ui-check.cjs
       - name: Test broad-work prototype on desktop and mobile
@@ -48,8 +50,6 @@ jobs:
         run: node scripts/baseline/admin-check.cjs
       - name: Test reviewed collection save, resume and submission on desktop and mobile
         run: node scripts/baseline/collection-check.cjs
-      - name: Test detailed v5 questions and resume on desktop and mobile
-        run: node scripts/baseline/depth-check.cjs
       - name: Save synthetic QA visual checks
         uses: actions/upload-artifact@v4
         with:
