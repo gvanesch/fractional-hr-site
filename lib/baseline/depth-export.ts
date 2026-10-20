@@ -4,6 +4,8 @@ import { MANAGEMENT_AREA } from "./management-prototype";
 import {
   LOCAL_REQUIREMENTS,
   WORK_PARTIES,
+  handoffOptions,
+  CURRENT_DEPTH_FORM_REVISION,
   OWNERSHIP,
   AUTONOMY,
   CAPACITY,
@@ -112,6 +114,7 @@ export function depthAnalysisTables(
       "Potential hours per week",
       "Potential FTE allocation",
       "Conditions for delivery elsewhere",
+      "Hand-off context",
     ],
     [
       "Share of items needing rework",
@@ -227,7 +230,15 @@ export function depthAnalysisTables(
             ...a,
             direction,
             s(code),
-            label(WORK_PARTIES, code),
+            label(
+              d.formRevision === CURRENT_DEPTH_FORM_REVISION
+                ? handoffOptions(
+                    s(w.area),
+                    direction === "Received from" ? "receives" : "passes",
+                  )
+                : WORK_PARTIES,
+              code,
+            ),
             s(w.handoffNote),
           ]);
       delivery.rows.push([
@@ -248,6 +259,7 @@ export function depthAnalysisTables(
         fraction(w.transferPercent),
         ...alloc(whole(w.transferPercent, w.area)),
         s(w.transferNote),
+        s(w.handoffNote),
       ]);
     }
     role.rows.push([

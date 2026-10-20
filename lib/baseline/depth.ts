@@ -62,6 +62,65 @@ export const OWNERSHIP = [
   ["advise", "Advise or approve rather than deliver"],
   ["unknown", "Not sure"],
 ];
+// Keep the original option vocabulary and definition stable for saved campaigns.
+export const CURRENT_DEPTH_FORM_REVISION = "2026-10-20";
+export function handoffOptions(area: string, direction: "receives" | "passes") {
+  const people = [
+    "employees",
+    "managers",
+    "local_people",
+    "regional_people",
+    "group_people",
+  ];
+  const extra: Record<string, string[]> = {
+    lifecycle: ["finance", "it", "legal", "system"],
+    recruitment: ["provider", "system"],
+    pay_benefits: ["finance", "provider", "system"],
+    advice_cases: ["legal"],
+    planning_development: ["finance", "provider", "system"],
+    experience: ["provider", "system"],
+    policies: ["legal"],
+    systems_data: ["finance", "it", "provider", "system"],
+    office: ["finance", "it", "provider", "system"],
+    people_management: [],
+  };
+  const allowed = [
+    ...people,
+    ...(extra[area] ?? []),
+    "other",
+    "none",
+    "unknown",
+  ];
+  return WORK_PARTIES.filter(([code]) => allowed.includes(code)).map(
+    ([code, label]) => [
+      code,
+      area === "recruitment" && code === "employees"
+        ? direction === "receives"
+          ? "Candidates / new joiners"
+          : "Candidates / successful applicants"
+        : area === "people_management" && code === "employees"
+          ? "Direct reports"
+          : area === "office" && code === "finance"
+            ? "Finance"
+            : area === "office" && code === "it"
+              ? "IT"
+              : area === "recruitment" && code === "provider"
+                ? "Recruitment agencies / assessment providers"
+                : area === "planning_development" && code === "provider"
+                  ? "Learning / development providers"
+                  : label,
+    ],
+  );
+}
+export function visibleHandoffs(
+  area: string,
+  direction: "receives" | "passes",
+  values: string[],
+) {
+  return values.filter((code) =>
+    handoffOptions(area, direction).some((o) => o[0] === code),
+  );
+}
 export const TASKS: Record<string, string[][]> = {
   lifecycle: [
     ["join", "Onboarding / joining"],
@@ -218,6 +277,7 @@ export const emptyWorkDetail = (): WorkDetail => ({
   transferNote: "",
 });
 export type DepthDraft = {
+  formRevision?: typeof CURRENT_DEPTH_FORM_REVISION;
   resumeStep: string;
   basedCountry: string;
   basedOther: string;
@@ -370,6 +430,7 @@ const splitIssues = (
   ).map((c) => prefix + c);
 };
 export function depthIssues(d: DepthDraft, selected: string[], step: string) {
+  const current = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
   const issues: string[] = [];
   const need = (condition: boolean, key: string) => {
     if (!condition) issues.push(key);
@@ -400,17 +461,22 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
       );
     need(text(d.businesses), "businesses");
     need(text(d.languages), "languages");
-    need(
-      NUMBER_BASIS.some((o) => o[0] === d.populationBasis),
-      "populationBasis",
-    );
-    if (known(d.populationBasis))
+    if (!current)
+      need(
+        NUMBER_BASIS.some((o) => o[0] === d.populationBasis),
+        "populationBasis",
+      );
+    if (current || known(d.populationBasis))
       need(number(d.supportedEmployees, 1e9), "supportedEmployees");
   }
   if (step === "work_detail")
     for (const area of selected) {
       const w = d.work[area] ?? emptyWorkDetail(),
         p = area + "_";
+      if (current && area === "other") {
+        need(text(w.taskNote), p + "taskNote");
+        continue;
+      }
       if (TASKS[area]) {
         need(
           chosen(w.tasks, [...TASKS[area], ["unknown", "Not sure"]]),
@@ -427,7 +493,35 @@ export function depthIssues(d: DepthDraft, selected: string[], step: string) {
         OWNERSHIP.some((o) => o[0] === w.ownership),
         p + "ownership",
       );
-      need(text(w.ownerTeam), p + "ownerTeam");
+      if (!current || w.ownership !== "accountable")
+        need(text(w.ownerTeam), p + "ownerTeam");
+      if (current) {
+        need(
+          chosen(
+            visibleHandoffs(area, "receives", w.receives),
+            handoffOptions(area, "receives"),
+          ),
+          p + "receives",
+        );
+        need(
+          chosen(
+            visibleHandoffs(area, "passes", w.passes),
+            handoffOptions(area, "passes"),
+          ),
+          p + "passes",
+        );
+        if (w.volume !== null) {
+          need(number(w.volume, 1e9), p + "volume");
+          need(
+            ["week", "month", "year"].includes(w.volumePeriod),
+            p + "volumePeriod",
+          );
+          need(text(w.volumeUnit), p + "volumeUnit");
+        }
+        if (w.reworkPercent !== null)
+          need(number(w.reworkPercent), p + "reworkPercent");
+        continue;
+      }
       need(chosen(w.receives, WORK_PARTIES), p + "receives");
       need(chosen(w.passes, WORK_PARTIES), p + "passes");
       need(
@@ -605,9 +699,16 @@ export function parseDepth(value: unknown, areaCodes: string[]): DepthDraft {
         throw Error("Use a positive number or leave unknown values blank.");
     }
   };
-  const raw = shape(value, emptyDepth());
+  const { formRevision, ...fields } = object(value);
+  if (
+    formRevision !== undefined &&
+    formRevision !== CURRENT_DEPTH_FORM_REVISION
+  )
+    throw Error("Check the detailed work form version.");
+  const raw = shape(fields, emptyDepth());
   checkTypes(raw, emptyDepth());
   const d = { ...emptyDepth(), ...raw } as DepthDraft;
+  if (formRevision) d.formRevision = formRevision;
   list(
     d.countries,
     COUNTRY_OPTIONS.map((o) => o[0]),
@@ -651,17 +752,20 @@ export function parseDepth(value: unknown, areaCodes: string[]): DepthDraft {
   return d;
 }
 export function depthEvidence(d: DepthDraft, selected: string[]) {
+  const current = d.formRevision === CURRENT_DEPTH_FORM_REVISION;
   const pct = (n: number | null | undefined) =>
     typeof n === "number" && Number.isFinite(n) ? n : null;
   const countryUnknown =
     d.countryTimeUnknown || d.countries.includes("unknown");
   return {
+    ...(current ? { formRevision: CURRENT_DEPTH_FORM_REVISION } : {}),
     basedCountry: d.basedCountry,
     basedOther: d.basedCountry === "other" ? d.basedOther : "",
     businesses: d.businesses,
     languages: d.languages,
-    populationBasis: d.populationBasis,
-    supportedEmployees: known(d.populationBasis) ? d.supportedEmployees : null,
+    populationBasis: current ? "" : d.populationBasis,
+    supportedEmployees:
+      current || known(d.populationBasis) ? d.supportedEmployees : null,
     countryTimeUnknown: countryUnknown,
     countries: coverageCountries(d).map(({ code, label, region }) => ({
       code,
@@ -670,7 +774,31 @@ export function depthEvidence(d: DepthDraft, selected: string[]) {
       shareOfWorkingTime: countryUnknown ? null : pct(d.countryTime[code]),
     })),
     work: selected.map((area) => {
-      const w = d.work[area] ?? emptyWorkDetail();
+      const saved = d.work[area] ?? emptyWorkDetail();
+      const w = !current
+        ? saved
+        : area === "other"
+          ? {
+              ...emptyWorkDetail(),
+              tasks: ["other"],
+              taskTimeUnknown: true,
+              taskNote: saved.taskNote,
+              handoffNote: saved.handoffNote,
+            }
+          : {
+              ...saved,
+              ownerTeam:
+                saved.ownership === "accountable" ? "My role" : saved.ownerTeam,
+              receives: visibleHandoffs(area, "receives", saved.receives),
+              passes: visibleHandoffs(area, "passes", saved.passes),
+              volumeBasis: saved.volume !== null ? "estimate" : "",
+              reworkBasis: saved.reworkPercent !== null ? "estimate" : "",
+              handlingBasis: "",
+              handlingMinutes: null,
+              transferable: "",
+              transferPercent: null,
+              transferNote: "",
+            };
       return {
         area,
         tasks: (TASKS[area] ? w.tasks : []).map((code) => ({

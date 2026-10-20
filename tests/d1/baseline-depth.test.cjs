@@ -23,6 +23,93 @@ async function fixture() {
   fillDepth(d);
   return { c, m, d };
 }
+test("Simplified revision keeps headcount and estimates without removed basis or transfer questions", async () => {
+  const { c, m, d } = await fixture();
+  const originalKeys = Object.keys(m.emptyDepth());
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.populationBasis = "";
+  const w = d.depth.work.lifecycle;
+  w.ownership = "accountable";
+  w.ownerTeam = "Hidden historic owner";
+  w.volumeBasis = w.handlingBasis = w.reworkBasis = "";
+  w.transferable = "";
+  assert.deepEqual(m.depthIssues(d.depth, d.broad.selected, "coverage"), []);
+  assert.deepEqual(m.depthIssues(d.depth, d.broad.selected, "work_detail"), []);
+  const parsed = m.parseDepth(d.depth, d.broad.selected);
+  assert.equal(parsed.work.lifecycle.ownerTeam, "Hidden historic owner");
+  const e = m.depthEvidence(parsed, d.broad.selected);
+  assert.equal(e.supportedEmployees, 200);
+  assert.equal(e.work[0].ownerTeam, "My role");
+  assert.equal(e.work[0].volume, 50);
+  assert.equal(e.work[0].reworkPercent, 5);
+  assert.equal(e.work[0].handlingMinutes, null);
+  assert.equal(e.work[0].transferPercent, null);
+  assert.equal(e.work[0].transferNote, "");
+  assert.deepEqual(Object.keys(m.emptyDepth()), originalKeys);
+  assert.ok(
+    !Object.keys(c.DEPTH_COLLECTION_DEFINITION).includes("formRevision"),
+  );
+  assert.throws(() =>
+    m.parseDepth({ ...d.depth, formRevision: "injected" }, d.broad.selected),
+  );
+  w.ownership = "steps";
+  w.ownerTeam = "";
+  assert.ok(
+    m
+      .depthIssues(d.depth, d.broad.selected, "work_detail")
+      .includes("lifecycle_ownerTeam"),
+  );
+  d.depth.supportedEmployees = null;
+  assert.ok(
+    m
+      .depthIssues(d.depth, d.broad.selected, "coverage")
+      .includes("supportedEmployees"),
+  );
+});
+test("Manager advice handoffs are relevant and stale hidden choices cannot count as answers", async () => {
+  const { m, d } = await fixture();
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  for (const direction of ["receives", "passes"]) {
+    const codes = m.handoffOptions("advice_cases", direction).map((o) => o[0]);
+    for (const excluded of ["it", "finance", "provider"])
+      assert.ok(!codes.includes(excluded));
+    assert.ok(codes.includes("other"));
+  }
+  const w = d.depth.work.lifecycle;
+  d.depth.work.advice_cases = {
+    ...w,
+    tasks: ["advice"],
+    taskTime: { advice: 100 },
+    receives: ["finance"],
+    passes: ["it"],
+  };
+  assert.ok(
+    m
+      .depthIssues(d.depth, ["advice_cases"], "work_detail")
+      .includes("advice_cases_receives"),
+  );
+  const e = m.depthEvidence(d.depth, ["advice_cases"]).work[0];
+  assert.deepEqual(e.receives, []);
+  assert.deepEqual(e.passes, []);
+});
+test("Other work uses open narratives and exports them without requiring standard activity fields", async () => {
+  const { m, d } = await fixture();
+  d.depth.formRevision = m.CURRENT_DEPTH_FORM_REVISION;
+  d.depth.work.other = {
+    ...m.emptyWorkDetail(),
+    taskNote: "Monthly community mentoring",
+    handoffNote: "Requested by colleagues; shared with the community lead",
+  };
+  assert.deepEqual(m.depthIssues(d.depth, ["other"], "work_detail"), []);
+  const w = m.depthEvidence(d.depth, ["other"]).work[0];
+  assert.equal(w.taskNote, "Monthly community mentoring");
+  assert.equal(w.handoffNote, d.depth.work.other.handoffNote);
+  assert.equal(w.tasks[0].shareOfAreaTime, null);
+  d.depth.work.other.taskNote = "";
+  assert.deepEqual(m.depthIssues(d.depth, ["other"], "work_detail"), [
+    "other_taskNote",
+  ]);
+});
 test("v5 requires depth while historic collection versions preserve their definitions and steps", async () => {
   const { c, m, d } = await fixture();
   assert.equal(c.CURRENT_COLLECTION_VERSION, c.DEPTH_COLLECTION_VERSION);

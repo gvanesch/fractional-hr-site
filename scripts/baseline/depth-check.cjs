@@ -154,6 +154,24 @@ const root = path.resolve(__dirname, "../..");
         })
         .waitFor();
       await check("Countries you regularly support: Other country / countries");
+      assert.equal(
+        await page
+          .getByLabel(
+            "Is the number of employees you support based on records or an estimate?",
+            { exact: true },
+          )
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .getByLabel(
+            "Approximately how many employees do you regularly support?",
+            { exact: true },
+          )
+          .inputValue(),
+        "200",
+      );
       await fill("Other countries you support", "Norway");
       await fill("Country time: Norway (%)", "20");
       await fill("Country time: Finland (%)", "80");
@@ -202,6 +220,25 @@ const root = path.resolve(__dirname, "../..");
         .waitFor();
       const office = "Reception, facilities and office support";
       await page.locator("summary").filter({ hasText: office }).click();
+      assert.equal(
+        await page
+          .getByText(
+            /Basis for your personal work volume|Average active minutes per item|Basis for rework|delivered from another country|physical presence\./,
+          )
+          .count(),
+        0,
+      );
+      const ownership = page.getByLabel(office + ": Your main accountability", {
+        exact: true,
+      });
+      const owner = page.getByLabel(
+        office + ": Who is accountable for the whole process / service?",
+        { exact: true },
+      );
+      await ownership.selectOption("accountable");
+      assert.equal(await owner.count(), 0);
+      await ownership.selectOption("steps");
+      assert.equal(await owner.inputValue(), "Regional People Operations lead");
       await check(office + ": Work you actually do: Fleet or company cars");
       assert.equal(
         await page
@@ -330,6 +367,57 @@ const root = path.resolve(__dirname, "../..");
         evidence.depth.countries.find((c) => c.code === "custom:canada")
           .shareOfWorkingTime,
         0,
+      );
+      // A separate resumed state exercises the bespoke Other panel and advice handoffs.
+      stored = m.initialCollection(m.DEPTH_COLLECTION_VERSION);
+      stored.started = true;
+      stored.broad.selected = ["advice_cases", "other"];
+      stored.broad.time = { advice_cases: 50, other: 50 };
+      require("./depth-fixture.cjs").fillDepth(stored);
+      stored.depth.resumeStep = "work_detail";
+      status = "in_progress";
+      await page.reload();
+      await page
+        .getByRole("heading", {
+          name: "Work activities and delivery",
+          exact: true,
+        })
+        .waitFor();
+      const advice = page
+        .locator("details")
+        .filter({
+          has: page.locator("summary").filter({ hasText: "Manager advice" }),
+        });
+      await advice.locator("summary").click();
+      for (const irrelevant of [
+        /Work or information received from: Finance/,
+        /Work or information received from: IT/,
+        /Work or information received from: External provider/,
+        /Work or approval passed to: Finance/,
+        /Work or approval passed to: IT/,
+        /Work or approval passed to: External provider/,
+      ])
+        assert.equal(
+          await advice.getByRole("checkbox", { name: irrelevant }).count(),
+          0,
+        );
+      const otherPanel = page
+        .locator("details")
+        .filter({
+          has: page.locator("summary").filter({ hasText: /^Other work$/ }),
+        });
+      await otherPanel.locator("summary").click();
+      assert.equal(await otherPanel.locator("textarea").count(), 2);
+      assert.equal(
+        await otherPanel
+          .locator('input[type="number"],select,input[type="checkbox"]')
+          .count(),
+        0,
+      );
+      assert.ok(
+        await otherPanel
+          .getByLabel(/Describe the other work you do/)
+          .inputValue(),
       );
       await page.close();
     }

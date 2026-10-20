@@ -85,7 +85,10 @@ export default function CollectionJourney() {
         const fragment = rawFragment.split(":")[0];
         const previewChallenge = rawFragment.split(":")[1] ?? "";
         if (fragment) {
-          const info = await api<{ version: string }>("invitation-info", {
+          const info = await api<{
+            version: string;
+            verificationPreview?: boolean;
+          }>("invitation-info", {
             token: fragment,
           });
           if (!active) return;
@@ -95,8 +98,17 @@ export default function CollectionJourney() {
           }
           history.replaceState(null, "", location.pathname);
           setToken(fragment);
-          if (/^[a-f0-9-]{36}$/.test(previewChallenge))
+          if (
+            info.verificationPreview &&
+            /^[a-f0-9-]{36}$/.test(previewChallenge)
+          )
             setChallenge(previewChallenge);
+          else {
+            const result = await api<{ challenge: string }>("request-code", {
+              token: fragment,
+            });
+            if (active) setChallenge(result.challenge);
+          }
         } else await load();
       } catch (e) {
         if (active)
@@ -183,13 +195,13 @@ export default function CollectionJourney() {
         )}
         {message && <p role="status">{message}</p>}
         {loading ? (
-          <p>Opening your assessment…</p>
+          <p>Opening your assessment and sending your verification code…</p>
         ) : token ? (
           <>
             <p>
               {challenge
                 ? "Enter the code sent to the email address used for your invitation."
-                : "We will send a verification code to the email address used for your invitation."}
+                : "We could not send your verification code. Please try again."}
             </p>
             {!challenge ? (
               <button
@@ -204,7 +216,7 @@ export default function CollectionJourney() {
                   })
                 }
               >
-                Send verification code
+                Try sending again
               </button>
             ) : (
               <form
@@ -237,23 +249,25 @@ export default function CollectionJourney() {
                 <p>
                   The code is valid for 10 minutes. Use the most recent code.
                 </p>
-                <button
-                  className="tb-secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void action(async () => {
-                      const r = await api<{ challenge: string }>(
-                        "request-code",
-                        { token },
-                      );
-                      setChallenge(r.challenge);
-                      setCode("");
-                    })
-                  }
-                >
-                  Get a current code
-                </button>
+                {error && (
+                  <button
+                    className="tb-secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void action(async () => {
+                        const r = await api<{ challenge: string }>(
+                          "request-code",
+                          { token },
+                        );
+                        setChallenge(r.challenge);
+                        setCode("");
+                      })
+                    }
+                  >
+                    Try sending a new code
+                  </button>
+                )}
               </form>
             )}
           </>

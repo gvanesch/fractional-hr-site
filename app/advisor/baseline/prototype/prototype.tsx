@@ -1,7 +1,11 @@
 "use client";
 import { BASELINE_COMPLETION_GUIDANCE } from "@/lib/baseline/copy";
 import Depth, { DepthReview } from "./depth";
-import { emptyDepth, depthIssues } from "@/lib/baseline/depth";
+import {
+  emptyDepth,
+  depthIssues,
+  CURRENT_DEPTH_FORM_REVISION,
+} from "@/lib/baseline/depth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   emptyManagementTime,
@@ -120,9 +124,11 @@ export default function Prototype({
   const revised =
     !saveCollection || isRevisedCollection(savedCollection?.draft.version);
   const expanded = savedCollection?.draft.version === DEPTH_COLLECTION_VERSION;
-  const [depth, setDepth] = useState(
-    savedCollection?.draft.depth ?? emptyDepth,
-  );
+  const [depth, setDepth] = useState(() => ({
+    ...(savedCollection?.draft.depth ?? emptyDepth()),
+    formRevision:
+      CURRENT_DEPTH_FORM_REVISION as typeof CURRENT_DEPTH_FORM_REVISION,
+  }));
   const [managementTime, setManagementTime] = useState(
     savedCollection?.draft.managementTime ?? emptyManagementTime,
   );
@@ -462,9 +468,7 @@ export default function Prototype({
               </label>
             </section>
           )}
-          <p className="tb-estimate">
-            {BASELINE_COMPLETION_GUIDANCE}
-          </p>
+          <p className="tb-estimate">{BASELINE_COMPLETION_GUIDANCE}</p>
           {saveCollection && (
             <p>
               Your answers save as you go. Use your private invitation to return

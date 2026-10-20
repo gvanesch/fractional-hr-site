@@ -51,10 +51,10 @@ export function invitationEmail(
 export function verificationEmail(code: string, link?: string) {
   return {
     subject: "team.blue | Your verification code",
-    text: `team.blue — Verify access\n\nEnter this code on the baseline assessment page:\n\n${code}\n\nThe code is valid for 10 minutes. Keep it private.${link ? "\n\nReturn to your assessment:\n" + link : ""}\n\nteam.blue · Current work baseline. Reply to this email for help.`,
+    text: `team.blue — Verify access\n\nEnter this code on the baseline assessment page you already have open:\n\n${code}\n\nThe code is valid for 10 minutes. Keep it private.${link ? "\n\nKeep this email so you can return later and continue your saved answers. Whenever you use the link below, a fresh verification code will be emailed automatically. Use the most recent code.\n\nReturn to your assessment:\n" + link : ""}\n\nteam.blue · Current work baseline. Reply to this email for help.`,
     html: frame(
       "Verify access to your baseline",
-      `<p>Enter this code on the baseline assessment page:</p><p style="font-size:32px;font-weight:700;letter-spacing:6px;background:#eff6ff;padding:18px;border-radius:8px">${escape(code)}</p><p>The code is valid for 10 minutes. Keep it private.</p>${link ? '<p><a href="' + escape(link) + '" style="color:#1e6fd9">Return to your assessment</a></p>' : ""}`,
+      `<p>Enter this code on the baseline assessment page you already have open:</p><p style="font-size:32px;font-weight:700;letter-spacing:6px;background:#eff6ff;padding:18px;border-radius:8px">${escape(code)}</p><p>The code is valid for 10 minutes. Keep it private.</p>${link ? '<p>Keep this email so you can return later and continue your saved answers. Whenever you use the link below, a fresh verification code will be emailed automatically. Use the most recent code.</p><p><a href="' + escape(link) + '" style="color:#1e6fd9">Return to your assessment</a></p>' : ""}`,
     ),
   };
 }

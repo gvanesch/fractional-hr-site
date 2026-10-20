@@ -2083,7 +2083,10 @@ async function invitationForVerification(request: Request, token: string) {
 }
 export async function invitationInfo(request: Request, token: string) {
   const p = await invitationForVerification(request, token);
-  return { version: p.version };
+  return {
+    version: p.version,
+    verificationPreview: baselineEnv().NEXT_PUBLIC_APP_ENV === "qa",
+  };
 }
 function verificationHash(id: string, code: string) {
   const salt = baselineEnv().INVITE_RATE_LIMIT_SALT;
@@ -2419,9 +2422,7 @@ export async function requestVerification(
           code,
           env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") +
             "/baseline/start#" +
-            token +
-            ":" +
-            challenge,
+            token,
         ),
         {
           challenge,
@@ -2441,9 +2442,7 @@ export async function requestVerification(
           code,
           env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") +
             "/baseline/start#" +
-            token +
-            ":" +
-            challenge,
+            token,
         ),
       });
       if (result.error)
@@ -2478,7 +2477,10 @@ export async function verifyCode(
     .bind(challenge, p.invite_id, now())
     .run();
   if (used.meta.changes !== 1)
-    throw new BaselineError("Request a current verification code.", 403);
+    throw new BaselineError(
+      "This code has expired or has already been used. Open the return link in your email to receive a new code automatically.",
+      403,
+    );
   const value = await db()
     .prepare(
       "SELECT code_hash FROM tb_baseline_verifications WHERE challenge_id=? AND invite_id=?",
@@ -2500,7 +2502,10 @@ export async function verifyCode(
     .bind(now(), challenge, p.invite_id, now())
     .run();
   if (consumed.meta.changes !== 1)
-    throw new BaselineError("Request a current verification code.", 403);
+    throw new BaselineError(
+      "This code has expired or has already been used. Open the return link in your email to receive a new code automatically.",
+      403,
+    );
   return redeem(request, token, true);
 }
 

@@ -8,7 +8,8 @@ import {
   PROJECT_COUNTRIES,
   COUNTRY_OPTIONS,
   LOCAL_REQUIREMENTS,
-  WORK_PARTIES,
+  handoffOptions,
+  visibleHandoffs,
   OWNERSHIP,
   TASKS,
   MONTHS,
@@ -264,17 +265,11 @@ export default function Depth({
           "Which brands, businesses or legal entities do you regularly support?",
           "List the names. Write Group-wide if applicable, or Not sure. This is service coverage, not just your employing entity.",
         )}
-        {pick(
-          "populationBasis",
-          "Is the number of employees you support based on records or an estimate?",
-          NUMBER_BASIS,
+        {num(
+          "supportedEmployees",
+          "Approximately how many employees do you regularly support?",
+          1e9,
         )}
-        {known(d.populationBasis) &&
-          num(
-            "supportedEmployees",
-            "Approximately how many employees do you regularly support?",
-            1e9,
-          )}
         {text(
           "languages",
           "Which languages can you use to deliver this work, and at what working level?",
@@ -287,9 +282,9 @@ export default function Depth({
       <>
         <p>
           Open each selected work area. Estimate the split within that area,
-          then describe ownership, local requirements, demand and hand-offs. You
-          can choose Not known where records or a sensible estimate are
-          unavailable.
+          then describe ownership, local requirements, demand and hand-offs.
+          Work volume and rework figures are optional estimates of your own
+          work.
         </p>
         {selected.map((area) => {
           const w = d.work[area] ?? emptyWorkDetail(),
@@ -337,12 +332,33 @@ export default function Depth({
           ) => (
             <Checks
               label={label + ": " + title}
-              values={w[key]}
+              values={
+                key === "local" ? w[key] : visibleHandoffs(area, key, w[key])
+              }
               options={options}
               invalid={bad(p + key)}
               change={(v) => update({ [key]: v })}
             />
           );
+          if (area === "other")
+            return (
+              <AreaPanel
+                key={area}
+                label={label}
+                invalid={issues.some((i) => i.startsWith(p))}
+              >
+                {txt(
+                  "taskNote",
+                  "Describe the other work you do",
+                  "Explain the purpose, examples of the work and how often it arises. Include anything important that the named work areas do not cover.",
+                )}
+                {txt(
+                  "handoffNote",
+                  "Who requests this work, what do you provide, and who receives it? (optional)",
+                  "Describe the people or teams involved and anything else that helps explain this work.",
+                )}
+              </AreaPanel>
+            );
           return (
             <AreaPanel
               key={area}
@@ -416,33 +432,33 @@ export default function Depth({
                 txt(
                   "localNote",
                   "Which countries, languages or sites need this, and why?",
-                  "Describe the work that must stay local, including required office cover or service hours. Local knowledge does not always require physical presence.",
+                  "Describe the country, language, site or service-hour requirements that apply to your current work.",
                 )}
               {pk("ownership", "Your main accountability", OWNERSHIP)}
-              {txt(
-                "ownerTeam",
-                "Who is accountable for the whole process / service?",
-                "Give a team or role, not a personal name. If you own it, say My role. If not known, write Not sure.",
-              )}
+              {w.ownership !== "accountable" &&
+                txt(
+                  "ownerTeam",
+                  "Who is accountable for the whole process / service?",
+                  "Give a team or role, not a personal name. If not known, write Not sure.",
+                )}
               {checks(
                 "receives",
                 "Work or information received from",
-                WORK_PARTIES,
+                handoffOptions(area, "receives"),
               )}
-              {checks("passes", "Work or approval passed to", WORK_PARTIES)}
+              {checks(
+                "passes",
+                "Work or approval passed to",
+                handoffOptions(area, "passes"),
+              )}
               {txt(
                 "handoffNote",
                 "Hand-off details or recurring delays (optional)",
                 "Name the step, team or system and where work waits, duplicates or returns for correction.",
               )}
-              {pk(
-                "volumeBasis",
-                "Basis for your personal work volume",
-                NUMBER_BASIS,
-              )}
-              {known(w.volumeBasis) && (
+              {n("volume", "Typical personal volume (optional estimate)", 1e9)}
+              {w.volume !== null && (
                 <>
-                  {n("volume", "Typical personal volume", 1e9)}
                   {pk("volumePeriod", "Volume period", [
                     ["week", "Per typical week"],
                     ["month", "Per typical month"],
@@ -450,49 +466,15 @@ export default function Depth({
                   ])}
                 </>
               )}
-              {(known(w.volumeBasis) ||
-                known(w.handlingBasis) ||
-                known(w.reworkBasis)) &&
+              {w.volume !== null &&
                 txt(
                   "volumeUnit",
                   "What is being counted?",
                   "For example joiners, leavers, contracts, cases, tickets or payroll employee records. Count your own work, not the whole team's workload.",
                 )}
-              {pk("handlingBasis", "Basis for time per item", NUMBER_BASIS)}
-              {known(w.handlingBasis) &&
-                n("handlingMinutes", "Average active minutes per item", 100000)}
-              {pk(
-                "reworkBasis",
-                "Basis for rework / corrections",
-                NUMBER_BASIS,
-              )}
-              {known(w.reworkBasis) &&
-                n(
-                  "reworkPercent",
-                  "Share of items needing rework / correction (%)",
-                )}
-              {pk(
-                "transferable",
-                "Could some of this work be delivered from another country?",
-                [
-                  ["yes", "Yes, subject to validation"],
-                  ["part", "Part of it, with conditions"],
-                  ["no", "No, it needs local delivery"],
-                  ["unknown", "Not sure"],
-                ],
-              )}
-              {["yes", "part"].includes(w.transferable) && (
-                <>
-                  {n(
-                    "transferPercent",
-                    "Estimated share that could be delivered elsewhere (%)",
-                  )}
-                  {txt(
-                    "transferNote",
-                    "Which work could move, and what would be needed?",
-                    "Include skills, permissions, language, local approvals, systems, documentation and hand-over effort. This is a proposal, not confirmed spare capacity.",
-                  )}
-                </>
+              {n(
+                "reworkPercent",
+                "Share of items needing rework / correction (%, optional estimate)",
               )}
             </AreaPanel>
           );
@@ -731,11 +713,7 @@ export function DepthReview({
       <p>Businesses: {draft.businesses}</p>
       <p>Working languages: {draft.languages}</p>
       <p>
-        Supported employee population:{" "}
-        {known(draft.populationBasis)
-          ? draft.supportedEmployees
-          : "Not known / not applicable"}{" "}
-        ({draft.populationBasis})
+        Supported employee population: {draft.supportedEmployees ?? "Not given"}
       </p>
       <p>
         Responsibility: {AUTONOMY.find((o) => o[0] === draft.autonomy)?.[1]}
@@ -794,6 +772,14 @@ export function DepthReview({
       </p>
       {selected.map((area) => {
         const w = draft.work[area] ?? emptyWorkDetail();
+        if (area === "other")
+          return (
+            <section className="tb-process" key={area}>
+              <h3>Other work</h3>
+              <p>{w.taskNote}</p>
+              {w.handoffNote && <p>{w.handoffNote}</p>}
+            </section>
+          );
         return (
           <section className="tb-process" key={area}>
             <h3>
@@ -823,52 +809,45 @@ export function DepthReview({
             </p>
             <p>
               Accountability: {OWNERSHIP.find((o) => o[0] === w.ownership)?.[1]}
-              ; process owner: {w.ownerTeam}
+              {w.ownership !== "accountable" && (
+                <>; process owner: {w.ownerTeam}</>
+              )}
             </p>
             <p>
               Receives from:{" "}
-              {w.receives
-                .map((c) => WORK_PARTIES.find((o) => o[0] === c)?.[1] ?? c)
+              {visibleHandoffs(area, "receives", w.receives)
+                .map(
+                  (c) =>
+                    handoffOptions(area, "receives").find(
+                      (o) => o[0] === c,
+                    )?.[1] ?? c,
+                )
                 .join(", ")}
               . Passes to:{" "}
-              {w.passes
-                .map((c) => WORK_PARTIES.find((o) => o[0] === c)?.[1] ?? c)
+              {visibleHandoffs(area, "passes", w.passes)
+                .map(
+                  (c) =>
+                    handoffOptions(area, "passes").find(
+                      (o) => o[0] === c,
+                    )?.[1] ?? c,
+                )
                 .join(", ")}
             </p>
             {w.handoffNote && <p>{w.handoffNote}</p>}
-            {(known(w.volumeBasis) ||
-              known(w.handlingBasis) ||
-              known(w.reworkBasis)) && <p>Item definition: {w.volumeUnit}</p>}
             <p>
               Volume:{" "}
-              {known(w.volumeBasis)
-                ? `${w.volume} ${w.volumeUnit} per ${w.volumePeriod} (${w.volumeBasis})`
-                : w.volumeBasis}
-              . Handling:{" "}
-              {known(w.handlingBasis)
-                ? w.handlingMinutes +
-                  " active minutes per item (" +
-                  w.handlingBasis +
-                  ")"
-                : w.handlingBasis}
+              {w.volume !== null
+                ? `${w.volume} ${w.volumeUnit} per ${w.volumePeriod} (estimate)`
+                : "Not given"}
               . Rework:{" "}
-              {known(w.reworkBasis)
-                ? w.reworkPercent + "% (" + w.reworkBasis + ")"
-                : w.reworkBasis}
-            </p>
-            <p>
-              Delivery from another country: {w.transferable};{" "}
-              {["yes", "part"].includes(w.transferable)
-                ? `${w.transferPercent}% of this area — ${w.transferNote}`
-                : ""}
+              {w.reworkPercent !== null
+                ? w.reworkPercent + "% (estimate)"
+                : "Not given"}
             </p>
           </section>
         );
       })}
-      <p>
-        Use the edit buttons to review all entries before submitting. Suggested
-        roles, capacity transfers and benefits require validation.
-      </p>
+      <p>Use the edit buttons to review all entries before submitting.</p>
       {["coverage", "work_detail", "role_capacity"].some(
         (step) => depthIssues(draft, selected, step).length > 0,
       ) && <p role="alert">Some detailed work answers need attention.</p>}
