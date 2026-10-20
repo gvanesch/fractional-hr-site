@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T14:22:08.491Z",
-  "reviewedCommit": "52fe0127294c79423df00e6f5a3b6c37d57ec60e",
-  "expectedVersionId": "cb09442c-98b9-4ac5-84de-13b60f7c813c",
-  "qaRunId": 39437941852,
-  "instruction": "Greg requested replacing the JSON answers attachment sent to employees with an Excel or Word document. Provide a readable Word DOCX organised by questionnaire section, with human-readable labels, percentages and written answers. Build from the same visibility-filtered submitted evidence so removed and deselected fields are excluded from current copies; preserve historic questionnaire labels. Update attachment filename and MIME type and explain the Word format in the email. Preserve recipient restrictions, original-recipient snapshot, opt-in, delivery status, retry/idempotency controls, saved responses, questionnaire definitions, enabled production email and existing Excel analysis exports. This code-only release sends no emails or invitations, changes no authentication settings and adds no deletion or retention criteria."
+  "confirmedAt": "2026-10-20T14:40:36.710Z",
+  "reviewedCommit": "7fb8b9150347bae0e06c86c553ee4c75e720c2db",
+  "expectedVersionId": "fc76cbf5-c3a7-4c21-9b85-9b726cf8b8c5",
+  "qaRunId": 39440772170,
+  "instruction": "Greg requested a fully production-ready opening page with acknowledgement that personal information is visible with responses. Publish the revised launch introduction and required named-response acknowledgement, completion guidance and return instructions. Preserve saved responses, existing email sending, authentication, campaign definitions and all retention settings. This code-only deployment sends no email. Greg separately authorised clearing his own test answers; the reviewed guarded one-off reset workflow will run only with its separate exact-target approval after deployment."
 }
