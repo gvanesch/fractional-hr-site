@@ -2614,7 +2614,7 @@ async function deliverAnswerCopy(participantId: string) {
           },
         ],
       },
-      { idempotencyKey: "baseline-answer-copy-" + participantId },
+      { idempotencyKey: "baseline-answer-copy-" + participantId + "-" + row.submitted_at },
     );
     if (result.error) throw Error("Delivery failed");
     await db()

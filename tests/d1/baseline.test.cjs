@@ -365,8 +365,9 @@ function harness() {
     resend: {
       Resend: class {
         emails = {
-          send: async (message) => {
+          send: async (message, options) => {
             state.emails.push(message);
+            (state.mailKeys ??= []).push(options?.idempotencyKey);
             return state.failMail
               ? { data: null, error: { message: "Synthetic delivery failure" } }
               : { data: { id: "fake" }, error: null };
@@ -1936,6 +1937,13 @@ test("Requested copies remain preview-only in QA and production retries keep the
     const calls = h.state.emails.length;
     await h.service.retryAnswerCopies("admin@example.invalid", campaign);
     assert.equal(h.state.emails.length, calls);
+    const firstKey = h.state.mailKeys.at(-1);
+    assert.equal(h.state.mailKeys.at(-2), firstKey, "A retry keeps the same delivery identifier");
+    h.sqlite.prepare("UPDATE tb_baseline_responses SET submitted_at=? WHERE participant_id=?").run("2026-10-21T12:00:00.000Z", p.participant_id);
+    h.sqlite.prepare("UPDATE tb_baseline_answer_copies SET status='pending',attempts=0 WHERE participant_id=?").run(p.participant_id);
+    await h.service.retryAnswerCopies("admin@example.invalid", campaign);
+    assert.equal(h.state.emails.length, calls + 1);
+    assert.notEqual(h.state.mailKeys.at(-1), firstKey, "A new submission after a reset has its own delivery identifier");
   } finally {
     h.sqlite.close();
   }
