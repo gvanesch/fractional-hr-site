@@ -202,25 +202,20 @@ const root = path.resolve(__dirname, "../..");
       await saved;
       assert.equal(stored.depth.countryTime["custom:canada"], 0);
       await page.getByRole("status").filter({ hasText: "Saved securely" }).waitFor();
-      if (process.env.BASELINE_SCREENSHOT_DIR) {
-        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
-        await page.screenshot({
-          path: path.join(
-            process.env.BASELINE_SCREENSHOT_DIR,
-            mobile ? "depth-coverage-mobile.png" : "depth-coverage-desktop.png",
-          ),
-          fullPage: true,
-        });
-      }
       assert.deepEqual(model.depthIssues(stored.depth, stored.broad.selected, "coverage"), [], "Saved coverage must be valid before continuing");
+      await page.evaluate(() => { window.__coverageClicks = []; document.addEventListener("click", e => window.__coverageClicks.push({ tag: e.target.tagName, text: e.target.textContent }), true); });
       await button("Continue").click();
-      console.log("Coverage navigation diagnostic", JSON.stringify({ mobile, revision: stored.depth.formRevision, heading: await page.locator("h1").allTextContents(), invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
+      console.log("Coverage navigation diagnostic", JSON.stringify({ mobile, clicks: await page.evaluate(() => window.__coverageClicks), revision: stored.depth.formRevision, heading: await page.locator("h1").allTextContents(), invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
       await page
         .getByRole("heading", {
           name: "Work activities and delivery",
           exact: true,
         })
         .waitFor();
+      if (process.env.BASELINE_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.BASELINE_SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({ path: path.join(process.env.BASELINE_SCREENSHOT_DIR, mobile ? "depth-work-mobile.png" : "depth-work-desktop.png"), fullPage: true });
+      }
       const office = "Reception, facilities and office support";
       await page.locator("summary").filter({ hasText: office }).click();
       assert.equal(
