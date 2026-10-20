@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T08:34:14.194Z",
-  "reviewedCommit": "3bf481dc60a15cd3024e1cd967a5580bf5502409",
-  "expectedVersionId": "92efefde-a351-4532-9501-f9d60bf369d9",
-  "qaRunId": 39393935215,
-  "instruction": "Greg requested a CSV workspace download, a closing time of 18:00 UTC on 30 October 2026, and completion guidance of 15–20 minutes with up to 30 minutes for complex roles. Add a UTC time selector defaulting to 18:00 for new campaigns, show the actual campaign date and time in invitations, and use the agreed timing guidance throughout. Preserve saved responses and existing campaign deadlines unless explicitly saved in settings; retain enabled production email. This deployment sends no invitations."
+  "confirmedAt": "2026-10-20T10:21:23.455Z",
+  "reviewedCommit": "de7bffc03de6fb55c67044b6f5f8f783a5cad4f0",
+  "expectedVersionId": "43cd2f09-efe4-414e-ad02-b5c10780f695",
+  "qaRunId": 39407054531,
+  "instruction": "Greg requested simplifying the live questionnaire before returning: keep supported headcount but remove its basis dropdown; remove work-volume, handling-time and rework basis questions, active minutes per item and all relocation/transfer questions and concerning centralisation wording; hide the whole-process owner question for fully accountable respondents across areas; tailor incoming and outgoing handoffs by work area; make Other work open narrative. Clarify the verification email return instructions and automatically request a fresh code when opening invitation or return links, including older emailed links, without a normal request-current-code button. Preserve saved answers, historic campaign definitions, enabled production email and the agreed campaign dates. No data deletion, retention changes, invitations or test emails during deployment."
 }
