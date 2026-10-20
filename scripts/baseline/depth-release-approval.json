@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T10:21:23.455Z",
-  "reviewedCommit": "de7bffc03de6fb55c67044b6f5f8f783a5cad4f0",
-  "expectedVersionId": "43cd2f09-efe4-414e-ad02-b5c10780f695",
-  "qaRunId": 39407054531,
-  "instruction": "Greg requested simplifying the live questionnaire before returning: keep supported headcount but remove its basis dropdown; remove work-volume, handling-time and rework basis questions, active minutes per item and all relocation/transfer questions and concerning centralisation wording; hide the whole-process owner question for fully accountable respondents across areas; tailor incoming and outgoing handoffs by work area; make Other work open narrative. Clarify the verification email return instructions and automatically request a fresh code when opening invitation or return links, including older emailed links, without a normal request-current-code button. Preserve saved answers, historic campaign definitions, enabled production email and the agreed campaign dates. No data deletion, retention changes, invitations or test emails during deployment."
+  "confirmedAt": "2026-10-20T13:41:36.846Z",
+  "reviewedCommit": "d97788f9cbb0e2ff9972fdafa8d1e1a7ff5516bd",
+  "expectedVersionId": "b475e12a-da66-4174-a14f-032e27c88414",
+  "qaRunId": 39432129304,
+  "instruction": "Greg requested a detailed review and simplification of every questionnaire section and confirmed to continue. Tailor questions, examples and hand-offs to each work area; distinguish beneficiaries from people who must act; allow shared contributions; remove unsuitable rework and local questions, particularly from engagement and Group systems work. Remove contracted-hours questions, remaining basis dropdowns, service measures/provider costs and any claims that answers will be validated or checked by a manager. Reduce repetition and extra activity percentages while retaining the overall work-area split and dedicated technology/management detail. Improve accessible help, separate information buttons from dropdown labels and preserve open panels through autosave. Preserve saved data, previous revisions, frozen campaign dictionaries, production email settings and campaign dates. This release sends no invitations or test emails and adds no deletion or retention criteria."
 }
