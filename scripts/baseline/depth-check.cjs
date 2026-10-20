@@ -211,7 +211,9 @@ const root = path.resolve(__dirname, "../..");
           fullPage: true,
         });
       }
+      assert.deepEqual(model.depthIssues(stored.depth, stored.broad.selected, "coverage"), [], "Saved coverage must be valid before continuing");
       await button("Continue").click();
+      console.log("Coverage navigation diagnostic", JSON.stringify({ revision: stored.depth.formRevision, invalid: await page.locator('[aria-invalid="true"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label") || n.textContent)), alerts: await page.getByRole("alert").allTextContents() }));
       await page
         .getByRole("heading", {
           name: "Work activities and delivery",
