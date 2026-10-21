@@ -264,11 +264,13 @@ export const CHANNEL_LABELS = [
   "Not sure",
 ];
 export const countryLabel = (code: string) =>
-  code === "OTHER"
-    ? "Another country"
-    : code === "NOT_SURE"
-      ? "Not sure"
-      : (new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code);
+  code === "CZ"
+    ? "Czech Republic"
+    : code === "OTHER"
+      ? "Another country"
+      : code === "NOT_SURE"
+        ? "Not sure"
+        : (new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code);
 export const STEP_LABELS = [
   "Who your work supports",
   "Your work areas",
