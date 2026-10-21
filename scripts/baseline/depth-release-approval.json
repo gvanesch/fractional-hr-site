@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-21T09:16:40.144Z",
-  "reviewedCommit": "50dd5b3ab1292254e9e958bfd6701f69626eb7ad",
-  "expectedVersionId": "3b5a03a4-0c85-4c86-aae7-435162fa017c",
-  "qaRunId": 39497320179,
-  "instruction": "Greg requested moving all advisor workspace components to production and full readiness for the 21 October launch, including full email access, project initiation and management, respondent adding/editing/withdrawal/reinstatement/extending, robust shared dashboards, removal of production QA messaging and final review of core launch CSV fields. Publish the tested workspace navigation, production controls, lean 16-column CSV template with full optional template and guidance, manager/leader readiness checks, shared dashboard refresh/recovery/revocation protection and exact UTC deadlines. Preserve existing responses, invitations, dashboard permissions, production authentication, unrestricted enabled email and retention settings. Perform the included read-only live authentication/configuration checks. Do not send cohort invitations, OTPs or copies as part of this release. Signed-in live browser walkthrough remains unverified because the secure sign-in step was cancelled; do not treat it as passed."
+  "confirmedAt": "2026-10-21T12:17:30.522Z",
+  "reviewedCommit": "6900da621b8c4f4143d8c787a06439307f6f761d",
+  "expectedVersionId": "425a0d3a-735d-4782-92a6-47c44a3be303",
+  "qaRunId": 39597764195,
+  "instruction": "Greg requested using Czech Republic instead of Czechia to match team.blue internal naming. Publish only the tested CZ display-label override. Preserve country code CZ, all campaign and response data, active invitations, authentication, normal enabled email and retention settings. Do not send email or change campaign state as part of this release."
 }
