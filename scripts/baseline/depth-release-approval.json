@@ -3,9 +3,9 @@
   "scope": "production-baseline-v5-depth-no-email",
   "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
   "sendEmail": false,
-  "confirmedAt": "2026-10-20T19:56:22.104Z",
-  "reviewedCommit": "712e0f66f75b50b468d5c8641add8351344fcdd5",
-  "expectedVersionId": "3138a5b5-b116-4eae-a322-518383f0011b",
-  "qaRunId": 39487120511,
-  "instruction": "Greg requested and said Please continue: remove the exact historic IT-delivery instruction from the participant introduction while retaining the standard named-response privacy notice; make the mandatory/compliance-training allocation note a separate underlined line; explain part-time time allocation against the respondent's own working hours; remove duplicated help text and provide spacing around remaining help icons; clarify office and employee-change dependency questions with relevant action/approval examples; place the closing Anything important about your work we have missed question after every selected category on final review. Publish the tested code-only changes. Preserve current answers, invitations, all population data, questionnaire dictionaries, authentication, enabled production email and retention settings. No email or invitation is sent by this release."
+  "confirmedAt": "2026-10-21T09:16:40.144Z",
+  "reviewedCommit": "50dd5b3ab1292254e9e958bfd6701f69626eb7ad",
+  "expectedVersionId": "3b5a03a4-0c85-4c86-aae7-435162fa017c",
+  "qaRunId": 39497320179,
+  "instruction": "Greg requested moving all advisor workspace components to production and full readiness for the 21 October launch, including full email access, project initiation and management, respondent adding/editing/withdrawal/reinstatement/extending, robust shared dashboards, removal of production QA messaging and final review of core launch CSV fields. Publish the tested workspace navigation, production controls, lean 16-column CSV template with full optional template and guidance, manager/leader readiness checks, shared dashboard refresh/recovery/revocation protection and exact UTC deadlines. Preserve existing responses, invitations, dashboard permissions, production authentication, unrestricted enabled email and retention settings. Perform the included read-only live authentication/configuration checks. Do not send cohort invitations, OTPs or copies as part of this release. Signed-in live browser walkthrough remains unverified because the secure sign-in step was cancelled; do not treat it as passed."
 }
