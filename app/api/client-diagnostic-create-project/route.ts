@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { requireAdvisorUser } from "@/lib/advisor-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  isD1ClientDiagnosticEnabled,
+  isD1ClientDiagnosticShadowWriteEnabled,
+} from "@/lib/d1/database";
+import { writeD1ClientProjectWithParticipants } from "@/lib/d1/client-diagnostic";
+import { shadowClientProjectFromSupabase } from "@/lib/d1/client-diagnostic-shadow";
 import { sendParticipantEventEmail } from "@/lib/client-diagnostic/participant-email";
 import {
   validateSegmentationSchema,
@@ -153,7 +159,6 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const supabase = createSupabaseAdminClient();
     const resend = new Resend(getEnv("RESEND_API_KEY"));
 
     const body = (await request.json()) as Partial<CreateProjectRequest>;
@@ -247,8 +252,153 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (isD1ClientDiagnosticEnabled()) {
+      const projectId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const inviteExpiresAt = getDefaultInviteExpiresAt();
+      const primary = participants[0];
+      const safeCompanyName = companyName ?? projectName;
+      const participantInputs: Array<{
+        questionnaireType: DatabaseQuestionnaireType;
+        roleLabel: string;
+        name: string;
+        email: string;
+        segmentationValues: SegmentationValues | null;
+      }> = participants.map((participant) => ({
+        questionnaireType: mapQuestionnaireTypeToDatabaseValue(
+          participant.questionnaireType,
+        ),
+        roleLabel: participant.questionnaireType,
+        name: participant.name.trim(),
+        email: participant.email.trim().toLowerCase(),
+        segmentationValues: validateSegmentationValues(
+          segmentationSchema,
+          participant.segmentationValues,
+        ),
+      }));
+
+      if (factPackRecipient) {
+        participantInputs.push({
+          questionnaireType: "client_fact_pack",
+          roleLabel: "Client Fact Pack",
+          name: factPackRecipient.name,
+          email: factPackRecipient.email,
+          segmentationValues: null,
+        });
+      }
+
+      const insertedParticipants: InsertedParticipantRow[] =
+        participantInputs.map((participant) => ({
+          participant_id: crypto.randomUUID(),
+          project_id: projectId,
+          questionnaire_type: participant.questionnaireType,
+          role_label: participant.roleLabel,
+          name: participant.name,
+          email: participant.email,
+          segmentation_values: participant.segmentationValues,
+          invite_token: crypto.randomUUID(),
+          invite_expires_at: inviteExpiresAt,
+        }));
+
+      await writeD1ClientProjectWithParticipants({
+        project: {
+          projectId,
+          companyName: safeCompanyName,
+          primaryContactName: primary.name.trim(),
+          primaryContactEmail: primary.email.trim().toLowerCase(),
+          projectStatus: "active",
+          notes: null,
+          createdAt: now,
+          updatedAt: now,
+          projectName,
+          status: "draft",
+          segmentationSchema,
+          billingContactName: null,
+          billingContactEmail: null,
+          companyWebsite: null,
+          purchaseOrderNumber: null,
+          msaStatus: null,
+          dpaStatus: null,
+        },
+        participants: insertedParticipants.map((participant) => ({
+          participantId: participant.participant_id,
+          projectId,
+          questionnaireType: participant.questionnaire_type,
+          roleLabel: participant.role_label,
+          inviteToken: participant.invite_token as string,
+          participantStatus: "invited",
+          startedAt: null,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          name: participant.name,
+          email: participant.email,
+          status: "invited",
+          invitedAt: now,
+          segmentationValues: participant.segmentation_values,
+          inviteExpiresAt,
+          inviteRevokedAt: null,
+          inviteLastUsedAt: null,
+          withdrawReason: null,
+          withdrawNote: null,
+          withdrawnAt: null,
+          reinstateReason: null,
+          reinstateNote: null,
+          reinstatedAt: null,
+        })),
+      });
+
+      const resend = new Resend(getEnv("RESEND_API_KEY"));
+      const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
+      const fromEmail = getEnv("CONTACT_FROM_EMAIL");
+      const replyToEmail = getEnv("CONTACT_TO_EMAIL");
+      const emailResults: EmailSendResult[] = await Promise.all(
+        insertedParticipants.map((participant) =>
+          sendParticipantEventEmail({
+            resend,
+            fromEmail,
+            replyToEmail,
+            siteUrl,
+            projectName,
+            companyName: safeCompanyName,
+            eventType: "invite",
+            participant: {
+              name: participant.name,
+              email: participant.email,
+              questionnaireType: participant.questionnaire_type,
+              inviteToken: participant.invite_token,
+              inviteExpiresAt: participant.invite_expires_at,
+            },
+          }),
+        ),
+      );
+      const failedEmails = emailResults.filter((result) => !result.success);
+
+      if (failedEmails.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Project created, but one or more invitation emails failed.",
+            projectId,
+            participants: insertedParticipants.length,
+            emailResults,
+          },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        projectId,
+        participants: insertedParticipants.length,
+        inviteExpiresAt,
+        emailResults,
+      });
+    }
+
     const primary = participants[0];
 
+    const supabase = createSupabaseAdminClient();
     const { data: project, error: projectError } = await supabase
       .from("client_projects")
       .insert({
@@ -349,6 +499,17 @@ export async function POST(request: Request): Promise<Response> {
       inviteExpiresAt,
       invitedAt,
     });
+
+    if (isD1ClientDiagnosticShadowWriteEnabled()) {
+      try {
+        await shadowClientProjectFromSupabase(project.project_id);
+      } catch (d1Error) {
+        console.error(
+          "[client-diagnostic-create-project] D1 shadow write failed",
+          d1Error,
+        );
+      }
+    }
 
     const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL").replace(/\/+$/, "");
     const fromEmail = getEnv("CONTACT_FROM_EMAIL");

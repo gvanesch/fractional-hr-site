@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isD1DiagnosticSubmissionsEnabled } from "@/lib/d1/database";
+import { getD1PublicDiagnosticSubmission } from "@/lib/d1/diagnostic-submissions";
 import {
     buildPublicDiagnosticInterpretation,
     calculateDiagnosticResult,
@@ -54,15 +56,40 @@ export async function GET(request: Request) {
             return jsonResponse({ ok: false, error: "Token required" }, 400);
         }
 
-        const supabase = createSupabaseAdminClient();
+        let data: {
+            answers: unknown;
+            company_size: string | null;
+            industry: string | null;
+            role: string | null;
+            email: string | null;
+        } | null = null;
 
-        const { data, error } = await supabase
-            .from("diagnostic_submissions")
-            .select("answers, company_size, industry, role, email")
-            .eq("public_token", token)
-            .single();
+        if (isD1DiagnosticSubmissionsEnabled()) {
+            const d1Submission = await getD1PublicDiagnosticSubmission(token);
 
-        if (error || !data) {
+            if (d1Submission) {
+                data = {
+                    answers: d1Submission.answers,
+                    company_size: d1Submission.companySize,
+                    industry: d1Submission.industry,
+                    role: d1Submission.role,
+                    email: d1Submission.email,
+                };
+            }
+        } else {
+            const supabase = createSupabaseAdminClient();
+            const response = await supabase
+                .from("diagnostic_submissions")
+                .select("answers, company_size, industry, role, email")
+                .eq("public_token", token)
+                .single();
+
+            if (!response.error) {
+                data = response.data;
+            }
+        }
+
+        if (!data) {
             return jsonResponse({ ok: false, error: "Not found" }, 404);
         }
 

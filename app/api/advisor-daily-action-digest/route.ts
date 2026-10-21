@@ -1,3 +1,9 @@
+import {
+    getD1Database,
+    isD1CrmProspectsEnabled,
+    isD1ClientDiagnosticEnabled,
+    isD1DiagnosticSubmissionsEnabled,
+} from "@/lib/d1/database";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
@@ -195,7 +201,10 @@ function buildProspectSection(
 
     const rows = prospects
         .map((prospect) => {
-            const prospectUrl = buildProspectUrl(appBaseUrl, prospect.prospect_id);
+            const prospectUrl = buildProspectUrl(
+                appBaseUrl,
+                prospect.prospect_id,
+            );
             const healthCheckUrl = buildHealthCheckUrl(
                 appBaseUrl,
                 prospect.linked_submission_id,
@@ -430,12 +439,21 @@ async function loadProspectsForDigest(
     nextSevenDaysProspects: AdvisorProspectRow[];
     noNextActionProspects: AdvisorProspectRow[];
 }> {
-    const supabase = createSupabaseAdminClient();
+    const prospects = isD1CrmProspectsEnabled()
+        ? (
+              await getD1Database()
+                  .prepare(
+                      "SELECT prospect_id, name, company, role, deal_stage, lead_temperature, next_action_date, next_step, linked_submission_id, updated_at FROM advisor_prospects ORDER BY next_action_date ASC NULLS LAST LIMIT 500",
+                  )
+                  .all<AdvisorProspectRow>()
+          ).results
+        : await (async () => {
+              const supabase = createSupabaseAdminClient();
 
-    const { data, error } = await supabase
-        .from("advisor_prospects")
-        .select(
-            `
+              const { data, error } = await supabase
+                  .from("advisor_prospects")
+                  .select(
+                      `
         prospect_id,
         name,
         company,
@@ -447,25 +465,34 @@ async function loadProspectsForDigest(
         linked_submission_id,
         updated_at
       `,
-        )
-        .order("next_action_date", { ascending: true, nullsFirst: false })
-        .limit(500)
-        .returns<AdvisorProspectRow[]>();
+                  )
+                  .order("next_action_date", {
+                      ascending: true,
+                      nullsFirst: false,
+                  })
+                  .limit(500)
+                  .returns<AdvisorProspectRow[]>();
 
-    if (error) {
-        throw new Error(`Failed to load advisor prospects: ${error.message}`);
-    }
+              if (error) {
+                  throw new Error(
+                      `Failed to load advisor prospects: ${error.message}`,
+                  );
+              }
 
-    const prospects = data ?? [];
+              return data ?? [];
+          })();
+
     const activeProspects = prospects.filter(
         (prospect) =>
-            prospect.deal_stage !== "converted" && prospect.deal_stage !== "lost",
+            prospect.deal_stage !== "converted" &&
+            prospect.deal_stage !== "lost",
     );
 
     return {
         overdueProspects: activeProspects.filter(
             (prospect) =>
-                prospect.next_action_date !== null && prospect.next_action_date < today,
+                prospect.next_action_date !== null &&
+                prospect.next_action_date < today,
         ),
         dueTodayProspects: activeProspects.filter(
             (prospect) => prospect.next_action_date === today,
@@ -487,38 +514,64 @@ async function loadProjectsForDigest(
     today: string,
     nextSevenDays: string,
 ): Promise<ProjectDigestRow[]> {
-    const supabase = createSupabaseAdminClient();
+    const { projects, participantRows } = isD1ClientDiagnosticEnabled()
+        ? await (async () => {
+              const db = getD1Database();
+              const projects = (
+                  await db
+                      .prepare(
+                          "SELECT project_id, company_name, project_status FROM client_projects WHERE project_status = 'active' ORDER BY company_name ASC",
+                      )
+                      .all<ClientProjectRow>()
+              ).results;
+              const participantRows = (
+                  await db
+                      .prepare(
+                          "SELECT p.project_id, p.participant_status, p.invite_expires_at FROM client_participants p JOIN client_projects c ON c.project_id = p.project_id WHERE c.project_status = 'active'",
+                      )
+                      .all<ParticipantRow>()
+              ).results;
+              return { projects, participantRows };
+          })()
+        : await (async () => {
+              const supabase = createSupabaseAdminClient();
 
-    const { data: projects, error: projectsError } = await supabase
-        .from("client_projects")
-        .select("project_id, company_name, project_status")
-        .eq("project_status", "active")
-        .order("company_name", { ascending: true })
-        .returns<ClientProjectRow[]>();
+              const { data: projects, error: projectsError } = await supabase
+                  .from("client_projects")
+                  .select("project_id, company_name, project_status")
+                  .eq("project_status", "active")
+                  .order("company_name", { ascending: true })
+                  .returns<ClientProjectRow[]>();
 
-    if (projectsError) {
-        throw new Error(`Failed to load active projects: ${projectsError.message}`);
-    }
+              if (projectsError) {
+                  throw new Error(
+                      `Failed to load active projects: ${projectsError.message}`,
+                  );
+              }
 
-    if (!projects || projects.length === 0) {
-        return [];
-    }
+              if (!projects || projects.length === 0) {
+                  return { projects: [], participantRows: [] };
+              }
 
-    const projectIds = projects.map((project) => project.project_id);
+              const projectIds = projects.map((project) => project.project_id);
 
-    const { data: participants, error: participantsError } = await supabase
-        .from("client_participants")
-        .select("project_id, participant_status, invite_expires_at")
-        .in("project_id", projectIds)
-        .returns<ParticipantRow[]>();
+              const { data: participants, error: participantsError } =
+                  await supabase
+                      .from("client_participants")
+                      .select(
+                          "project_id, participant_status, invite_expires_at",
+                      )
+                      .in("project_id", projectIds)
+                      .returns<ParticipantRow[]>();
 
-    if (participantsError) {
-        throw new Error(
-            `Failed to load project participants: ${participantsError.message}`,
-        );
-    }
+              if (participantsError) {
+                  throw new Error(
+                      `Failed to load project participants: ${participantsError.message}`,
+                  );
+              }
 
-    const participantRows = participants ?? [];
+              return { projects, participantRows: participants ?? [] };
+          })();
 
     return projects
         .map((project) => {
@@ -546,16 +599,30 @@ async function loadProjectsForDigest(
                 dashboardUrl: buildProjectUrl(appBaseUrl, project.project_id),
             };
         })
-        .filter((project) => project.outstanding > 0 || project.inviteExpiryCount > 0);
+        .filter(
+            (project) =>
+                project.outstanding > 0 || project.inviteExpiryCount > 0,
+        );
 }
 
-async function loadContactFormDiagnostics(): Promise<ContactFormDiagnosticRow[]> {
-    const supabase = createSupabaseAdminClient();
+async function loadContactFormDiagnostics(): Promise<
+    ContactFormDiagnosticRow[]
+> {
+    const submissions = isD1DiagnosticSubmissionsEnabled()
+        ? (
+              await getD1Database()
+                  .prepare(
+                      "SELECT submission_id, contact_name, contact_email, contact_company, contact_topic, score, band, contact_submitted_at FROM diagnostic_submissions WHERE contact_submitted_at IS NOT NULL AND contact_email IS NOT NULL AND contact_name IS NOT NULL ORDER BY contact_submitted_at DESC LIMIT 200",
+                  )
+                  .all<ContactFormDiagnosticRow>()
+          ).results
+        : await (async () => {
+              const supabase = createSupabaseAdminClient();
 
-    const { data, error } = await supabase
-        .from("diagnostic_submissions")
-        .select(
-            `
+              const { data, error } = await supabase
+                  .from("diagnostic_submissions")
+                  .select(
+                      `
         submission_id,
         contact_name,
         contact_email,
@@ -565,39 +632,78 @@ async function loadContactFormDiagnostics(): Promise<ContactFormDiagnosticRow[]>
         band,
         contact_submitted_at
       `,
-        )
-        .not("contact_submitted_at", "is", null)
-        .not("contact_email", "is", null)
-        .not("contact_name", "is", null)
-        .order("contact_submitted_at", { ascending: false })
-        .limit(200)
-        .returns<ContactFormDiagnosticRow[]>();
+                  )
+                  .not("contact_submitted_at", "is", null)
+                  .not("contact_email", "is", null)
+                  .not("contact_name", "is", null)
+                  .order("contact_submitted_at", { ascending: false })
+                  .limit(200)
+                  .returns<ContactFormDiagnosticRow[]>();
 
-    if (error) {
-        throw new Error(`Failed to load contact-form diagnostics: ${error.message}`);
-    }
+              if (error) {
+                  throw new Error(
+                      `Failed to load contact-form diagnostics: ${error.message}`,
+                  );
+              }
 
-    const submissions = data ?? [];
+              return data ?? [];
+          })();
 
     if (submissions.length === 0) {
         return [];
     }
 
-    const submissionIds = submissions.map((submission) => submission.submission_id);
+    const submissionIds = submissions.map(
+        (submission) => submission.submission_id,
+    );
 
-    const { data: linkedProspects, error: prospectError } = await supabase
-        .from("advisor_prospects")
-        .select(
-            `
+    const linkedProspects = isD1CrmProspectsEnabled()
+        ? await (async () => {
+              const rows: Array<{
+                  linked_submission_id: string;
+                  deal_stage: string;
+              }> = [];
+              // Bound parameters stay below D1's per-statement limit.
+              for (
+                  let offset = 0;
+                  offset < submissionIds.length;
+                  offset += 90
+              ) {
+                  const ids = submissionIds.slice(offset, offset + 90);
+                  const result = await getD1Database()
+                      .prepare(
+                          `SELECT linked_submission_id, deal_stage FROM advisor_prospects WHERE linked_submission_id IN (${ids.map(() => "?").join(",")})`,
+                      )
+                      .bind(...ids)
+                      .all<{
+                          linked_submission_id: string;
+                          deal_stage: string;
+                      }>();
+                  rows.push(...result.results);
+              }
+              return rows;
+          })()
+        : await (async () => {
+              const supabase = createSupabaseAdminClient();
+              const { data: linkedProspects, error: prospectError } =
+                  await supabase
+                      .from("advisor_prospects")
+                      .select(
+                          `
         linked_submission_id,
         deal_stage
       `,
-        )
-        .in("linked_submission_id", submissionIds);
+                      )
+                      .in("linked_submission_id", submissionIds);
 
-    if (prospectError) {
-        throw new Error(`Failed to load linked prospects: ${prospectError.message}`);
-    }
+              if (prospectError) {
+                  throw new Error(
+                      `Failed to load linked prospects: ${prospectError.message}`,
+                  );
+              }
+
+              return linkedProspects ?? [];
+          })();
 
     const prospectMap = new Map(
         (linkedProspects ?? []).map((prospect) => [
@@ -615,9 +721,12 @@ async function loadContactFormDiagnostics(): Promise<ContactFormDiagnosticRow[]>
 
         const stage = linkedProspect.deal_stage;
 
-        return !["in_conversation", "proposal_discussed", "converted", "lost"].includes(
-            stage,
-        );
+        return ![
+            "in_conversation",
+            "proposal_discussed",
+            "converted",
+            "lost",
+        ].includes(stage);
     });
 }
 
@@ -638,9 +747,10 @@ export async function POST(request: Request) {
 
         const requestUrl = new URL(request.url);
         const forceSend = requestUrl.searchParams.get("force") === "true";
+        const dryRun = requestUrl.searchParams.get("dryRun") === "true";
         const londonHour = getLondonHour(new Date());
 
-        if (!forceSend && londonHour !== 8) {
+        if (!dryRun && !forceSend && londonHour !== 8) {
             return NextResponse.json({
                 success: true,
                 message: "Skipped outside 08:00 Europe/London.",
@@ -651,7 +761,10 @@ export async function POST(request: Request) {
         const today = getLondonDateString(new Date());
         const nextSevenDays = addDaysToDateString(today, 7);
 
-        const prospectDigest = await loadProspectsForDigest(today, nextSevenDays);
+        const prospectDigest = await loadProspectsForDigest(
+            today,
+            nextSevenDays,
+        );
         const contactFormDiagnostics = await loadContactFormDiagnostics();
         const activeProjects = await loadProjectsForDigest(
             appBaseUrl,
@@ -666,6 +779,19 @@ export async function POST(request: Request) {
         };
 
         const emailHtml = buildEmailHtml(data, appBaseUrl);
+        if (dryRun) {
+            return NextResponse.json({
+                success: true,
+                dryRun: true,
+                emailGenerated: emailHtml.length > 0,
+                overdueProspects: data.overdueProspects.length,
+                dueTodayProspects: data.dueTodayProspects.length,
+                nextSevenDaysProspects: data.nextSevenDaysProspects.length,
+                noNextActionProspects: data.noNextActionProspects.length,
+                contactFormDiagnostics: data.contactFormDiagnostics.length,
+                activeProjects: data.activeProjects.length,
+            });
+        }
         const resend = getResendClient();
 
         const resendResponse = await resend.emails.send({

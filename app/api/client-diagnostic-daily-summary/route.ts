@@ -1,8 +1,8 @@
+import { getD1Database, isD1ClientDiagnosticEnabled } from "@/lib/d1/database";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { questionnaireTypes } from "@/lib/client-diagnostic/question-bank";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
 
 type ClientProjectRow = {
   project_id: string;
@@ -234,6 +234,15 @@ function buildEmailHtml(projects: SummaryProjectResult[]) {
 }
 
 async function loadActiveProjects() {
+  if (isD1ClientDiagnosticEnabled()) {
+    return (
+      await getD1Database()
+        .prepare(
+          "SELECT project_id, company_name, project_status FROM client_projects WHERE project_status = 'active' ORDER BY company_name ASC",
+        )
+        .all<ClientProjectRow>()
+    ).results;
+  }
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -254,21 +263,32 @@ async function buildProjectResult(
   project: ClientProjectRow,
   appBaseUrl: string | null,
 ): Promise<SummaryProjectResult> {
-  const supabase = createSupabaseAdminClient();
+  const participantRows = isD1ClientDiagnosticEnabled()
+    ? (
+        await getD1Database()
+          .prepare(
+            "SELECT questionnaire_type, participant_status FROM client_participants WHERE project_id = ?",
+          )
+          .bind(project.project_id)
+          .all<ParticipantRow>()
+      ).results
+    : await (async () => {
+        const supabase = createSupabaseAdminClient();
 
-  const { data: participants, error: participantsError } = await supabase
-    .from("client_participants")
-    .select("questionnaire_type, participant_status")
-    .eq("project_id", project.project_id)
-    .returns<ParticipantRow[]>();
+        const { data: participants, error: participantsError } = await supabase
+          .from("client_participants")
+          .select("questionnaire_type, participant_status")
+          .eq("project_id", project.project_id)
+          .returns<ParticipantRow[]>();
 
-  if (participantsError) {
-    throw new Error(
-      `Failed to load participants for project ${project.project_id}: ${participantsError.message}`,
-    );
-  }
+        if (participantsError) {
+          throw new Error(
+            `Failed to load participants for project ${project.project_id}: ${participantsError.message}`,
+          );
+        }
 
-  const participantRows = participants ?? [];
+        return participants ?? [];
+      })();
 
   const { totalInvited, outstanding, completed, completionPercentage } =
     getCompletionMetrics(participantRows);
@@ -306,7 +326,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const resend = getResendClient();
+    const dryRun = new URL(request.url).searchParams.get("dryRun") === "true";
     const activeProjects = await loadActiveProjects();
 
     if (activeProjects.length === 0) {
@@ -321,6 +341,7 @@ export async function POST(request: Request) {
         success: true,
         message: "No active projects.",
         projectCount: 0,
+        ...(dryRun ? { dryRun: true, emailGenerated: false } : {}),
       });
     }
 
@@ -330,6 +351,15 @@ export async function POST(request: Request) {
 
     const emailHtml = buildEmailHtml(projectResults);
 
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        emailGenerated: emailHtml.length > 0,
+        projectCount: projectResults.length,
+      });
+    }
+    const resend = getResendClient();
     const resendResponse = await resend.emails.send({
       from: "Van Esch Advisory <no-reply@vanesch.uk>",
       to: dailySummaryRecipient,

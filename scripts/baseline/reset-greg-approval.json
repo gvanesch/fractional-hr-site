@@ -1,0 +1,23 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "reset-only-greg-test-answers",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "sendEmail": false,
+  "confirmedAt": "2026-10-20T14:50:11.247Z",
+  "reviewedCommit": "42bbe7d945d51345b90ba41ad162b62ee3220a51",
+  "expectedVersionId": "3138a5b5-b116-4eae-a322-518383f0011b",
+  "targets": [
+    [
+      "55000001-2026-4017-8040-000000000002",
+      "55000001-2026-4017-8040-000000000001",
+      "greg@vanesch.uk"
+    ],
+    [
+      "55000003-2026-4019-8040-000000000002",
+      "55000003-2026-4019-8040-000000000001",
+      "greg.vanesch@team.blue"
+    ]
+  ],
+  "qaRunId": 39441728085,
+  "instruction": "Greg explicitly requested: please clear out all my answers so I can go in again. Reset only his two identified production test responses to empty/not_started. Verify exact participant, campaign and email identity first. Preserve profile, invitation links, all other respondents, population and invitation counts, and retain prior answers in a protected audit snapshot. Invalidate his stale sessions and verification codes, clear only his active response evidence/context and prior answer-copy ledger so he can submit a fresh response. Send no invitation or email now. No retention or automatic deletion rule is authorised."
+}

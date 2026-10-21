@@ -1,0 +1,15 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-d1-activation-retain-password-auth-only",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "worker": "fractional-hr-site",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "reviewedCommit": "8ba8d479829225349d96358aea6f8c209a53b9b7",
+  "expectedDeploymentId": "341b4c25-b1e8-46e3-950f-eb33faaf1d89",
+  "confirmedAt": "2026-10-16T19:51:59Z",
+  "bundleRunId": 38958649337,
+  "bundleArtifactId": 12071632194,
+  "bundleDigest": "sha256:791d27f1db096d3afd7197769a4ad24899bb75edffdd1fc1ebf2cd34e798cccd",
+  "sourceVerification": "fresh-connector-snapshot",
+  "excludeExpiredRateLimits": true
+}

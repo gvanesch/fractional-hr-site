@@ -1,0 +1,11 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-greg-only-email-and-otp-test",
+  "confirmedAt": "2026-10-17T12:18:03Z",
+  "recipient": "greg@vanesch.uk",
+  "campaignId": "55000001-2026-4017-8040-000000000001",
+  "sendBulkEmail": false,
+  "reviewedCommit": "fd164102d111edff867405c5841dfa3627308a36",
+  "expectedVersionId": "f17aa8eb-c12a-403a-8b36-856ec50b7684",
+  "qaRunId": 39038234916
+}

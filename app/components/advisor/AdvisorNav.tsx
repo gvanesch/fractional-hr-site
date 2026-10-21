@@ -26,7 +26,25 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/advisor/projects",
     label: "Projects",
-    activePrefixes: ["/advisor/projects", "/advisor/project/", "/advisor/report/"],
+    activePrefixes: [
+      "/advisor/projects",
+      "/advisor/project/",
+      "/advisor/report/",
+    ],
+  },
+  {
+    href: "/advisor/baseline/create",
+    label: "Create baseline project",
+    activePrefixes: ["/advisor/baseline/create"],
+    exact: true,
+  },
+  {
+    href: "/advisor/baseline",
+    label: "Baseline projects",
+    activePrefixes: [
+      "/advisor/baseline/project/",
+      "/advisor/baseline/depth-preview",
+    ],
   },
   {
     href: "/advisor/explorers",
@@ -55,7 +73,10 @@ export default function AdvisorNav() {
       return pathname === item.href;
     }
 
-    return item.activePrefixes.some((prefix) => pathname.startsWith(prefix));
+    return (
+      pathname === item.href ||
+      item.activePrefixes.some((prefix) => pathname.startsWith(prefix))
+    );
   }
 
   async function handleLogout() {
@@ -77,6 +98,15 @@ export default function AdvisorNav() {
         throw new Error("Logout failed.");
       }
 
+      const payload = (await response.json()) as {
+        logoutUrl?: string;
+      };
+
+      if (payload.logoutUrl) {
+        window.location.assign(payload.logoutUrl);
+        return;
+      }
+
       router.replace("/advisor/login");
       router.refresh();
     } catch (error) {
@@ -89,7 +119,10 @@ export default function AdvisorNav() {
   return (
     <div className="w-full border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-5 px-6 py-4">
-        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Advisor">
+        <nav
+          className="flex flex-wrap items-center gap-x-6 gap-y-2"
+          aria-label="Advisor"
+        >
           {NAV_ITEMS.map((item) => {
             const active = isActive(item);
 

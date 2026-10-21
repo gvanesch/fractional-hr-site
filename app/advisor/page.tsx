@@ -48,6 +48,8 @@ function formatDealStage(value: DashboardProspect["deal_stage"]): string {
       return "Meeting booked";
     case "in_conversation":
       return "In conversation";
+    case "health_check_completed":
+      return "Health Check completed";
     case "diagnostic_assessment_candidate":
       return "Assessment candidate";
     case "proposal_discussed":
@@ -61,7 +63,9 @@ function formatDealStage(value: DashboardProspect["deal_stage"]): string {
   }
 }
 
-function temperatureClasses(value: DashboardProspect["lead_temperature"]): string {
+function temperatureClasses(
+  value: DashboardProspect["lead_temperature"],
+): string {
   switch (value) {
     case "hot":
       return "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200";
@@ -186,7 +190,7 @@ function SectionError({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
       <p className="text-sm font-medium text-rose-700">
-        Unable to load this data from Supabase.
+        Unable to load this data.
       </p>
       <p className="mt-1 text-xs text-rose-600">{message}</p>
     </div>
@@ -281,7 +285,9 @@ export default async function AdvisorHomePage() {
 
   // ---- Prospect / CRM metrics ----
   const activeProspects = prospects.data.filter(isActiveDeal);
-  const hotProspects = activeProspects.filter((p) => p.lead_temperature === "hot");
+  const hotProspects = activeProspects.filter(
+    (p) => p.lead_temperature === "hot",
+  );
   const warmProspects = activeProspects.filter(
     (p) => p.lead_temperature === "warm",
   );
@@ -413,9 +419,7 @@ export default async function AdvisorHomePage() {
           <div className="max-w-4xl">
             <p className="brand-kicker">Advisor workspace</p>
 
-            <h1 className="brand-heading-lg mt-5 text-white">
-              Command centre
-            </h1>
+            <h1 className="brand-heading-lg mt-5 text-white">Command centre</h1>
 
             <p className="brand-subheading brand-body-on-dark mt-6 max-w-3xl">
               A single view across diagnostic projects, Health Check signals,
@@ -424,13 +428,31 @@ export default async function AdvisorHomePage() {
             </p>
 
             <p className="mt-6 text-sm text-white/70">
-              Signed in as <strong className="text-white">{advisorUser.email}</strong>
+              Signed in as{" "}
+              <strong className="text-white">{advisorUser.email}</strong>
             </p>
           </div>
         </div>
       </section>
 
       <div className="brand-container space-y-8 py-10">
+        <SectionShell
+          kicker="People Operations"
+          title="Baseline project workspace"
+          description="Create baseline projects, import respondents, manage launch and invitations, review progress, share dashboards and download answers."
+        >
+          <div className="flex flex-wrap gap-3">
+            <Link className="brand-button-primary" href="/advisor/baseline">
+              Baseline projects
+            </Link>
+            <Link
+              className="brand-button-outline"
+              href="/advisor/baseline/create"
+            >
+              Create baseline project
+            </Link>
+          </div>
+        </SectionShell>
         {hasAnyError ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-medium text-amber-800">
@@ -498,7 +520,7 @@ export default async function AdvisorHomePage() {
           />
           <KpiCard
             label="Avg HC score"
-            value={healthChecks.error ? "—" : averageScore ?? "N/A"}
+            value={healthChecks.error ? "—" : (averageScore ?? "N/A")}
             helper="Across completed checks"
           />
         </section>
@@ -549,7 +571,10 @@ export default async function AdvisorHomePage() {
                       warmProspects.length
                     }
                   />
-                  <StatPill label="Next 7 days" value={upcomingProspects.length} />
+                  <StatPill
+                    label="Next 7 days"
+                    value={upcomingProspects.length}
+                  />
                 </div>
 
                 {pipelineStages.length > 0 ? (
@@ -586,7 +611,9 @@ export default async function AdvisorHomePage() {
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">
-                            {prospect.company || prospect.name || "Unnamed prospect"}
+                            {prospect.company ||
+                              prospect.name ||
+                              "Unnamed prospect"}
                           </p>
                           <p className="truncate text-xs text-slate-600">
                             {formatDealStage(prospect.deal_stage)} ·{" "}
@@ -689,8 +716,8 @@ export default async function AdvisorHomePage() {
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-slate-500">
-                        {project.company_name || "No company recorded"} · created{" "}
-                        {formatDate(project.created_at)}
+                        {project.company_name || "No company recorded"} ·
+                        created {formatDate(project.created_at)}
                       </p>
                     </Link>
                   ))}

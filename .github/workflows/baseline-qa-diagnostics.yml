@@ -1,0 +1,21 @@
+name: Baseline QA entry diagnostics
+on:
+  push:
+    branches: [feature/team-blue-baseline]
+    paths: [.github/workflows/baseline-qa-diagnostics.yml]
+permissions:
+  contents: read
+jobs:
+  public-entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect QA-only public entry headers
+        run: |
+          node --input-type=module <<'JS'
+          const site = 'https://fractional-hr-site-qa.greg-732.workers.dev';
+          for (const path of ['/baseline/start','/baseline/test','/baseline/dashboard']) {
+            const r=await fetch(site+path,{redirect:'manual'});
+            console.log(JSON.stringify({path,status:r.status,robots:r.headers.get('x-robots-tag'),referrer:r.headers.get('referrer-policy'),location:r.headers.get('location')}));
+          }
+          JS
