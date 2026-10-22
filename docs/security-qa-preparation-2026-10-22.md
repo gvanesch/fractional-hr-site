@@ -6,7 +6,7 @@ Greg approved preparation and QA only on 22 October 2026. Production deployment,
 
 - Next.js 16.4.2 and React/React DOM 19.2.9, pinned in package.json and package-lock.json.
 - sharp is overridden to 0.35.5 throughout the dependency tree, including the adapter's copy.
-- OpenNext adapter remains on the existing supported version; its published peer range permits the selected Next.js version. A successful Worker build and hosted QA checks are still required for compatibility.
+- OpenNext adapter is pinned to 1.20.13 (Wrangler resolves to 4.152.0). The original 1.20.2 build passed but its hosted dynamic entry route returned HTTP 500. Upstream issue #1355 documents the missing Next.js 16.4 preview-props manifest; 1.20.13 includes that fix. The full hosted regression suite must pass with the corrected adapter before release.
 - The prior ESLint configuration version is retained as a pinned dev dependency. Updating the lint preset introduced new rules against existing questionnaire code. No runtime questionnaire refactor or rule suppression is included in this security release.
 
 ## Release B: safe advisor login destination
@@ -44,3 +44,9 @@ The blocked npm vulnerability scan remains excluded: this approval does not expl
 ## Release decision
 
 No production release approval is generated. After QA completes, report the exact candidate commit, automated evidence, untouched production head and outstanding account/recovery checks. Obtain a new deployment decision before changing production.
+
+## QA evidence to date
+
+Candidate c0b65ac60824ce5630c10c8db5e16a513a0c28a5: 121 tests, types/lint, all desktop/mobile browser suites, Worker build and QA deployment passed. Hosted entry failed (HTTP 500), so hosted participant contracts did not run. Run: https://github.com/gvanesch/fractional-hr-site/actions/runs/39825521028. This candidate is not release-ready.
+
+The GET-only recovery inspection confirmed the original production Worker version and storage/auth/mail configuration, and availability of current and 24-hour-old D1 Time Travel bookmarks. No restore was performed; the full backup window and independent backup arrangements remain unverified. Production writes: none; emails sent: none.
