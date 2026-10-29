@@ -431,9 +431,14 @@ if (!["qa", "production"].includes(environment))
       assert.ok(await page.getByRole("dialog").isVisible());
       assert.equal(
         await page.getByRole("dialog").locator("input,select").count(),
-        24,
+        environment === "qa" ? 29 : 24,
       );
-      await page.getByLabel("Name *", { exact: true }).fill("Added");
+      if(environment === "qa") {
+        assert.ok(await page.getByLabel("Completer name", {exact:true}).isVisible());
+        assert.ok(await page.getByLabel("Completer delivery email (can be shared across roles)", {exact:true}).isVisible());
+        assert.ok(await page.getByLabel("Usual-role reference period", {exact:true}).isVisible());
+      }
+      await page.getByLabel(environment === "qa" ? "Participant name (whose role is described) *" : "Name *", { exact: true }).fill("Added");
       await page
         .getByLabel("Work email *", { exact: true })
         .fill("added@example.invalid");
