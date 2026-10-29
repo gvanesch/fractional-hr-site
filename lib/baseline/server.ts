@@ -1203,7 +1203,7 @@ export async function changeParticipant(
       ),
     ).profile;
     metadata = rosterMetadata(value as Record<string, unknown>);
-    if (p.roster.response_source === "proxy" && p.status !== "not_started" && ["completer_name","completer_email","reference_period","proxy_note"].some(k => metadata[k] !== p.roster[k])) throw new BaselineError("On-behalf attribution is fixed once work starts.",409);
+    if (p.roster.response_source === "proxy" && p.status !== "not_started" && (profile.name !== p.profile.name || profile.email !== p.email || ["completer_name","completer_email","reference_period","proxy_note"].some(k => metadata[k] !== p.roster[k]))) throw new BaselineError("On-behalf attribution is fixed once work starts.",409);
     if (
       data.participants.some(
         (other) => other.participant_id !== id && other.email === profile.email,
@@ -1217,7 +1217,7 @@ export async function changeParticipant(
   const stamp = now(),
     mutation = randomUUID(),
     database = db(),
-    emailChanged = profile.email !== p.email || (p.roster.response_source === "proxy" && ["completer_email", "completer_name"].some(k => metadata[k] !== p.roster[k]));
+    emailChanged = profile.email !== p.email || (p.roster.response_source === "proxy" && (profile.name !== p.profile.name || ["completer_email", "completer_name"].some(k => metadata[k] !== p.roster[k])));
   const statements = [
     database
       .prepare(

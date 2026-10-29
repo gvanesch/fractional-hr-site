@@ -45,6 +45,6 @@ Before requesting approval:
 
 Record the pre-release Worker version. If a deployment check fails, restore that code version without restoring a database snapshot. No schema rollback is required. Existing responses, including answers arriving during deployment, remain in the database.
 
-If proxy activation fails, first remove the proxy project from the enablement list and stop its invitation delivery. Retain its records and audit history. Reverting the Worker code must not involve deleting or replacing any live baseline tables. Investigate before any resend because invitation generation revokes prior links for that participant.
+If proxy activation fails after invitations exist, first close only the separate proxy campaign and revoke its invitations and sessions while the new code is still available. Then remove that project from the enablement list and revert the Worker if required. The old Worker does not understand the new feature flag, so removing the flag alone is insufficient before a code rollback. Retain the proxy records, saved answers and audit history. Never close the main baseline campaign or revoke its sessions as part of this rollback. Reverting code must not delete or replace any live baseline table. Investigate before any resend because invitation generation revokes prior links for that participant.
 
 The preparation workflow does not merge, publish a production release approval or deploy to production.

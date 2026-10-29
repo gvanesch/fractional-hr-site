@@ -2297,6 +2297,8 @@ test('Release candidate routes both proxy invitations, OTPs and attributed Word 
    assert.equal((await h.service.requestAnswerCopy(identity)).copyStatus,'sent');assert.equal(h.state.emails.length,before+3);
   }
   assert.equal(h.state.emails.length,6);assert.ok(h.state.emails.every(x=>x.to==='manager@example.invalid'));
+  const frozen=(await h.service.campaignRows(c.campaignId)).participants[0];
+  await assert.rejects(h.service.changeParticipant(actor,c.campaignId,frozen.participant_id,{action:'edit',revision:frozen.revision,csv:h.model.toCsv([{...Object.fromEntries(Object.entries(frozen.profile).filter(([k])=>!['support_levels','support_countries','support_other'].includes(k))),...frozen.roster,name:'Changed represented person'}])}),/attribution is fixed/);
   const dashboard=await h.service.completionDashboard(c.campaignId);assert.equal(dashboard.counts.completed,2);assert.ok(dashboard.participants.every(x=>x.responseSource==='proxy'&&x.completerName==='QA Manager'));
   assert.equal((await h.service.completionDashboard(ordinary.campaign)).counts.completed,0);
   h.env.BASELINE_PROXY_CAMPAIGN_IDS='';
