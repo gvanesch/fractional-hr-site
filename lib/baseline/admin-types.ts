@@ -35,6 +35,9 @@ export type LaunchReadiness = {
 
 export type DashboardParticipant = {
   participantId: string;
+  responseSource?: "proxy";
+  completerName?: string;
+  referencePeriod?: string;
   name: string;
   email: string;
   jobTitle: string;

@@ -4,7 +4,7 @@ export function validate(config, ref) {
   const qa = config.env?.qa;
   const database = qa?.d1_databases?.find((d) => d.binding === "DB");
   if (
-    !["refs/heads/feature/team-blue-baseline", "refs/heads/qa/proxy-completion"].includes(ref) ||
+    !["refs/heads/feature/team-blue-baseline", "refs/heads/qa/proxy-completion", "refs/heads/release/proxy-completion-candidate"].includes(ref) ||
     config.name !== "fractional-hr-site" ||
     config.d1_databases?.find((d) => d.binding === "DB")?.database_id !==
       "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc" ||

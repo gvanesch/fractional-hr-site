@@ -40,6 +40,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 }
 export default function Administration({
   campaign,
+  proxyEnabled = process.env.NEXT_PUBLIC_APP_ENV === "qa",
   name,
   people,
   refresh,
@@ -51,6 +52,7 @@ export default function Administration({
   editParticipantId: string | null;
   onEditOpened: () => void;
   campaign: string;
+  proxyEnabled?: boolean;
   name: string;
   people: Person[];
   refresh: () => Promise<void>;
@@ -729,10 +731,10 @@ export default function Administration({
                 gap: 12,
               }}
             >
-              {ROSTER_FIELDS.filter(k => process.env.NEXT_PUBLIC_APP_ENV === "qa" || !PROXY_FIELDS.includes(k)).map((k) => (
+              {ROSTER_FIELDS.filter(k => proxyEnabled || !PROXY_FIELDS.includes(k)).map((k) => (
                 <label key={k} className="tb-field">
                   <span>
-                    {process.env.NEXT_PUBLIC_APP_ENV === "qa" && k === "name" ? "Participant name (whose role is described)" : FIELD_LABELS[k]}
+                    {proxyEnabled && k === "name" ? "Participant name (whose role is described)" : FIELD_LABELS[k]}
                     {["name", "email"].includes(k) ? " *" : ""}
                   </span>
                   {k === "response_source" ? <select value={fields[k] ?? ""} onChange={e => setFields({...fields,[k]:e.target.value})}><option value="">Self-response</option><option value="proxy">Completed on behalf of someone else</option></select> : ["work_type", "manages_people"].includes(k) ? (

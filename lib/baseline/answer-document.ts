@@ -1,3 +1,4 @@
+import type { ProxyAttribution } from "./proxy";
 import type { collectionEvidence } from "./collection";
 import { zipTextFiles } from "./analysis-xlsx";
 import { areaQuestions } from "./work-area-questions";
@@ -73,6 +74,7 @@ export type AnswerSection = {
 };
 export type AnswerDocumentDetails = {
   profile?: Record<string, unknown>;
+  attribution?: ProxyAttribution | null;
   submittedAt?: string | null;
 };
 
@@ -96,6 +98,13 @@ export function answerDocumentSections(
     current.answers.push({ question, answer: text || "Not answered" });
   };
   const profile = details.profile ?? {};
+  if (details.attribution) {
+    section("Completed on behalf of someone else");
+    answer("Participant whose role is described", details.attribution.participantName);
+    answer("Completed by", details.attribution.completerName);
+    answer("Reference period", details.attribution.referencePeriod);
+    answer("Context, estimates and coverage gap", details.attribution.note, true);
+  }
   if (
     [
       profile.name,

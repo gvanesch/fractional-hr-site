@@ -4,7 +4,7 @@ const database = "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc";
 const worker = "fractional-hr-site";
 if (
   process.env.GITHUB_REPOSITORY !== "gvanesch/fractional-hr-site" ||
-  process.env.GITHUB_REF !== "refs/heads/feature/team-blue-baseline" ||
+  !["refs/heads/feature/team-blue-baseline", "refs/heads/release/proxy-completion-candidate"].includes(process.env.GITHUB_REF) ||
   process.env.CLOUDFLARE_ACCOUNT_ID !== account ||
   !process.env.CLOUDFLARE_API_TOKEN
 ) throw Error("Read-only recovery context differs");
@@ -29,6 +29,7 @@ const bindings = new Map(settings.bindings.map((b) => [b.name,b]));
 if (
   (bindings.get("DB")?.id ?? bindings.get("DB")?.database_id) !== database ||
   bindings.get("BASELINE_MAIL_MODE")?.text !== "send" ||
+  Boolean(bindings.get("BASELINE_PROXY_CAMPAIGN_IDS")?.text?.trim()) ||
   (bindings.get("ADVISOR_AUTH_MODE")?.text ?? "supabase") !== "supabase"
 ) throw Error("Production baseline storage/auth/mail checkpoint differs");
 const deployment = (await get(`workers/scripts/${worker}/deployments`)).result.deployments?.[0];
@@ -38,7 +39,7 @@ if (deployment?.versions?.length !== 1 || version.percentage !== 100 || version.
 const current = await get(`d1/database/${database}/time_travel/bookmark`, true);
 const previous = await get(`d1/database/${database}/time_travel/bookmark?timestamp=${encodeURIComponent(new Date(Date.now()-86400000).toISOString())}`, true);
 console.log(JSON.stringify({
-  productionVersionUnchanged: true, storageAuthMailUnchanged: true,
+  productionVersionUnchanged: true, productionVersion: version.version_id, storageAuthMailUnchanged: true,
   currentRecoveryBookmarkAvailable: Boolean(current.available && current.result?.bookmark),
   recoveryBookmark24HoursAgoAvailable: Boolean(previous.available && previous.result?.bookmark),
   restoreRehearsalPerformed: false, backupWindowVerified: false,

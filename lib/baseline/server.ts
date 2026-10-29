@@ -57,6 +57,7 @@ type Env = CloudflareEnv & {
   BASELINE_MAIL_MODE?: string;
   BASELINE_TEST_CAMPAIGN_ID?: string;
   BASELINE_QA_EMAIL_TESTS?: string;
+  BASELINE_PROXY_CAMPAIGN_IDS?: string;
   BASELINE_QA_RESEND_API_KEY?: string;
   NEXT_PUBLIC_APP_ENV?: string;
   NEXT_PUBLIC_SITE_URL?: string;
@@ -523,6 +524,7 @@ export async function campaignRows(campaign: string) {
       privacy_notice: String(c.privacy_notice),
       retention_days: null,
       retention_policy: "keep",
+      proxyEnabled: proxyCampaignEnabled(campaign),
       version: String(c.version),
       entities: JSON.parse(String(c.entities_json)) as EntityOption[],
     },
@@ -744,16 +746,23 @@ export async function configureCampaign(
   return { success: true };
 }
 async function attributionFor(participantId: string): Promise<ProxyAttribution | null> {
-  const row = await db().prepare("SELECT p.profile_json,m.metadata_json FROM tb_baseline_participants p JOIN tb_baseline_roster_details m USING(participant_id) WHERE p.participant_id=?").bind(participantId).first<{profile_json: string; metadata_json: string}>();
+  const row = await db().prepare("SELECT p.campaign_id,p.profile_json,m.metadata_json FROM tb_baseline_participants p JOIN tb_baseline_roster_details m USING(participant_id) WHERE p.participant_id=?").bind(participantId).first<{campaign_id: string; profile_json: string; metadata_json: string}>();
   const attribution = row ? proxyAttribution(JSON.parse(row.profile_json), JSON.parse(row.metadata_json)) : null;
-  if (attribution && baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa") throw new BaselineError("Completion on behalf is available in QA only.",403);
+  if (attribution && !proxyCampaignEnabled(row!.campaign_id)) throw new BaselineError("Completion on behalf is not enabled for this project.",403);
   return attribution;
 }
-function proxyOnlyInQA(profiles: Partial<Profile>[]) {
-  if (profiles.some(p => (p as Record<string, unknown>).response_source === "proxy") && baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa") throw new BaselineError("Completion on behalf is available in QA only.",403);
+function proxyCampaignIds() {
+  return (baselineEnv().BASELINE_PROXY_CAMPAIGN_IDS ?? "").split(",").map(id => id.trim()).filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+}
+function proxyCampaignEnabled(campaign: string) {
+  return baselineEnv().NEXT_PUBLIC_APP_ENV === "qa" || proxyCampaignIds().includes(campaign);
+}
+function assertProxyAllowed(campaign: string, profiles: Partial<Profile>[]) {
+  if (profiles.some(p => (p as Record<string, unknown>).response_source === "proxy") && !proxyCampaignEnabled(campaign)) throw new BaselineError("Completion on behalf is not enabled for this project.",403);
+  if (proxyCampaignIds().includes(campaign) && profiles.some(p => (p as Record<string, unknown>).response_source !== "proxy")) throw new BaselineError("This project is reserved for on-behalf responses.",409);
 }
 async function separateProxyCampaign(campaign: string, profiles: Partial<Profile>[]) {
-  proxyOnlyInQA(profiles);
+  assertProxyAllowed(campaign, profiles);
   const rows = await campaignRows(campaign);
   const kinds = new Set([...rows.participants.map(p => p.roster.response_source === "proxy"), ...profiles.map(p => (p as Record<string, unknown>).response_source === "proxy")]);
   if (kinds.size > 1) throw new BaselineError("Keep on-behalf responses in a separate proxy-only campaign.",409);
@@ -905,7 +914,7 @@ export async function invite(
       "The reviewed questionnaire is not ready for production invitations.",
       409,
     );
-  if (send && !productionMailAllowed(p.email, campaign))
+  if (send && !productionMailAllowed(recipientEmail, campaign))
     throw new BaselineError(
       env.NEXT_PUBLIC_APP_ENV === "qa" ? "Email is disabled in QA. Generate a test link instead." : "Email delivery is unavailable for this campaign. Check the production email configuration.",
     );
@@ -1182,7 +1191,7 @@ export async function changeParticipant(
     }
     if (parsed.length !== 1)
       throw new BaselineError("Edit one respondent at a time.");
-    proxyOnlyInQA(parsed);
+    assertProxyAllowed(campaign, parsed);
     const value = parsed[0];
     if (((value as Record<string, unknown>).response_source === "proxy") !== (p.roster.response_source === "proxy")) throw new BaselineError("Response source is fixed. Create a separate campaign for on-behalf responses.",409);
     profile = initialDraft(
@@ -1421,6 +1430,7 @@ export async function completionDashboard(
     participants: eligible.map((p) => ({
       participantId: p.participant_id,
       name: String(p.profile.name),
+      ...(p.roster.response_source === "proxy" ? {responseSource: "proxy" as const, completerName: String(p.roster.completer_name), referencePeriod: String(p.roster.reference_period)} : {}),
       email: p.email,
       jobTitle: String(p.profile.job_title),
       country: String(p.profile.country),
@@ -1593,7 +1603,7 @@ export async function launchReadiness(campaign: string) {
   if (String(data.campaign.closes_at) <= now())
     blockers.push("Set a future closing date.");
   if (
-    active.some((p) => !productionMailAllowed(p.email, campaign)) ||
+    active.some((p) => !productionMailAllowed(p.roster.response_source === "proxy" ? p.roster.completer_email : p.email, campaign)) ||
     !env.RESEND_API_KEY ||
     !env.CONTACT_FROM_EMAIL
   )
@@ -2368,7 +2378,8 @@ export async function requestVerification(
   const p = await invitationForVerification(request, token),
     env = baselineEnv();
   const attribution = await attributionFor(p.participant_id);
-  if (attribution && !preview) throw new BaselineError("QA on-behalf invitations use synthetic preview codes only. No email is sent.",403);
+  if (attribution && !preview && env.NEXT_PUBLIC_APP_ENV === "qa") throw new BaselineError("QA on-behalf invitations use synthetic preview codes only. No email is sent.",403);
+  const recipientEmail = attribution?.completerEmail ?? p.email;
   if (!isCollectionVersion(p.version))
     throw new BaselineError("Use the invitation link for this questionnaire.");
   if (
@@ -2382,7 +2393,7 @@ export async function requestVerification(
   if (
     !preview &&
     !canTestMail(p.email, p.campaign_id) &&
-    !productionMailAllowed(p.email, p.campaign_id)
+    !productionMailAllowed(recipientEmail, p.campaign_id)
   )
     throw new BaselineError(
       "Email verification is in QA preview mode. Ask the organiser for a synthetic test access code.",
@@ -2476,14 +2487,14 @@ export async function requestVerification(
         throw new BaselineError("Email verification is not configured.", 503);
       const result = await new Resend(env.RESEND_API_KEY).emails.send({
         from: baselineSender(env.CONTACT_FROM_EMAIL),
-        to: p.email,
+        to: recipientEmail,
         replyTo: "info@vanesch.uk",
-        ...verificationEmail(
+        ...attributedMessage(verificationEmail(
           code,
           env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") +
             "/baseline/start#" +
             token,
-        ),
+        ), attribution),
       });
       if (result.error)
         throw new BaselineError(
@@ -2635,7 +2646,9 @@ async function deliverAnswerCopy(participantId: string) {
         profile_json: row.profile_json,
       }),
       evidence = collectionEvidence(JSON.parse(row.draft_json), manager);
-    const message = answerCopyEmail(evidence);
+    const attribution = await attributionFor(participantId);
+    if (attribution && row.recipient_email !== attribution.completerEmail) throw Error("Answer-copy attribution and recipient do not match");
+    const message = attributedMessage(answerCopyEmail(evidence), attribution);
     const result = await new Resend(env.RESEND_API_KEY).emails.send(
       {
         from: baselineSender(env.CONTACT_FROM_EMAIL!),
@@ -2649,6 +2662,7 @@ async function deliverAnswerCopy(participantId: string) {
             content: Buffer.from(answerCopyDocx(evidence, {
               profile: JSON.parse(row.profile_json),
               submittedAt: row.submitted_at,
+              attribution,
             })),
           },
         ],

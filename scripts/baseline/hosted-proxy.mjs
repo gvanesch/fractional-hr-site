@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 const account='73221f18acc676e4992c89fcbf2b2a8f', database='b25d59da-5f93-4301-9996-7be0c9708789';
 const site=process.env.NEXT_PUBLIC_SITE_URL, credential=process.env.CLOUDFLARE_API_TOKEN;
-if(process.env.GITHUB_REF!=='refs/heads/qa/proxy-completion'||process.env.CLOUDFLARE_ACCOUNT_ID!==account||!credential||!/^https:\/\/fractional-hr-site-qa\.[a-z0-9-]+\.workers\.dev$/.test(site??'')) throw Error('Isolated proxy QA target required');
+if(!['refs/heads/qa/proxy-completion','refs/heads/release/proxy-completion-candidate'].includes(process.env.GITHUB_REF)||process.env.CLOUDFLARE_ACCOUNT_ID!==account||!credential||!/^https:\/\/fractional-hr-site-qa\.[a-z0-9-]+\.workers\.dev$/.test(site??'')) throw Error('Isolated proxy QA target required');
 const built=await require('esbuild').build({entryPoints:[new URL('../../lib/baseline/collection.ts',import.meta.url).pathname],bundle:true,platform:'node',format:'cjs',write:false});
 const mod={exports:{}};new Function('module','exports',built.outputFiles[0].text)(mod,mod.exports);const m=mod.exports;
 async function query(sql,params=[]){const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${database}/query`,{method:'POST',headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({sql,params})});if(!r.ok)throw Error('QA query HTTP '+r.status);const b=await r.json();if(!b.success||b.result.some(x=>!x.success))throw Error('QA fixture query failed');return b.result[0].results;}

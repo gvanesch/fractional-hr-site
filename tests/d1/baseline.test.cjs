@@ -2260,3 +2260,48 @@ test('Proxy creation rejects production and incomplete attribution without weake
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM tb_baseline_participants').get().n,1);
  }finally{h.sqlite.close();}
 });
+
+test('Release candidate routes both proxy invitations, OTPs and attributed Word copies to the completer only', async()=>{
+ const h=harness();try{
+  const actor='admin@example.invalid';
+  const ordinary=await reviewedSetup(h,'ordinary@example.invalid',h.collection.DEPTH_COLLECTION_VERSION);
+  const c=await h.service.createCampaign(actor,{questionnaireVersion:h.collection.DEPTH_COLLECTION_VERSION,name:'Synthetic proxy release',privacy:h.model.PRIVACY,closesAt:new Date(Date.now()+86400000).toISOString()});
+  await h.service.importRoster(actor,c.campaignId,'name,email,country,region,manages_people,response_source,completer_name,completer_email,reference_period,proxy_note\nSynthetic Anne,anne@example.invalid,DK,QA,no,proxy,QA Manager,manager@example.invalid,Usual role before absence,Synthetic leave gap\nSynthetic Charlotte,charlotte@example.invalid,DK,QA,no,proxy,QA Manager,manager@example.invalid,Usual role before departure,Synthetic vacancy');
+  await h.service.configureCampaign(actor,c.campaignId,{status:'open'});
+  const people=(await h.service.campaignRows(c.campaignId)).participants;
+  Object.assign(h.env,{NEXT_PUBLIC_APP_ENV:'production',BASELINE_MAIL_MODE:'send',RESEND_API_KEY:'synthetic-never-networked',CONTACT_FROM_EMAIL:'qa@example.invalid'});
+  for(const k of ['D1_SYSTEM_EVENTS_MODE','D1_CRM_PROSPECTS_MODE','D1_DIAGNOSTIC_SUBMISSIONS_MODE','D1_CLIENT_DIAGNOSTIC_MODE','D1_CLIENT_DIAGNOSTIC_SECURITY_MODE'])h.env[k]='d1';
+  await assert.rejects(h.service.invite(actor,c.campaignId,people[0].participant_id,true),e=>e.status===403);
+  assert.equal(h.state.emails.length,0);
+  h.env.BASELINE_PROXY_CAMPAIGN_IDS=c.campaignId;
+  assert.equal((await h.service.campaignRows(c.campaignId)).campaign.proxyEnabled,true);
+  assert.equal((await h.service.campaignRows(ordinary.campaign)).campaign.proxyEnabled,false);
+  await assert.rejects(h.service.importRoster(actor,c.campaignId,'name,email\nSelf,self@example.invalid'),/reserved/);
+  const d={...reviewedComplete(h),version:h.collection.DEPTH_COLLECTION_VERSION,managementTime:{time:{},uncertain:false,other:''}};
+  require('../../scripts/baseline/depth-fixture.cjs').fillDepth(d);d.answerCopy=true;
+  for(const p of people){
+   const before=h.state.emails.length;
+   await h.service.invite(actor,c.campaignId,p.participant_id,true);
+   const invitation=h.state.emails[before];assert.equal(invitation.to,'manager@example.invalid');assert.match(invitation.subject,new RegExp(p.profile.name));
+   const token=invitation.text.match(/\/baseline\/start#([a-f0-9]{64})/)[1];
+   const verification=await h.service.requestVerification(h.request({}),token,false);
+   assert.equal(verification.code,undefined);
+   const codeMail=h.state.emails[before+1];assert.equal(codeMail.to,'manager@example.invalid');assert.match(codeMail.subject,new RegExp(p.profile.name));
+   const code=codeMail.text.match(/\b[0-9]{6}\b/)[0];
+   const auth=await h.service.verifyCode(h.request({}),token,verification.challenge,code);h.state.cookie=auth.session;
+   const identity=await h.service.participant(h.request({}));
+   await h.service.verifyResponseContext(identity,p.participant_id);
+   await h.service.saveResponse(identity,d,0,8,true);
+   const copy=h.state.emails[before+2];assert.equal(copy.to,'manager@example.invalid');assert.match(copy.subject,new RegExp(p.profile.name));assert.match(copy.html,/Completed on behalf/);
+   const attachment=Buffer.from(copy.attachments[0].content);assert.ok(attachment.includes(Buffer.from(p.profile.name)));assert.ok(attachment.includes(Buffer.from('Completed by')));assert.ok(attachment.includes(Buffer.from('QA Manager')));assert.ok(attachment.includes(Buffer.from('Reference period')));
+   assert.equal((await h.service.requestAnswerCopy(identity)).copyStatus,'sent');assert.equal(h.state.emails.length,before+3);
+  }
+  assert.equal(h.state.emails.length,6);assert.ok(h.state.emails.every(x=>x.to==='manager@example.invalid'));
+  const dashboard=await h.service.completionDashboard(c.campaignId);assert.equal(dashboard.counts.completed,2);assert.ok(dashboard.participants.every(x=>x.responseSource==='proxy'&&x.completerName==='QA Manager'));
+  assert.equal((await h.service.completionDashboard(ordinary.campaign)).counts.completed,0);
+  h.env.BASELINE_PROXY_CAMPAIGN_IDS='';
+  await assert.rejects(h.service.previewRoster(c.campaignId,'name,email,response_source,completer_name,completer_email,reference_period\nProxy,p@example.invalid,proxy,Manager,manager@example.invalid,Usual role'),e=>e.status===403);
+  const v=await h.service.requestVerification(h.request({}),ordinary.token,true).catch(e=>e);
+  assert.equal(v.status,403); // Production never exposes preview codes.
+ }finally{h.sqlite.close();}
+});

@@ -197,6 +197,7 @@ export default function Dashboard({
                 {p.active ? p.status.replaceAll("_", " ") : "Withdrawn"}
               </span>
             </div>
+            {p.responseSource === "proxy" && <p><strong>Completed on behalf by {p.completerName}</strong><br />Reference period: {p.referencePeriod}</p>}
             <p>
               {p.email} · {p.jobTitle}
             </p>
