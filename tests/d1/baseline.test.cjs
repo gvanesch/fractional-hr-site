@@ -2238,6 +2238,9 @@ test('QA on-behalf records share a completer mailbox but preserve identity, OTP,
   const tables=mod.exports.analysisTables(exported);const respondent=tables.find(t=>t.name==='Respondents');
   assert.ok(respondent.rows.every(r=>r[respondent.columns.indexOf('Include in analysis')]===false));
   const allocation=tables.find(t=>t.name==='Work allocation');assert.ok(allocation.rows.every(r=>r[allocation.columns.indexOf('Include in analysis')]===false));
+  h.env.BASELINE_QA_EMAIL_TESTS='greg-only';
+  h.sqlite.prepare('UPDATE tb_baseline_participants SET email=? WHERE participant_id=?').run('greg@vanesch.uk',people[0].participant_id);
+  await assert.rejects(h.service.qaTestInvitation(h.request({}),links[0]),/preview-only/);
   assert.equal(h.state.emails.length,0);
   await assert.rejects(h.service.requestVerification(h.request({}),links[0],false),e=>e.status===403);
   await assert.rejects(h.service.importRoster(actor,c.campaignId,'name,email\nSelf,self@example.invalid'),/separate proxy-only campaign/);

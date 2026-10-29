@@ -2307,6 +2307,7 @@ async function sendGregTest(
 }
 export async function qaTestInvitation(request: Request, token: string) {
   const p = await invitationForVerification(request, token);
+  if (await attributionFor(p.participant_id)) throw new BaselineError("On-behalf QA invitations remain preview-only. No email is sent.",403);
   if (
     !canTestMail(p.email, p.campaign_id) &&
     !itTestMailAllowed(p.email, p.campaign_id)
