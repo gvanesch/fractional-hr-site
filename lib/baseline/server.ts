@@ -1,3 +1,4 @@
+import { proxyAttribution, attributedMessage, type ProxyAttribution } from "./proxy";
 import { analysisTables } from "./analysis-export";
 import { participantPrivacyNotice } from "./copy";
 import { IT_DELIVERY_TEST, deliveryTestFor } from "./it-delivery-test";
@@ -742,6 +743,25 @@ export async function configureCampaign(
   ]);
   return { success: true };
 }
+async function attributionFor(participantId: string): Promise<ProxyAttribution | null> {
+  const row = await db().prepare("SELECT p.profile_json,m.metadata_json FROM tb_baseline_participants p JOIN tb_baseline_roster_details m USING(participant_id) WHERE p.participant_id=?").bind(participantId).first<{profile_json: string; metadata_json: string}>();
+  const attribution = row ? proxyAttribution(JSON.parse(row.profile_json), JSON.parse(row.metadata_json)) : null;
+  if (attribution && baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa") throw new BaselineError("Completion on behalf is available in QA only.",403);
+  return attribution;
+}
+function proxyOnlyInQA(profiles: Partial<Profile>[]) {
+  if (profiles.some(p => (p as Record<string, unknown>).response_source === "proxy") && baselineEnv().NEXT_PUBLIC_APP_ENV !== "qa") throw new BaselineError("Completion on behalf is available in QA only.",403);
+}
+async function separateProxyCampaign(campaign: string, profiles: Partial<Profile>[]) {
+  proxyOnlyInQA(profiles);
+  const rows = await campaignRows(campaign);
+  const kinds = new Set([...rows.participants.map(p => p.roster.response_source === "proxy"), ...profiles.map(p => (p as Record<string, unknown>).response_source === "proxy")]);
+  if (kinds.size > 1) throw new BaselineError("Keep on-behalf responses in a separate proxy-only campaign.",409);
+}
+export async function verifyResponseContext(p: Identity, expected: unknown) {
+  const attribution = await attributionFor(p.participant_id);
+  if ((expected !== undefined && expected !== p.participant_id) || (attribution && expected !== p.participant_id)) throw new BaselineError("Another assessment is open in this browser. Reopen the correct invitation before saving.",409);
+}
 export async function importRoster(
   actor: string,
   campaign: string,
@@ -762,6 +782,7 @@ export async function importRoster(
     );
   }
   if (!profiles.length) throw new BaselineError("The roster is empty.");
+  await separateProxyCampaign(campaign, profiles);
   const existing = new Set(
     (
       await db()
@@ -863,6 +884,8 @@ export async function invite(
     throw new BaselineError(
       "Open the campaign before inviting an active participant.",
     );
+  const attribution = await attributionFor(participantId);
+  const recipientEmail = attribution?.completerEmail ?? p.email;
   const token = randomBytes(32).toString("hex"),
     id = randomUUID(),
     stamp = now(),
@@ -915,9 +938,9 @@ export async function invite(
       throw new BaselineError("Email is not configured.", 503);
     const result = await new Resend(env.RESEND_API_KEY).emails.send({
       from: baselineSender(env.CONTACT_FROM_EMAIL),
-      to: p.email,
+      to: recipientEmail,
       replyTo: "info@vanesch.uk",
-      ...invitationEmail(p.name, link, p.closes_at, p.version),
+      ...attributedMessage(invitationEmail(p.name, link, p.closes_at, p.version), attribution),
     });
     if (result.error) {
       await audit(actor, "invitation_delivery_failed", campaign, participantId);
@@ -928,7 +951,7 @@ export async function invite(
     }
     await audit(actor, "invitation_sent", campaign, participantId);
   }
-  return { link: send ? undefined : link, sent: send, expiresAt: expires };
+  return { link: send ? undefined : link, sent: send, expiresAt: expires, ...(attribution ? {recipientEmail, attribution, emailPreview: attributedMessage(invitationEmail(p.name, link, p.closes_at, p.version), attribution)} : {}) };
 }
 export async function revoke(
   actor: string,
@@ -1111,6 +1134,7 @@ export async function previewRoster(campaign: string, csv: string) {
     throw new BaselineError(e instanceof Error ? e.message : "Check the CSV.");
   }
   if (!rows.length) throw new BaselineError("The roster is empty.");
+  await separateProxyCampaign(campaign, rows);
   const existing = new Set(
     data.participants.map((p) => String(p.email).toLowerCase()),
   );
@@ -1158,7 +1182,9 @@ export async function changeParticipant(
     }
     if (parsed.length !== 1)
       throw new BaselineError("Edit one respondent at a time.");
+    proxyOnlyInQA(parsed);
     const value = parsed[0];
+    if (((value as Record<string, unknown>).response_source === "proxy") !== (p.roster.response_source === "proxy")) throw new BaselineError("Response source is fixed. Create a separate campaign for on-behalf responses.",409);
     profile = initialDraft(
       Object.fromEntries(
         CORE_ROSTER_FIELDS.map((k) => [
@@ -1168,6 +1194,7 @@ export async function changeParticipant(
       ),
     ).profile;
     metadata = rosterMetadata(value as Record<string, unknown>);
+    if (p.roster.response_source === "proxy" && p.status !== "not_started" && ["completer_name","completer_email","reference_period","proxy_note"].some(k => metadata[k] !== p.roster[k])) throw new BaselineError("On-behalf attribution is fixed once work starts.",409);
     if (
       data.participants.some(
         (other) => other.participant_id !== id && other.email === profile.email,
@@ -1181,7 +1208,7 @@ export async function changeParticipant(
   const stamp = now(),
     mutation = randomUUID(),
     database = db(),
-    emailChanged = profile.email !== p.email;
+    emailChanged = profile.email !== p.email || (p.roster.response_source === "proxy" && ["completer_email", "completer_name"].some(k => metadata[k] !== p.roster[k]));
   const statements = [
     database
       .prepare(
@@ -1786,6 +1813,7 @@ async function savedCollectionManager(p: {
 }
 async function readCollectionResponse(p: Identity) {
   await collectionDefinition(p.version);
+  const attribution = await attributionFor(p.participant_id);
   const row = await db()
     .prepare("SELECT * FROM tb_baseline_responses WHERE participant_id=?")
     .bind(p.participant_id)
@@ -1799,6 +1827,7 @@ async function readCollectionResponse(p: Identity) {
       closed: p.status !== "open" || p.closes_at <= now(),
       copyPreview: baselineEnv().NEXT_PUBLIC_APP_ENV === "qa",
       manager: await savedCollectionManager(p),
+      ...(attribution ? {attribution, participantId: p.participant_id} : {}),
     },
     draft: JSON.parse(row.draft_json) as CollectionDraft,
     copyStatus: await answerCopyStatus(p.participant_id),
@@ -1830,6 +1859,7 @@ async function saveCollectionResponse(
   )
     throw new BaselineError("Reload your saved response before continuing.");
   const manager = await savedCollectionManager(p);
+  const attribution = await attributionFor(p.participant_id);
   let draft: CollectionDraft;
   try {
     draft = parseCollection(input, manager);
@@ -1924,6 +1954,7 @@ async function saveCollectionResponse(
           JSON.stringify({
             version: draft.version,
             answerCopy: draft.answerCopy,
+            ...(attribution ? {responseSource:"proxy", completerName:attribution.completerName, completerEmail:attribution.completerEmail, referencePeriod:attribution.referencePeriod} : {}),
           }),
           stamp,
           p.participant_id,
@@ -1939,7 +1970,7 @@ async function saveCollectionResponse(
           .bind(
             p.participant_id,
             p.version,
-            p.email,
+            attribution?.completerEmail ?? p.email,
             baselineEnv().NEXT_PUBLIC_APP_ENV === "qa" ? "preview" : "pending",
             stamp,
             p.participant_id,
@@ -2091,6 +2122,7 @@ export async function invitationInfo(request: Request, token: string) {
   return {
     version: p.version,
     verificationPreview: baselineEnv().NEXT_PUBLIC_APP_ENV === "qa",
+    attribution: await attributionFor(p.participant_id),
   };
 }
 function verificationHash(id: string, code: string) {
@@ -2334,11 +2366,13 @@ export async function requestVerification(
 ) {
   const p = await invitationForVerification(request, token),
     env = baselineEnv();
+  const attribution = await attributionFor(p.participant_id);
+  if (attribution && !preview) throw new BaselineError("QA on-behalf invitations use synthetic preview codes only. No email is sent.",403);
   if (!isCollectionVersion(p.version))
     throw new BaselineError("Use the invitation link for this questionnaire.");
   if (
     preview &&
-    (env.NEXT_PUBLIC_APP_ENV !== "qa" || !p.email.endsWith(".invalid"))
+    (env.NEXT_PUBLIC_APP_ENV !== "qa" || !(attribution?.completerEmail ?? p.email).endsWith(".invalid"))
   )
     throw new BaselineError(
       "Private QA code previews use synthetic recipients only.",

@@ -1,4 +1,5 @@
 "use client";
+import { PROXY_FIELDS } from "@/lib/baseline/proxy";
 import { useEffect, useRef, useState } from "react";
 import {
   ROSTER_FIELDS,
@@ -361,7 +362,7 @@ export default function Administration({
                     </span>
                   </div>
                   <p>
-                    {p.email} · {p.status.replaceAll("_", " ")} ·{" "}
+                    {p.roster.response_source === "proxy" && <>Completed on behalf by {p.roster.completer_name} ({p.roster.completer_email}) · </>}{p.email} · {p.status.replaceAll("_", " ")} ·{" "}
                     {p.active ? "Active" : "Removed"}
                   </p>
                   <p>
@@ -728,13 +729,13 @@ export default function Administration({
                 gap: 12,
               }}
             >
-              {ROSTER_FIELDS.map((k) => (
+              {ROSTER_FIELDS.filter(k => process.env.NEXT_PUBLIC_APP_ENV === "qa" || !PROXY_FIELDS.includes(k)).map((k) => (
                 <label key={k} className="tb-field">
                   <span>
-                    {FIELD_LABELS[k]}
+                    {process.env.NEXT_PUBLIC_APP_ENV === "qa" && k === "name" ? "Participant name (whose role is described)" : FIELD_LABELS[k]}
                     {["name", "email"].includes(k) ? " *" : ""}
                   </span>
-                  {["work_type", "manages_people"].includes(k) ? (
+                  {k === "response_source" ? <select value={fields[k] ?? ""} onChange={e => setFields({...fields,[k]:e.target.value})}><option value="">Self-response</option><option value="proxy">Completed on behalf of someone else</option></select> : ["work_type", "manages_people"].includes(k) ? (
                     <select
                       value={fields[k] ?? ""}
                       onChange={(e) =>

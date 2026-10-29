@@ -2188,3 +2188,72 @@ test('Detailed v5 saves and resumes evidence, enforces completion, exports it an
   assert.equal(h.sqlite.prepare('SELECT status FROM tb_baseline_responses WHERE participant_id=?').get(p.participant_id).status,'completed');
  }finally{h.sqlite.close();}
 });
+
+test('QA on-behalf records share a completer mailbox but preserve identity, OTP, sessions and evidence', async () => {
+ const h=harness();try {
+  const actor='admin@example.invalid';
+  const c=await h.service.createCampaign(actor,{questionnaireVersion:h.collection.DEPTH_COLLECTION_VERSION,name:'Synthetic Denmark proxy-only',privacy:h.model.PRIVACY,closesAt:new Date(Date.now()+86400000).toISOString()});
+  const csv='name,email,country,manages_people,response_source,completer_name,completer_email,reference_period,proxy_note\nSynthetic Anne,anne@example.invalid,DK,no,proxy,Synthetic Manager,manager@example.invalid,Usual role before leave,Leave coverage gap\nSynthetic Charlotte,charlotte@example.invalid,DK,no,proxy,Synthetic Manager,manager@example.invalid,Usual role before departure,Vacant role coverage';
+  assert.equal((await h.service.previewRoster(c.campaignId,csv)).canImport,true);
+  await h.service.importRoster(actor,c.campaignId,csv);
+  await h.service.configureCampaign(actor,c.campaignId,{status:'open'});
+  const people=(await h.service.campaignRows(c.campaignId)).participants;
+  assert.equal(people.length,2);
+  const links=[];
+  for(const p of people){
+   const v=await h.service.invite(actor,c.campaignId,p.participant_id,false);
+   assert.equal(v.recipientEmail,'manager@example.invalid');
+   assert.match(v.emailPreview.subject,new RegExp(p.profile.name));
+   assert.match(v.emailPreview.text,/Completed on behalf/);
+   assert.match(v.emailPreview.html,/Synthetic Manager/);
+   links.push(v.link.split('#')[1]);
+  }
+  assert.notEqual(links[0],links[1]);
+  const codes=[];for(const token of links) codes.push(await h.service.requestVerification(h.request({}),token,true));
+  await assert.rejects(h.service.verifyCode(h.request({}),links[0],codes[1].challenge,codes[1].code));
+  const verified=await h.service.verifyCode(h.request({}),links[0],codes[0].challenge,codes[0].code);h.state.cookie=verified.session;
+  const id0=await h.service.participant(h.request({}));const read=await h.service.readResponse(id0);
+  assert.equal(read.campaign.attribution.participantName,people[0].profile.name);
+  assert.equal(read.campaign.attribution.completerName,'Synthetic Manager');
+  assert.equal(read.campaign.participantId,people[0].participant_id);
+  const d={...reviewedComplete(h),version:h.collection.DEPTH_COLLECTION_VERSION,managementTime:{time:{},uncertain:false,other:''}};
+  require('../../scripts/baseline/depth-fixture.cjs').fillDepth(d);d.answerCopy=true;
+  const post=(pid,rev=0,submit=false)=>h.route.POST(h.request({participantId:pid,draft:d,revision:rev,progress:8}),{params:Promise.resolve({path:[submit?'submit':'save']})});
+  assert.equal((await post(undefined)).status,409);
+  assert.equal((await post(people[0].participant_id)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT revision FROM tb_baseline_responses WHERE participant_id=?').get(people[1].participant_id).revision,0);
+  const v2=await h.service.verifyCode(h.request({}),links[1],codes[1].challenge,codes[1].code);h.state.cookie=v2.session;
+  // A stale tab cannot write the other record even when its revision happens to match.
+  assert.equal((await post(people[0].participant_id,0)).status,409);
+  assert.equal((await post(people[1].participant_id,0,true)).status,200);
+  await assert.rejects(h.service.saveResponse(await h.service.participant(h.request({})),d,1,8,true));
+  h.state.cookie=verified.session;
+  assert.equal((await post(people[0].participant_id,1,true)).status,200);
+  const exported=JSON.parse(await h.service.exportDataset(actor,c.campaignId,'json'));
+  for(const r of exported.respondents){assert.equal(r.response_source,'proxy');assert.equal(r.completer_email,'manager@example.invalid');assert.equal(r.status,'completed');}
+  const copies=h.sqlite.prepare('SELECT recipient_email,status FROM tb_baseline_answer_copies').all();
+  assert.equal(copies.length,2);assert.ok(copies.every(x=>x.recipient_email==='manager@example.invalid'&&x.status==='preview'));
+  const analysis=require('esbuild').buildSync({entryPoints:[path.join(root,'lib/baseline/analysis-export.ts')],bundle:true,platform:'node',format:'cjs',write:false});
+  const mod={exports:{}};new Function('module','exports',analysis.outputFiles[0].text)(mod,mod.exports);
+  const tables=mod.exports.analysisTables(exported);const respondent=tables.find(t=>t.name==='Respondents');
+  assert.ok(respondent.rows.every(r=>r[respondent.columns.indexOf('Include in analysis')]===false));
+  const allocation=tables.find(t=>t.name==='Work allocation');assert.ok(allocation.rows.every(r=>r[allocation.columns.indexOf('Include in analysis')]===false));
+  assert.equal(h.state.emails.length,0);
+  await assert.rejects(h.service.requestVerification(h.request({}),links[0],false),e=>e.status===403);
+  await assert.rejects(h.service.importRoster(actor,c.campaignId,'name,email\nSelf,self@example.invalid'),/separate proxy-only campaign/);
+ }finally{h.sqlite.close();}
+});
+
+test('Proxy creation rejects production and incomplete attribution without weakening participant uniqueness', async()=>{
+ const h=harness();try{
+  const csv='name,email,response_source,completer_name,completer_email,reference_period\nSynthetic,synthetic@example.invalid,proxy,Manager,manager@example.invalid,Before leave';
+  const {campaign}=await reviewedSetup(h);
+  await assert.rejects(h.service.importRoster('admin@example.invalid',campaign,csv),/separate proxy-only campaign/);
+  assert.throws(()=>h.model.parseRoster(csv.replace(',Manager,',',,')),/completer/);
+  assert.throws(()=>h.model.parseRoster('name,email\nA,a@example.invalid\nB,a@example.invalid'),/unique/);
+  h.env.NEXT_PUBLIC_APP_ENV='production';for(const k of ['D1_SYSTEM_EVENTS_MODE','D1_CRM_PROSPECTS_MODE','D1_DIAGNOSTIC_SUBMISSIONS_MODE','D1_CLIENT_DIAGNOSTIC_MODE','D1_CLIENT_DIAGNOSTIC_SECURITY_MODE'])h.env[k]='d1';
+  await assert.rejects(h.service.previewRoster(campaign,csv),e=>e.status===403);
+  await assert.rejects(h.service.importRoster('admin@example.invalid',campaign,csv),e=>e.status===403);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM tb_baseline_participants').get().n,1);
+ }finally{h.sqlite.close();}
+});

@@ -94,7 +94,7 @@ export default function Prototype({
     draft: CollectionDraft;
     progress: number;
     status: string;
-    campaign: { privacy: string; closed: boolean; copyPreview?: boolean };
+    campaign: { privacy: string; closed: boolean; copyPreview?: boolean; attribution?: import("@/lib/baseline/proxy").ProxyAttribution };
     copyStatus?: string | null;
   };
   endCollectionSession?: () => Promise<void>;
@@ -310,12 +310,15 @@ export default function Prototype({
     setChecked(false);
     if (next === reviewStage) setReviewVisited(true);
   }
+  const attribution = savedCollection?.campaign.attribution;
+  const proxyNotice = attribution ? <section className="tb-card" role="note" aria-label="Completed on behalf"><strong>Completed on behalf of {attribution.participantName}</strong><p>Completer: {attribution.completerName}. Reference period: {attribution.referencePeriod}.</p><p>Describe this person’s usual role. Record estimates, unknowns and current coverage gaps in the final comments.</p>{attribution.note && <p>{attribution.note}</p>}</section> : null;
   if (saveCollection && (submitted || savedCollection?.campaign.closed))
     return (
       <main className="tb-shell tb-prototype">
         <header className="tb-header">
           <span>team.blue · Current work baseline</span>
         </header>
+        {proxyNotice}
         <section className="tb-card">
           <h1>
             {submitted
@@ -441,6 +444,7 @@ export default function Prototype({
           Understand current work, protect strengths and improve how we work.
         </p>
       </header>
+      {proxyNotice}
       {!started ? (
         <section className="tb-card">
           <h1>

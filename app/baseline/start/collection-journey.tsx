@@ -11,6 +11,8 @@ import "./style.css";
 type Saved = {
   draft: CollectionDraft;
   campaign: {
+    attribution?: import("@/lib/baseline/proxy").ProxyAttribution;
+    participantId?: string;
     name: string;
     privacy: string;
     closed: boolean;
@@ -63,7 +65,7 @@ export default function CollectionJourney() {
       try {
         const result = await api<{ copyStatus: string | null }>(
           "answer-copy",
-          {},
+          {participantId: data.campaign.participantId},
         );
         data.copyStatus = result.copyStatus;
       } catch {
@@ -140,6 +142,7 @@ export default function CollectionJourney() {
           draft,
           progress,
           revision: revision.current,
+          participantId: saved?.campaign.participantId,
         });
         revision.current = result.revision;
         last.current = payload;
@@ -168,7 +171,7 @@ export default function CollectionJourney() {
         savedCollection={saved}
         saveCollection={save}
         retryAnswerCopy={async () =>
-          (await api<{ copyStatus: string | null }>("answer-copy", {}))
+          (await api<{ copyStatus: string | null }>("answer-copy", {participantId: saved.campaign.participantId}))
             .copyStatus
         }
         endCollectionSession={async () => {
