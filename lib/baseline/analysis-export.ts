@@ -55,7 +55,7 @@ const base = (p: Obj): Cell[] => [
   str(p.participant_id),
   str(p.name),
   str(p.status),
-  p.status === "completed",
+  p.status === "completed" && p.response_source !== "proxy",
   str(p.country),
   str(p.region),
   str(p.entity),
@@ -84,6 +84,11 @@ const evidenceKeys = new Set([
   "answerCopyRequested",
 ]);
 const heading: Record<string, string> = {
+  response_source: "Response source",
+  completer_name: "Completer name",
+  completer_email: "Completer delivery email",
+  reference_period: "Reference period",
+  proxy_note: "Proxy context and coverage gap",
   participant_id: "Participant ID",
   campaign_id: "Campaign ID",
   questionnaire_version: "Questionnaire version",
@@ -287,7 +292,7 @@ export function analysisTables(
         if (k === "access_active") return v === true || v === 1 || v === "1";
         return typeof v === "object" ? str(v) : (v as Cell);
       }),
-      p.status === "completed",
+      p.status === "completed" && p.response_source !== "proxy",
       str(p.scope),
       scopeLabel(p.scope),
       str(c.recording),
@@ -508,7 +513,7 @@ export function analysisTables(
     note("management.note", "Management context", mgr.note);
     note("management.other", "Other management work", mgr.other);
   }
-  const complete = people.filter((p) => p.status === "completed").length;
+  const complete = people.filter((p) => p.status === "completed" && p.response_source !== "proxy").length;
   const guide: AnalysisTable = {
     name: "Read me",
     columns: ["Item", "Guidance"],
@@ -521,7 +526,7 @@ export function analysisTables(
       ["Not started", people.filter((p) => p.status === "not_started").length],
       [
         "Default analysis",
-        "Filter Include in analysis to TRUE. Drafts are retained for operational review.",
+        "Filter Include in analysis to TRUE. Manager-provided proxy evidence is retained separately and excluded from this selection.",
       ],
       [
         "Joining tables",
@@ -604,7 +609,7 @@ export function analysisTables(
               : c === "Participant ID"
                 ? "Stable respondent join key."
                 : c === "Include in analysis"
-                  ? "TRUE for completed responses only."
+                  ? "TRUE for completed self-responses only. Proxy responses remain supplementary evidence."
                   : c === "Hours per week"
                     ? "Contracted weekly hours multiplied by share of total working time."
                     : c === "FTE allocation"

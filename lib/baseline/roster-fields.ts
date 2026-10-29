@@ -1,3 +1,4 @@
+import { PROXY_FIELDS, validateProxyFields } from "./proxy";
 export const CORE_ROSTER_FIELDS = [
   "name",
   "email",
@@ -10,6 +11,7 @@ export const CORE_ROSTER_FIELDS = [
   "direct_reports",
 ];
 export const EXTRA_ROSTER_FIELDS = [
+  ...PROXY_FIELDS,
   "participant_reference",
   "division",
   "brand",
@@ -46,6 +48,11 @@ export const LAUNCH_ROSTER_FIELDS = [
   "working_fraction",
 ];
 export const FIELD_LABELS: Record<string, string> = {
+  response_source: "Response source (proxy for completion on behalf)",
+  completer_name: "Completer name",
+  completer_email: "Completer delivery email (can be shared across roles)",
+  reference_period: "Usual-role reference period",
+  proxy_note: "Reason, estimates and current coverage gap",
   name: "Name",
   email: "Work email",
   job_title: "Current job title",
@@ -77,6 +84,7 @@ export function rosterMetadata(p: Record<string, unknown>) {
   );
 }
 export function validateRosterExtras(p: Record<string, string>, row: number) {
+  validateProxyFields(p);
   for (const key of ["manager_email", "leader_email", "regional_leader_email"])
     if (p[key] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p[key]))
       throw new Error(`Check ${key} on row ${row}.`);

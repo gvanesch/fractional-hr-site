@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url),
   credential = process.env.CLOUDFLARE_API_TOKEN,
   site = process.env.NEXT_PUBLIC_SITE_URL;
 if (
-  process.env.GITHUB_REF !== "refs/heads/feature/team-blue-baseline" ||
+  !["refs/heads/feature/team-blue-baseline", "refs/heads/qa/proxy-completion"].includes(process.env.GITHUB_REF) ||
   process.env.CLOUDFLARE_ACCOUNT_ID !== account ||
   !credential ||
   !/^https:\/\/fractional-hr-site-qa\.[a-z0-9-]+\.workers\.dev$/.test(
