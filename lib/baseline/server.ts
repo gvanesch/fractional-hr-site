@@ -949,7 +949,7 @@ export async function invite(
       from: baselineSender(env.CONTACT_FROM_EMAIL),
       to: recipientEmail,
       replyTo: "info@vanesch.uk",
-      ...attributedMessage(invitationEmail(p.name, link, p.closes_at, p.version), attribution),
+      ...invitationEmail(p.name, link, p.closes_at, p.version, attribution),
     });
     if (result.error) {
       await audit(actor, "invitation_delivery_failed", campaign, participantId);
@@ -960,7 +960,7 @@ export async function invite(
     }
     await audit(actor, "invitation_sent", campaign, participantId);
   }
-  return { link: send ? undefined : link, sent: send, expiresAt: expires, ...(attribution ? {recipientEmail, attribution, emailPreview: attributedMessage(invitationEmail(p.name, link, p.closes_at, p.version), attribution)} : {}) };
+  return { link: send ? undefined : link, sent: send, expiresAt: expires, ...(attribution ? {recipientEmail, attribution, emailPreview: invitationEmail(p.name, link, p.closes_at, p.version, attribution)} : {}) };
 }
 export async function revoke(
   actor: string,

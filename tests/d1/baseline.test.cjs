@@ -2204,7 +2204,11 @@ test('QA on-behalf records share a completer mailbox but preserve identity, OTP,
    const v=await h.service.invite(actor,c.campaignId,p.participant_id,false);
    assert.equal(v.recipientEmail,'manager@example.invalid');
    assert.match(v.emailPreview.subject,new RegExp(p.profile.name));
-   assert.match(v.emailPreview.text,/Completed on behalf/);
+   assert.match(v.emailPreview.text,/Please complete this assessment on behalf of/);
+   assert.match(v.emailPreview.text,new RegExp('Hello Synthetic Manager'));
+   assert.match(v.emailPreview.text,new RegExp(p.profile.name+'’s usual role and work, not your own'));
+   assert.match(v.emailPreview.html,new RegExp('Complete '+p.profile.name+'’s assessment'));
+   assert.doesNotMatch(v.emailPreview.text,/Please describe the work you do today/);
    assert.match(v.emailPreview.html,/Synthetic Manager/);
    links.push(v.link.split('#')[1]);
   }
@@ -2283,6 +2287,7 @@ test('Release candidate routes both proxy invitations, OTPs and attributed Word 
    const before=h.state.emails.length;
    await h.service.invite(actor,c.campaignId,p.participant_id,true);
    const invitation=h.state.emails[before];assert.equal(invitation.to,'manager@example.invalid');assert.match(invitation.subject,new RegExp(p.profile.name));
+   assert.match(invitation.text,/Hello QA Manager/);assert.match(invitation.text,new RegExp(p.profile.name+'’s usual role and work, not your own'));assert.match(invitation.html,new RegExp('Complete '+p.profile.name+'’s assessment'));
    const token=invitation.text.match(/\/baseline\/start#([a-f0-9]{64})/)[1];
    const verification=await h.service.requestVerification(h.request({}),token,false);
    assert.equal(verification.code,undefined);

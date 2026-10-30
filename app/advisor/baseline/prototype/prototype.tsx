@@ -311,7 +311,7 @@ export default function Prototype({
     if (next === reviewStage) setReviewVisited(true);
   }
   const attribution = savedCollection?.campaign.attribution;
-  const proxyNotice = attribution ? <section className="tb-card" role="note" aria-label="Completed on behalf"><strong>Completed on behalf of {attribution.participantName}</strong><p>Completer: {attribution.completerName}. Reference period: {attribution.referencePeriod}.</p><p>Describe this person’s usual role. Record estimates, unknowns and current coverage gaps in the final comments.</p>{attribution.note && <p>{attribution.note}</p>}</section> : null;
+  const proxyNotice = attribution ? <section className="tb-card" role="note" aria-label="Completed on behalf"><strong>Assessment for {attribution.participantName}</strong><p>Complete this assessment based on {attribution.participantName}’s usual role and work, not your own. Where a question says “you”, it refers to {attribution.participantName}.</p><p>Completer: {attribution.completerName}. Reference period: {attribution.referencePeriod}.</p><p>Record estimates, unknowns and current coverage gaps in the final comments.</p>{attribution.note && <p>{attribution.note}</p>}</section> : null;
   if (saveCollection && (submitted || savedCollection?.campaign.closed))
     return (
       <main className="tb-shell tb-prototype">

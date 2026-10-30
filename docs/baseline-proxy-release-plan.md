@@ -48,3 +48,10 @@ Record the pre-release Worker version. If a deployment check fails, restore that
 If proxy activation fails after invitations exist, first close only the separate proxy campaign and revoke its invitations and sessions while the new code is still available. Then remove that project from the enablement list and revert the Worker if required. The old Worker does not understand the new feature flag, so removing the flag alone is insufficient before a code rollback. Retain the proxy records, saved answers and audit history. Never close the main baseline campaign or revoke its sessions as part of this rollback. Reverting code must not delete or replace any live baseline table. Investigate before any resend because invitation generation revokes prior links for that participant.
 
 The preparation workflow does not merge, publish a production release approval or deploy to production.
+
+
+## Invitation and page wording
+
+On-behalf invitations use a dedicated template addressed to the completer. The subject, assessment heading and action name the represented participant. The body explicitly asks for that participant’s usual role and work, identifies the reference period, and explains that the completer’s own assessment remains separate. OTP and answer-copy routing stays attributed to the same represented record.
+
+The named participant notice appears on the introduction, every questionnaire stage, review, submitted and closed views. It explains that “you” means the represented participant, shows the completer and reference period, and asks for estimates, unknowns and coverage gaps in the final comments. The questionnaire definitions and answer fields stay unchanged. Desktop/mobile journey checks assert the notice at navigation and submission.
