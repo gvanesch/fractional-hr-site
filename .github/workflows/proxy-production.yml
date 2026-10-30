@@ -1,0 +1,44 @@
+name: Approved on-behalf production release
+on:
+  push:
+    branches: [migration/d1]
+    paths: [scripts/baseline/proxy-production-approval.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: https://qxddddhhpfrrxbaunwfw.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SITE_URL: https://vanesch.uk
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:d1
+      - run: npx tsc --noEmit
+      - name: Verify exact source, preserve settings and prepare rollback
+        run: node scripts/baseline/proxy-production-release.mjs prepare
+      - name: Build tested application for production
+        run: npx opennextjs-cloudflare build
+      - name: Deploy code with existing production settings
+        id: deploy
+        run: npx opennextjs-cloudflare deploy
+      - name: Verify production release
+        id: verify
+        run: node scripts/baseline/proxy-production-release.mjs verify
+      - name: Restore previous application if deployment or verification fails
+        if: failure() && steps.deploy.outcome != 'skipped'
+        run: node scripts/baseline/proxy-production-release.mjs rollback
