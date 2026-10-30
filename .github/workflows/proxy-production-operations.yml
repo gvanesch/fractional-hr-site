@@ -1,0 +1,22 @@
+name: Approved supplementary project operations
+on:
+  push:
+    branches: [migration/d1]
+    paths: [scripts/baseline/proxy-operations-approval.json]
+permissions:
+  contents: read
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+jobs:
+  scoped-operation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --check scripts/baseline/proxy-production-operations.mjs
+      - name: Apply only the approved supplementary project operation
+        run: node scripts/baseline/proxy-production-operations.mjs

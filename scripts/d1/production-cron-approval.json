@@ -1,0 +1,9 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-cron-credential-only",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "worker": "fractional-hr-site",
+  "binding": "CRON_SECRET",
+  "source": "DAILY_SUMMARY_ENDPOINT_SECRET",
+  "confirmedAt": "2026-10-04T11:23:38Z"
+}

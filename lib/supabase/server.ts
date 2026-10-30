@@ -2,11 +2,13 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { getValidatedSupabaseUrl } from "@/lib/supabase/environment";
 
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
+function getRequiredAnonKey(): string {
+  // A literal reference lets Next.js include the public build credential.
+  // A dynamic lookup requires a separate runtime binding and can lose login.
+  const value = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
 
   return value;
@@ -17,7 +19,7 @@ export async function createSupabaseServerClient() {
 
   return createServerClient(
     getValidatedSupabaseUrl(),
-    getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    getRequiredAnonKey(),
     {
       cookies: {
         get(name: string) {

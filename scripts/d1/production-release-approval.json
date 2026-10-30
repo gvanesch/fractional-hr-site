@@ -1,0 +1,10 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-worker-release-flags-off-only",
+  "accountId": "73221f18acc676e4992c89fcbf2b2a8f",
+  "worker": "fractional-hr-site",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "reviewedCommit": "81ab20a2e71ec379f22c0333918ae9160b4fdda0",
+  "expectedDeploymentId": "d7f9a678-a787-48b6-8d29-c0bd74cba241",
+  "confirmedAt": "2026-10-08T13:19:30Z"
+}

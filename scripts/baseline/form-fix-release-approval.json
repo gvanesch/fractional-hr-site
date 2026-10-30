@@ -1,0 +1,11 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-baseline-form-fix-no-email",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "sendEmail": false,
+  "confirmedAt": "2026-10-17T15:58:07Z",
+  "reviewedCommit": "4205b4a96b38c360582ce2c6d866e8ee0eeafe9e",
+  "expectedVersionId": "e67113a7-b23f-43f2-8b2d-e46c39baa697",
+  "qaRunId": 39047173683,
+  "instruction": "Fix late technology checkbox allocations; preserve responses; no automatic retention or deletion; collection planned 21–30 October 2026."
+}

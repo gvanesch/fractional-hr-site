@@ -1,3 +1,5 @@
+> **D1 continuation (28 September 2026):** This register documents the older Supabase environment contract. When `D1_DIAGNOSTIC_SUBMISSIONS_MODE=d1`, the public write middleware validates the D1 mode instead of requiring a Supabase URL. QA D1 still requires `NEXT_PUBLIC_APP_ENV=qa` for the synthetic-data banner, a separate `vanesch-qa` binding, and a deployed Worker with the intended QA flags. See `docs/D1_FINAL_READINESS.md` for the current gate. Do not send production respondents to QA.
+
 # Diagnostic QA environment isolation
 
 ## Required deployment contract

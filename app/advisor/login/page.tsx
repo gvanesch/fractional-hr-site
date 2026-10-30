@@ -1,4 +1,7 @@
 import AdvisorLoginForm from "./AdvisorLoginForm";
+import { redirect } from "next/navigation";
+import { isCloudflareAdvisorAuthEnabled } from "@/lib/cloudflare-access";
+import { advisorReturnPath } from "@/lib/advisor-return-path";
 
 export const metadata = {
   robots: {
@@ -18,7 +21,12 @@ export default async function AdvisorLoginPage({
   searchParams,
 }: AdvisorLoginPageProps) {
   const resolvedSearchParams = await searchParams;
-  const nextPath = resolvedSearchParams.next || "/advisor";
+  const nextPath = advisorReturnPath(resolvedSearchParams.next);
+
+  if (isCloudflareAdvisorAuthEnabled()) {
+    redirect(nextPath);
+  }
+
   const initialError =
     resolvedSearchParams.error === "forbidden"
       ? "Your account is not authorised to access the advisor workspace."

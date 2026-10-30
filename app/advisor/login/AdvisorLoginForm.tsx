@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { advisorReturnPath } from "@/lib/advisor-return-path";
 
 type AdvisorLoginFormProps = {
   nextPath: string;
@@ -72,13 +73,9 @@ export default function AdvisorLoginForm({
         return;
       }
 
-// Force cookie propagation before navigation
-await wait(100);
-
-// Hard reload ensures middleware sees fresh cookies
-window.location.href = nextPath;
-
-      window.location.assign(nextPath);
+      // Force cookie propagation before a hard navigation so middleware sees it.
+      await wait(100);
+      window.location.assign(advisorReturnPath(nextPath));
     } catch {
       setError("Something went wrong during login. Please try again.");
     } finally {

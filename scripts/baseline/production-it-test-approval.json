@@ -1,0 +1,14 @@
+{
+  "approvedBy": "Greg van Esch",
+  "scope": "production-toni-email-and-otp-test",
+  "databaseId": "b81b99d7-4b10-4f7e-a0c1-ada3adf596fc",
+  "recipient": "antoni.serra@team.blue",
+  "campaignId": "55000002-2026-4019-8040-000000000001",
+  "sendEmail": true,
+  "sendBulkEmail": false,
+  "confirmedAt": "2026-10-19T09:59:55.618Z",
+  "reviewedCommit": "c937de43873f0a1726d1a6c1b83aef862f99c95e",
+  "expectedVersionId": "e07bf575-9449-4f08-a375-0d4f3c024791",
+  "qaRunId": 39233703109,
+  "instruction": "Greg requested one production invitation to Toni at this exact address to test receiving an OTP and opening the current questionnaire. Send no OTP until Toni requests it, preserve Greg's test access and all existing data, and leave general campaign invitations disabled."
+}

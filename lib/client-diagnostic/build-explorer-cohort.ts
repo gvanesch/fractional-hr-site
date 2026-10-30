@@ -1,4 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  getD1Database,
+  isD1ClientDiagnosticEnabled,
+} from "@/lib/d1/database";
 import { dimensionDefinitions } from "@/lib/client-diagnostic/question-bank";
 import type { ProjectSummaryResponse } from "@/lib/client-diagnostic/build-project-summary";
 
@@ -433,35 +437,86 @@ export async function buildExplorerCohort({
   availableKeys: AvailableKey[];
   reportingMinN: number;
 }): Promise<ExplorerCohort> {
-  const supabase = createSupabaseAdminClient();
-  const pageSize = 1000;
+  let participants: ParticipantRow[];
+  let dimensionScores: DimensionScoreRow[];
+  let comments: CommentRow[];
 
-  async function loadPagedRows<T>(
-    loadPage: (
-      from: number,
-      to: number,
-    ) => Promise<{ data: T[] | null; error: unknown }>,
-  ): Promise<T[]> {
-    const rows: T[] = [];
+  if (isD1ClientDiagnosticEnabled()) {
+    const database = getD1Database();
+    const [participantResult, dimensionScoreResult, commentResult] =
+      await Promise.all([
+        database
+          .prepare(
+            `SELECT participant_id, questionnaire_type, participant_status,
+              segmentation_values
+            FROM client_participants
+            WHERE project_id = ?
+            ORDER BY participant_id ASC`,
+          )
+          .bind(projectId)
+          .all<Omit<ParticipantRow, "segmentation_values"> & {
+            segmentation_values: string | null;
+          }>(),
+        database
+          .prepare(
+            `SELECT participant_id, questionnaire_type, dimension_key,
+              average_score
+            FROM client_dimension_scores
+            WHERE project_id = ?
+            ORDER BY participant_id ASC, dimension_key ASC`,
+          )
+          .bind(projectId)
+          .all<DimensionScoreRow>(),
+        database
+          .prepare(
+            `SELECT participant_id, questionnaire_type, dimension_key,
+              question_key, comment_text, updated_at
+            FROM client_responses
+            WHERE project_id = ? AND comment_text IS NOT NULL
+            ORDER BY participant_id ASC, question_key ASC`,
+          )
+          .bind(projectId)
+          .all<CommentRow>(),
+      ]);
 
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await loadPage(from, from + pageSize - 1);
+    participants = participantResult.results.map((participant) => ({
+      ...participant,
+      segmentation_values: participant.segmentation_values
+        ? JSON.parse(participant.segmentation_values) as Record<string, string>
+        : null,
+    }));
+    dimensionScores = dimensionScoreResult.results;
+    comments = commentResult.results;
+  } else {
+    const supabase = createSupabaseAdminClient();
+    const pageSize = 1000;
 
-      if (error) {
-        throw error;
-      }
+    async function loadPagedRows<T>(
+      loadPage: (
+        from: number,
+        to: number,
+      ) => Promise<{ data: T[] | null; error: unknown }>,
+    ): Promise<T[]> {
+      const rows: T[] = [];
 
-      const pageRows = data ?? [];
-      rows.push(...pageRows);
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await loadPage(from, from + pageSize - 1);
 
-      if (pageRows.length < pageSize) {
-        return rows;
+        if (error) {
+          throw error;
+        }
+
+        const pageRows = data ?? [];
+        rows.push(...pageRows);
+
+        if (pageRows.length < pageSize) {
+          return rows;
+        }
       }
     }
-  }
 
-  const [participants, dimensionScores, comments] = await Promise.all([
-    loadPagedRows<ParticipantRow>(async (from, to) => {
+    [participants, dimensionScores, comments] = await Promise.all([
+      loadPagedRows<ParticipantRow>(async (from, to) => {
       const { data, error } = await supabase
         .from("client_participants")
         .select(
@@ -473,8 +528,8 @@ export async function buildExplorerCohort({
         .returns<ParticipantRow[]>();
 
       return { data, error };
-    }),
-    loadPagedRows<DimensionScoreRow>(async (from, to) => {
+      }),
+      loadPagedRows<DimensionScoreRow>(async (from, to) => {
       const { data, error } = await supabase
         .from("client_dimension_scores")
         .select(
@@ -487,8 +542,8 @@ export async function buildExplorerCohort({
         .returns<DimensionScoreRow[]>();
 
       return { data, error };
-    }),
-    loadPagedRows<CommentRow>(async (from, to) => {
+      }),
+      loadPagedRows<CommentRow>(async (from, to) => {
       const { data, error } = await supabase
         .from("client_responses")
         .select(
@@ -502,8 +557,9 @@ export async function buildExplorerCohort({
         .returns<CommentRow[]>();
 
       return { data, error };
-    }),
-  ]);
+      }),
+    ]);
+  }
 
   const scoredParticipants = participants.filter(
     (participant) =>

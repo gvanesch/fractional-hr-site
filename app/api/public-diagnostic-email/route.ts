@@ -1,6 +1,11 @@
 import { logSystemEvent } from "@/lib/system-events";
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isD1DiagnosticSubmissionsEnabled } from "@/lib/d1/database";
+import {
+    getD1PublicDiagnosticSubmission,
+    updateD1PublicDiagnosticEmail,
+} from "@/lib/d1/diagnostic-submissions";
 import {
     buildPublicDiagnosticInterpretation,
     calculateDiagnosticResult,
@@ -203,15 +208,32 @@ export async function POST(request: Request) {
 
         const email = normaliseEmail(rawBody.email);
 
-        const supabase = createSupabaseAdminClient();
+        let data: { submission_id: string; answers: unknown } | null = null;
+        const useD1 = isD1DiagnosticSubmissionsEnabled();
 
-        const { data, error } = await supabase
-            .from("diagnostic_submissions")
-            .select("submission_id, answers")
-            .eq("public_token", token)
-            .single();
+        if (useD1) {
+            const d1Submission = await getD1PublicDiagnosticSubmission(token);
 
-        if (error || !data) {
+            if (d1Submission) {
+                data = {
+                    submission_id: d1Submission.submissionId,
+                    answers: d1Submission.answers,
+                };
+            }
+        } else {
+            const supabase = createSupabaseAdminClient();
+            const response = await supabase
+                .from("diagnostic_submissions")
+                .select("submission_id, answers")
+                .eq("public_token", token)
+                .single();
+
+            if (!response.error) {
+                data = response.data;
+            }
+        }
+
+        if (!data) {
             return jsonResponse({ ok: false, error: "Result not found." }, 404);
         }
 
@@ -232,10 +254,22 @@ export async function POST(request: Request) {
         const result = calculateDiagnosticResult(answers);
         const interpretation = buildPublicDiagnosticInterpretation(result);
 
-        await supabase
-            .from("diagnostic_submissions")
-            .update({ email })
-            .eq("public_token", token);
+        if (useD1) {
+            const updated = await updateD1PublicDiagnosticEmail(token, email);
+
+            if (!updated) {
+                return jsonResponse(
+                    { ok: false, error: "Result not found." },
+                    404,
+                );
+            }
+        } else {
+            const supabase = createSupabaseAdminClient();
+            await supabase
+                .from("diagnostic_submissions")
+                .update({ email })
+                .eq("public_token", token);
+        }
 
         const apiKey = process.env.RESEND_API_KEY;
         const fromEmail = process.env.CONTACT_FROM_EMAIL;
