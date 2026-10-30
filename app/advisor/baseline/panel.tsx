@@ -22,6 +22,7 @@ import {
 import "@/app/baseline/start/style.css";
 type Campaign = {
   campaign_id: string;
+  proxyEnabled?: boolean;
   name: string;
   status: string;
   closes_at: string;
@@ -697,6 +698,7 @@ export default function AdminPanel({
               section={tab}
               campaign={id}
               name={current.name}
+              proxyEnabled={current.proxyEnabled}
               people={people}
               refresh={() => refresh()}
             />

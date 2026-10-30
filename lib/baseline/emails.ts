@@ -1,4 +1,5 @@
 import { BASELINE_COMPLETION_GUIDANCE } from "./copy";
+import type { ProxyAttribution } from "./proxy";
 export function baselineSender(configured: string) {
   const address =
     configured.match(/<([^>]+)>/)?.[1]?.trim() ?? configured.trim();
@@ -21,8 +22,8 @@ export function invitationEmail(
   name: string,
   link: string,
   closes: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Preserve the API for versioned invitation callers.
   _version?: string,
+  attribution?: ProxyAttribution | null,
 ) {
   const date = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -38,6 +39,17 @@ export function invitationEmail(
   }).format(new Date(closes));
   const deadline = `${date} at ${time} UTC`;
   const timing = BASELINE_COMPLETION_GUIDANCE;
+  if (attribution) {
+    const { participantName, completerName, referencePeriod } = attribution;
+    const instruction = `Complete this assessment based on ${participantName}’s usual role and work, not your own.`;
+    const title = `Assessment for ${participantName}`;
+    const action = `Complete ${participantName}’s assessment`;
+    return {
+      subject: `team.blue | Complete the baseline on behalf of ${participantName}`,
+      text: `team.blue — Current work baseline\n\nHello ${completerName},\n\nPlease complete this assessment on behalf of ${participantName}. ${instruction}\n\nReference period: ${referencePeriod}.\n\nThis link opens a separate assessment for ${participantName}. Your own assessment remains separate.\n\n1. Open ${participantName}’s assessment using the link below.\n2. Verify access using the code sent to your email address.\n3. Complete the questions by ${deadline}. You can save your progress and return later.\n\nMark anything you cannot confirm and describe current coverage gaps in the final comments.\n\n${timing}\n\n${link}\n\nKeep your link and verification code private.\n\nteam.blue · Current work baseline. Reply to this email for help.`,
+      html: frame(title, `<p>Hello ${escape(completerName)},</p><p>Please complete this assessment <strong>on behalf of ${escape(participantName)}</strong>.</p><p><strong>${escape(instruction)}</strong></p><p>Reference period: ${escape(referencePeriod)}.</p><p>This link opens a separate assessment for ${escape(participantName)}. Your own assessment remains separate.</p><ol style="line-height:1.7"><li>Open ${escape(participantName)}’s assessment.</li><li>Verify access using the code sent to your email address.</li><li>Complete the questions by <strong>${escape(deadline)}</strong>. You can save your progress and return later.</li></ol><p>Mark anything you cannot confirm and describe current coverage gaps in the final comments.</p><p>${timing}</p><p><a href="${escape(link)}" style="display:inline-block;background:#1e6fd9;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px">${escape(action)}</a></p><p style="font-size:13px;color:#475569">Keep your link and verification code private.</p>`),
+    };
+  }
   const subject = "team.blue | Your current work baseline";
   return {
     subject,

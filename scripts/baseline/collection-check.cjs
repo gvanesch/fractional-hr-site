@@ -51,6 +51,8 @@ const root = path.resolve(__dirname, "../..");
     emailModule,
     emailModule.exports,
   );
+  const proxyMode = process.env.BASELINE_PROXY_UI === "1";
+  const proxyContext = proxyMode ? {participantId:"synthetic-proxy-anne",attribution:{participantName:"Synthetic Anne",completerName:"Synthetic Manager",completerEmail:"manager@example.invalid",referencePeriod:"Usual role before leave",note:"Synthetic leave coverage gap"}} : {};
   const browser = await chromium.launch({
     channel: "chromium",
     headless: true,
@@ -109,6 +111,7 @@ const root = path.resolve(__dirname, "../..");
                 status,
                 updatedAt: new Date().toISOString(),
                 campaign: {
+                  ...proxyContext,
                   name: "Synthetic reviewed campaign",
                   privacy:
                     "We use these answers to understand current work and improve support. This is synthetic QA data.",
@@ -118,6 +121,7 @@ const root = path.resolve(__dirname, "../..");
                 },
               };
             if (action === "save" || action === "submit") {
+              if(proxyMode) assert.equal(body.participantId,"synthetic-proxy-anne");
               assert.equal(body.revision, revision);
               stored = body.draft;
               revision++;
@@ -164,6 +168,9 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Verify and continue", exact: true })
           .click();
+        if(proxyMode) await page.getByRole("note",{name:"Completed on behalf"}).getByText("Assessment for Synthetic Anne",{exact:true}).waitFor();
+        const assertProxyNotice = async () => { if (proxyMode) { const note = page.getByRole("note", {name:"Completed on behalf"}); await note.getByText("Assessment for Synthetic Anne", {exact:true}).waitFor(); await note.getByText("Complete this assessment based on Synthetic Anne’s usual role and work, not your own.", {exact:false}).waitFor(); } };
+        await assertProxyNotice();
         const start = page.getByRole("button", {
           name: "Start questionnaire",
           exact: true,
@@ -180,6 +187,7 @@ const root = path.resolve(__dirname, "../..");
           .check();
         assert.equal(await start.isEnabled(), true);
         await start.click();
+        await assertProxyNotice();
         assert.equal(await page.locator(".tb-guidance-note").count(), 1);
         await page
           .getByRole("checkbox", {
@@ -190,6 +198,7 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Continue", exact: true })
           .click();
+        await assertProxyNotice();
         const saveWait = page.waitForResponse((r) =>
           r.url().endsWith("/api/baseline/save"),
         );
@@ -221,6 +230,7 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Continue", exact: true })
           .click();
+        await assertProxyNotice();
         await page
           .getByRole("checkbox", {
             name: "Main contact routes: Work email (your own work address)",
@@ -247,6 +257,7 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Continue", exact: true })
           .click();
+        await assertProxyNotice();
         const info = page.getByRole("button", {
           name: "More information: Do you regularly support one business or more than one?",
           exact: true,
@@ -284,6 +295,7 @@ const root = path.resolve(__dirname, "../..");
         await page
           .getByRole("button", { name: "Review answers", exact: true })
           .click();
+        await assertProxyNotice();
         assert.equal(
           await page.locator("textarea").last().getAttribute("aria-label"),
           closingQuestion,
@@ -318,6 +330,7 @@ const root = path.resolve(__dirname, "../..");
             exact: true,
           })
           .waitFor();
+        if(proxyMode) await page.getByRole("note",{name:"Completed on behalf"}).getByText("Assessment for Synthetic Anne",{exact:true}).waitFor();
         assert.equal(status, "completed");
         assert.equal(stored.answerCopy, true);
         assert.equal(
