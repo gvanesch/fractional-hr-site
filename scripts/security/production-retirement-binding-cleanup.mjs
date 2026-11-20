@@ -56,6 +56,8 @@ export class BindingCleanupError extends Error {
 const check = (condition, message) => { if (!condition) throw new BindingCleanupError(message); };
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const hash = value => fingerprint({ value });
+// Repeated base64 groups exhaust V8's regexp stack for valid multi-MB modules.
+const base64Valid = value => typeof value === "string" && value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value);
 const without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
 function fields(value, allowed, label) {
   check(object(value) && Object.keys(value).every(key => allowed.includes(key)),
@@ -149,7 +151,7 @@ function moduleFingerprint(modules, main) {
   const result = modules.map(item => {
     fields(item, ["name", "content_type", "content_base64"], "Worker module");
     check(typeof item.name === "string" && item.name && !seen.has(item.name) && typeof item.content_type === "string" &&
-      typeof item.content_base64 === "string" && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(item.content_base64),
+      base64Valid(item.content_base64),
     "Worker module content is invalid; cleanup cannot prove code preservation.");
     seen.add(item.name);
     return { name: item.name, contentType: item.content_type, sha256: createHash("sha256").update(Buffer.from(item.content_base64, "base64")).digest("hex") };

@@ -155,6 +155,15 @@ test("cleanup preparation is read-only, pins complete state, and returns only sa
     assert.ok(!JSON.stringify(prepared).includes(forbidden));
 });
 
+test("cleanup verifies a multi-megabyte module without regexp stack exhaustion", async () => {
+  const f = fixture();
+  f.state.prod.versions.get(PROD).beta.modules[0].content_base64 = Buffer.alloc(5_000_000, 97).toString("base64");
+  const checkpoint = await f.prepare();
+  assert.match(checkpoint.production.codeFingerprint, /^[a-f0-9]{64}$/);
+  assert.ok(JSON.stringify(checkpoint).length < 10000);
+  assert.equal(mutations(f.state).length, 0);
+});
+
 test("staging performs one narrowly scoped inactive PATCH; activation is a separate verified call", async () => {
   const f = fixture(), checkpoint = await f.prepare(), initialQa = hash(f.state.qa.settings);
   const staged = await f.stage(checkpoint);
@@ -210,6 +219,8 @@ test("unavailable or unsupported provider metadata fails before the first mutati
     v => { v.beta.unmapped_provider_setting = true; }, v => { v.legacy.resources.unmapped = true; },
     v => { v.legacy.metadata.unmapped = true; },
     v => { v.beta.modules[0].content_base64 = "invalid?"; },
+    v => { v.beta.modules[0].content_base64 = "AA=A"; },
+    v => { v.beta.modules[0].content_base64 = "AAA"; },
     v => { v.beta.assets.new_identity = "unknown"; },
     v => { v.beta.env.DB.database_id = QA.database; },
     v => { v.beta.bindings[0].id = QA.database; },
