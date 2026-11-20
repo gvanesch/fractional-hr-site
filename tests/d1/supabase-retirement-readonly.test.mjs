@@ -3,10 +3,20 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import {
   ACCOUNT, CANDIDATE_REF, TARGETS, MODES, REQUIRED_BINDINGS, REQUIRED_TABLES,
-  SCHEMA_SELECT, PROTECTED_PATHS, inspectSettings, matchesDestination, runAudit, validateContext, failureReport,
+  SCHEMA_SELECT, PROTECTED_PATHS, EXPECTED_ACCESS_AUTH_DOMAIN, inspectSettings, inspectAccessOrganization, inspectWorkerBuildSettings, matchesDestination, runAudit, validateContext, failureReport,
 } from "../../scripts/security/supabase-retirement-readonly.mjs";
 
 const privateValue = "private-value-must-not-be-logged";
+const workerTag = "12345678901234567890123456789012";
+function fixtureBuildSettings({ branch = "migration/d1", previewsEnabled = false } = {}) {
+  return {
+    script_tag: workerTag,
+    git_repository: { provider_type: "github", provider_account_name: "gvanesch", repo_name: "fractional-hr-site", branch, repo_id: privateValue },
+    production_settings: { build_command: privateValue, deploy_command: privateValue, build_token_uuid: privateValue, environment_variables: { SECRET: { value: privateValue, is_secret: true } } },
+    previews_enabled: previewsEnabled,
+    previews_base_config: { environment_variables: { PRIVATE: privateValue } },
+  };
+}
 const env = {
   GITHUB_REPOSITORY: "gvanesch/fractional-hr-site", GITHUB_REF: CANDIDATE_REF,
   CLOUDFLARE_ACCOUNT_ID: ACCOUNT, CLOUDFLARE_API_TOKEN: privateValue,
@@ -40,6 +50,7 @@ function fixture({ targetName = "production", missingMode, accessUnavailable = f
         assert.equal(options.body, undefined);
         if (url.endsWith("/settings")) result = { bindings: fixtureBindings(target).filter(b => b.name !== missingMode) };
         else if (url.endsWith("/secrets")) result = [];
+        else if (url.endsWith("/access/organizations")) result = { auth_domain: EXPECTED_ACCESS_AUTH_DOMAIN, private_configuration: privateValue };
         else if (url.includes("/access/apps?")) {
           if (accessUnavailable) return new Response("forbidden", { status: 403 });
           result = applications ?? target.hosts.map((host, index) => ({
@@ -47,6 +58,7 @@ function fixture({ targetName = "production", missingMode, accessUnavailable = f
           }));
         } else if (url.endsWith("/policies")) result = [{ decision: "allow", include: [{ email: { email: "private-person@example.invalid" } }] }];
         else if (url.endsWith("/workers/scripts")) result = [{ id: target.worker, tag: "12345678901234567890123456789012" }];
+        else if (url.endsWith(`/builds/workers/${workerTag}`)) result = fixtureBuildSettings();
         else if (url.endsWith("/deployments")) result = { deployments: [{ versions: [{ version_id: "00000000-0000-4000-8000-000000000000", percentage: 100 }] }] };
         else assert.fail(`Unexpected API path: ${url}`);
       }
@@ -87,12 +99,134 @@ test("retirement audit reads only schema and metadata and never emits secrets or
     assert.equal(result.scope.emailSent, false);
     assert.equal(result.scope.deploymentsChanged, false);
     assert.equal(result.access.applications[0].audienceMatch, "unverifiable_secret");
+    assert.deepEqual(result.access.organization, { readable: true, authDomain: EXPECTED_ACCESS_AUTH_DOMAIN, expectedAuthDomainMatch: true, failure: null });
     assert.ok(result.publicApiBoundaries.every(route => route.applicationMethodRejected));
     const output = JSON.stringify(result);
     assert.ok(!output.includes(privateValue));
     assert.ok(!output.includes("private-person"));
+    assert.ok(!output.includes(workerTag));
+    assert.equal(result.externalBuilds.checked, targetName === "production");
+    if (targetName === "production") {
+      assert.equal(result.externalBuilds.workerMatched, true);
+      assert.equal(result.externalBuilds.productionBranch, "migration/d1");
+      assert.equal(result.externalBuilds.mainPushMayTriggerBuild, false);
+      assert.ok(f.requests.some(r => r.url.endsWith(`/builds/workers/${workerTag}`)));
+    } else assert.ok(!f.requests.some(r => r.url.includes("/builds/")));
     assert.equal(f.requests.filter(r => r.options.method === "POST").length, 1);
     assert.ok(!f.requests.some(r => /supabase\.co|resend\.com/.test(r.url)));
+  }
+});
+
+test("external build settings report branch risk without leaking commands, variables, tokens or Worker IDs", () => {
+  for (const [branch, previewsEnabled, mainPushMayTriggerBuild] of [["main", false, true], ["migration/d1", true, true], ["migration/d1", false, false]]) {
+    const report = inspectWorkerBuildSettings(fixtureBuildSettings({ branch, previewsEnabled }), workerTag);
+    assert.equal(report.readable, true);
+    assert.equal(report.repositoryMatches, true);
+    assert.equal(report.workerMatched, true);
+    assert.equal(report.productionBranch, branch);
+    assert.equal(report.mainPushMayTriggerBuild, mainPushMayTriggerBuild);
+    assert.ok(!JSON.stringify(report).includes(privateValue));
+    assert.ok(!JSON.stringify(report).includes(workerTag));
+  }
+  const unknownRepository = fixtureBuildSettings();
+  delete unknownRepository.git_repository.provider_account_name;
+  assert.equal(inspectWorkerBuildSettings(unknownRepository, workerTag).mainPushMayTriggerBuild, null);
+  const wrongWorker = { ...fixtureBuildSettings(), script_tag: "00000000000000000000000000000000" };
+  assert.equal(inspectWorkerBuildSettings(wrongWorker, workerTag).workerMatched, false);
+  assert.equal(inspectWorkerBuildSettings(wrongWorker, workerTag).mainPushMayTriggerBuild, null);
+});
+
+test("unavailable or unrecognized external build configuration stays unknown and does not hide the rest of the audit", async () => {
+  const cases = [
+    { response: () => new Response(privateValue, { status: 403 }), code: "http_failure", httpStatus: 403 },
+    { response: () => new Response(privateValue, { status: 404 }), code: "http_failure", httpStatus: 404 },
+    { response: () => { throw new Error(privateValue); }, code: "transport_failure", httpStatus: null },
+    { response: () => new Response(privateValue, { status: 200 }), code: "invalid_json", httpStatus: 200 },
+    { response: () => Response.json({ success: true, result: { environment_variables: privateValue } }), code: "invalid_build_configuration", httpStatus: null },
+  ];
+  for (const item of cases) {
+    const f = fixture();
+    const fetchImpl = async (url, options) => String(url).includes("/builds/workers/") ? item.response() : f.fetchImpl(url, options);
+    const result = await runAudit({ env, fetchImpl });
+    assert.equal(result.externalBuilds.readable, false);
+    assert.equal(result.externalBuilds.configurationFound, null, "a denied or unsupported read is not proof that no build integration exists");
+    assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null);
+    assert.deepEqual(result.externalBuilds.failure, { code: item.code, httpStatus: item.httpStatus });
+    assert.equal(result.health.d1Connected, true);
+    assert.equal(result.deployedVersions.length, 1);
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+  }
+});
+
+test("build inspection never guesses a Worker tag or queries build configuration after an identity failure", async () => {
+  const f = fixture();
+  let buildRequested = false;
+  const fetchImpl = async (url, options) => {
+    if (String(url).endsWith("/workers/scripts")) return Response.json({ success: true, result: [{ id: TARGETS.production.worker, tag: "not-a-worker-tag" }] });
+    if (String(url).includes("/builds/workers/")) buildRequested = true;
+    return f.fetchImpl(url, options);
+  };
+  const result = await runAudit({ env, fetchImpl });
+  assert.equal(buildRequested, false);
+  assert.equal(result.externalBuilds.workerMatched, null);
+  assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null);
+  assert.equal(result.externalBuilds.failure.code, "worker_identity_unverified");
+});
+
+test("Zero Trust team parser normalizes only safe hostnames and never echoes other configuration", () => {
+  for (const auth_domain of [EXPECTED_ACCESS_AUTH_DOMAIN, `  HTTPS://${EXPECTED_ACCESS_AUTH_DOMAIN.toUpperCase()}/  `]) {
+    assert.deepEqual(inspectAccessOrganization({ auth_domain, identity_provider: privateValue }), {
+      readable: true, authDomain: EXPECTED_ACCESS_AUTH_DOMAIN, expectedAuthDomainMatch: true, failure: null,
+    });
+  }
+  for (const auth_domain of [null, {}, "", `http://${EXPECTED_ACCESS_AUTH_DOMAIN}`, `${EXPECTED_ACCESS_AUTH_DOMAIN}?token=${privateValue}`,
+    `${privateValue}@${EXPECTED_ACCESS_AUTH_DOMAIN}`, `${EXPECTED_ACCESS_AUTH_DOMAIN}/private`, `${EXPECTED_ACCESS_AUTH_DOMAIN}.evil.invalid`]) {
+    const result = inspectAccessOrganization({ auth_domain, private_configuration: privateValue });
+    assert.equal(result.readable, false);
+    assert.equal(result.authDomain, null);
+    assert.equal(result.expectedAuthDomainMatch, null);
+    assert.equal(result.failure.code, "invalid_auth_domain");
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+  }
+});
+
+test("a different Zero Trust team is distinguished from an empty app inventory", async () => {
+  const f = fixture({ applications: [] });
+  const fetchImpl = async (url, options) => String(url).endsWith("/access/organizations")
+    ? Response.json({ success: true, result: { auth_domain: "different-team.cloudflareaccess.com", secret: privateValue } })
+    : f.fetchImpl(url, options);
+  const result = await runAudit({ env, fetchImpl });
+  assert.equal(result.access.organization.readable, true);
+  assert.equal(result.access.organization.authDomain, "different-team.cloudflareaccess.com");
+  assert.equal(result.access.organization.expectedAuthDomainMatch, false);
+  assert.equal(result.access.diagnostics.totalApplicationsRead, 0);
+  assert.equal(result.readOnlyChecksPassed, false);
+  assert.ok(result.blockers.some(message => message.includes("does not match")));
+  assert.ok(!JSON.stringify(result).includes(privateValue));
+});
+
+test("Zero Trust identity read failures remain explicit and sanitized while other audit evidence completes", async () => {
+  const cases = [
+    { response: () => new Response(privateValue, { status: 403 }), code: "http_failure", httpStatus: 403 },
+    { response: () => { throw new Error(privateValue); }, code: "transport_failure", httpStatus: null },
+    { response: () => new Response(privateValue, { status: 200 }), code: "invalid_json", httpStatus: 200 },
+    { response: () => Response.json({ success: false, errors: [privateValue] }), code: "provider_rejected", httpStatus: 200 },
+    { response: () => Response.json({ success: true, result: { auth_domain: privateValue } }), code: "invalid_auth_domain", httpStatus: null },
+  ];
+  for (const item of cases) {
+    const f = fixture();
+    const fetchImpl = async (url, options) => String(url).endsWith("/access/organizations") ? item.response() : f.fetchImpl(url, options);
+    const result = await runAudit({ env, fetchImpl });
+    assert.deepEqual(result.access.organization, {
+      readable: false, authDomain: null, expectedAuthDomainMatch: null,
+      failure: { code: item.code, httpStatus: item.httpStatus },
+    });
+    assert.equal(result.readOnlyChecksPassed, false);
+    assert.equal(result.health.d1Connected, true);
+    assert.equal(result.deployedVersions.length, 1);
+    assert.equal(result.access.inventoryComplete, true);
+    assert.ok(result.blockers.some(message => message.includes("organization identity is not readable")));
+    assert.ok(!JSON.stringify(result).includes(privateValue));
   }
 });
 

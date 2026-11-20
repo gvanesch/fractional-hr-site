@@ -53,6 +53,7 @@ type SubmissionRow = {
   score: number | null;
   band: string | null;
   advisor_brief: JsonValue;
+  completed_at: string | null;
   contact_submitted_at: string | null;
 };
 
@@ -107,6 +108,7 @@ type DerivedResult = {
     industry: string | null;
     role: string | null;
     countryRegion: string | null;
+    completedAt: string | null;
     contactSubmittedAt: string | null;
   };
   diagnostic: {
@@ -530,6 +532,7 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
           score,
           band,
           advisor_brief,
+          completed_at,
           contact_submitted_at
         FROM diagnostic_submissions
         WHERE submission_id = ?
@@ -576,6 +579,7 @@ async function getSubmission(submissionId: string): Promise<SubmissionRow | null
         score,
         band,
         advisor_brief,
+        completed_at,
         contact_submitted_at
       `,
     )
@@ -699,6 +703,7 @@ async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
       industry: submission.industry,
       role: submission.role,
       countryRegion: submission.country_region,
+      completedAt: submission.completed_at,
       contactSubmittedAt: submission.contact_submitted_at,
     },
     diagnostic: result
@@ -740,9 +745,11 @@ async function getSubmissionView(submissionId: string): Promise<DerivedResult> {
 function MetricCard({
   label,
   value,
+  secondary,
 }: {
   label: string;
   value: string;
+  secondary?: string;
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
@@ -752,6 +759,9 @@ function MetricCard({
       <p className="mt-2 break-words text-lg font-semibold text-slate-900">
         {value}
       </p>
+      {secondary ? (
+        <p className="mt-2 text-sm leading-6 text-slate-600">{secondary}</p>
+      ) : null}
     </div>
   );
 }
@@ -1035,8 +1045,15 @@ export default async function AdvisorSubmissionPage({
                     value={submission.submissionId}
                   />
                   <MetricCard
-                    label="Submitted"
-                    value={formatSubmittedAt(submission.contactSubmittedAt)}
+                    label={result ? "Health Check completed" : "Enquiry submitted"}
+                    value={formatSubmittedAt(
+                      result ? submission.completedAt : submission.contactSubmittedAt,
+                    )}
+                    secondary={
+                      result && submission.contactSubmittedAt
+                        ? `Enquiry submitted: ${formatSubmittedAt(submission.contactSubmittedAt)}`
+                        : undefined
+                    }
                   />
                   <MetricCard
                     label="Profile"

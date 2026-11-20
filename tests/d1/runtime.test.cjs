@@ -1046,3 +1046,63 @@ test("Advisor server pages read Health Checks, CRM and project spaces entirely f
     assert.equal(h.state.supabaseCalls, 0);
   } finally { h.sqlite.close(); }
 });
+
+test("Advisor Health Check detail keeps completion and later enquiry dates distinct", async () => {
+  const h = harness();
+  try {
+    const input = healthCheckInput(h);
+    const completed = await h.route("diagnostic-complete", input);
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    const submissionId = completed.body.submissionId;
+    const completedAt = "2026-11-20T09:24:00.000Z";
+    const enquiredAt = "2026-11-21T15:42:00.000Z";
+    h.sqlite.prepare("UPDATE diagnostic_submissions SET completed_at = ? WHERE submission_id = ?")
+      .run(completedAt, submissionId);
+    const format = (value) => new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "medium", timeStyle: "short",
+    }).format(new Date(value));
+    const page = h.load("app/advisor/[submissionId]/page.tsx").default;
+    async function readCard(id, label) {
+      const tree = await page({ params: Promise.resolve({ submissionId: id }) });
+      function find(node) {
+        if (Array.isArray(node)) return node.map(find).find(Boolean);
+        if (!node || typeof node !== "object") return undefined;
+        if (node.props?.label === label) return node.props;
+        return find(node.props?.children);
+      }
+      const card = find(tree);
+      assert.ok(card, `Expected visible ${label} date card`);
+      return card;
+    }
+
+    const anonymous = await readCard(submissionId, "Health Check completed");
+    assert.equal(anonymous.value, format(completedAt));
+    assert.equal(anonymous.secondary, undefined);
+
+    const enquiry = await h.route("contact", {
+      ...input, submissionId, diagnosticAnswers: input.answers,
+      name: "Synthetic Contact", email: "contact@example.invalid",
+      message: "Please discuss this synthetic Health Check result.",
+      source: "diagnostic-interpretation",
+    });
+    assert.equal(enquiry.status, 200, JSON.stringify(enquiry.body));
+    h.sqlite.prepare("UPDATE diagnostic_submissions SET contact_submitted_at = ? WHERE submission_id = ?")
+      .run(enquiredAt, submissionId);
+    const withEnquiry = await readCard(submissionId, "Health Check completed");
+    assert.equal(withEnquiry.value, format(completedAt));
+    assert.equal(withEnquiry.secondary, `Enquiry submitted: ${format(enquiredAt)}`);
+
+    const contactOnly = await h.route("contact", {
+      name: "Synthetic Enquiry", email: "enquiry@example.invalid",
+      message: "An ordinary website enquiry without a Health Check.",
+    });
+    assert.equal(contactOnly.status, 200, JSON.stringify(contactOnly.body));
+    const row = h.sqlite.prepare("SELECT * FROM diagnostic_submissions WHERE contact_email = ?")
+      .get("enquiry@example.invalid");
+    assert.equal(row.completed_at, null);
+    const ordinaryEnquiry = await readCard(row.submission_id, "Enquiry submitted");
+    assert.equal(ordinaryEnquiry.value, format(row.contact_submitted_at));
+    assert.equal(ordinaryEnquiry.secondary, undefined);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});

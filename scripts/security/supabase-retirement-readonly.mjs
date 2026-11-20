@@ -3,6 +3,7 @@
 import { pathToFileURL } from "node:url";
 
 export const ACCOUNT = "73221f18acc676e4992c89fcbf2b2a8f";
+export const EXPECTED_ACCESS_AUTH_DOMAIN = "gregvanesch.cloudflareaccess.com";
 export const CANDIDATE_REF = "refs/heads/chore/supabase-retirement-2026-11";
 export const TARGETS = Object.freeze({
   production: {
@@ -102,6 +103,65 @@ export function inspectSettings(settings, secrets, target) {
   return { bindings, report };
 }
 
+function accessOrganizationFailure(code, httpStatus = null) {
+  return {
+    readable: false, authDomain: null, expectedAuthDomainMatch: null,
+    failure: { code, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null },
+  };
+}
+
+export function inspectAccessOrganization(organization) {
+  // Emit only a normalized Cloudflare team hostname. Never return the rest of
+  // the organization response, a malformed URL, query, or identity-provider data.
+  const value = typeof organization?.auth_domain === "string" ? organization.auth_domain.trim().toLowerCase() : "";
+  const match = /^(?:https:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com)\/?$/.exec(value);
+  if (!match) return accessOrganizationFailure("invalid_auth_domain");
+  return {
+    readable: true, authDomain: match[1],
+    expectedAuthDomainMatch: match[1] === EXPECTED_ACCESS_AUTH_DOMAIN,
+    failure: null,
+  };
+}
+
+function workerBuildFailure(code, httpStatus = null, workerMatched = null) {
+  return {
+    checked: true, workerMatched, readable: false, configurationFound: null,
+    repositoryMatches: null, productionBranch: null, previewsEnabled: null,
+    mainPushMayTriggerBuild: null,
+    failure: { code, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null },
+  };
+}
+
+export function inspectWorkerBuildSettings(configuration, workerId) {
+  // Never emit build commands, environment variables, repository/account IDs,
+  // build tokens or the immutable Worker tag. Only the connected branch and
+  // booleans relevant to a narrow main-branch workflow update are reported.
+  if (!configuration || typeof configuration !== "object" || Array.isArray(configuration))
+    return workerBuildFailure("invalid_build_configuration", null, true);
+  if (configuration.script_tag != null && configuration.script_tag !== workerId)
+    return workerBuildFailure("build_worker_mismatch", null, false);
+  const repository = configuration.git_repository;
+  const branch = repository?.branch;
+  if (!repository || typeof repository !== "object" || Array.isArray(repository) ||
+      typeof branch !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$/.test(branch) ||
+      typeof configuration.previews_enabled !== "boolean" ||
+      !configuration.production_settings || typeof configuration.production_settings !== "object" || Array.isArray(configuration.production_settings))
+    return workerBuildFailure("invalid_build_configuration", null, true);
+  const repositoryIdentified = typeof repository.provider_type === "string" &&
+    typeof repository.provider_account_name === "string" && typeof repository.repo_name === "string";
+  const repositoryMatches = repositoryIdentified
+    ? repository.provider_type === "github" && repository.provider_account_name.toLowerCase() === "gvanesch" && repository.repo_name.toLowerCase() === "fractional-hr-site"
+    : null;
+  return {
+    checked: true, workerMatched: true, readable: true, configurationFound: true,
+    repositoryMatches, productionBranch: branch, previewsEnabled: configuration.previews_enabled,
+    // Conservatively ignore watch-path exclusions: they can narrow a trigger,
+    // but a connected main or enabled preview branch may still execute code.
+    mainPushMayTriggerBuild: repositoryMatches === null ? null : repositoryMatches && (branch === "main" || configuration.previews_enabled),
+    failure: null,
+  };
+}
+
 // Conservative inventory matching, not a replacement for Cloudflare's policy
 // evaluation. More-specific overlapping apps and policy selectors need review.
 // https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/
@@ -190,6 +250,22 @@ export async function runAudit({ env = process.env, targetName = "production", f
   const tableNames = new Set(schema.result[0].results.map(row => row.name));
   const schemaReport = Object.fromEntries(REQUIRED_TABLES.map(name => [name, tableNames.has(name)]));
 
+  // A successful but empty Access app list can result from scoped visibility.
+  // Check which Zero Trust team this account exposes without printing its wider
+  // configuration. This independent optional read must not hide other evidence.
+  let accessOrganization;
+  try {
+    const organization = await api("access/organizations", { optional: true, operation: "access_organization" });
+    accessOrganization = organization.unavailable
+      ? accessOrganizationFailure(organization.code, organization.status)
+      : inspectAccessOrganization(organization.result);
+  } catch (error) {
+    accessOrganization = accessOrganizationFailure(
+      error instanceof AuditError ? error.code : "unexpected_failure",
+      error instanceof AuditError ? error.httpStatus : null,
+    );
+  }
+
   const allApps = [];
   let accessReadable = true, accessFailure = null, pagesFetched = 0, reportedTotal = null;
   for (let page = 1; page <= 20; page++) {
@@ -204,15 +280,42 @@ export async function runAudit({ env = process.env, targetName = "production", f
       reportedTotal !== null ? allApps.length >= reportedTotal : result.result.length < 100) break;
     if (page === 20) accessReadable = false;
   }
-  // Worker destinations use an immutable Worker ID, not its display name.
-  // Read the script tag only when such a destination needs resolving; never emit
-  // the wider worker inventory or other applications' domains/identities.
+  // Worker Access destinations and Workers Builds use an immutable Worker tag,
+  // obtained from the documented Scripts API. Never emit the wider inventory.
+  // https://developers.cloudflare.com/workers/ci-cd/builds/api-reference/
   let workerId = null, workerIdentityReadable = true;
-  if (allApps.some(app => appDestinations(app).some(destination => destination.type === "worker"))) {
-    const workers = await api("workers/scripts", { optional: true, operation: "worker_identity_inventory" });
-    const worker = Array.isArray(workers.result) ? workers.result.find(item => item.id === target.worker) : null;
-    if (typeof worker?.tag === "string" && /^[a-f\d]{32}$/i.test(worker.tag)) workerId = worker.tag;
-    else workerIdentityReadable = false;
+  let workerIdentityFailure = null;
+  if (targetName === "production" || allApps.some(app => appDestinations(app).some(destination => destination.type === "worker"))) {
+    try {
+      const workers = await api("workers/scripts", { optional: true, operation: "worker_identity_inventory" });
+      const matches = Array.isArray(workers.result) ? workers.result.filter(item => item.id === target.worker) : [];
+      const worker = matches.length === 1 ? matches[0] : null;
+      if (!workers.unavailable && typeof worker?.tag === "string" && /^[a-f\d]{32}$/i.test(worker.tag)) workerId = worker.tag;
+      else {
+        workerIdentityReadable = false;
+        workerIdentityFailure = { code: workers.unavailable ? workers.code : "worker_identity_unverified", httpStatus: workers.status ?? null };
+      }
+    } catch (error) {
+      workerIdentityReadable = false;
+      workerIdentityFailure = { code: error instanceof AuditError ? error.code : "unexpected_failure", httpStatus: error instanceof AuditError ? error.httpStatus : null };
+    }
+  }
+  let externalBuilds = { checked: false };
+  if (targetName === "production") {
+    if (!workerId) externalBuilds = workerBuildFailure(workerIdentityFailure?.code ?? "worker_identity_unverified", workerIdentityFailure?.httpStatus);
+    else {
+      try {
+        const builds = await api(`builds/workers/${workerId}`, { optional: true, operation: "worker_build_configuration" });
+        externalBuilds = builds.unavailable
+          ? workerBuildFailure(builds.code, builds.status, true)
+          : inspectWorkerBuildSettings(builds.result, workerId);
+      } catch (error) {
+        externalBuilds = workerBuildFailure(
+          error instanceof AuditError ? error.code : "unexpected_failure",
+          error instanceof AuditError ? error.httpStatus : null, true,
+        );
+      }
+    }
   }
   const knownDestinationTypes = ["public", "private", "worker", "preview_worker", "all_workers", "all_preview_workers", "via_mcp_server_portal"];
   const diagnostics = {
@@ -255,6 +358,7 @@ export async function runAudit({ env = process.env, targetName = "production", f
   const apps = allApps.filter(app => appDestinations(app).some(destination =>
     target.hosts.some(host => destinationTargetsHost(destination, target, host, workerId))));
   const access = {
+    organization: accessOrganization,
     inventoryComplete: accessReadable, inventoryFailure: accessFailure, parsingComplete,
     coverageStatus: accessReadable && parsingComplete ? "evaluated_candidate_coverage" : "unknown",
     matchingApplicationCount: apps.length, diagnostics, applications: [], routes: [],
@@ -331,6 +435,8 @@ export async function runAudit({ env = process.env, targetName = "production", f
   if (!config.accessAuthEnabled) blockers.push("Advisor authentication still requires a non-Access path.");
   if (Object.values(config.requiredBindings).some(v => !v)) blockers.push("One or more required service/auth bindings are missing.");
   if (Object.values(schemaReport).some(v => !v)) blockers.push("One or more required D1 tables are missing.");
+  if (!access.organization.readable) blockers.push("Zero Trust organization identity is not readable with this credential.");
+  else if (!access.organization.expectedAuthDomainMatch) blockers.push("Zero Trust organization does not match the observed QA sign-in team.");
   if (!access.inventoryComplete) blockers.push("Access application inventory is not readable with this credential.");
   if (!access.parsingComplete) blockers.push("Some Access destinations could not be interpreted; route coverage remains unknown.");
   if (access.coverageStatus !== "unknown" && access.routes.some(route => !route.candidateApplicationIndexes.length))
@@ -342,7 +448,7 @@ export async function runAudit({ env = process.env, targetName = "production", f
   if (publicApiBoundaries.some(route => !route.applicationMethodRejected)) blockers.push("A public participant/Health Check or cron API has an unexpected unauthenticated GET boundary.");
   return {
     target: targetName, observedAt: new Date().toISOString(), config, schema: schemaReport,
-    access, health, publicPages, publicApiBoundaries, deployedVersions, blockers,
+    access, externalBuilds, health, publicPages, publicApiBoundaries, deployedVersions, blockers,
     readOnlyChecksPassed: blockers.length === 0,
     scope: {
       dataWrites: false, emailSent: false, deploymentsChanged: false, clientRecordsRead: false,

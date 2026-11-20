@@ -32,7 +32,9 @@ jobs:
           DAILY_SUMMARY_ENDPOINT_SECRET: ${{ secrets.DAILY_SUMMARY_ENDPOINT_SECRET }}
           FORCE_SEND: ${{ inputs.force }}
         run: |
-          ADVISOR_ACTION_DIGEST_URL="https://www.vanesch.uk/api/advisor-daily-action-digest"
+          # Keep the scheduler outside the Cloudflare Access advisor API paths.
+          # This alias uses the same handler and CRON_SECRET bearer authorization.
+          ADVISOR_ACTION_DIGEST_URL="https://www.vanesch.uk/api/cron/advisor-daily-action-digest"
 
           if [ "$FORCE_SEND" = "true" ]; then
             ADVISOR_ACTION_DIGEST_URL="${ADVISOR_ACTION_DIGEST_URL}?force=true"
