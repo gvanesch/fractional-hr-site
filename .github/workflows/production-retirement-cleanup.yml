@@ -1,0 +1,49 @@
+name: Remove accepted production Supabase bindings
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+    paths:
+      - scripts/security/production-retirement-cleanup-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify the request and completed acceptance before credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+        run: node scripts/security/production-retirement-cleanup-run.mjs validate
+      - name: Check guarded cleanup and recovery behavior without credentials
+        run: node --test tests/d1/production-retirement-cleanup-run.test.mjs tests/d1/production-retirement-binding-cleanup.test.mjs
+      - name: Stage and activate the single accepted binding cleanup
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}
+        run: node scripts/security/production-retirement-cleanup-run.mjs execute
+      - name: Retain sanitized cleanup and recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-retirement-binding-cleanup
+          path: production-retirement-cleanup-report.json
+          if-no-files-found: ignore
+          retention-days: 14
