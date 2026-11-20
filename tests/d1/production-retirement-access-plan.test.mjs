@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   AccessPlanError, PRODUCTION_DESTINATIONS, buildAccessPlan, createAccessReader,
-  inspectIdentityPolicy, inspectConnectionRules, readCompleteList, readProductionAccessPlan,
+  inspectIdentityPolicy, inspectConnectionRules, readCompleteList, readProductionAccessPlan, inspectRecordedPolicyMetadata,
 } from "../../scripts/security/production-retirement-access-plan.mjs";
 import { ACCOUNT, CANDIDATE_REF, EXPECTED_ACCESS_AUTH_DOMAIN, TARGETS } from "../../scripts/security/supabase-retirement-readonly.mjs";
 
@@ -166,4 +166,25 @@ test("planner workflow supplies token only to the read step and includes no depl
   const preflightStep = workflow.split("      - name: Read actual production runtime and release eligibility\n")[1].split("      - name:")[0];
   assert.equal((preflightStep.match(/secrets\.CLOUDFLARE_API_TOKEN/g) ?? []).length, 1);
   assert.equal(preflightStep.includes("CLOUDFLARE_RETIREMENT_AUDIT_TOKEN"), false);
+});
+
+test("recorded policy diagnosis is one fixed GET and exposes only field shapes and exact identity assertions", async () => {
+  const id = "f0f42710-0b34-4dd8-b44a-c63c308fa6de";
+  const policy = { id, uid: id, name: "Van Esch production advisor - Greg [retirement-20261120-production-01]",
+    include: [{ email: { email: "private-selector@example.invalid" } }], private_extension: "private-provider-value", app_count: 0, reusable: true };
+  let calls = 0;
+  const fetchImpl = async (url, options) => {
+    calls++;
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/access/policies/${id}`);
+    assert.equal(options.method, "GET"); assert.equal(options.redirect, "error"); assert.equal(options.body, undefined);
+    return response({ success: true, result: policy });
+  };
+  const report = await inspectRecordedPolicyMetadata({ env, fetchImpl });
+  assert.equal(calls, 1); assert.equal(report.appCount, 0);
+  assert.equal(report.fields.uid.uuidAliasMatchesId, true);
+  assert.deepEqual(report.fields.include, { kind: "array", count: 1 });
+  assert.ok(!JSON.stringify(report).includes("private-provider-value"));
+  assert.ok(!JSON.stringify(report).includes("private-selector@example.invalid"));
+  policy.name = "unowned-policy";
+  await assert.rejects(inspectRecordedPolicyMetadata({ env, fetchImpl }), /recorded_policy_identity_mismatch/);
 });

@@ -609,7 +609,7 @@ test("Access credential is confined to reviewed reads and the request-gated Acce
   assert.ok(!beforePlan.includes(tokenName));
   const [planStep, ...laterSteps] = planAndLater.split("      - name:");
   assert.equal(planStep.match(new RegExp(`${tokenName}:`, "g")).length, 1);
-  assert.ok(planStep.includes("run: node scripts/security/production-retirement-access-plan.mjs > production-retirement-access-plan-report.json"));
+  assert.ok(planStep.includes("run: node scripts/security/production-retirement-access-plan.mjs --inspect-owned-policy > production-retirement-access-plan-report.json"));
   assert.ok(!laterSteps.join("\n").includes(tokenName));
   assert.ok(!/wrangler|npm (?:run )?(?:build|deploy)|run:.*production-retirement-release\.mjs/.test(plan));
   const cutover = readFileSync(new URL("production-retirement-cutover.yml", workflows), "utf8");

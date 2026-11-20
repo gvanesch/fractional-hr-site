@@ -33,7 +33,8 @@ export function validatePlanContext(env) {
 export function createAccessReader(env, fetchImpl = fetch) {
   validatePlanContext(env);
   return async function get(path) {
-    requireCondition(/^(?:access\/organizations|access\/(?:apps|identity_providers)\?page=[1-5]&per_page=100|access\/apps\/[a-f\d-]{36}\/policies\?page=[1-5]&per_page=100)$/.test(path), "unsupported_read_endpoint");
+    requireCondition(/^(?:access\/organizations|access\/(?:apps|identity_providers)\?page=[1-5]&per_page=100|access\/apps\/[a-f\d-]{36}\/policies\?page=[1-5]&per_page=100)$/.test(path) ||
+      path === "access/policies/f0f42710-0b34-4dd8-b44a-c63c308fa6de", "unsupported_read_endpoint");
     let response;
     try { response = await fetchImpl(API + path, {
       method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
@@ -284,9 +285,30 @@ export async function readProductionAccessPlan({ env = process.env, fetchImpl = 
   return buildAccessPlan({ organization: org.result, apps, policies, identityProviders });
 }
 
+// GET-only diagnosis of the policy returned by the recorded first cutover
+// attempt. Emit field names/types and equality assertions, never field strings,
+// selectors or provider configuration. This does not resume the mutation.
+export async function inspectRecordedPolicyMetadata({ env = process.env, fetchImpl = fetch } = {}) {
+  const id = "f0f42710-0b34-4dd8-b44a-c63c308fa6de";
+  const body = await createAccessReader(env, fetchImpl)(`access/policies/${id}`);
+  const policy = body.result;
+  requireCondition(policy && typeof policy === "object" && !Array.isArray(policy) && policy.id === id &&
+    policy.name === `${PRODUCTION_POLICY_NAME} [retirement-20261120-production-01]`, "recorded_policy_identity_mismatch");
+  const fields = {};
+  for (const [name, value] of Object.entries(policy)) {
+    requireCondition(/^[a-z_]{1,64}$/.test(name), "unsupported_policy_metadata_field_name");
+    fields[name] = value == null ? { kind: "null" } : Array.isArray(value) ? { kind: "array", count: value.length } :
+      typeof value === "string" ? { kind: "string", length: value.length, uuidAliasMatchesId: UUID.test(value) ? value === id : null } :
+      typeof value === "boolean" ? { kind: "boolean", value } : { kind: typeof value };
+  }
+  return { readOnly: true, mutationAttempted: false, policyId: id, recordedRequestIdentityMatches: true,
+    appCount: Number.isSafeInteger(policy.app_count) ? policy.app_count : null, fields };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const plan = await readProductionAccessPlan();
+    if (process.argv.includes("--inspect-owned-policy")) plan.report.recordedPolicyMetadata = await inspectRecordedPolicyMetadata();
     console.log(JSON.stringify(plan.report, null, 2));
     if (!plan.report.planReady) process.exitCode = 1;
   } catch (error) {
