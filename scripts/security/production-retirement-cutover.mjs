@@ -10,7 +10,7 @@ import {
   REQUEST_PATH, CONFIG_PATH, ProductionReleaseError, validateProductionRequest,
   readProductionEligibility, prepareProductionRelease, deployProductionRelease, uploadProductionCandidate,
 } from "./production-retirement-release.mjs";
-import { createProductionAccess, inspectProductionAccess, AccessApplyError, accessApplyFailure } from "./production-retirement-access-apply.mjs";
+import { createProductionAccess, resumeProductionAccess, inspectProductionAccess, AccessApplyError, accessApplyFailure } from "./production-retirement-access-apply.mjs";
 
 export const PREFLIGHT_PATH = "production-retirement-preflight-checkpoint.json";
 export const BUILD_PATH = "production-retirement-build-checkpoint.json";
@@ -65,6 +65,7 @@ export async function runProductionCutover({ request, env, git, repositoryConfig
   getBuiltFingerprint = fingerprintBuiltWorker, fetchImpl = fetch, now = Date.now(),
   onEvidence = async () => {}, saveAccessCheckpoint = async () => {}, writeConfig,
   eligibilityImpl = readProductionEligibility, createAccessImpl = createProductionAccess,
+  resumeAccessImpl = resumeProductionAccess,
   inspectAccessImpl = inspectProductionAccess, prepareImpl = prepareProductionRelease,
   deployImpl = deployProductionRelease, uploadImpl = uploadProductionCandidate }) {
   validateProductionRequest(request, env, git, now);
@@ -85,12 +86,12 @@ export async function runProductionCutover({ request, env, git, repositoryConfig
   await verifyWorkerLease();
   await onEvidence({ stage: "verified_build_and_preflight", requestId: request.requestId, sourceCommit: git.head,
     buildFingerprint: built.build.fingerprint, priorProductionVersion: request.expectedProductionVersionId, qaVersion: request.expectedQaVersionId });
-  const accessResult = await createAccessImpl({ request, env, git, verifyWorkerLease, fetchImpl, now,
+  const accessResult = await (request.accessRecovery ? resumeAccessImpl : createAccessImpl)({ request, env, git, verifyWorkerLease, fetchImpl, now,
     onEvidence: report => onEvidence({ stage: "access", access: report }) });
   const access = accessResult?.checkpoint;
   check(access && typeof access === "object", "Access creation did not return its verified reconciliation checkpoint.");
   await saveAccessCheckpoint(access);
-  const inspectAccess = () => inspectAccessImpl({ request, env, checkpoint: access, fetchImpl });
+  const inspectAccess = () => inspectAccessImpl({ request: request.accessRecovery?.originalRequest ?? request, env, checkpoint: access, fetchImpl });
   const prepared = await prepareImpl({ request, env, git, repositoryConfig, inspectAccess, fetchImpl, now });
   await writeConfig(prepared.config);
   check(fingerprint(await getBuiltFingerprint()) === fingerprint(built.build), "The built Worker changed after Access creation; activation stopped.");

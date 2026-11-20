@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AccessApplyError, accessApplyFailure, createAccessIntent, createProductionAccess,
-  inspectProductionAccess, reconcileProductionAccess,
+  inspectProductionAccess, reconcileProductionAccess, resumeProductionAccess,
 } from "../../scripts/security/production-retirement-access-apply.mjs";
 import { accessFingerprint, buildAccessPlan, PRODUCTION_APP_NAME, PRODUCTION_POLICY_NAME }
   from "../../scripts/security/production-retirement-access-plan.mjs";
@@ -82,12 +82,12 @@ function fixture() {
       if (path === "access/policies") {
         assert.equal(state.evidence.at(-1)?.stage, "policy_create_requested_outcome_unknown");
         assert.equal(policy(), undefined);
-        created = { ...clone(call.body), id: NEW_POLICY, reusable: true, app_count: 0, created_at: new Date(NOW).toISOString() };
+        created = { ...clone(call.body), id: NEW_POLICY, uid: NEW_POLICY, reusable: true, app_count: 0, created_at: new Date(NOW).toISOString() };
         state.reusablePolicies.push(created);
       } else if (path === "access/apps") {
         assert.equal(state.evidence.at(-1)?.stage, "application_create_requested_outcome_unknown");
         assert.equal(app(), undefined);
-        created = { ...clone(call.body), id: NEW_APP, aud: AUD, created_at: new Date(NOW).toISOString() };
+        created = { ...clone(call.body), id: NEW_APP, uid: NEW_APP, aud: AUD, created_at: new Date(NOW).toISOString() };
         state.applications.push(created); policy().app_count = 1;
       } else assert.fail("An unapproved mutation endpoint was called");
       return await state.afterPost?.({ path, created }) ?? ok(created);
@@ -394,4 +394,146 @@ test("checkpoints cannot be swapped between requests and unverified checkpoints 
   const changed = clone(f.request); changed.requestId = "different-request-001";
   assert.notEqual(createAccessIntent(f.plan, changed).fingerprint, createAccessIntent(f.plan, f.request).fingerprint);
   assert.equal(checkpoint.requestFingerprint, accessFingerprint(f.request));
+});
+
+test("only exact matching policy/application UID aliases are accepted as response metadata", async () => {
+  const absent = fixture(); absent.state.afterPost = ({ created }) => { delete created.uid; };
+  assert.equal((await absent.create()).checkpoint.stage, "verified");
+  for (const path of ["access/policies", "access/apps"]) {
+    for (const uid of [OTHER_ID, "not-a-uuid", 42, {}]) {
+      const f = fixture(); f.state.afterPost = item => { if (item.path === path) item.created.uid = uid; };
+      await assert.rejects(f.create(), /identity_alias_mismatch/);
+      assert.equal(f.posts().length, path === "access/policies" ? 1 : 2);
+    }
+  }
+});
+
+test("eager cookie setting preserves the documented true default without changing the create payload", async () => {
+  for (const setting of [undefined, true, false, "true", null]) {
+    const f = fixture(); f.state.afterPost = ({ path, created }) => {
+      if (path === "access/apps" && setting !== undefined) created.eager_redirect_cookie_setting = setting;
+    };
+    if (setting === undefined || setting === true) assert.equal((await f.create()).checkpoint.stage, "verified");
+    else await assert.rejects(f.create(), /created_application_payload_mismatch|created_application_eager_cookie_setting_invalid/);
+    assert.equal(Object.hasOwn(f.posts().at(-1).body, "eager_redirect_cookie_setting"), false);
+  }
+});
+
+async function recoveryFixture() {
+  const f = fixture();
+  // Reproduce a known successful policy POST whose subsequent verification did
+  // not finish, leaving the durable recorded ID and no application attempt.
+  f.state.beforeCall = call => call.path === `access/policies/${NEW_POLICY}` ? new Response("synthetic read interruption", { status: 503 }) : null;
+  await assert.rejects(f.create(), /http_failure/);
+  const originalRequest = clone(f.request), evidence = clone(f.state.evidence.at(-1));
+  assert.equal(evidence.stage, "policy_created_verification_pending");
+  assert.equal(evidence.policyId, NEW_POLICY);
+  f.state.beforeCall = null;
+  f.state.calls.length = 0; f.state.events.length = 0; f.state.evidence.length = 0; f.state.leaseReads = 0;
+  const recoveryRequest = { ...clone(originalRequest), requestId: "retirement-20261120-recovery-01",
+    requestedAt: new Date(NOW).toISOString(), reviewedCommit: "d".repeat(40), accessRecovery: { originalRequest, evidence } };
+  const recoveryGit = { head: "e".repeat(40), parent: recoveryRequest.reviewedCommit, changedPaths: [REQUEST_PATH] };
+  const recoveryInputs = { ...f.inputs, request: recoveryRequest, git: recoveryGit, env: { ...f.env, GITHUB_SHA: recoveryGit.head } };
+  return { ...f, recoveryRequest, recoveryInputs, originalRequest, evidence,
+    resume: () => resumeProductionAccess(recoveryInputs) };
+}
+
+test("policy-only resume creates only the app and preserves original ownership plus separate execution provenance", async () => {
+  const f = await recoveryFixture(), original = clone(f.recoveryRequest.accessRecovery);
+  const policyBefore = clone(f.policy());
+  const result = await f.resume();
+  assert.deepEqual(f.posts().map(call => call.path), ["access/apps"]);
+  assert.equal(f.posts()[0].body.name, `${PRODUCTION_APP_NAME} [${f.originalRequest.requestId}]`);
+  assert.deepEqual(f.posts()[0].body.policies, [{ id: NEW_POLICY, precedence: 1 }]);
+  assert.deepEqual(f.policy(), { ...policyBefore, app_count: 1 });
+  assert.equal(f.state.leaseReads, 2);
+  assert.deepEqual(f.recoveryRequest.accessRecovery, original);
+  assert.equal(result.checkpoint.sourceCommit, HEAD);
+  assert.equal(result.checkpoint.requestFingerprint, accessFingerprint(f.originalRequest));
+  assert.equal(result.checkpoint.intentFingerprint, f.evidence.intentFingerprint);
+  assert.equal(result.checkpoint.resumeExecutionFingerprint, accessFingerprint(f.recoveryRequest));
+  assert.equal(result.checkpoint.resumeExecutionSourceCommit, f.recoveryInputs.git.head);
+  assert.equal(result.checkpoint.resumeEvidenceFingerprint, accessFingerprint(f.evidence));
+  assert.equal(result.checkpoint.stage, "verified");
+  assert.deepEqual(result.proof, await f.inspect(result.checkpoint));
+  assert.equal(f.posts().length, 1);
+  const serialized = JSON.stringify(f.state.evidence);
+  for (const secret of ["greg@vanesch.uk", OTP, AUD, "synthetic-access-token", "private-idp-configuration"])
+    assert.equal(serialized.includes(secret), false);
+});
+
+test("resume refuses unverified or application-attempt evidence, injected fields and mismatched ownership", async () => {
+  for (const change of [
+    f => { f.evidence.stage = "policy_create_requested_outcome_unknown"; },
+    f => { f.evidence.stage = "application_create_requested_outcome_unknown"; },
+    f => { f.evidence.stage = "application_created_verification_pending"; },
+    f => { f.evidence.applicationId = NEW_APP; },
+    f => { f.evidence.applicationFingerprint = "0".repeat(64); },
+    f => { f.evidence.secret = "unreviewed-sensitive-value"; },
+    f => { f.evidence.policyId = OTHER_ID; },
+    f => { f.evidence.requestFingerprint = "0".repeat(64); },
+    f => { f.evidence.intentFingerprint = "0".repeat(64); },
+    f => { f.evidence.workerEligibilityFingerprint = "0".repeat(64); },
+    f => { f.evidence.policyFingerprint = "0".repeat(64); },
+    f => { f.evidence.automaticMutationRetryAllowed = true; },
+    f => { f.originalRequest.requestId = "different-original-request"; },
+    f => { f.originalRequest.accessRecovery = {}; },
+    f => { f.originalRequest.expectedProductionVersionId = OTHER_ID; },
+    f => { f.recoveryRequest.expectedQaVersionId = OTHER_ID; },
+    f => { f.recoveryInputs.git.parent = "f".repeat(40); },
+  ]) {
+    const f = await recoveryFixture(); change(f);
+    await assert.rejects(f.resume()); assert.equal(f.posts().length, 0);
+  }
+});
+
+test("resume verifies the known unused policy, unchanged source inventory and exact original Worker lease", async () => {
+  for (const change of [
+    f => { f.state.reusablePolicies = f.state.reusablePolicies.filter(p => p.id !== NEW_POLICY); },
+    f => { f.policy().app_count = 1; }, f => { delete f.policy().app_count; },
+    f => { f.policy().reusable = false; }, f => { f.policy().name = "Different policy"; },
+    f => { f.policy().include[0].email.email = "other@example.invalid"; },
+    f => { f.policy().uid = OTHER_ID; },
+    f => { f.state.reusablePolicies.push({ ...clone(f.policy()), id: OTHER_ID, uid: OTHER_ID }); },
+    f => { f.state.reusablePolicies[0].name = "Changed existing policy"; },
+    f => { f.state.identityProviders[0].config.privateProviderConfiguration = "Changed provider"; },
+    f => { f.state.applications[0].session_duration = "48h"; },
+    f => { f.state.applications.push({ id: OTHER_ID, type: "self_hosted", destinations: [{ type: "public", uri: "vanesch.uk/advisor" }] }); },
+    f => { f.state.leaseHook = (_count, lease) => ({ ...lease, productionBindingFingerprint: "9".repeat(64) }); },
+  ]) {
+    const f = await recoveryFixture(); change(f);
+    await assert.rejects(f.resume()); assert.equal(f.posts().length, 0);
+  }
+});
+
+test("resume rechecks policy and Worker state after its first durable checkpoint", async () => {
+  for (const change of [
+    f => { f.policy().app_count = 1; },
+    f => { f.state.applications[0].name = "Concurrent QA change"; },
+    f => { f.state.leaseHook = (_count, lease) => ({ ...lease, productionSettingsFingerprint: "9".repeat(64) }); },
+  ]) {
+    const f = await recoveryFixture(); f.state.evidenceHook = value => { if (value.stage === "policy_verified") change(f); };
+    await assert.rejects(f.resume()); assert.equal(f.posts().length, 0);
+  }
+});
+
+test("resume requires durable evidence, records app identity before validation and never retries uncertain app writes", async () => {
+  const failedEvidence = await recoveryFixture();
+  failedEvidence.state.evidenceHook = value => { if (value.stage === "application_create_requested_outcome_unknown") throw new Error("Synthetic durable write failure"); };
+  await assert.rejects(failedEvidence.resume(), /durable write failure/); assert.equal(failedEvidence.posts().length, 0);
+  const mismatch = await recoveryFixture();
+  mismatch.state.afterPost = ({ created }) => { created.uid = OTHER_ID; };
+  await assert.rejects(mismatch.resume(), /created_application_identity_alias_mismatch/);
+  assert.equal(mismatch.state.evidence.at(-1).applicationId, NEW_APP);
+  assert.equal(mismatch.posts().length, 1);
+  const uncertain = await recoveryFixture();
+  uncertain.state.afterPost = () => { throw new Error("Private lost response"); };
+  await assert.rejects(uncertain.resume(), error => error instanceof AccessApplyError && error.mutationOutcomeUnknown === true);
+  const evidence = uncertain.state.evidence.at(-1);
+  assert.equal(evidence.stage, "application_create_requested_outcome_unknown");
+  assert.equal(evidence.applicationId, undefined);
+  assert.equal(uncertain.posts().length, 1);
+  const recovered = await uncertain.reconcile(evidence);
+  assert.equal(recovered.status, "verified_existing_attempt");
+  assert.equal(uncertain.posts().length, 1);
 });

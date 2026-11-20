@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/security/production-retirement-access-plan.mjs
       - scripts/security/production-retirement-preflight.mjs
+      - scripts/security/production-retirement-cleanup-preflight.mjs
       - scripts/security/production-retirement-release.mjs
       - .github/workflows/production-retirement-access-plan.yml
   workflow_dispatch:
@@ -29,7 +30,7 @@ jobs:
         with:
           node-version: 24
       - name: Verify read-only planner guards
-        run: node --test tests/d1/production-retirement-access-plan.test.mjs tests/d1/production-retirement-release.test.mjs
+        run: node --test tests/d1/production-retirement-access-plan.test.mjs tests/d1/production-retirement-release.test.mjs tests/d1/production-retirement-cleanup-preflight.test.mjs
       - name: Read existing Access policy and prepare bounded production configuration
         env:
           CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
@@ -41,12 +42,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/security/production-retirement-preflight.mjs > production-retirement-preflight-report.json
+      - name: Inspect obsolete-binding cleanup metadata with GET only
+        if: always()
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/security/production-retirement-cleanup-preflight.mjs > production-cleanup-metadata-preflight.json
       - name: Publish sanitized planning evidence
         if: always()
         run: cat production-retirement-access-plan-report.json
       - name: Publish sanitized production eligibility evidence
         if: always()
         run: cat production-retirement-preflight-report.json
+      - name: Publish sanitized cleanup metadata evidence
+        if: always()
+        run: cat production-cleanup-metadata-preflight.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -54,5 +65,6 @@ jobs:
           path: |
             production-retirement-access-plan-report.json
             production-retirement-preflight-report.json
+            production-cleanup-metadata-preflight.json
           if-no-files-found: ignore
           retention-days: 14

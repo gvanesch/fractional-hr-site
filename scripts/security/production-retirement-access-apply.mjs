@@ -14,6 +14,7 @@ const API = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/`;
 const TEAM = `https://${EXPECTED_ACCESS_AUTH_DOMAIN}`;
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
 const HASH = /^[a-f\d]{64}$/;
+const SHA = /^[a-f\d]{40}$/;
 const CHECKPOINT_KIND = "production-retirement-access-checkpoint";
 const STAGES = ["prepared", "policy_create_requested_outcome_unknown", "policy_created_verification_pending",
   "policy_verified", "application_create_requested_outcome_unknown", "application_created_verification_pending", "verified"];
@@ -33,15 +34,15 @@ const equal = (a, b) => accessFingerprint(a) === accessFingerprint(b);
 const emptyArray = value => value == null ? [] : value;
 const inactive = value => value == null || value === false || value === "" ||
   Array.isArray(value) && value.length === 0 || object(value) && Object.keys(value).length === 0;
-const POLICY_FIELDS = new Set(["id", "name", "decision", "include", "exclude", "require", "session_duration", "mfa_config",
+const POLICY_FIELDS = new Set(["id", "uid", "name", "decision", "include", "exclude", "require", "session_duration", "mfa_config",
   "connection_rules", "approval_required", "approval_groups", "purpose_justification_required", "purpose_justification_prompt",
   "isolation_required", "account_id", "policy_resolution_account_id", "reusable", "disabled", "precedence", "app_count",
   "created_at", "updated_at", "created_on", "updated_on"]);
-const APPLICATION_FIELDS = new Set(["id", "name", "type", "domain", "destinations", "self_hosted_domains", "policies", "aud",
+const APPLICATION_FIELDS = new Set(["id", "uid", "name", "type", "domain", "destinations", "self_hosted_domains", "policies", "aud",
   "account_id", "created_at", "updated_at", "created_on", "updated_on", "allow_all_identity_providers", "allowed_idps",
   "session_duration", "auto_redirect_to_identity", "allow_authenticate_via_warp", "options_preflight_bypass",
   "http_only_cookie_attribute", "same_site_cookie_attribute", "enable_binding_cookie", "path_cookie_attribute",
-  "app_launcher_visible", "skip_interstitial", "allow_iframe", "read_service_tokens_from_header", "cors_headers",
+  "app_launcher_visible", "skip_interstitial", "allow_iframe", "eager_redirect_cookie_setting", "read_service_tokens_from_header", "cors_headers",
   "custom_deny_url", "custom_non_identity_deny_url", "custom_deny_message", "custom_pages", "mfa_config", "scim_config",
   "service_auth_401_redirect", "logo_url", "tags"]);
 
@@ -51,12 +52,12 @@ export function accessApplyFailure(error) {
     : { operation: "access_apply", code: "unexpected_failure", httpStatus: null, mutationOutcomeUnknown: null };
 }
 
-function client(env, fetchImpl) {
+function client(env, fetchImpl, writePaths = ["access/policies", "access/apps"]) {
   validatePlanContext(env);
   const posted = new Set();
   return async (path, { method = "GET", body } = {}) => {
     const read = /^(?:access\/organizations|access\/(?:apps|identity_providers|policies)\?page=[1-5]&per_page=100|access\/apps\/[a-f\d-]{36}(?:\/policies\?page=[1-5]&per_page=100)?|access\/policies\/[a-f\d-]{36})$/i;
-    const write = method === "POST" && ["access/policies", "access/apps"].includes(path);
+    const write = method === "POST" && writePaths.includes(path);
     check(method === "GET" && read.test(path) && body === undefined || write && object(body), "endpoint_or_method_forbidden", "access_request");
     if (write) {
       check(!posted.has(path), "mutation_already_attempted", "access_request");
@@ -123,6 +124,9 @@ function policyShape(value, expected, allowedIdps) {
   check(object(value) && (!value.account_id || value.account_id === ACCOUNT) &&
     (!value.policy_resolution_account_id || value.policy_resolution_account_id === ACCOUNT) && (value.reusable == null || value.reusable === true) &&
     (value.disabled == null || value.disabled === false) && inspectIdentityPolicy([value], allowedIdps).supported, "created_policy_security_mismatch");
+  // The live GET response also returns uid as an id alias. Accept only the
+  // observed exact identity relationship, never an independently valued field.
+  check(value.uid == null || UUID.test(value.uid) && value.uid === value.id, "created_policy_identity_alias_mismatch");
   check(Object.entries(value).every(([key, item]) => POLICY_FIELDS.has(key) || item == null), "unreviewed_policy_field");
   const connection = inspectConnectionRules(value.connection_rules);
   check(connection.report.supported, "created_policy_connection_rules_mismatch");
@@ -145,6 +149,9 @@ function applicationShape(value, expected, policyId, identityProviders) {
     value.allow_all_identity_providers !== true && value.path_cookie_attribute !== true && (value.allow_iframe == null || value.allow_iframe === false) &&
     (value.destinations == null || Array.isArray(value.destinations)) &&
     (value.self_hosted_domains == null || Array.isArray(value.self_hosted_domains)), "created_application_security_mismatch");
+  check(value.uid == null || UUID.test(value.uid) && value.uid === value.id, "created_application_identity_alias_mismatch");
+  check(value.eager_redirect_cookie_setting === undefined || typeof value.eager_redirect_cookie_setting === "boolean",
+    "created_application_eager_cookie_setting_invalid");
   check(Object.entries(value).every(([key, item]) => APPLICATION_FIELDS.has(key) || item == null) &&
     ["scim_config", "service_auth_401_redirect", "custom_pages", "custom_deny_message", "logo_url", "tags"].every(key => inactive(value[key])),
   "unreviewed_application_setting");
@@ -172,6 +179,9 @@ function applicationShape(value, expected, policyId, identityProviders) {
     same_site_cookie_attribute: value.same_site_cookie_attribute ?? "none",
     enable_binding_cookie: value.enable_binding_cookie ?? false, path_cookie_attribute: value.path_cookie_attribute ?? false,
     app_launcher_visible: value.app_launcher_visible ?? true, skip_interstitial: value.skip_interstitial ?? false,
+    // Cloudflare documents true as the default; the reviewed QA source returns
+    // true. Keep the original POST intent unchanged while verifying that default.
+    eager_redirect_cookie_setting: value.eager_redirect_cookie_setting ?? true,
   };
   if (expected) check(equal(shape, applicationShape({ ...expected, policies: [{ id: policyId, precedence: 1 }] }, null, policyId, identityProviders)),
     "created_application_payload_mismatch");
@@ -316,6 +326,91 @@ export async function createProductionAccess({ request, env, git, verifyWorkerLe
   checkpoint.applicationId = appCreated.result.id;
   await emit("application_created_verification_pending");
   const verified = await verifyOwnedState(api, request, checkpoint, { sealed: false });
+  checkpoint.policyFingerprint = verified.policyFingerprint;
+  checkpoint.applicationFingerprint = verified.proof.applicationFingerprint;
+  await emit("verified");
+  return { checkpoint, proof: verified.proof };
+}
+
+const ORIGINAL_REQUEST_FIELDS = new Set(["operation", "requestId", "requestedAt", "reviewedCommit", "expectedProductionVersionId",
+  "expectedQaVersionId", "expectedAccessPlanFingerprint"]);
+const POLICY_ONLY_EVIDENCE_FIELDS = new Set(["kind", "stage", "preparedAt", "sourceCommit", "requestId", "requestFingerprint",
+  "sourceFingerprint", "planFingerprint", "intentFingerprint", "otherPoliciesFingerprint", "workerEligibilityFingerprint",
+  "policyId", "policyFingerprint", "manualReviewRequired", "automaticMutationRetryAllowed"]);
+
+function validatePolicyOnlyRecovery(request, now) {
+  const recovery = request.accessRecovery;
+  check(object(recovery) && Object.keys(recovery).length === 2 && Object.hasOwn(recovery, "originalRequest") &&
+    Object.hasOwn(recovery, "evidence"), "policy_only_recovery_required");
+  const { originalRequest, evidence } = recovery;
+  check(object(originalRequest) && Object.keys(originalRequest).every(key => ORIGINAL_REQUEST_FIELDS.has(key)) &&
+    originalRequest.operation === request.operation && /^[a-z0-9][a-z0-9-]{7,63}$/.test(originalRequest.requestId ?? "") &&
+    SHA.test(originalRequest.reviewedCommit ?? "") && Number.isFinite(Date.parse(originalRequest.requestedAt)) &&
+    ["expectedProductionVersionId", "expectedQaVersionId", "expectedAccessPlanFingerprint"].every(key => originalRequest[key] === request[key]),
+  "original_recovery_request_mismatch");
+  validateCheckpoint(evidence, originalRequest);
+  check(object(evidence) && Object.keys(evidence).every(key => POLICY_ONLY_EVIDENCE_FIELDS.has(key)) &&
+    ["policy_created_verification_pending", "policy_verified"].includes(evidence.stage) &&
+    UUID.test(evidence.policyId ?? "") && SHA.test(evidence.sourceCommit ?? "") &&
+    HASH.test(evidence.workerEligibilityFingerprint ?? "") && evidence.manualReviewRequired === true &&
+    evidence.automaticMutationRetryAllowed === false && Date.parse(originalRequest.requestedAt) <= Date.parse(evidence.preparedAt) &&
+    Date.parse(evidence.preparedAt) <= now &&
+    (evidence.policyFingerprint == null || HASH.test(evidence.policyFingerprint)) &&
+    (evidence.stage !== "policy_verified" || HASH.test(evidence.policyFingerprint ?? "")), "recovery_not_verified_policy_only");
+  return { originalRequest, evidence };
+}
+
+async function verifyUnusedOwnedPolicy(api, originalRequest, evidence) {
+  const [state, read] = await Promise.all([inventory(api), api(`access/policies/${evidence.policyId}`)]);
+  validatePlan(state.plan, originalRequest);
+  const intent = createAccessIntent(state.plan, originalRequest);
+  check(state.plan.sourceFingerprint === evidence.sourceFingerprint && intent.fingerprint === evidence.intentFingerprint &&
+    otherPoliciesFingerprint(state.reusablePolicies, evidence.policyId) === evidence.otherPoliciesFingerprint,
+  "recovery_source_or_other_policy_inventory_drift");
+  const listed = state.reusablePolicies.filter(policy => policy.id === evidence.policyId || policy.name === intent.policy.name);
+  check(listed.length === 1 && listed[0].id === evidence.policyId && read.result?.id === evidence.policyId &&
+    [listed[0], read.result].every(policy => policy.name === intent.policy.name && policy.reusable === true && policy.app_count === 0),
+  "recovery_owned_policy_missing_changed_or_attached");
+  const canonical = policyShape(read.result, intent.policy, intent.application.allowed_idps);
+  check(equal(canonical, policyShape(listed[0], intent.policy, intent.application.allowed_idps)), "recovery_policy_readback_mismatch");
+  const policyFingerprint = accessFingerprint({ id: evidence.policyId, policy: canonical });
+  check(evidence.policyFingerprint == null || evidence.policyFingerprint === policyFingerprint, "recovery_policy_fingerprint_mismatch");
+  return { intent, policyFingerprint };
+}
+
+// This is a continuation of a positively recorded policy-only outcome, not a
+// retry. The new execution is source-gated separately; original ownership and
+// payload fingerprints remain immutable. The scoped client permits app POST only.
+export async function resumeProductionAccess({ request, env, git, verifyWorkerLease, fetchImpl = fetch, onEvidence, now = Date.now() }) {
+  validateProductionRequest(request, env, git, now);
+  validatePlanContext(env);
+  check(typeof onEvidence === "function", "durable_evidence_callback_required");
+  const { originalRequest, evidence } = validatePolicyOnlyRecovery(request, now);
+  const api = client(env, fetchImpl, ["access/apps"]);
+  const verifiedPolicy = await verifyUnusedOwnedPolicy(api, originalRequest, evidence);
+  check(await workerLease(verifyWorkerLease, request) === evidence.workerEligibilityFingerprint, "recovery_worker_lease_changed");
+  const checkpoint = { ...structuredClone(evidence), policyFingerprint: verifiedPolicy.policyFingerprint,
+    resumeExecutionFingerprint: accessFingerprint(request), resumeExecutionSourceCommit: git.head,
+    resumeEvidenceFingerprint: accessFingerprint(evidence) };
+  const emit = async stage => {
+    checkpoint.stage = stage;
+    checkpoint.manualReviewRequired = stage !== "verified";
+    checkpoint.automaticMutationRetryAllowed = false;
+    await onEvidence(structuredClone(checkpoint));
+  };
+  await emit("policy_verified");
+  const beforeApp = await verifyUnusedOwnedPolicy(api, originalRequest, evidence);
+  check(beforeApp.policyFingerprint === checkpoint.policyFingerprint && beforeApp.intent.fingerprint === checkpoint.intentFingerprint,
+    "recovery_policy_changed_before_application_create");
+  check(await workerLease(verifyWorkerLease, request) === evidence.workerEligibilityFingerprint, "recovery_worker_lease_changed");
+  await emit("application_create_requested_outcome_unknown");
+  const created = await api("access/apps", { method: "POST",
+    body: { ...beforeApp.intent.application, policies: [{ id: checkpoint.policyId, precedence: 1 }] } });
+  if (!UUID.test(created.result?.id ?? ""))
+    throw new AccessApplyError("access_create", "created_application_identity_unavailable", null, true);
+  checkpoint.applicationId = created.result.id;
+  await emit("application_created_verification_pending");
+  const verified = await verifyOwnedState(api, originalRequest, checkpoint, { sealed: false });
   checkpoint.policyFingerprint = verified.policyFingerprint;
   checkpoint.applicationFingerprint = verified.proof.applicationFingerprint;
   await emit("verified");

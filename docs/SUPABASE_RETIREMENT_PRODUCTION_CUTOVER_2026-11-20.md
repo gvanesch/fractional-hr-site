@@ -63,6 +63,14 @@ The complete Access plan and runtime eligibility both passed in [run 44763451457
 
 The application is built before Access creation. A shorter transition still exists between creating the production Access application and activating the new backend. This is recorded explicitly; it is not evidence that production cutover has already completed. On any failure, retain the exact stage and resource IDs for recovery.
 
+## First production attempt and controlled continuation
+
+[Run 44774079890](https://github.com/gvanesch/fractional-hr-site/actions/runs/44774079890), requested by commit `5e93e1060bc1d5e66909f43a0f65f967b032aadc`, passed all 251 tests and its build/preflight. The updated token created the separate reusable policy `f0f42710-0b34-4dd8-b44a-c63c308fa6de`. Its strict readback stopped on an extra response field before any application was created or Worker uploaded. Production and QA remained unchanged.
+
+GET-only diagnosis in [run 44774703927](https://github.com/gvanesch/fractional-hr-site/actions/runs/44774703927) confirmed that the extra `uid` is a UUID exactly equal to the policy's `id`, the recorded request name matches, the policy is reusable and attached to zero applications, and all source/plan/runtime fingerprints remain unchanged. [Run 44775009571](https://github.com/gvanesch/fractional-hr-site/actions/runs/44775009571) also inspected QA response metadata before enabling production login.
+
+The continuation preserves the original ownership request and evidence unchanged inside a new reviewed execution request. It must verify the unused existing policy and complete source/runtime inventories twice, then issue only one application POST. It cannot create, edit or delete a policy. Evidence from any previous application-create attempt is ineligible for this path and requires GET-only reconciliation instead. The original resource names and fingerprints are retained, while separate hashes identify the new execution and reviewed code.
+
 ## Recovery
 
 Retain the exact prior production version `6f47c7ec-3697-486c-ad8a-a9823be99424`. A failed or timed-out mutation is not automatically retried. Inspect actual deployment/resource state before deciding the next action.

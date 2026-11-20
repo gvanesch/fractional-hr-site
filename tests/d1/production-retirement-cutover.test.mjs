@@ -53,6 +53,27 @@ test("cutover uses the verified build before Access, saves only the returned che
   assert.equal(f.state.evidence[0].buildFingerprint, f.build.fingerprint);
 });
 
+test("reviewed policy-only recovery uses its separate adapter and retains the original Access ownership request for inspection", async () => {
+  const f = fixture();
+  const originalRequest = clone(f.inputs.request);
+  f.inputs.request = { ...f.inputs.request, requestId: "retirement-production-recovery-02",
+    accessRecovery: { originalRequest, evidence: clone(f.checkpoint) } };
+  f.inputs.preflight.requestFingerprint = fingerprint(f.inputs.request);
+  f.inputs.built.requestFingerprint = fingerprint(f.inputs.request);
+  f.inputs.createAccessImpl = async () => assert.fail("Recovery must never re-enter policy creation");
+  f.inputs.resumeAccessImpl = async ({ request, verifyWorkerLease }) => {
+    assert.deepEqual(request.accessRecovery.originalRequest, originalRequest);
+    await verifyWorkerLease();
+    return { checkpoint: clone(f.checkpoint), proof: { privateFreshAudience: "not-a-checkpoint" } };
+  };
+  f.inputs.inspectAccessImpl = async ({ request, checkpoint }) => {
+    assert.deepEqual(request, originalRequest); assert.deepEqual(checkpoint, f.checkpoint);
+    return { privateFreshAudience: "not-a-checkpoint" };
+  };
+  assert.deepEqual(await runProductionCutover(f.inputs), { passed: true });
+  assert.equal(f.state.creates, 0); assert.equal(f.state.deploys, 1);
+});
+
 test("stale source, request, build or preflight stops before any Access write", async () => {
   for (const mutate of [
     f => { f.inputs.git.changedPaths.push("app/page.tsx"); },
