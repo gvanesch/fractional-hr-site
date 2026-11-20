@@ -1,7 +1,7 @@
 // Production code/auth cutover only. Access policy creation is a separate,
 // reviewed operation. This module never migrates D1, sends mail, changes routes,
-// rotates secrets, modifies QA, or pauses Supabase. There is deliberately no CLI
-// or workflow trigger: the caller must supply a freshly verified Access reader.
+// rotates secrets, modifies QA, or pauses Supabase. The separate request-gated
+// cutover orchestrator supplies a freshly verified Access reader to this module.
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
@@ -21,8 +21,12 @@ const HASH = /^[a-f0-9]{64}$/i;
 const REQUIRED = ["ADVISOR_ALLOWED_EMAILS", "CLIENT_DIAGNOSTIC_OTP_SECRET", "INVITE_RATE_LIMIT_SALT", "CRON_SECRET", "RESEND_API_KEY", "CONTACT_FROM_EMAIL", "CONTACT_TO_EMAIL", "DAILY_SUMMARY_RECIPIENT"];
 const AUTH_NAMES = ["ADVISOR_AUTH_MODE", "CLOUDFLARE_ACCESS_AUD", "CLOUDFLARE_ACCESS_TEAM_DOMAIN"];
 
+export class ProductionReleaseError extends Error {
+  constructor(message) { super(message); this.name = "ProductionReleaseError"; }
+}
+
 function check(condition, message) {
-  if (!condition) throw new Error(message);
+  if (!condition) throw new ProductionReleaseError(message);
 }
 
 export function validateProductionRequest(request, env, git, now = Date.now()) {
@@ -402,6 +406,14 @@ export function productionUploadArguments({ configPath, tag, message }) {
     "--name", PRODUCTION.worker, "--tag", tag, "--message", message];
 }
 
+export function productionUploaderEnvironment(env) {
+  const result = { ...env, WRANGLER_SEND_METRICS: "false", CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "false" };
+  // Access creation/verification runs in the orchestrator. The uploader needs
+  // only the existing Worker credential, never the Access write credential.
+  delete result.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN;
+  return result;
+}
+
 export async function uploadProductionCandidate(args) {
   const commandArgs = productionUploadArguments(args);
   check(HASH.test(args.expectedConfigFingerprint ?? "") && !process.env.CLOUDFLARE_ENV && !process.env.NEXT_DEV_WRANGLER_ENV,
@@ -415,7 +427,7 @@ export async function uploadProductionCandidate(args) {
     // Wrangler may internally retry an inactive upload. Traffic activation is
     // separate, issued once above, and never automatically retried here.
     output = await promisify(execFile)(process.execPath, commandArgs, {
-      cwd: process.cwd(), env: { ...process.env, WRANGLER_SEND_METRICS: "false", CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "false" },
+      cwd: process.cwd(), env: productionUploaderEnvironment(process.env),
       timeout: 5 * 60 * 1000, maxBuffer: 16 * 1024 * 1024,
     });
   } catch { throw new Error("Production inactive upload failed; raw uploader output is withheld because it may contain binding values."); }

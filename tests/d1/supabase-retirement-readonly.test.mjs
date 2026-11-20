@@ -595,7 +595,7 @@ test("dedicated Access read failures never retry with the deployment credential"
   }
 });
 
-test("optional audit secret is isolated to the read-only audit step and absent from build/deploy workflow jobs", () => {
+test("Access credential is confined to reviewed reads and the request-gated Access cutover, absent from builds and runtime", () => {
   const workflows = new URL("../../.github/workflows/", import.meta.url);
   const tokenName = "CLOUDFLARE_RETIREMENT_AUDIT_TOKEN";
   const source = readFileSync(new URL("supabase-retirement-verification.yml", workflows), "utf8");
@@ -612,7 +612,17 @@ test("optional audit secret is isolated to the read-only audit step and absent f
   assert.ok(planStep.includes("run: node scripts/security/production-retirement-access-plan.mjs > production-retirement-access-plan-report.json"));
   assert.ok(!laterSteps.join("\n").includes(tokenName));
   assert.ok(!/wrangler|npm (?:run )?(?:build|deploy)|run:.*production-retirement-release\.mjs/.test(plan));
-  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && !["supabase-retirement-verification.yml", "production-retirement-access-plan.yml"].includes(file)))
+  const cutover = readFileSync(new URL("production-retirement-cutover.yml", workflows), "utf8");
+  const [beforeApply, applyAndLater] = cutover.split("      - name: Apply the exact Access plan and activate the verified production Worker once\n");
+  assert.ok(!beforeApply.includes(tokenName));
+  const [applyStep, ...afterApply] = applyAndLater.split("      - name:");
+  assert.equal(applyStep.match(new RegExp(`${tokenName}:`, "g")).length, 1);
+  assert.ok(applyStep.includes("CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}"));
+  assert.ok(applyStep.includes("run: node scripts/security/production-retirement-cutover.mjs apply"));
+  assert.ok(!afterApply.join("\n").includes(tokenName));
+  assert.ok(cutover.includes("      - scripts/security/production-retirement-release-request.json"));
+  assert.ok(!cutover.includes("workflow_dispatch"));
+  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && !["supabase-retirement-verification.yml", "production-retirement-access-plan.yml", "production-retirement-cutover.yml"].includes(file)))
     assert.ok(!readFileSync(new URL(file, workflows), "utf8").includes(tokenName), `Audit token must not enter ${file}`);
   assert.ok(!readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").includes(tokenName));
 });

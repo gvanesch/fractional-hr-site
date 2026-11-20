@@ -4,13 +4,15 @@
 
 Greg has authorized completing the D1 migration and retiring Supabase. All Supabase application records are disposable test data. Existing D1 records and questionnaires must be preserved.
 
+Greg has updated the existing token and requested that status/reminder emails stop. The email follow-up automation is disabled; report progress and decision points in the active chat. The permission update authorizes proceeding with the reviewed cutover, subject to the live request and configuration checks below.
+
 The hosted QA acceptance is complete: Health Check write/read/results, advisor access, CRM mutations, project spaces, reports, baseline export and logout passed on the candidate. Production already uses D1 for application data but still uses Supabase advisor authentication.
 
 The new GitHub audit secret works. [Run 44744836576, attempt 2](https://github.com/gvanesch/fractional-hr-site/actions/runs/44744836576) read the correct Zero Trust organization, one existing QA application, no production Access application, and the production Worker-trigger inventory. Production and QA versions remain unchanged. An empty Worker-trigger list is limited evidence; it does not authorize pushing old application code from `main`.
 
 ## Concrete production configuration
 
-Create one self-hosted Access application named **Van Esch production advisor**, and one separate production policy. Reuse the account's existing, verified email-code identity provider. Do not change the QA application, its policy or the identity provider.
+Create one self-hosted Access application named **Van Esch production advisor [request-id]**, and one separate production policy with the same request suffix. The suffix identifies resources owned by a single attempt for read-only reconciliation. Reuse the account's existing, verified email-code identity provider. Do not change the QA application, its policy or the identity provider.
 
 | Item | Planned value or rule |
 | --- | --- |
@@ -30,31 +32,36 @@ The exact path list and source/configuration fingerprints are produced by `scrip
 
 The public Health Check, results, participant OTP/questionnaires, baseline participation and both cron endpoints stay outside Access. In particular, the existing `/api/advisor-daily-action-digest` scheduler URL remains outside the 42 protected destinations, so the old default-branch scheduler can continue without changing `main`.
 
-## Access required from Greg
+## Access supplied by Greg
 
-The token named **D1 retirement audit** currently has **Access: Apps and Policies — Read**. The verified next operation is creating one production policy and application, which requires **Access: Apps and Policies — Edit** on the same account.
+Greg reported that the existing **D1 retirement audit** token has been updated for **Access: Apps and Policies — Edit** on the same account. Its GitHub secret remains `CLOUDFLARE_RETIREMENT_AUDIT_TOKEN`. Organization/identity-provider and Workers Builds permissions remain Read, with single-account scope and the 27 November expiry. The actual create response will verify the new write capability; do not infer a successful cloud mutation from the user update alone.
 
-Edit that one permission on the existing short-lived user token. Keep the organization/identity-provider and Workers Builds permissions at Read, the same single-account scope, and the 27 November expiry. Use the existing GitHub secret if editing the token does not replace its value; if Cloudflare generates a replacement value, update only `CLOUDFLARE_RETIREMENT_AUDIT_TOKEN` directly in GitHub. Never share token values in chat, email, repository files or logs. The existing deployment credential does not need to be changed for this Access permission.
+The Access token is supplied only to the reviewed Access reads and the guarded cutover process. It is stripped from the OpenNext/Wrangler upload child process. Application builds have neither Cloudflare credential nor Supabase configuration. Checkout credentials are not persisted. The existing Worker deployment credential remains separate and unchanged.
 
-This is a required Cloudflare authorization capability, not a request to approve the migration again. Do not attempt a denied mutation with broader credentials or ask Greg to repeat the rejected shared-browser login.
+Do not attempt a denied mutation with broader credentials or ask Greg to repeat the rejected Cloudflare dashboard login. Never publish token values, raw private provider configuration or secret values in logs or artifacts.
 
 ## Execution and verification
 
-1. Re-read the QA policy/login settings, complete relevant application inventory, and current production/QA deployments. Require the reviewed configuration fingerprints and source commit to match.
-2. Create a separate production reusable policy using the reviewed exact identity/security criteria; read it back. Create the production application with the 42 destinations and that policy; read back its audience, routes, cookies and policy.
-3. Build the reviewed application with no Supabase URL or keys. Generate production runtime configuration with only the three intended Access auth bindings added/changed; preserve D1, services, assets, other variables and secret names.
+1. Require a fresh, request-only commit directly above the reviewed implementation. Verify the fixed repository, branch, account, source and expected production/QA versions. Read and fingerprint the current runtime using GET requests only.
+2. Run the D1 tests and build the complete production application without provider credentials or Supabase values, before any live Access mutation. Pin all generated code, assets and internal symlinks; verify that advisor authentication reads its audience, team and mode at runtime.
+3. Re-read the complete QA policy/login/application inventory and compare the reviewed plan. Verify the Worker state still matches the pre-build checkpoint. Create one production reusable policy and one application with 42 destinations, with evidence recorded before and after each POST. Read back the exact identity, provider, routes, cookies and new audience. Generate production configuration with only the intended auth bindings added/changed; preserve other bindings and resources.
 4. Upload an inactive production Worker version. Verify its code annotations, bindings and runtime, re-read current production/QA/Access state, and activate once only if all leases still match.
 5. Verify production health reports D1 connected and Supabase not required; public pages and public/participant/cron boundaries remain reachable; anonymous advisor access reaches the correct Access team.
 6. Complete a real production advisor sign-in and bounded functional acceptance. Verify the reviewed scheduler handler's no-send mode before making an authenticated dry-run request. Any production Health Check write must be explicitly synthetic and bounded, with notification behavior controlled.
-7. Remove obsolete active Supabase configuration, pause Supabase reversibly, and repeat independence checks. Confirm the separate subscription/billing outcome; pausing a project alone is not proof that its paid subscription is cancelled.
+7. Remove obsolete active Supabase configuration through a separately verified inactive Worker version. Preserve the accepted D1/Access version as the cleanup rollback target.
+8. Confirm the full Supabase organization project inventory and whether any unrelated project requires Pro. Supabase does not allow paid projects to be paused. For this retiring organization, downgrade its subscription to Free, verify the new plan, then pause the project and repeat independence checks. If another project requires Pro, resolve that dependency before downgrading, or transfer the retiring project to a Free organization. Verify cancellation and any final usage invoice separately.
 
-The new `production-retirement-release.mjs` module provides the guarded inactive-upload and single-activation logic, including repeated production/QA/Access checks and sanitized recovery evidence. Its 19 focused tests passed, including configuration-file drift, unsupported runtime settings, uncertain activation and GET-only eligibility checks. It deliberately has no deployment workflow or release request file in this preparation commit. The Access creation/verification adapter and final invocation must be reviewed and wired before any production mutation.
+The `production-retirement-cutover.yml` workflow is now wired to `production-retirement-cutover.mjs` and the reviewed Access adapter. It is triggered only by changes to `scripts/security/production-retirement-release-request.json` on the retirement branch. A request must be the sole change above its reviewed implementation commit. No request is included in the implementation commit. It uses the same `vanesch-production-release` concurrency group as the existing production release workflows.
+
+The release module performs an inactive upload and one activation with repeated production/QA/Access checks. The Access adapter never retries a mutation or deletes resources. Its checkpoint contains only owned IDs, timestamps, flags and fingerprints; fresh reads reconstruct the private intended configuration. The published progress artifact excludes raw policy/provider configuration and audiences. Any partial or uncertain result requires GET-only reconciliation before further action.
 
 The read-only planning workflow also runs `production-retirement-preflight.mjs`. It checks the real production and QA runtime metadata against the proposed release mechanism before any Access application is created, using the existing deployment credential for GET requests only. Its result cannot establish production Access readiness by itself.
 
 That live runtime eligibility check **passed** in [run 44762956134](https://github.com/gvanesch/fractional-hr-site/actions/runs/44762956134), at the unchanged production/QA versions. It verified production environment/site, D1 identity/modes, existing secret names, runtime/grouping, prior auth configuration and QA isolation. The separate Access-policy planner initially stopped on nonempty connection-rule metadata; its parser now distinguishes documented RDP settings from structurally inactive SSH metadata, preserves applicable settings and refuses active/unknown SSH rules. The source fingerprint continues to cover the original policy. See the latest planning run for its actual result.
 
-The current module requires the Access application to exist before production preparation/build. There may therefore be a short transition during which the edge requires Access but the old backend still presents its existing login. The implementation must account for that window and preserve recovery options; do not describe the cutover as already completed.
+The complete Access plan and runtime eligibility both passed in [run 44763451457](https://github.com/gvanesch/fractional-hr-site/actions/runs/44763451457). The logical plan fingerprint was `e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42`. A fresh planning result must be checked before issuing the production request.
+
+The application is built before Access creation. A shorter transition still exists between creating the production Access application and activating the new backend. This is recorded explicitly; it is not evidence that production cutover has already completed. On any failure, retain the exact stage and resource IDs for recovery.
 
 ## Recovery
 
@@ -69,3 +76,5 @@ If reverting an activated candidate, restore the exact prior production Worker b
 - [Authorization cookies and domain scope](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/)
 - [Create a reusable Access policy](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/policies/methods/create/)
 - [Cloudflare API token permissions](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
+- [Supabase paid-plan pausing restriction](https://supabase.com/docs/guides/platform/free-project-pausing)
+- [Supabase subscription cancellation and downgrade](https://supabase.com/docs/guides/platform/manage-your-subscription)
