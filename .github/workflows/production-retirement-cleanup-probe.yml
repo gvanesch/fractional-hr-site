@@ -1,0 +1,69 @@
+name: Read-only production cleanup metadata probe
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+    paths:
+      - scripts/security/production-retirement-cleanup-probe-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-retirement-cleanup-metadata-readonly
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate the fresh request-only commit before using cloud credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import { execFileSync } from "node:child_process";
+          import { CLEANUP_PROBE_REQUEST_PATH, validateCleanupProbeRequest } from "./scripts/security/production-retirement-cleanup-preflight.mjs";
+          try {
+            const request = JSON.parse(await readFile(CLEANUP_PROBE_REQUEST_PATH, "utf8"));
+            const git = args => execFileSync("git", args, { encoding: "utf8" }).trim();
+            const report = validateCleanupProbeRequest({ request, env: process.env, git: {
+              head: git(["rev-parse", "HEAD"]), parent: git(["rev-parse", "HEAD^"]),
+              changedPaths: git(["diff", "--name-only", "HEAD^", "HEAD"]).split("\n").filter(Boolean),
+            } });
+            console.log(JSON.stringify(report));
+          } catch {
+            console.error("Cleanup metadata request rejected; no Cloudflare call was made.");
+            process.exitCode = 1;
+          }
+          NODE
+      - name: Verify metadata reader and request guards
+        run: node --test tests/d1/production-retirement-cleanup-preflight.test.mjs
+      - name: Read exact Worker metadata without changing cloud state
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/security/production-retirement-cleanup-preflight.mjs > production-cleanup-metadata-preflight.json
+      - name: Publish sanitized metadata evidence
+        if: always()
+        run: |
+          if [ -f production-cleanup-metadata-preflight.json ]; then
+            cat production-cleanup-metadata-preflight.json
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-cleanup-metadata-preflight
+          path: production-cleanup-metadata-preflight.json
+          if-no-files-found: ignore
+          retention-days: 14

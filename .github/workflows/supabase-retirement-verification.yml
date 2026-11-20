@@ -1,0 +1,81 @@
+name: Supabase retirement verification
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-retirement-verification
+  cancel-in-progress: true
+
+jobs:
+  no-supabase-build:
+    name: Test and build without Supabase credentials
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_APP_ENV: qa
+      NEXT_PUBLIC_SITE_URL: https://fractional-hr-site-qa.greg-732.workers.dev
+      ADVISOR_AUTH_MODE: cloudflare_access
+      ADVISOR_ALLOWED_EMAILS: test@example.invalid
+      CLOUDFLARE_ACCESS_AUD: synthetic-ci-audience
+      CLOUDFLARE_ACCESS_TEAM_DOMAIN: https://synthetic-ci.cloudflareaccess.com
+      D1_SYSTEM_EVENTS_MODE: d1
+      D1_DIAGNOSTIC_SUBMISSIONS_MODE: d1
+      D1_CRM_PROSPECTS_MODE: d1
+      D1_CLIENT_DIAGNOSTIC_MODE: d1
+      D1_CLIENT_DIAGNOSTIC_SECURITY_MODE: d1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit
+      - name: D1 application and retirement regression tests
+        run: npm run test:d1
+      - name: Next and Cloudflare Worker build with no Supabase URL or keys
+        run: npx opennextjs-cloudflare build
+      - name: Exercise built Worker with isolated local D1 and no email transport
+        timeout-minutes: 5
+        run: node scripts/security/local-worker-smoke.mjs
+
+  live-readonly:
+    name: Inspect ${{ matrix.target }} without writes
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [production, qa]
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read Worker configuration, D1 schema, Access policies and public pages
+        env:
+          # Optional, read-only Access/Workers CI token. Never used by builds,
+          # tests, application runtime or deployment workflows.
+          CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}
+        run: node scripts/security/supabase-retirement-readonly.mjs "${{ matrix.target }}" > retirement-${{ matrix.target }}.json
+      - name: Publish sanitized evidence
+        if: always()
+        run: cat retirement-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: supabase-retirement-${{ matrix.target }}-readonly
+          path: retirement-${{ matrix.target }}.json
+          retention-days: 14

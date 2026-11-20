@@ -1,0 +1,5 @@
+{
+  "operation": "verify-healthcheck-on-qa",
+  "requestId": "retirement-20261120-02",
+  "expectedQaVersionId": "f6076224-8523-4761-8148-69b637e2e542"
+}

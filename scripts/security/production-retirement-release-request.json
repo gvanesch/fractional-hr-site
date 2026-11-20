@@ -1,0 +1,36 @@
+{
+  "operation": "deploy-reviewed-retirement-candidate-to-production",
+  "requestId": "retirement-20261120-production-02",
+  "requestedAt": "2026-11-20T16:42:34Z",
+  "reviewedCommit": "c19697d27c743cfe24ab5eb709ac6fb9949ff6f4",
+  "expectedProductionVersionId": "6f47c7ec-3697-486c-ad8a-a9823be99424",
+  "expectedQaVersionId": "f6076224-8523-4761-8148-69b637e2e542",
+  "expectedAccessPlanFingerprint": "e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42",
+  "accessRecovery": {
+    "originalRequest": {
+      "operation": "deploy-reviewed-retirement-candidate-to-production",
+      "requestId": "retirement-20261120-production-01",
+      "requestedAt": "2026-11-20T16:30:01Z",
+      "reviewedCommit": "4e48034f1a619cc5b2baa54b1effeaa8b984322d",
+      "expectedProductionVersionId": "6f47c7ec-3697-486c-ad8a-a9823be99424",
+      "expectedQaVersionId": "f6076224-8523-4761-8148-69b637e2e542",
+      "expectedAccessPlanFingerprint": "e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42"
+    },
+    "evidence": {
+      "kind": "production-retirement-access-checkpoint",
+      "stage": "policy_created_verification_pending",
+      "preparedAt": "2026-11-20T16:31:19.863Z",
+      "sourceCommit": "5e93e1060bc1d5e66909f43a0f65f967b032aadc",
+      "requestId": "retirement-20261120-production-01",
+      "requestFingerprint": "8c007891fa35ad1041eaf6e5a3916d1fa2b3d5c29651a39b5babcd20135a8e78",
+      "sourceFingerprint": "76a76c12a1919acf36d0504d014e74ba73841802377ef9445a2417ed0d2b26eb",
+      "planFingerprint": "e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42",
+      "intentFingerprint": "b12f0cdb8d0c4650971f19f5a43dadc5239d43d11f4fdfa3dee2f55fcf9e73bb",
+      "otherPoliciesFingerprint": "edd410a3fb12e7db75b370e933974464612ee1e55119f1465c01e25bd078ba17",
+      "workerEligibilityFingerprint": "efbb18577408dcdb6dabac02e670fbb6a6f8c493dcdcb5b572705d0fc3fc4511",
+      "manualReviewRequired": true,
+      "automaticMutationRetryAllowed": false,
+      "policyId": "f0f42710-0b34-4dd8-b44a-c63c308fa6de"
+    }
+  }
+}

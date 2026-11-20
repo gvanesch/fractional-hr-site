@@ -1,0 +1,6 @@
+{
+  "operation": "read-production-cleanup-metadata",
+  "requestId": "retirement-cleanup-probe-20261120-02",
+  "requestedAt": "2026-11-20T17:13:06.914Z",
+  "reviewedCommit": "f4de9c61a3e2275a722dd0b543e3ff96490606cb"
+}

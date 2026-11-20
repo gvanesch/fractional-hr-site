@@ -1,0 +1,8 @@
+{
+  "operation": "deploy-reviewed-retirement-candidate-to-qa",
+  "requestId": "retirement-20261120-qa-01",
+  "requestedAt": "2026-11-20T11:38:49.000Z",
+  "reviewedCommit": "3a57a73d19e63066f67bab768b6be9d824bd8aa1",
+  "expectedQaVersionId": "31410344-cdba-4b49-9d9d-88e546830083",
+  "expectedProductionVersionId": "6f47c7ec-3697-486c-ad8a-a9823be99424"
+}

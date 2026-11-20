@@ -748,37 +748,61 @@ export async function POST(request: Request) {
       completion.submissionId,
     )}`;
 
-    const resendResponse = await sendDiagnosticEmail({
-      score,
-      bandLabel: band.label,
-      bandSummary: band.summary,
-      companySize: body.companySize,
-      industry: body.industry,
-      role: body.role,
-      countryRegion: body.countryRegion,
-      email: body.email,
-      answers: body.answers,
-      advisorUrl,
-    });
+    // The submission is already durable. A notification outage must not turn
+    // a saved Health Check into an apparent failure or encourage resubmission.
+    let resendResponse: ResendSendResponse | null = null;
+    let internalEmailStatus: "sent" | "failed" = "failed";
 
-    await logSystemEvent({
-      eventType: "health_check_internal_email",
-      submissionId: completion.submissionId,
-      publicToken: completion.publicToken,
-      source: "health-check",
-      metadata: {
+    try {
+      resendResponse = await sendDiagnosticEmail({
+        score,
+        bandLabel: band.label,
+        bandSummary: band.summary,
+        companySize: body.companySize,
+        industry: body.industry,
+        role: body.role,
+        countryRegion: body.countryRegion,
+        email: body.email,
+        answers: body.answers,
+        advisorUrl,
+      });
+      internalEmailStatus = "sent";
+
+      await logSystemEvent({
+        eventType: "health_check_internal_email",
+        submissionId: completion.submissionId,
+        publicToken: completion.publicToken,
+        source: "health-check",
+        metadata: {
+          score,
+          band: band.label,
+          resendId: resendResponse.id ?? null,
+        },
+      });
+
+      console.log("HEALTH_CHECK_INTERNAL_EMAIL_SENT", {
+        submissionId: completion.submissionId,
         score,
         band: band.label,
         resendId: resendResponse.id ?? null,
-      },
-    });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
 
-    console.log("HEALTH_CHECK_INTERNAL_EMAIL_SENT", {
-      submissionId: completion.submissionId,
-      score,
-      band: band.label,
-      resendId: resendResponse.id ?? null,
-    });
+      await logSystemEvent({
+        eventType: "health_check_internal_email",
+        status: "error",
+        submissionId: completion.submissionId,
+        publicToken: completion.publicToken,
+        source: "health-check",
+        metadata: { error: message },
+      });
+
+      console.error("HEALTH_CHECK_INTERNAL_EMAIL_FAILED", {
+        submissionId: completion.submissionId,
+        error: message,
+      });
+    }
 
     if (body.email) {
       try {
@@ -862,7 +886,8 @@ export async function POST(request: Request) {
       completedAt: completion.completedAt,
       score,
       band: band.label,
-      resendId: resendResponse.id ?? null,
+      resendId: resendResponse?.id ?? null,
+      internalEmailStatus,
     });
   } catch (error) {
     await logSystemEvent({

@@ -1,0 +1,14 @@
+{
+  "operation": "activate-recorded-retirement-candidate-to-production",
+  "requestId": "retirement-20261120-activation-01",
+  "requestedAt": "2026-11-20T16:53:57Z",
+  "reviewedCommit": "1fa929e0301913d753595aedc755ae4c923a9c4f",
+  "expectedProductionVersionId": "6f47c7ec-3697-486c-ad8a-a9823be99424",
+  "expectedQaVersionId": "f6076224-8523-4761-8148-69b637e2e542",
+  "expectedAccessPlanFingerprint": "e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42",
+  "candidateVersionId": "9bd890ab-41e1-4845-867c-f6d4eb85196f",
+  "originalRequestFingerprint": "eced68ae64362ce144a1b7571dbed171e948e72e633893741384fc620f928308",
+  "originalSourceCommit": "aba9dd3d1c59f125d3c436528387d6aedff225a9",
+  "recordedReportFingerprint": "faee2c9b14fe51e6e9dca66e992ad8af9d47011987fbbb0038b9c8b2b106396f",
+  "originalEligibilityFingerprint": "efbb18577408dcdb6dabac02e670fbb6a6f8c493dcdcb5b572705d0fc3fc4511"
+}
