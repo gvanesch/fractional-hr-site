@@ -1,0 +1,49 @@
+name: One production Health Check D1 proof
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+    paths:
+      - scripts/security/production-healthcheck-smoke-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+
+jobs:
+  prove:
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify the one-shot adapter and request guards without credentials
+        run: node --test tests/d1/production-healthcheck-smoke.test.mjs tests/d1/production-healthcheck-smoke-run.test.mjs
+      - name: Verify the fresh request-only commit before provider access
+        run: node scripts/security/production-healthcheck-smoke-run.mjs validate
+      - name: Read production metadata and prove the single reserved Health Check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node scripts/security/production-healthcheck-smoke-run.mjs preflight
+          node scripts/security/production-healthcheck-smoke-run.mjs submit
+      - name: Retain sanitized proof and reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-healthcheck-smoke-evidence
+          path: production-healthcheck-smoke-report.json
+          if-no-files-found: ignore
+          retention-days: 14

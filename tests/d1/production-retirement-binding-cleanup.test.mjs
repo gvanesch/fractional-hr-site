@@ -74,7 +74,7 @@ function fixture() {
   const state = { prod, qa, calls: [], evidence: [], patches: 0, activations: 0, accessReads: 0,
     beforeReply: null, afterPatch: null, afterActivation: null, failPatch: false, failActivation: false, failHealth: false, redirectHealth: false };
   function updateBindings(target, entries, versionId = target.active) {
-    if (versionId === target.active) target.settings.bindings = clone(entries);
+    if (versionId === target.order[0]) target.settings.bindings = clone(entries);
     const entry = target.versions.get(versionId);
     entry.legacy.resources.bindings = clone(entries);
     entry.beta.bindings = asBeta(entries);
@@ -110,6 +110,7 @@ function fixture() {
       base.beta.annotations = { ...base.beta.annotations, ...body.annotations, "workers/triggered_by": "secret" };
       base.legacy.annotations = clone(base.beta.annotations);
       prod.versions.set(CANDIDATE, base); prod.order.unshift(CANDIDATE); updateBindings(prod, nextBindings, CANDIDATE);
+      prod.settings.annotations = clone(base.beta.annotations);
       await state.afterPatch?.(); result = { id: CANDIDATE };
     } else if (method === "POST") {
       assert.equal(match[1], "scripts"); assert.equal(target, prod); assert.equal(resource, "deployments"); assert.equal(url.search, "");
@@ -168,6 +169,10 @@ test("staging performs one narrowly scoped inactive PATCH; activation is a separ
   const f = fixture(), checkpoint = await f.prepare(), initialQa = hash(f.state.qa.settings);
   const staged = await f.stage(checkpoint);
   assert.equal(f.state.prod.active, PROD); assert.equal(f.state.activations, 0);
+  assert.ok(f.state.prod.versions.get(PROD).legacy.resources.bindings.some(item => item.name === "SUPABASE_SERVICE_ROLE_KEY"),
+    "The immutable serving version retains its original bindings until activation");
+  assert.ok(!f.state.prod.settings.bindings.some(item => LEGACY_SUPABASE_BINDINGS.includes(item.name)),
+    "Settings already describe the known inactive cleanup candidate");
   assert.deepEqual(mutations(f.state).map(call => call.method), ["PATCH"]);
   assert.deepEqual(mutations(f.state)[0].body.env, Object.fromEntries(LEGACY_SUPABASE_BINDINGS.map(name => [name, null])));
   const report = await f.activate(checkpoint, staged);
@@ -179,6 +184,36 @@ test("staging performs one narrowly scoped inactive PATCH; activation is a separ
   assert.deepEqual(f.state.evidence.map(item => item.stage), ["cleanup_patch_requested_outcome_unknown", "cleanup_uploaded_not_verified",
     "cleanup_verified_not_activated", "cleanup_activation_requested_outcome_unknown", "cleanup_activated_verification_pending", "cleanup_verified"]);
   assert.ok(mutations(f.state).every(call => !call.search));
+});
+
+test("stale active settings or secret inventory cannot masquerade as the known inactive candidate", async () => {
+  for (const stale of ["settings", "secrets"]) {
+    const f = fixture(), checkpoint = await f.prepare();
+    f.state.afterPatch = () => {
+      if (stale === "settings") f.state.prod.settings.bindings = clone(f.state.prod.versions.get(PROD).legacy.resources.bindings);
+      else f.state.beforeReply = ({ target, resource, result }) => {
+        if (target === f.state.prod && resource === "secrets") return Response.json({ success: true,
+          result: [...result, { name: "SUPABASE_SERVICE_ROLE_KEY", type: "secret_text" }] });
+      };
+    };
+    await assert.rejects(f.stage(checkpoint), /known latest/);
+    assert.equal(f.state.patches, 1); assert.equal(f.state.activations, 0); assert.equal(f.state.prod.active, PROD);
+    assert.equal(f.state.evidence.at(-1).stage, "cleanup_uploaded_not_verified");
+  }
+});
+
+test("candidate settings cannot hide an unknown latest upload or drift in the still-serving version", async () => {
+  for (const change of [
+    f => { f.state.prod.order.unshift(OTHER); },
+    f => { f.state.prod.order.splice(1, 0, OTHER); },
+    f => { f.updateBindings(f.state.prod, f.state.prod.versions.get(PROD).legacy.resources.bindings.filter(item => item.name !== "RESEND_API_KEY"), PROD); },
+    f => { f.state.prod.versions.get(PROD).beta.modules[0].content_base64 = Buffer.from("changed serving code").toString("base64"); },
+  ]) {
+    const f = fixture(), checkpoint = await f.prepare(), staged = await f.stage(checkpoint);
+    change(f);
+    await assert.rejects(f.activate(checkpoint, staged));
+    assert.equal(f.state.activations, 0); assert.equal(f.state.prod.active, PROD);
+  }
 });
 
 test("staging removes only known bindings actually present and preserves all others", async () => {

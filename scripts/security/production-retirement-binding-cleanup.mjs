@@ -244,13 +244,25 @@ async function inspectWorker(api, target, expectedVersion, latestVersion = expec
   check(object(settings) && Array.isArray(secrets) && Array.isArray(schedules?.schedules) && typeof subdomain?.enabled === "boolean",
     "Worker settings, secret inventory, schedule or subdomain metadata is unavailable.");
   const active = version(detail, legacy, expectedVersion);
-  check(hash(bindings(settings.bindings)) === active.bindingFingerprint, "Active version and Worker settings bindings disagree.");
+  // /settings and /secrets follow the latest uploaded version, even while an
+  // older immutable version still serves all traffic. Only the exact known
+  // cleanup candidate may occupy that latest slot; never relax the lease to
+  // allow an arbitrary newer version or use its bindings as the serving state.
+  let latest = active;
+  if (latestVersion !== expectedVersion) {
+    const [latestLegacy, latestDetail] = await reads([
+      api(`${prefix}/versions/${latestVersion}`),
+      api(`/workers/workers/${target.worker}/versions/${latestVersion}?include=modules,sourcemaps`),
+    ]);
+    latest = version(latestDetail, latestLegacy, latestVersion);
+  }
+  check(hash(bindings(settings.bindings)) === latest.bindingFingerprint, "The known latest version and Worker settings bindings disagree.");
   const secretNames = secrets.map(item => {
     fields(item, ["name", "type"], "secret-name inventory");
     check(typeof item.name === "string" && ["secret_text", "secret_key"].includes(item.type), "Secret-name inventory is invalid.");
     return { name: item.name, type: item.type };
   }).sort((a, b) => a.name.localeCompare(b.name));
-  check(hash(secretNames) === hash(active.bindings.filter(item => ["secret_text", "secret_key"].includes(item.type))), "Secret-name and active binding inventories disagree.");
+  check(hash(secretNames) === hash(latest.bindings.filter(item => ["secret_text", "secret_key"].includes(item.type))), "Secret-name and known latest binding inventories disagree.");
   return { ...active, worker: target.worker, deploymentId: deployment.id, latestVersionId: versions.items[0].id,
     settingsFingerprint: hash({ ...without(settings, ["bindings", "annotations"]), annotations: annotations(settings.annotations) }),
     routingFingerprint: hash({ schedules, subdomain }) };

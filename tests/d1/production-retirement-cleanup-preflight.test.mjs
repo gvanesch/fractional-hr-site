@@ -1,12 +1,33 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { runCleanupMetadataPreflight, runProductionBindingReconciliation, cleanupPreflightFailure } from "../../scripts/security/production-retirement-cleanup-preflight.mjs";
+import { runCleanupMetadataPreflight, runProductionBindingReconciliation, cleanupPreflightFailure,
+  CLEANUP_PROBE_REQUEST_PATH, validateCleanupProbeRequest } from "../../scripts/security/production-retirement-cleanup-preflight.mjs";
 import { ACCOUNT, fingerprint, normalizeBindings } from "../../scripts/security/qa-retirement-release.mjs";
 
 const ID = "11111111-1111-4111-8111-111111111111", OTHER = "22222222-2222-4222-8222-222222222222";
 const DEPLOY = "33333333-3333-4333-8333-333333333333";
 const clone = value => structuredClone(value);
+
+test("metadata workflow requires a fresh request-only push on the reviewed branch and first run", () => {
+  const now = Date.parse("2026-11-20T12:00:00Z"), head = "a".repeat(40), parent = "b".repeat(40);
+  const valid = { request: { operation: "read-production-cleanup-metadata", requestId: "cleanup-metadata-probe-01",
+    requestedAt: new Date(now - 1000).toISOString(), reviewedCommit: parent },
+    env: { GITHUB_REPOSITORY: "gvanesch/fractional-hr-site", GITHUB_REF: "refs/heads/chore/supabase-retirement-2026-11",
+      GITHUB_EVENT_NAME: "push", GITHUB_RUN_ATTEMPT: "1", GITHUB_SHA: head },
+    git: { head, parent, changedPaths: [CLEANUP_PROBE_REQUEST_PATH] }, now };
+  assert.equal(validateCleanupProbeRequest(valid).validated, true);
+  for (const mutate of [
+    x => { x.env.GITHUB_REPOSITORY = "untrusted/repo"; }, x => { x.env.GITHUB_REF = "refs/heads/main"; },
+    x => { x.env.GITHUB_EVENT_NAME = "workflow_dispatch"; }, x => { x.env.GITHUB_RUN_ATTEMPT = "2"; },
+    x => { x.request.operation = "activate-production"; }, x => { x.request.extra = "unreviewed"; },
+    x => { x.request.requestedAt = new Date(now - 86400001).toISOString(); },
+    x => { x.request.requestedAt = new Date(now + 1).toISOString(); },
+    x => { x.env.GITHUB_SHA = parent; }, x => { x.git.parent = head; },
+    x => { x.git.changedPaths.push("scripts/security/production-retirement-cleanup-preflight.mjs"); },
+    x => { x.git.changedPaths = ["app/page.tsx"]; },
+  ]) { const args = clone(valid); mutate(args); assert.throws(() => validateCleanupProbeRequest(args)); }
+});
 function fixture() {
   const env = { GITHUB_REPOSITORY: "gvanesch/fractional-hr-site", GITHUB_REF: "refs/heads/chore/supabase-retirement-2026-11",
     CLOUDFLARE_ACCOUNT_ID: ACCOUNT, CLOUDFLARE_API_TOKEN: "private-test-token" };

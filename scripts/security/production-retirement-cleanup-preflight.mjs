@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { ACCOUNT, PRODUCTION, fingerprint, normalizeBindings } from "./qa-retirement-release.mjs";
 
 const API = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}`;
+export const CLEANUP_PROBE_REQUEST_PATH = "scripts/security/production-retirement-cleanup-probe-request.json";
 const PREFIX = `/workers/scripts/${PRODUCTION.worker}`;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
@@ -49,6 +50,19 @@ const check = (condition, code) => { if (!condition) throw new PreflightError(co
 const SCOPE = Object.freeze({ metadataOnly: true, acceptanceVerified: false, mutationAttempted: false,
   clientRecordsRead: false, databaseRequests: false, emailsSent: false, secretValuesPrinted: false,
   bindingValuesPrinted: false, moduleContentsPrinted: false, assetTokensPrinted: false });
+
+export function validateCleanupProbeRequest({ request, env, git, now = Date.now() }) {
+  check(env?.GITHUB_REPOSITORY === "gvanesch/fractional-hr-site" && env.GITHUB_REF === "refs/heads/chore/supabase-retirement-2026-11" &&
+    env.GITHUB_EVENT_NAME === "push" && String(env.GITHUB_RUN_ATTEMPT) === "1", "probe_request_context_unverified");
+  const fields = ["operation", "requestId", "requestedAt", "reviewedCommit"], age = now - Date.parse(request?.requestedAt);
+  check(object(request) && Object.keys(request).every(name => fields.includes(name)) &&
+    request.operation === "read-production-cleanup-metadata" && /^[a-z0-9][a-z0-9-]{7,63}$/.test(request.requestId ?? "") &&
+    /^[a-f0-9]{40}$/.test(request.reviewedCommit ?? "") && Number.isFinite(age) && age >= 0 && age <= 86400000,
+  "probe_request_invalid_or_stale");
+  check(/^[a-f0-9]{40}$/.test(git?.head ?? "") && git.head === env.GITHUB_SHA && git.parent === request.reviewedCommit &&
+    git.changedPaths?.length === 1 && git.changedPaths[0] === CLEANUP_PROBE_REQUEST_PATH, "probe_request_only_source_unverified");
+  return { validated: true, metadataOnly: true, mutationAttempted: false, requestId: request.requestId, reviewedCommit: request.reviewedCommit };
+}
 
 export function cleanupPreflightFailure(error) {
   return { kind: "production-cleanup-metadata-preflight", metadataReadCompleted: false, metadataReady: false,
