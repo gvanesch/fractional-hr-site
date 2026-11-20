@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import {
   ACCOUNT, CANDIDATE_REF, TARGETS, MODES, REQUIRED_BINDINGS, REQUIRED_TABLES,
-  SCHEMA_SELECT, inspectSettings, matchesDestination, runAudit, validateContext,
+  SCHEMA_SELECT, PROTECTED_PATHS, inspectSettings, matchesDestination, runAudit, validateContext, failureReport,
 } from "../../scripts/security/supabase-retirement-readonly.mjs";
 
 const privateValue = "private-value-must-not-be-logged";
@@ -19,7 +20,7 @@ function fixtureBindings(target = TARGETS.production) {
     { name: "SUPABASE_SERVICE_ROLE_KEY", type: "secret_text", text: privateValue },
   ];
 }
-function fixture({ targetName = "production", missingMode, accessUnavailable = false, supabaseRequired = false, missingTable } = {}) {
+function fixture({ targetName = "production", missingMode, accessUnavailable = false, supabaseRequired = false, missingTable, applications } = {}) {
   const target = TARGETS[targetName];
   const requests = [];
   const fetchImpl = async (url, options = {}) => {
@@ -41,10 +42,11 @@ function fixture({ targetName = "production", missingMode, accessUnavailable = f
         else if (url.endsWith("/secrets")) result = [];
         else if (url.includes("/access/apps?")) {
           if (accessUnavailable) return new Response("forbidden", { status: 403 });
-          result = target.hosts.map((host, index) => ({
+          result = applications ?? target.hosts.map((host, index) => ({
             id: `${index}0000000-0000-4000-8000-000000000000`, domain: host, aud: privateValue,
           }));
         } else if (url.endsWith("/policies")) result = [{ decision: "allow", include: [{ email: { email: "private-person@example.invalid" } }] }];
+        else if (url.endsWith("/workers/scripts")) result = [{ id: target.worker, tag: "12345678901234567890123456789012" }];
         else if (url.endsWith("/deployments")) result = { deployments: [{ versions: [{ version_id: "00000000-0000-4000-8000-000000000000", percentage: 100 }] }] };
         else assert.fail(`Unexpected API path: ${url}`);
       }
@@ -110,6 +112,9 @@ test("unreadable Access configuration is an unknown blocker, never a success", a
   assert.equal(result.readOnlyChecksPassed, false);
   assert.equal(result.access.inventoryComplete, false);
   assert.ok(result.blockers.some(message => message.includes("not readable")));
+  assert.equal(result.access.coverageStatus, "unknown");
+  assert.ok(!result.blockers.some(message => message.includes("No candidate")));
+  assert.ok(result.access.routes.every(route => route.coverage === "unknown"));
 });
 
 test("empty configuration values do not qualify as configured", () => {
@@ -130,6 +135,10 @@ test("Access destination inventory respects path boundaries and documented wildc
   assert.equal(match("vanesch.uk/api/advisor-*", "/api/contact"), false);
   assert.equal(match("vanesch.uk", "/advisor", "www.vanesch.uk"), false);
   assert.equal(match("evil.example/advisor", "/advisor"), false);
+  assert.equal(match("*.vanesch.uk/advisor*", "/advisor", "www.vanesch.uk"), true);
+  assert.equal(match("*.vanesch.uk/advisor*", "/advisor", "vanesch.uk"), false);
+  assert.equal(match("*.vanesch.uk/advisor*", "/advisor", "one.two.vanesch.uk"), false);
+  assert.equal(match("https://VANESCH.UK/advisor*", "/advisor"), true);
 });
 
 test("website redirects never leak the Cloudflare API credential or follow an unapproved host", async () => {
@@ -159,4 +168,75 @@ test("a public API redirected to same-host Access login is a blocker, even when 
   assert.equal(followedLogin, false);
   assert.equal(result.readOnlyChecksPassed, false);
   assert.equal(result.publicApiBoundaries.find(route => route.path === "/api/diagnostic-complete").applicationMethodRejected, false);
+});
+
+test("the audit covers every existing advisor API except the explicitly independent cron endpoint", () => {
+  const expected = readdirSync(new URL("../../app/api/", import.meta.url)).filter(name => name.startsWith("advisor-") && name !== "advisor-daily-action-digest");
+  for (const name of expected) assert.ok(PROTECTED_PATHS.includes(`/api/${name}`), `Missing advisor coverage: ${name}`);
+});
+
+test("modern public wildcard destinations are detected without disclosing any other app domains", async () => {
+  const f = fixture({ targetName: "qa", applications: [
+    { id: "00000000-0000-4000-8000-000000000000", domain: "unrelated-private.example", destinations: [{ type: "public", uri: "*.greg-732.workers.dev/advisor*" }] },
+    { id: "10000000-0000-4000-8000-000000000000", domain: "another-private.example" },
+  ] });
+  const result = await runAudit({ env, targetName: "qa", fetchImpl: f.fetchImpl });
+  assert.equal(result.access.diagnostics.totalApplicationsRead, 2);
+  assert.equal(result.access.matchingApplicationCount, 1);
+  assert.equal(result.access.diagnostics.matchingWildcardPublicDestinations, 1);
+  assert.equal(result.access.diagnostics.matchingModernPublicDestinations, 1);
+  assert.equal(result.access.routes.find(route => route.path === "/advisor").coverage, "candidate_match");
+  assert.ok(!JSON.stringify(result).includes("private.example"));
+});
+
+test("Worker destinations resolve immutable IDs and respect public path overrides", async () => {
+  const f = fixture({ applications: [{
+    id: "00000000-0000-4000-8000-000000000000",
+    destinations: [{ type: "worker", worker_id: "12345678901234567890123456789012", overrides: [{ behavior: "public", path_pattern: "/api/advisor-logout" }] }],
+  }] });
+  const result = await runAudit({ env, fetchImpl: f.fetchImpl });
+  assert.equal(result.access.diagnostics.matchingWorkerDestinations, 1);
+  assert.equal(result.access.matchingApplicationCount, 1);
+  assert.equal(result.access.diagnostics.workerIdentityReadable, true);
+  assert.equal(result.access.routes.find(route => route.path === "/advisor").coverage, "candidate_match");
+  assert.equal(result.access.routes.find(route => route.path === "/api/advisor-logout").coverage, "no_candidate_match");
+  assert.ok(!JSON.stringify(result).includes("12345678901234567890123456789012"));
+});
+
+test("modern destinations supersede legacy domains and unknown shapes cannot produce an absence claim", async () => {
+  const f = fixture({ applications: [{
+    id: "00000000-0000-4000-8000-000000000000", domain: "vanesch.uk", self_hosted_domains: ["vanesch.uk"],
+    destinations: [{ type: "public", uri: "private-other-app.example" }, { type: "new-unhandled-type", secret: privateValue }],
+  }] });
+  const result = await runAudit({ env, fetchImpl: f.fetchImpl });
+  assert.equal(result.access.matchingApplicationCount, 0);
+  assert.equal(result.access.parsingComplete, false);
+  assert.equal(result.access.coverageStatus, "unknown");
+  assert.equal(result.access.diagnostics.unknownDestinationTypeCount, 1);
+  assert.ok(!JSON.stringify(result).includes("private-other-app"));
+  assert.ok(!JSON.stringify(result).includes("new-unhandled-type"));
+  assert.ok(!JSON.stringify(result).includes(privateValue));
+  assert.ok(!result.blockers.some(message => message.includes("No candidate")));
+});
+
+test("failed required reads report a fixed operation and HTTP status while suppressing provider and transport details", async () => {
+  const f = fixture();
+  const fetchImpl = async (url, options) => String(url).endsWith("/query")
+    ? new Response(privateValue, { status: 403 }) : f.fetchImpl(url, options);
+  let output;
+  try { await runAudit({ env, fetchImpl }); assert.fail("expected read denial"); }
+  catch (error) { output = failureReport(error); }
+  assert.deepEqual(output.failure, { operation: "d1_schema", code: "http_failure", httpStatus: 403 });
+  assert.ok(!JSON.stringify(output).includes(privateValue));
+  assert.ok(!JSON.stringify(failureReport(new Error(privateValue))).includes(privateValue));
+});
+
+test("unrecognized self-hosted application destination structure keeps coverage unknown", async () => {
+  const f = fixture({ applications: [{ type: "self_hosted", destinations: { unexpected: privateValue } }] });
+  const result = await runAudit({ env, fetchImpl: f.fetchImpl });
+  assert.equal(result.access.diagnostics.unparsedApplicationCount, 1);
+  assert.equal(result.access.diagnostics.malformedDestinationListCount, 1);
+  assert.equal(result.access.coverageStatus, "unknown");
+  assert.ok(!result.blockers.some(message => message.includes("No candidate")));
+  assert.ok(!JSON.stringify(result).includes(privateValue));
 });

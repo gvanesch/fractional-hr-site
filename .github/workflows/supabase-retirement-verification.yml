@@ -41,8 +41,8 @@ jobs:
       - run: npm ci --no-audit
       - name: D1 application and retirement regression tests
         run: npm run test:d1
-      - name: Next application build with no Supabase URL or keys
-        run: npm run build
+      - name: Next and Cloudflare Worker build with no Supabase URL or keys
+        run: npx opennextjs-cloudflare build
 
   live-readonly:
     name: Inspect ${{ matrix.target }} without writes

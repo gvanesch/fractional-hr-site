@@ -55,7 +55,13 @@ function harness() {
       }
     },
   };
-  const state = { authorized: true, messages: [], supabaseCalls: 0 };
+  const state = {
+    authorized: true,
+    messages: [],
+    supabaseCalls: 0,
+    cookies: new Map(),
+    failAdvisorEmail: false,
+  };
   const env = { DB: db };
   for (const key of [
     "SYSTEM_EVENTS",
@@ -90,6 +96,13 @@ function harness() {
       authenticateAdvisorRequest: async () =>
         state.authorized ? { email: "advisor@example.invalid" } : null,
     },
+    "next/headers": {
+      cookies: async () => ({ get: (name) => state.cookies.get(name) }),
+    },
+    "next/navigation": {
+      redirect: (url) => { throw new Error(`redirect:${url}`); },
+      notFound: () => { throw new Error("notFound"); },
+    },
     resend: {
       Resend: class {
         emails = {
@@ -102,7 +115,13 @@ function harness() {
     },
     "next/server": {
       NextResponse: {
-        json: Response.json,
+        json: (...args) => {
+          const response = Response.json(...args);
+          response.cookies = {
+            set: (cookie) => state.cookies.set(cookie.name, cookie),
+          };
+          return response;
+        },
         next: () => new Response(null),
         redirect: (url) => Response.redirect(url),
       },
@@ -111,15 +130,22 @@ function harness() {
   const cache = new Map();
   function load(file) {
     file = path.resolve(root, file);
-    if (!path.extname(file)) file += ".ts";
+    if (!path.extname(file)) file += fs.existsSync(`${file}.ts`) ? ".ts" : ".tsx";
+    for (const name of ["admin", "server"]) {
+      if (file === path.join(root, `lib/supabase/${name}.ts`)) {
+        return overrides[`@/lib/supabase/${name}`];
+      }
+    }
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} };
     cache.set(file, module);
     const code = ts.transpileModule(fs.readFileSync(file, "utf8"), {
+      fileName: file,
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
         target: ts.ScriptTarget.ES2022,
         esModuleInterop: true,
+        jsx: ts.JsxEmit.ReactJSX,
       },
     }).outputText;
     const localRequire = (name) => {
@@ -139,6 +165,7 @@ function harness() {
         Response,
         Headers,
         URL,
+        URLSearchParams,
         TextEncoder,
         TextDecoder,
         Buffer,
@@ -148,9 +175,17 @@ function harness() {
         clearTimeout,
         fetch: async (url, options) => {
           if (url === "https://api.resend.com/emails") {
-            state.messages.push(JSON.parse(options.body));
+            const message = JSON.parse(options.body);
+            state.messages.push(message);
+            if (state.failAdvisorEmail && message.to.includes(processEnv.CONTACT_TO_EMAIL)) {
+              return Response.json({ message: "Synthetic mail provider outage" }, { status: 503 });
+            }
             return Response.json({ id: "synthetic" });
           }
+          if (url === "https://qa.example.invalid/api/public-diagnostic-email") {
+            return load("app/api/public-diagnostic-email/route.ts").POST(new Request(url, options));
+          }
+          if (new URL(url).hostname.endsWith(".supabase.co")) state.supabaseCalls++;
           throw new Error("External network prohibited");
         },
       },
@@ -734,6 +769,280 @@ test("Scheduler alias keeps cron authorization and dry runs never send email", a
       assert.equal(result.body.projectCount, 0);
       assert.equal(empty.state.messages.length, 0);
     } finally { empty.sqlite.close(); }
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+function healthCheckInput(h) {
+  return {
+    answers: Object.fromEntries(h.load("lib/diagnostic.ts").questions.map(q => [q.id, 4])),
+    companySize: "51-200",
+    industry: "Synthetic services",
+    role: "HR leader",
+    countryRegion: "United Kingdom",
+  };
+}
+
+test("HR Health Check persists answers, returns its result and sends both emails without Supabase", async () => {
+  const h = harness();
+  try {
+    const input = { ...healthCheckInput(h), email: "participant@example.invalid" };
+    const completed = await h.route("diagnostic-complete", input);
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    assert.equal(completed.body.internalEmailStatus, "sent");
+    const row = h.sqlite.prepare("SELECT * FROM diagnostic_submissions").get();
+    assert.equal(row.submission_id, completed.body.submissionId);
+    assert.equal(row.public_token, completed.body.publicToken);
+    assert.equal(row.submission_source, "health-check");
+    assert.deepEqual(JSON.parse(row.answers), input.answers);
+    assert.equal(row.email, input.email);
+    assert.equal(row.score, completed.body.score);
+    assert.ok(JSON.parse(row.advisor_brief).headline);
+    assert.equal(h.state.messages.length, 2);
+    assert.deepEqual(h.state.messages.map(m => m.to[0]), ["advisor@example.invalid", input.email]);
+    const result = await h.route("public-diagnostic-result", null, "GET", `?token=${row.public_token}`);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.result.score, row.score);
+    assert.equal(result.body.context.companySize, input.companySize);
+    assert.equal(result.body.context.emailPresent, true);
+    assert.equal((await h.route("public-diagnostic-result", null, "GET", "?token=unknown")).status, 404);
+    const advisor = await h.route("advisor-submission", null, "GET", `?submissionId=${row.submission_id}`);
+    assert.equal(advisor.status, 200, JSON.stringify(advisor.body));
+    assert.equal(advisor.body.diagnostic.score, row.score);
+    const dashboard = await h.load("lib/advisor-dashboard.ts").getAdvisorDashboardData();
+    assert.equal(dashboard.healthChecks.error, null);
+    assert.equal(dashboard.healthChecks.data[0].submission_id, row.submission_id);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+test("Health Check validation and honeypot do not write records or send email", async () => {
+  const h = harness();
+  try {
+    const input = healthCheckInput(h);
+    assert.equal((await h.route("diagnostic-complete", { ...input, answers: { 1: 4 } })).status, 400);
+    assert.equal((await h.route("diagnostic-complete", { ...input, answers: { ...input.answers, 1: 9 } })).status, 400);
+    assert.equal((await h.route("diagnostic-complete", { ...input, website: "bot.example.invalid" })).status, 200);
+    assert.equal(h.sqlite.prepare("SELECT count(*) n FROM diagnostic_submissions").get().n, 0);
+    assert.equal(h.state.messages.length, 0);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+for (const failure of ["provider outage", "missing configuration"]) {
+  test(`A saved D1 Health Check remains successful during an advisor email ${failure}`, async () => {
+    const h = harness();
+    try {
+      if (failure === "provider outage") h.state.failAdvisorEmail = true;
+      else delete h.processEnv.CONTACT_TO_EMAIL;
+      const completed = await h.route("diagnostic-complete", {
+        ...healthCheckInput(h), email: "participant@example.invalid",
+      });
+      assert.equal(completed.status, 200, JSON.stringify(completed.body));
+      assert.equal(completed.body.ok, true);
+      assert.equal(completed.body.internalEmailStatus, "failed");
+      assert.equal(completed.body.resendId, null);
+      assert.equal(h.sqlite.prepare("SELECT count(*) n FROM diagnostic_submissions").get().n, 1);
+      assert.equal((await h.route("public-diagnostic-result", null, "GET", `?token=${completed.body.publicToken}`)).status, 200);
+      assert.equal(h.state.messages.at(-1).to[0], "participant@example.invalid", "Client result email still attempted");
+      const event = h.sqlite.prepare("SELECT status, metadata FROM system_events WHERE event_type = 'health_check_internal_email'").get();
+      assert.equal(event.status, "error");
+      assert.ok(JSON.parse(event.metadata).error);
+      assert.equal(h.sqlite.prepare("SELECT count(*) n FROM system_events WHERE event_type = 'health_check_failure'").get().n, 0);
+      assert.equal(h.state.supabaseCalls, 0);
+    } finally { h.sqlite.close(); }
+  });
+}
+
+test("A failed D1 Health Check write returns failure without sending notifications or falling back", async () => {
+  const h = harness();
+  try {
+    const prepare = h.db.prepare;
+    h.db.prepare = (sql) => {
+      if (/INSERT INTO diagnostic_submissions/.test(sql)) throw new Error("Synthetic D1 write failure");
+      return prepare(sql);
+    };
+    const completed = await h.route("diagnostic-complete", healthCheckInput(h));
+    assert.equal(completed.status, 500);
+    assert.equal(completed.body.publicToken, undefined);
+    assert.equal(h.sqlite.prepare("SELECT count(*) n FROM diagnostic_submissions").get().n, 0);
+    assert.equal(h.state.messages.length, 0);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+test("Health Check enquiries, CRM updates, notes and link/unlink work together in D1", async () => {
+  const h = harness();
+  try {
+    const input = healthCheckInput(h);
+    const completed = await h.route("diagnostic-complete", input);
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    const contact = await h.route("contact", {
+      ...input,
+      submissionId: completed.body.submissionId,
+      diagnosticAnswers: input.answers,
+      name: "Synthetic Contact",
+      email: "contact@example.invalid",
+      company: "Synthetic Ltd",
+      message: "Please discuss this synthetic Health Check result.",
+      source: "diagnostic-interpretation",
+    });
+    assert.equal(contact.status, 200, JSON.stringify(contact.body));
+    assert.equal(h.sqlite.prepare("SELECT count(*) n FROM diagnostic_submissions").get().n, 1);
+    const healthProspect = h.sqlite.prepare("SELECT * FROM health_check_prospects").get();
+    assert.equal(healthProspect.submission_id, completed.body.submissionId);
+    const updatedHealthProspect = await h.route("prospect-update", {
+      prospect_id: healthProspect.prospect_id,
+      source: "website", relationship: "strong", status: "contacted",
+      notes: "Synthetic follow-up", next_action_date: "2030-01-01",
+    });
+    assert.equal(updatedHealthProspect.status, 200, JSON.stringify(updatedHealthProspect.body));
+    assert.equal(h.sqlite.prepare("SELECT status FROM health_check_prospects").get().status, "contacted");
+    assert.ok(h.sqlite.prepare("SELECT count(*) n FROM health_check_prospect_activity").get().n > 0);
+    const created = await h.route("advisor-create-prospect", {
+      name: "Synthetic Contact", company: "Synthetic Ltd", source: "website",
+    });
+    assert.equal(created.status, 200, JSON.stringify(created.body));
+    const prospectId = created.body.prospect_id;
+    for (const [name, body] of [
+      ["advisor-update-prospect", { prospect_id: prospectId, deal_stage: "in_conversation", contact_email: "contact@example.invalid", next_step: "Discuss result" }],
+      ["advisor-add-prospect-note", { prospect_id: prospectId, note: "Synthetic CRM note", note_type: "internal", next_action_date: "2030-01-01" }],
+      ["advisor-link-health-check-prospect", { prospect_id: prospectId, submission_id: completed.body.submissionId }],
+    ]) {
+      const response = await h.route(name, body);
+      assert.equal(response.status, 200, `${name}: ${JSON.stringify(response.body)}`);
+    }
+    const dashboard = await h.load("lib/advisor-dashboard.ts").getAdvisorDashboardData();
+    assert.equal(dashboard.prospects.error, null);
+    assert.equal(dashboard.prospects.data[0].linked_submission_id, completed.body.submissionId);
+    assert.equal(dashboard.prospects.data[0].deal_stage, "in_conversation");
+    assert.equal(dashboard.healthChecks.data[0].contact_name, "Synthetic Contact");
+    assert.ok(h.sqlite.prepare("SELECT count(*) n FROM advisor_prospect_activity WHERE prospect_id = ?").get(prospectId).n >= 3);
+    const unlinked = await h.route("advisor-unlink-health-check-prospect", { prospect_id: prospectId });
+    assert.equal(unlinked.status, 200, JSON.stringify(unlinked.body));
+    assert.equal(h.sqlite.prepare("SELECT linked_submission_id FROM advisor_prospects").get().linked_submission_id, null);
+    h.state.authorized = false;
+    assert.equal((await h.route("advisor-create-prospect", { name: "Forbidden" })).status, 401);
+    assert.equal(h.sqlite.prepare("SELECT count(*) n FROM advisor_prospects").get().n, 1);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+test("D1 project spaces support details, participant OTP, questionnaires, Fact Pack and reports", async () => {
+  const h = harness();
+  try {
+    const projectId = h.project();
+    const details = await h.route("client-diagnostic-project-update", {
+      projectId, billingContactName: "Synthetic Billing", notes: "Synthetic project space",
+    }, "PATCH");
+    assert.equal(details.status, 200, JSON.stringify(details.body));
+    assert.equal(h.sqlite.prepare("SELECT billing_contact_name FROM client_projects WHERE project_id = ?").get(projectId).billing_contact_name, "Synthetic Billing");
+    const schema = h.load("lib/client-diagnostic/segmentation.ts").buildDefaultSegmentationSchema();
+    h.sqlite.prepare("UPDATE client_projects SET segmentation_schema = ? WHERE project_id = ?").run(JSON.stringify(schema), projectId);
+    const segmentationValues = Object.fromEntries(schema.fields.map(f => [f.fieldKey, f.options[0].optionKey]));
+    const bank = h.load("lib/client-diagnostic/question-bank.ts");
+
+    for (const questionnaireType of ["hr", "manager", "leadership", "client_fact_pack"]) {
+      h.state.cookies.clear();
+      const added = await h.route("advisor-project-participants", {
+        projectId, questionnaireType, segmentationValues,
+        name: `Synthetic ${questionnaireType}`, roleLabel: questionnaireType,
+        email: `${questionnaireType}@example.invalid`,
+      });
+      assert.equal(added.status, 201, JSON.stringify(added.body));
+      const participant = h.sqlite.prepare("SELECT * FROM client_participants WHERE project_id = ? AND questionnaire_type = ?").get(projectId, questionnaireType);
+      const identifiers = { projectId, participantId: participant.participant_id, inviteToken: participant.invite_token };
+      const issued = await h.route("client-diagnostic-otp-request", { inviteToken: participant.invite_token });
+      assert.equal(issued.status, 200, JSON.stringify(issued.body));
+      const otpCode = h.state.messages.at(-1).html.match(/>\s*(\d{6})\s*</)?.[1];
+      assert.match(otpCode, /^\d{6}$/);
+      const verified = await h.route("client-diagnostic-otp-verify", {
+        inviteToken: participant.invite_token, challengeId: issued.body.challengeId, otpCode,
+      });
+      assert.equal(verified.status, 200, JSON.stringify(verified.body));
+      assert.equal([...h.state.cookies.values()][0].httpOnly, true);
+      assert.equal([...h.state.cookies.values()][0].secure, true);
+
+      if (questionnaireType === "client_fact_pack") {
+        const responseJson = { companyProfile: { employees: 100 }, notes: "Synthetic Fact Pack" };
+        const draft = await h.route("client-fact-pack-submit", { ...identifiers, responseJson, mode: "draft" });
+        assert.equal(draft.status, 200, JSON.stringify(draft.body));
+        const loaded = await h.route("client-fact-pack", null, "GET", `?${new URLSearchParams(identifiers)}`);
+        assert.equal(loaded.status, 200, JSON.stringify(loaded.body));
+        assert.deepEqual(loaded.body.data, responseJson);
+        assert.equal(loaded.body.status, "in_progress");
+        const submitted = await h.route("client-fact-pack-submit", { ...identifiers, responseJson, mode: "submit" });
+        assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+        assert.equal(h.sqlite.prepare("SELECT status FROM client_fact_packs WHERE participant_id = ?").get(participant.participant_id).status, "completed");
+      } else {
+        const responses = bank.getQuestionsForQuestionnaireType(questionnaireType).map(q => ({
+          questionId: q.id, dimension: q.dimension, kind: q.kind,
+          value: q.kind === "score" ? 4 : "Synthetic operational evidence",
+        }));
+        const submitted = await h.route("client-diagnostic-submit", {
+          ...identifiers, questionnaireType, submission: { questionnaireType, responses },
+        });
+        assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+        assert.equal(submitted.body.savedResponseCount, responses.length);
+        assert.equal(h.sqlite.prepare("SELECT count(*) n FROM client_responses WHERE participant_id = ?").get(participant.participant_id).n, responses.length);
+        assert.ok(h.sqlite.prepare("SELECT count(*) n FROM client_dimension_scores WHERE participant_id = ?").get(participant.participant_id).n > 0);
+      }
+      assert.equal(h.sqlite.prepare("SELECT participant_status FROM client_participants WHERE participant_id = ?").get(participant.participant_id).participant_status, "completed");
+    }
+
+    const projects = await h.route("client-diagnostic-projects", null, "GET");
+    assert.equal(projects.status, 200, JSON.stringify(projects.body));
+    assert.equal(projects.body.projects[0].project_id, projectId);
+    const summary = await h.route("client-diagnostic-project-summary", null, "GET", `?projectId=${projectId}`);
+    assert.equal(summary.status, 200, JSON.stringify(summary.body));
+    assert.equal(summary.body.completion.completed, 4);
+    const report = await h.route("client-diagnostic-report", null, "GET", `?projectId=${projectId}`);
+    assert.equal(report.status, 200, JSON.stringify(report.body));
+    assert.equal(report.body.report.project.projectId, projectId);
+    assert.equal(report.body.report.executiveSummary.completedRespondentGroups, 3);
+    const dashboard = await h.load("lib/advisor-dashboard.ts").getAdvisorDashboardData();
+    assert.equal(dashboard.projects.error, null);
+    assert.equal(dashboard.projects.data[0].project_id, projectId);
+    const closed = await h.route("client-diagnostic-project-status", { projectId, projectStatus: "closed" }, "PATCH");
+    assert.equal(closed.status, 200, JSON.stringify(closed.body));
+    assert.equal(h.sqlite.prepare("SELECT project_status FROM client_projects WHERE project_id = ?").get(projectId).project_status, "closed");
+    h.state.authorized = false;
+    assert.equal((await h.route("client-diagnostic-projects", null, "GET")).status, 403);
+    assert.equal((await h.route("client-diagnostic-report", null, "GET", `?projectId=${projectId}`)).status, 403);
+    assert.equal(h.state.supabaseCalls, 0);
+  } finally { h.sqlite.close(); }
+});
+
+test("Advisor server pages read Health Checks, CRM and project spaces entirely from D1", async () => {
+  const h = harness();
+  try {
+    const completed = await h.route("diagnostic-complete", healthCheckInput(h));
+    assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    const created = await h.route("advisor-create-prospect", { name: "D1 synthetic prospect", company: "D1 synthetic company" });
+    assert.equal(created.status, 200, JSON.stringify(created.body));
+    const projectId = h.project();
+    h.sqlite.prepare("UPDATE client_projects SET project_name = 'D1 synthetic workspace' WHERE project_id = ?").run(projectId);
+    const props = { searchParams: Promise.resolve({}), params: Promise.resolve({
+      submissionId: completed.body.submissionId, prospectId: created.body.prospect_id, projectId,
+    }) };
+    for (const [page, expected] of [
+      ["page.tsx", "D1 synthetic workspace"],
+      ["health-checks/page.tsx", completed.body.submissionId],
+      ["[submissionId]/page.tsx", completed.body.submissionId],
+      ["prospects/page.tsx", "D1 synthetic prospect"],
+      ["prospects/[prospectId]/page.tsx", "D1 synthetic prospect"],
+      ["projects/page.tsx", "D1 synthetic workspace"],
+      ["project/[projectId]/page.tsx", "D1 synthetic workspace"],
+      ["explorers/page.tsx", "D1 synthetic workspace"],
+    ]) {
+      const render = h.load(`app/advisor/${page}`).default;
+      const element = await render(props);
+      const renderedProps = JSON.stringify(element, (key, value) => key === "type" ? undefined : value);
+      assert.ok(renderedProps.includes(expected), `${page} must include its D1 record`);
+      h.state.authorized = false;
+      await assert.rejects(() => render(props), /redirect:\/advisor\/login/, page);
+      h.state.authorized = true;
+    }
     assert.equal(h.state.supabaseCalls, 0);
   } finally { h.sqlite.close(); }
 });

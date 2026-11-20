@@ -1,15 +1,18 @@
 // Exercise the real Access verifier, middleware, server authorization and logout.
 // JWTs are signed locally; JWKS is the only mocked HTTP endpoint. Supabase clients
 // throw if constructed, and no Supabase environment variables are supplied.
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
-const { webcrypto } = require("node:crypto");
-const ts = require("typescript");
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { webcrypto } from "node:crypto";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
-const root = path.resolve(__dirname, "../..");
+const nodeRequire = createRequire(import.meta.url);
+const root = fileURLToPath(new URL("../..", import.meta.url));
 const teamDomain = "https://synthetic-advisor.cloudflareaccess.com";
 const audience = "synthetic-advisor-audience";
 const advisorEmail = "advisor@example.invalid";
@@ -115,8 +118,8 @@ function harness(keys) {
       file += fs.existsSync(`${file}.ts`) ? ".ts" : ".tsx";
     }
     if (cache.has(file)) return cache.get(file).exports;
-    const module = { exports: {} };
-    cache.set(file, module);
+    const targetModule = { exports: {} };
+    cache.set(file, targetModule);
     const code = ts.transpileModule(fs.readFileSync(file, "utf8"), {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
@@ -129,7 +132,7 @@ function harness(keys) {
       if (overrides[name]) return overrides[name];
       if (name.startsWith("@/")) return load(name.slice(2));
       if (name.startsWith(".")) return load(path.resolve(path.dirname(file), name));
-      return require(name);
+      return nodeRequire(name);
     };
     vm.runInNewContext(
       `(function(require,module,exports){${code}\n})`,
@@ -156,8 +159,8 @@ function harness(keys) {
         },
       },
       { filename: file },
-    )(localRequire, module, module.exports);
-    return module.exports;
+    )(localRequire, targetModule, targetModule.exports);
+    return targetModule.exports;
   }
   function request(pathname, token) {
     const headers = new Headers();

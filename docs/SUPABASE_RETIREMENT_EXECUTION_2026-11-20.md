@@ -30,17 +30,17 @@ Greg has asked for independent implementation now, with notification at genuine 
 
 ### C. Notifications and legacy APIs
 - [x] Trace diagnostic submission and email flows: the D1 path writes its own record and sends its own advisor notification.
-- [ ] Verify notification error handling and D1-backed event logging using mocked email transport.
+- [x] Verify notification error handling and D1-backed event logging using mocked email transport. A saved Health Check now remains successful if the advisor email provider fails; the error is recorded and the participant email is still attempted.
 - [ ] Verify all public diagnostic, fact pack, client diagnostic, baseline and CRM paths are D1-authoritative.
 - [ ] Prepare permission removal for obsolete RPCs only after caller audit.
 
 ### D. D1 acceptance tests
-- [ ] HR Health Check: submit synthetic answers, verify the stored D1 row, result retrieval, CRM linkage and advisor notification.
-- [ ] Advisor and CRM: authenticated reads and mutations work with Supabase constructors blocked and credentials absent.
-- [ ] Project spaces: project/participant administration, invitations, OTP, questionnaire save/submit, Fact Packs and reporting work through D1.
-- [ ] Baseline workflows and exports retain their existing behavior and data.
-- [ ] Notifications, system events and scheduled digests use D1 and their own appropriate authorization.
-- [ ] A production build succeeds without Supabase credentials.
+- [x] Local HR Health Check integration: submit synthetic answers, verify the stored SQLite/D1-schema row, result retrieval, CRM linkage and mocked advisor notification.
+- [x] Local advisor and CRM integration: actual server pages and authenticated mutations work with Supabase constructors blocked and credentials absent.
+- [x] Local project integration: project/participant administration, invitations, OTP, questionnaire save/submit, Fact Packs and reporting work through the D1 data helpers.
+- [x] Existing baseline workflow/export regression tests pass; no live questionnaire or D1 record was changed.
+- [x] Local notifications, system events and scheduled digest integration uses D1 and the appropriate authorization, with email delivery mocked.
+- [x] Next.js and OpenNext Cloudflare Worker builds succeed without Supabase credentials after the Next.js 16.4.5 security patch.
 - [ ] Hosted QA and a bounded production smoke test confirm behavior beyond local simulation.
 
 There is no Supabase row-count/checksum parity gate or historical archive requirement. Existing D1 recovery remains relevant to normal operations; it is not evidence that Supabase test data must be retained.
@@ -55,6 +55,10 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 ## Current evidence and challenges
 - A read-only GET on 20 November 2026 followed `https://vanesch.uk/api/health` to `https://www.vanesch.uk/api/health` and returned HTTP 200 with `{"status":"ok","supabase":"connected","d1":"connected"}`. D1 connectivity is live; this does not establish that every feature uses D1 or that Supabase can already be paused.
 - The new auth integration tests exercise real JWT signature validation, middleware, advisor helpers and login/logout without any Supabase credentials. External Cloudflare Access policy and an actual hosted advisor login still need verification.
+- [Read-only CI run 44709422115](https://github.com/gvanesch/fractional-hr-site/actions/runs/44709422115) verified the expected live D1 binding, all five D1 modes and all required tables in both production and QA. Production has not enabled Access authentication and lacks the Access audience/team-domain bindings. QA reports Supabase is not required and has its Access bindings.
+- The QA advisor browser check reached the existing Cloudflare email-code login at `gregvanesch.cloudflareaccess.com`. There is no authenticated advisor session in this test browser. Complete that login before claiming hosted advisor/CRM/project UI verification.
+- The initial complete regression run after the application fix and security patch passed 144 tests. The audit was then extended with additional parser/safety coverage; see the latest CI run for the final test count.
+- Next.js 16.4.2 triggered a security build failure. The candidate now uses the same-minor [16.4.5 security release](https://github.com/vercel/next.js/releases/tag/v16.4.5); React and OpenNext versions are unchanged. Both the Next build and the complete OpenNext Worker bundle passed locally with Supabase URL and keys absent.
 - Existing historical release scripts deliberately pin the previous Supabase-auth checkpoint. They are not suitable as a new retirement release procedure.
 - Notify Greg only when a concrete unresolved decision, access requirement or failed acceptance test needs his input. Do not send obsolete data-reconciliation tasks.
 
