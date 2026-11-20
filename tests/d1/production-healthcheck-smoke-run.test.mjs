@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fingerprint } from "../../scripts/security/qa-retirement-release.mjs";
-import { ProductionHealthCheckError } from "../../scripts/security/production-healthcheck-smoke.mjs";
+import { ProductionHealthCheckError, STRICT_NOTIFICATION_ROUTING, EXISTING_NOTIFICATION_ROUTING } from "../../scripts/security/production-healthcheck-smoke.mjs";
 import {
   REQUEST_PATH, REPORT_PATH, HEALTHCHECK_REQUEST_ID, EXPECTED_PRODUCTION_VERSION_ID,
   ProductionHealthCheckRunError, validateProductionHealthCheckRequest,
@@ -15,23 +15,27 @@ const NOW = Date.parse("2026-11-20T21:00:00.000Z");
 const HEAD = "a".repeat(40), PARENT = "b".repeat(40);
 const PRIVATE = "synthetic-private-provider-secret-never-output";
 const fail = code => error => error instanceof ProductionHealthCheckRunError && error.code === code;
-function fixture() {
+function fixture(notificationRouting) {
   const request = { operation: "verify-healthcheck-on-production", requestId: HEALTHCHECK_REQUEST_ID,
     requestedAt: new Date(NOW - 60000).toISOString(), reviewedCommit: PARENT,
-    expectedProductionVersionId: EXPECTED_PRODUCTION_VERSION_ID };
+    expectedProductionVersionId: EXPECTED_PRODUCTION_VERSION_ID,
+    ...(notificationRouting ? { notificationRouting } : {}) };
   const env = { GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: "push", GITHUB_RUN_ATTEMPT: "1",
     GITHUB_REPOSITORY: "gvanesch/fractional-hr-site", GITHUB_REF: "refs/heads/chore/supabase-retirement-2026-11",
     GITHUB_SHA: HEAD, CLOUDFLARE_ACCOUNT_ID: "73221f18acc676e4992c89fcbf2b2a8f" };
   const git = { head: HEAD, parents: [PARENT], changedPaths: [REQUEST_PATH], clean: true };
   const adapterRequest = { operation: request.operation, requestId: request.requestId,
-    expectedProductionVersionId: request.expectedProductionVersionId };
+    expectedProductionVersionId: request.expectedProductionVersionId,
+    ...(notificationRouting ? { notificationRouting } : {}) };
+  const routingEvidence = { notificationRouting: notificationRouting ?? STRICT_NOTIFICATION_ROUTING,
+    internalRecipientBindingPresent: true, recipientValueVerified: !notificationRouting };
   const adapterCheckpoint = { kind: "production-healthcheck-smoke-checkpoint", requestFingerprint: fingerprint(adapterRequest),
     productionVersionId: EXPECTED_PRODUCTION_VERSION_ID, payloadFingerprint: "c".repeat(64), leaseFingerprint: "d".repeat(64) };
   const state = { prepared: { readOnly: true, databaseWrites: false, applicationSubmissionAttempted: false,
-    internalRecipientVerified: true, participantEmails: 0, state: "ready", checkpoint: adapterCheckpoint,
+    ...routingEvidence, participantEmails: 0, state: "ready", checkpoint: adapterCheckpoint,
     payload: { sensitiveNeverPersisted: PRIVATE }, ignoredPrivateResponse: PRIVATE },
   proof: { requestId: HEALTHCHECK_REQUEST_ID, productionVersion: EXPECTED_PRODUCTION_VERSION_ID,
-    d1WriteVerified: true, publicResultVerified: true, insertEventVerified: true, internalRecipientVerified: true,
+    d1WriteVerified: true, publicResultVerified: true, insertEventVerified: true, ...routingEvidence,
     participantEmails: 0, existingDataChanged: false, automaticResubmissionAllowed: false,
     internalNotificationStatus: "provider_accepted", advisorEmailProviderAccepted: true,
     createdSubmission: true, reusedSubmission: false, applicationSubmissionAttempted: true, submissionMethod: "api",
@@ -81,7 +85,9 @@ test("Only the fixed accepted version, fixed durable identity and fresh exact re
     h => { h.request.expectedProductionVersionId = "11111111-2222-4333-8444-555555555555"; },
     h => { h.request.reviewedCommit = "invalid"; }, h => { h.request.requestedAt = new Date(NOW - 86400001).toISOString(); },
     h => { h.request.requestedAt = new Date(NOW + 1).toISOString(); }, h => { h.request.requestedAt = "invalid"; },
-    h => { h.request.recipient = "another@example.invalid"; }, h => { delete h.request.requestedAt; } ]) {
+    h => { h.request.recipient = "another@example.invalid"; }, h => { delete h.request.requestedAt; },
+    h => { h.request.notificationRouting = "any-recipient"; }, h => { h.request.notificationRouting = undefined; },
+    h => { h.request.notificationRouting = STRICT_NOTIFICATION_ROUTING; } ]) {
     const h = fixture(); change(h);
     assert.throws(() => validateProductionHealthCheckRequest(h.request, h.env, h.git, NOW),
       fail("production_healthcheck_reviewed_request_invalid_or_stale"));
@@ -156,7 +162,7 @@ test("Fresh lease or durable-attempt state changes after preflight block submiss
 });
 
 test("Unverified recipient or non-read-only preflight is rejected before any library run", async () => {
-  for (const [key, value] of [["internalRecipientVerified", false], ["participantEmails", 1], ["databaseWrites", true],
+  for (const [key, value] of [["recipientValueVerified", false], ["internalRecipientBindingPresent", false], ["participantEmails", 1], ["databaseWrites", true],
     ["readOnly", false], ["applicationSubmissionAttempted", true]]) {
     const h = fixture(); h.state.prepared[key] = value;
     await assert.rejects(h.prepare(), fail("production_healthcheck_readonly_preflight_unverified"));
@@ -203,7 +209,7 @@ test("Notification failure remains visible and unsafe or incomplete proof cannot
     assert.equal((await h.execute(checkpoint)).internalNotificationStatus, status);
     assert.equal(h.state.runCalls.length, 1);
   }
-  for (const [key, value] of [["participantEmails", 1], ["internalRecipientVerified", false], ["productionVersion", "another"],
+  for (const [key, value] of [["participantEmails", 1], ["recipientValueVerified", false], ["internalRecipientBindingPresent", false], ["productionVersion", "another"],
     ["requestId", "another"], ["publicResultVerified", false], ["automaticResubmissionAllowed", true], ["submissionMethod", "browser"]]) {
     const h = fixture(), checkpoint = await h.prepare(); h.state.proof[key] = value;
     await assert.rejects(h.execute(checkpoint), fail("production_healthcheck_completion_unverified_do_not_resubmit"));
@@ -259,4 +265,44 @@ test("Importing the runner performs no network, file writes or CLI execution", (
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "");
+});
+
+test("Only an explicit existing-production routing field enables the six-field exception request and truthful proof", async () => {
+  const h = fixture(EXISTING_NOTIFICATION_ROUTING);
+  assert.equal(Object.keys(h.request).length, 6);
+  assert.deepEqual(validateProductionHealthCheckRequest(h.request, h.env, h.git, NOW), h.adapterRequest);
+  assert.equal(Object.keys(h.adapterRequest).length, 4);
+  const checkpoint = await h.prepare(), proof = await h.execute(checkpoint);
+  assert.equal(proof.notificationRouting, EXISTING_NOTIFICATION_ROUTING);
+  assert.equal(proof.recipientValueVerified, false);
+  assert.equal(proof.internalRecipientBindingPresent, true);
+  assert.equal(proof.participantEmails, 0);
+  assert.equal(Object.hasOwn(proof, "internalRecipientVerified"), false);
+  assert.equal(h.state.runCalls.length, 1);
+  assert.equal(h.state.runCalls[0].request.requestId, HEALTHCHECK_REQUEST_ID);
+  assert.equal(h.state.runCalls[0].request.expectedProductionVersionId, EXPECTED_PRODUCTION_VERSION_ID);
+  assert.equal(h.state.runCalls[0].request.notificationRouting, EXISTING_NOTIFICATION_ROUTING);
+  assert.ok(h.state.evidence.every(item => item.recipientValueVerified !== true && item.internalRecipientVerified !== true));
+  assert.doesNotMatch(JSON.stringify([checkpoint, proof, h.state.evidence]), new RegExp(PRIVATE));
+});
+
+test("The explicit exception never accepts a false claim that its unreadable recipient was verified", async () => {
+  const h = fixture(EXISTING_NOTIFICATION_ROUTING);
+  h.state.prepared.recipientValueVerified = true;
+  await assert.rejects(h.prepare(), fail("production_healthcheck_readonly_preflight_unverified"));
+  assert.equal(h.state.runCalls.length, 0);
+  h.state.prepared.recipientValueVerified = false;
+  const checkpoint = await h.prepare(); h.state.proof.recipientValueVerified = true;
+  await assert.rejects(h.execute(checkpoint), fail("production_healthcheck_completion_unverified_do_not_resubmit"));
+  assert.equal(h.state.runCalls.length, 1);
+  assert.ok(!h.state.evidence.some(item => item.stage === "production_healthcheck_verified"));
+});
+
+test("A routing exception changes both request fingerprints and cannot reuse a prior strict checkpoint", async () => {
+  const strict = fixture(), exception = fixture(EXISTING_NOTIFICATION_ROUTING);
+  const old = await strict.prepare(), next = await exception.prepare();
+  assert.notEqual(old.requestFingerprint, next.requestFingerprint);
+  assert.notEqual(old.adapterCheckpoint.requestFingerprint, next.adapterCheckpoint.requestFingerprint);
+  await assert.rejects(exception.execute(old), fail("production_healthcheck_preflight_missing_changed_or_stale"));
+  assert.equal(exception.state.runCalls.length, 0);
 });

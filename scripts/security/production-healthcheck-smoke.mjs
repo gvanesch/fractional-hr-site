@@ -1,10 +1,14 @@
 // Inert library: no CLI, workflow, import-time requests, logging or credentials
-// in output. One real submission uses the normal internal notification to Greg.
+// in output. Default mode verifies Greg-only internal notification. An explicit
+// request may instead use unchanged production secret routing without claiming
+// the recipient value is known. Neither mode sends a participant email.
 // Existing records are never updated/deleted; only one synthetic attempt is reserved.
 import { fingerprint, normalizeBindings, PRODUCTION } from "./qa-retirement-release.mjs";
 import { ACCOUNT, CANDIDATE_REF, MODES } from "./supabase-retirement-readonly.mjs";
 
 export const PRODUCTION_HEALTHCHECK_ORIGIN = "https://www.vanesch.uk";
+export const STRICT_NOTIFICATION_ROUTING = "verified-greg-only";
+export const EXISTING_NOTIFICATION_ROUTING = "existing-production-configuration";
 const API = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}`;
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
 const HASH = /^[a-f\d]{64}$/;
@@ -41,11 +45,14 @@ function context({ request, env = process.env, fetchImpl = fetch }) {
   check(env.GITHUB_REPOSITORY === "gvanesch/fractional-hr-site" && env.GITHUB_REF === CANDIDATE_REF &&
     env.CLOUDFLARE_ACCOUNT_ID === ACCOUNT && typeof env.CLOUDFLARE_API_TOKEN === "string" && env.CLOUDFLARE_API_TOKEN.trim(),
   "production_healthcheck_context_unverified");
-  check(object(request) && Object.keys(request).every(key => ["operation", "requestId", "expectedProductionVersionId"].includes(key)) &&
+  check(object(request) && Object.keys(request).every(key => ["operation", "requestId", "expectedProductionVersionId", "notificationRouting"].includes(key)) &&
     request.operation === "verify-healthcheck-on-production" && /^[a-z0-9][a-z0-9-]{7,63}$/.test(request.requestId ?? "") &&
-    UUID.test(request.expectedProductionVersionId ?? ""), "production_healthcheck_request_invalid");
+    UUID.test(request.expectedProductionVersionId ?? "") &&
+    (!Object.hasOwn(request, "notificationRouting") || request.notificationRouting === EXISTING_NOTIFICATION_ROUTING),
+  "production_healthcheck_request_invalid");
   request = structuredClone(request);
   const credential = env.CLOUDFLARE_API_TOKEN.trim();
+  const notificationRouting = request.notificationRouting ?? STRICT_NOTIFICATION_ROUTING;
   const countryRegion = `SYNTHETIC PRODUCTION TEST - ${request.requestId}`;
   check(countryRegion.length <= 120, "production_healthcheck_marker_invalid");
   const payload = { answers: { ...ANSWERS }, companySize: COMPANY_SIZE, industry: "Other", role: "Other", countryRegion };
@@ -95,10 +102,10 @@ function context({ request, env = process.env, fetchImpl = fetch }) {
       ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) },
     "production_hosted", body !== undefined);
   }
-  return { request, payload, attemptId, requestFingerprint, payloadFingerprint, api, query, hosted };
+  return { request, payload, attemptId, requestFingerprint, payloadFingerprint, notificationRouting, api, query, hosted };
 }
 
-function bindingsFingerprint(entries) {
+function bindingsFingerprint(entries, notificationRouting) {
   let bindings;
   try { bindings = normalizeBindings(entries); }
   catch { throw new ProductionHealthCheckError("production_binding_inventory_invalid"); }
@@ -112,11 +119,19 @@ function bindingsFingerprint(entries) {
     map.get("ADVISOR_AUTH_MODE")?.type === "plain_text" && map.get("ADVISOR_AUTH_MODE").text === "cloudflare_access" &&
     map.get("NEXT_PUBLIC_SITE_URL")?.type === "plain_text" && ["https://vanesch.uk", PRODUCTION_HEALTHCHECK_ORIGIN].includes(map.get("NEXT_PUBLIC_SITE_URL").text),
   "production_runtime_environment_unverified");
-  // Equality, not contains/suffix matching: multiple recipients and unreadable
-  // secret-only destination bindings must not authorize the synthetic notification.
-  check(map.get("CONTACT_TO_EMAIL")?.type === "plain_text" && map.get("CONTACT_TO_EMAIL").text === "greg@vanesch.uk",
-    "production_internal_recipient_unverified");
-  check(map.get("CONTACT_FROM_EMAIL")?.type === "plain_text" && Boolean(map.get("CONTACT_FROM_EMAIL").text.trim()) &&
+  if (notificationRouting === EXISTING_NOTIFICATION_ROUTING) {
+    // This narrowly declared mode preserves the observed production secret
+    // bindings. It cannot establish, expose, choose or replace their values.
+    check(map.get("CONTACT_TO_EMAIL")?.type === "secret_text" && map.get("CONTACT_FROM_EMAIL")?.type === "secret_text",
+      "production_existing_notification_secret_bindings_unverified");
+  } else {
+    // Default strict mode still requires exact readable Greg-only delivery.
+    check(map.get("CONTACT_TO_EMAIL")?.type === "plain_text" && map.get("CONTACT_TO_EMAIL").text === "greg@vanesch.uk",
+      "production_internal_recipient_unverified");
+    check(map.get("CONTACT_FROM_EMAIL")?.type === "plain_text" && Boolean(map.get("CONTACT_FROM_EMAIL").text.trim()),
+      "production_mail_transport_unverified");
+  }
+  check(
     (map.get("RESEND_API_KEY")?.type === "secret_text" || map.get("RESEND_API_KEY")?.type === "plain_text" && Boolean(map.get("RESEND_API_KEY").text.trim())),
   "production_mail_transport_unverified");
   return fingerprint(bindings);
@@ -134,8 +149,8 @@ async function runtimeLease(ctx) {
   "production_active_version_changed");
   check((database?.uuid ?? database?.id) === PRODUCTION.database && database.name === "vanesch-prod", "production_database_identity_unverified");
   check(health?.status === "ok" && health.d1 === "connected" && health.supabase === "not_required", "production_d1_health_unverified");
-  const bindingFingerprint = bindingsFingerprint(settings?.bindings);
-  check(bindingFingerprint === bindingsFingerprint(version.resources?.bindings), "production_settings_and_active_bindings_disagree");
+  const bindingFingerprint = bindingsFingerprint(settings?.bindings, ctx.notificationRouting);
+  check(bindingFingerprint === bindingsFingerprint(version.resources?.bindings, ctx.notificationRouting), "production_settings_and_active_bindings_disagree");
   return fingerprint({ deploymentId: deployment.id, versionId: version.id, bindingFingerprint, databaseId: PRODUCTION.database });
 }
 
@@ -174,7 +189,9 @@ async function prepare(ctx) {
   const lease = await runtimeLease(ctx), state = await syntheticState(ctx, lease);
   return { checkpoint: checkpoint(ctx, lease), state: state.row ? "existing_submission" : state.attempt ? "reserved_attempt_requires_verification" : "ready",
     formUrl: `${PRODUCTION_HEALTHCHECK_ORIGIN}/diagnostic`, payload: structuredClone(ctx.payload),
-    readOnly: true, databaseWrites: false, applicationSubmissionAttempted: false, internalRecipientVerified: true, participantEmails: 0 };
+    readOnly: true, databaseWrites: false, applicationSubmissionAttempted: false, participantEmails: 0,
+    notificationRouting: ctx.notificationRouting, internalRecipientBindingPresent: true,
+    recipientValueVerified: ctx.notificationRouting === STRICT_NOTIFICATION_ROUTING };
 }
 
 // Read-only at the SQL level: D1's query transport uses POST for SELECT statements.
@@ -245,7 +262,9 @@ async function verify(ctx, completion) {
   }
   check(lease === await runtimeLease(ctx), "production_runtime_changed_during_verification");
   return { requestId: ctx.request.requestId, productionVersion: ctx.request.expectedProductionVersionId,
-    d1WriteVerified: true, publicResultVerified: true, insertEventVerified: true, internalRecipientVerified: true,
+    d1WriteVerified: true, publicResultVerified: true, insertEventVerified: true,
+    notificationRouting: ctx.notificationRouting, internalRecipientBindingPresent: true,
+    recipientValueVerified: ctx.notificationRouting === STRICT_NOTIFICATION_ROUTING,
     internalNotificationStatus: notificationStatus, advisorEmailProviderAccepted: notificationStatus === "provider_accepted",
     participantEmails: 0, submissionMethod: attempt.method, automaticResubmissionAllowed: false, existingDataChanged: false };
 }

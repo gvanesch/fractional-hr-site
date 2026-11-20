@@ -40,7 +40,8 @@ function fixture() {
   ];
   const runtime = { compatibility_date: "2026-03-01", compatibility_flags: ["nodejs_compat"], usage_model: "standard" };
   const legacy = { id: ID, number: 50, metadata: { created_on: "2026-11-20T12:00:00Z", author_email: "private-author@example.invalid", hasPreview: false },
-    resources: { bindings, script: { etag: "private-etag", handlers: ["fetch"], named_handlers: [] }, script_runtime: clone(runtime) } };
+    resources: { bindings, script: { etag: "private-etag", handlers: ["fetch"], named_handlers: [] },
+      script_runtime: { ...clone(runtime), assets: { opaque_test_metadata: { reference: "private-runtime-assets", flags: [true] } } } } };
   const betaBindings = bindings.map(item => item.type === "d1" ? { name: item.name, type: "d1", database_id: item.id } : clone(item));
   const beta = { id: ID, number: 50, created_on: "2026-11-20T12:00:00Z", urls: ["https://private-preview.example.invalid"],
     ...runtime, bindings: betaBindings, env: Object.fromEntries(betaBindings.map(({ name, ...rest }) => [name, rest])),
@@ -86,10 +87,41 @@ test("read-only metadata preflight uses exactly two fresh detailed reads and doe
   assert.equal(report.first.bindings.beta.secretBindingCount, 1);
   assert.deepEqual(report.first.fieldTypes["beta.assets"].jwt, ["string"]);
   const text = JSON.stringify(report);
-  for (const privateValue of ["private-test-token", "private-assets-jwt", "private-etag", "private-author", "private-preview", "private-binding-value",
+  for (const privateValue of ["private-test-token", "private-assets-jwt", "private-runtime-assets", "private-etag", "private-author", "private-preview", "private-binding-value",
     "private-filename", "private-module-content", "private-source-map-content", "private-test-instance", "PRIVATE_SECRET_NAME", Buffer.from("private-module-content").toString("base64")])
     assert.ok(!text.includes(privateValue), `Report leaked ${privateValue}`);
   assert.ok(report.first.bindings.beta.nonSecretBindings.some(item => item.name === "ADVISOR_AUTH_MODE"));
+});
+
+test("observed no-JWT metadata retains the complete opaque asset object with bounded nested type diagnostics", async () => {
+  const f = fixture();
+  delete f.state.beta.assets.jwt;
+  delete f.state.legacy.metadata.hasPreview;
+  f.state.legacy.metadata.has_preview = false;
+  const opaque = f.state.legacy.resources.script_runtime.assets;
+  const report = await f.run();
+  assert.equal(report.metadataReady, true); assert.equal(report.acceptanceVerified, false);
+  assert.equal(report.first.assets.jwtPresent, false); assert.equal(report.first.assets.jwtFingerprint, null);
+  assert.equal(report.first.assets.independentContentDigestsVerified, false);
+  assert.equal(report.first.assets.runtimeMetadataFingerprint, fingerprint({ value: opaque }));
+  assert.equal(report.stability.runtimeAssetsEqual, true); assert.equal(report.stability.assetsMetadataEqual, true);
+  assert.deepEqual(report.first.fieldTypes["legacy.runtime.assets.opaque_test_metadata"].reference, ["string"]);
+  assert.deepEqual(report.unsupportedFields, []); assert.equal(f.state.calls.length, 8);
+  assert.ok(!JSON.stringify(report).includes("private-runtime-assets"));
+});
+
+test("opaque field diagnostics are bounded while full nested metadata still determines equality", async () => {
+  const f = fixture(); delete f.state.beta.assets.jwt;
+  f.state.legacy.resources.script_runtime.assets = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`field_${i}`, { value: "private-opaque-value" }]));
+  f.state.alter = ({ path, result, round }) => {
+    if (round === 2 && path.includes("/workers/scripts/") && result.resources)
+      result.resources.script_runtime.assets.field_99.value = "private-changed-value";
+  };
+  const report = await f.run();
+  assert.equal(report.metadataReady, false); assert.equal(report.stability.runtimeAssetsEqual, false);
+  assert.equal(report.first.assets.runtimeFieldShape.truncated, true);
+  assert.equal(report.first.assets.runtimeFieldShape.fieldsVisited, 64);
+  assert.ok(!JSON.stringify(report).includes("private-opaque-value") && !JSON.stringify(report).includes("private-changed-value"));
 });
 
 test("multi-megabyte valid modules are fingerprinted without regexp stack exhaustion", async () => {
@@ -161,7 +193,9 @@ test("reconciliation reports unsupported binding metadata and rejects a changing
 
 test("unknown or missing metadata is reported without printing values or claiming readiness", async () => {
   for (const change of [
-    f => { delete f.state.beta.assets.jwt; }, f => { delete f.state.beta.modules; },
+    f => { f.state.beta.assets.jwt = null; }, f => { delete f.state.beta.assets.config; }, f => { delete f.state.beta.modules; },
+    f => { delete f.state.legacy.resources.script_runtime.assets; }, f => { f.state.legacy.resources.script_runtime.assets = []; },
+    f => { f.state.legacy.metadata.has_preview = true; }, f => { f.state.legacy.metadata.has_preview = "false"; },
     f => { delete f.state.beta.urls; }, f => { f.state.beta.created_on = "unknown"; },
     f => { delete f.state.legacy.resources.script.handlers; }, f => { f.state.beta.annotations = { example: 123 }; },
     f => { f.state.beta.provider_new_field = "private-unknown-value"; },
@@ -185,6 +219,7 @@ test("two reads expose unstable asset tokens, code, etags, or metadata", async (
     ({ path, result }) => { if (path.includes("/workers/workers/")) result.modules[0].content_base64 = Buffer.from("different-code").toString("base64"); },
     ({ path, result }) => { if (path.includes("/workers/scripts/") && result.resources) result.resources.script.etag = "different-etag"; },
     ({ path, result }) => { if (path.includes("/workers/workers/")) result.assets.config.run_worker_first = false; },
+    ({ path, result }) => { if (path.includes("/workers/scripts/") && result.resources) result.resources.script_runtime.assets.opaque_test_metadata.flags.push(false); },
   ]) {
     const f = fixture(); f.state.alter = event => { if (event.round === 2) change(event); };
     const report = await f.run(); assert.equal(report.metadataReady, false);

@@ -5,6 +5,23 @@ Complete the existing Cloudflare D1 migration. Greg confirmed on 20 November 202
 
 Greg has asked for independent implementation now, with notification at genuine decision points, challenges or questions. Verification and implementation proceed without another planning approval. Production changes must follow successful verification of the affected services; do not infer that disposable Supabase records make its still-active authentication safe to turn off.
 
+## Latest verified status — production cutover complete, shutdown pending
+
+The later evidence in this section supersedes the historical starting checkpoints below. Greg's updated audit token successfully created the production Cloudflare Access policy and application. [Activation 44777994990](https://github.com/gvanesch/fractional-hr-site/actions/runs/44777994990) placed Worker version `9bd890ab-41e1-4845-867c-f6d4eb85196f` at 100% of production traffic. D1 is connected, Supabase is not required, public routes work, advisor routes are protected, and QA/configuration preservation passed.
+
+[Verification 44777994810](https://github.com/gvanesch/fractional-hr-site/actions/runs/44777994810) passed the production inspection, 298 tests, the complete build without Supabase credentials and isolated local D1 Worker smoke. Its independent QA boundary job remains red for the known legacy cron URL; this is not a production activation failure.
+
+Live production browser acceptance has verified:
+
+- The advisor dashboard recognises `greg@vanesch.uk` through the existing Access session and loads the production D1 Health Check/CRM data.
+- Synthetic prospect `583fdaea-5b5a-4c0d-bc5c-d78f1ced949a` was created without contact details or follow-up date, updated to Lost/Cold, and given an internal note. A full reload confirmed fields, note and audit history. Existing CRM records were not changed.
+- The diagnostic project directory and Explorer directory load successfully, both with zero production diagnostic projects. Full diagnostic project write/report checks passed in QA.
+- The baseline directory loads seven projects. Existing synthetic project `55000040-2026-4016-8040-000000000040` loads its 40-person roster, 32 completed, six in progress and two not invited, with 84% completion of the invited roster. Export controls render. No existing respondent or questionnaire was edited.
+
+The single production Health Check attempt [44779316999](https://github.com/gvanesch/fractional-hr-site/actions/runs/44779316999) stopped in read-only preflight, before a reservation, application submission or email. The existing sender and internal recipient are secret bindings, so the originally stated Greg-only recipient condition cannot be verified. The historical approved production route is `info@vanesch.uk`; that record is not evidence of the current secret value. A prepared, inert opt-in can use the unchanged production notification route for the one fixed synthetic attempt while explicitly reporting that its recipient value was not read. It must not be triggered until Greg resolves this narrow notification choice. No production mail setting has changed.
+
+Status/reminder email automation remains disabled. Supabase still reports the organization on Pro and project `qxddddhhpfrrxbaunwfw` active. Dashboard billing is at a sign-in screen. Cleanup, the final Health Check/advisor readback, production logout, downgrade, pause and post-shutdown verification remain pending. Do not mark retirement or billing cancellation complete.
+
 ## Verified starting evidence
 - `docs/PRODUCTION_BASELINE_2026-10-16.md`: all five D1 application-data flags enabled, baseline data in dedicated D1 tables; Supabase advisor password authentication and historical recovery retained. This is an October checkpoint, not proof of current live settings.
 - `lib/advisor-auth.ts`: existing `ADVISOR_AUTH_MODE=cloudflare_access` branch calls `verifyCloudflareAdvisorAccess`; default branch uses Supabase Auth.
@@ -19,14 +36,14 @@ Greg has asked for independent implementation now, with notification at genuine 
 - [x] Confirm remaining Supabase tables and Edge Functions.
 - [x] Trace legacy notification trigger and HTTP call.
 - [ ] Inventory all repository Supabase imports, env keys, workflows, runtime fallbacks, scheduled jobs, auth/logout paths and public APIs.
-- [ ] Verify actual Cloudflare production environment bindings, Access policies and live deployment through the existing read-only CI credentials.
+- [x] Verify actual Cloudflare production environment bindings, Access policies and live deployment through the existing read-only CI credentials.
 - [ ] Identify live use of `swift-handler` and notification function, including legacy external callers.
 
 ### B. Authentication
-- [ ] Review Cloudflare Access policy (protect advisor routes, not public questionnaire endpoints) and allowed identities.
+- [x] Review Cloudflare Access policy (protect advisor routes, not public questionnaire endpoints) and allowed identities.
 - [x] Test Cloudflare JWT validation, denied access, permissions, logout, session expiry and advisor UI in QA. Local crypto tests cover token rules; hosted sign-in, API-backed UI and logout were verified on the deployed candidate.
 - [x] Review Supabase-specific logout and login routes. The existing Access branch passed and required no auth-code change.
-- [ ] Confirm the deployed Access application protects advisor paths, permits the intended advisor identities and leaves public/participant endpoints usable.
+- [x] Confirm the deployed Access application protects advisor paths, permits the intended advisor identities and leaves public/participant endpoints usable.
 
 ### C. Notifications and legacy APIs
 - [x] Trace diagnostic submission and email flows: the D1 path writes its own record and sends its own advisor notification.
@@ -49,8 +66,8 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 
 ### E. Controlled retirement
 - [ ] Complete local and hosted verification, resolve any actual configuration/access blocker and prepare the production candidate.
-- [ ] Activate the verified non-Supabase advisor authentication and deploy required fixes; recheck the live workflows.
-- [ ] Confirm health reports Supabase is not required and that required journeys produce no Supabase calls.
+- [x] Activate the verified non-Supabase advisor authentication and deploy required fixes; production public/auth boundaries and signed-in reads/CRM passed, with the remaining full acceptance described above.
+- [x] Confirm health reports Supabase is not required; local integration and the full build run with Supabase constructors blocked or credentials absent. Finish the remaining hosted acceptance before shutdown.
 - [ ] Remove obsolete Supabase configuration from active deployment paths and disable the unused services.
 - [ ] Verify shutdown and billing outcome. Distinguish a reversible pause from permanent project deletion.
 

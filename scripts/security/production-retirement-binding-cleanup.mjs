@@ -11,18 +11,24 @@
 // https://developers.cloudflare.com/api/resources/workers/subresources/beta/subresources/workers/subresources/versions/methods/get/
 // https://developers.cloudflare.com/api/resources/workers/subresources/beta/subresources/workers/subresources/versions/
 // https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/versions/methods/get/
+// https://github.com/cloudflare/workers-sdk/blob/f41e83bf8e5a7b67ca9f5ccfe200563e1a7ac282/packages/wrangler/src/__tests__/versions/secrets/utils.ts
 // Wrangler src/versions/secrets/index.ts PATCHes /versions/latest with an env
 // merge patch, application/merge-patch+json, and no deploy query. This creates
 // an inactive version. Do not substitute a UUID in that PATCH path.
 //
 // Beta GET ?include=modules,sourcemaps returns result.{id,number,bindings,
 // env?,modules:[{name,content_type,content_base64}],assets:{config?,jwt?},...}.
-// assets.jwt is documented as an asset-upload completion token. This verifier
-// requires exact equality alongside the env-only merge contract; it is not an
-// independently documented content digest. Its availability/stability for this
-// real Worker has NOT been established and must be reviewed before wiring.
-// Missing identity, unknown fields, or unequal fingerprints stop the operation;
-// missing metadata is never treated as proof that resources were preserved.
+// assets.jwt is an asset-upload completion token, not a content digest; the live
+// GET omits it. Wrangler's own PATCH tests explicitly say keep_assets and other
+// omitted fields are inherited. Asset preservation therefore rests on that
+// env-only merge contract, the exact base/next-version sequence, and equality
+// of ALL readable asset/config/runtime metadata, not independent asset bytes.
+// The observed legacy script_runtime.assets object has no documented mapping
+// to beta assets. Keep it opaque and fingerprint the complete object, including
+// every nested member. Never drop it or substitute beta config for it. A JWT,
+// when returned, is also fingerprinted and must remain identical.
+// Missing required metadata, unknown outer fields, or unequal fingerprints
+// stop the operation. No asset digest or static-content parity is claimed.
 // Secret values are never readable: preservation of non-target secrets follows
 // from the unchanged latest-version base and untouched env merge entries, with
 // exact name/type inventories checked before and after.
@@ -49,6 +55,8 @@ const BETA_VOLATILE = ["id", "number", "created_on", "urls", "author_email", "au
 const BETA_FIELDS = [...BETA_VOLATILE, "annotations", "assets", "bindings", "env", "cache_options", "compatibility_date",
   "compatibility_flags", "containers", "exports", "exports_reconciliation", "limits", "main_module", "migration_tag",
   "migrations", "modules", "package_dependencies", "placement", "usage_model"];
+const ASSET_PRESERVATION = Object.freeze({ basis: "provider-env-only-merge-inheritance-and-readable-metadata-equality",
+  independentAssetContentDigestsVerified: false });
 
 export class BindingCleanupError extends Error {
   constructor(message) { super(message); this.name = "BindingCleanupError"; }
@@ -167,15 +175,16 @@ function version(value, legacy, expectedId) {
   fields(legacy, ["id", "number", "metadata", "annotations", "resources", "cache_options"], "script Worker version");
   check(legacy.id === expectedId && legacy.number === value.number, "Worker version APIs disagree on identity or sequence.");
   if (legacy.metadata !== undefined) {
-    fields(legacy.metadata, ["author_email", "author_id", "created_on", "hasPreview", "modified_on", "source"], "script version publication");
-    check(Object.entries(legacy.metadata).every(([key, item]) => key === "hasPreview" ? typeof item === "boolean" : typeof item === "string"),
+    fields(legacy.metadata, ["author_email", "author_id", "created_on", "hasPreview", "has_preview", "modified_on", "source"], "script version publication");
+    check(Object.entries(legacy.metadata).every(([key, item]) => ["hasPreview", "has_preview"].includes(key) ? typeof item === "boolean" : typeof item === "string") &&
+      (legacy.metadata.hasPreview === undefined || legacy.metadata.has_preview === undefined || legacy.metadata.hasPreview === legacy.metadata.has_preview),
       "Worker publication metadata has an unsupported shape.");
   }
   fields(legacy.resources, ["bindings", "script", "script_runtime"], "script version resources");
   fields(legacy.resources.script, ["etag", "handlers", "named_handlers", "placement_mode", "placement", "last_deployed_from"], "script code");
   const script = legacy.resources.script;
   check(typeof script.etag === "string" && script.etag && Array.isArray(script.handlers), "Worker code etag/handler metadata is unavailable.");
-  fields(legacy.resources.script_runtime, ["compatibility_date", "compatibility_flags", "usage_model", "limits", "exports", "migration_tag"], "script runtime");
+  fields(legacy.resources.script_runtime, ["compatibility_date", "compatibility_flags", "usage_model", "limits", "exports", "migration_tag", "assets"], "script runtime");
   const runtime = legacy.resources.script_runtime;
   check(typeof value.compatibility_date === "string" && value.compatibility_date === runtime.compatibility_date &&
     hash(value.compatibility_flags ?? []) === hash(runtime.compatibility_flags ?? []) &&
@@ -193,17 +202,18 @@ function version(value, legacy, expectedId) {
     check(hash(bindings(entries)) === hash(normalized), "Beta Worker env and binding metadata disagree.");
   }
   fields(value.assets, ["config", "jwt"], "Worker assets");
-  check(typeof value.assets.jwt === "string" && value.assets.jwt.length > 0,
-    "Stable asset identity (assets.jwt) is unavailable; review the provider response before cleanup.");
-  if (value.assets.config !== undefined) fields(value.assets.config,
+  check(value.assets.jwt === undefined || typeof value.assets.jwt === "string" && value.assets.jwt.length > 0,
+    "Worker asset upload-token metadata has an unsupported shape.");
+  fields(value.assets.config,
     ["base_path", "html_handling", "not_found_handling", "run_worker_first"], "Worker asset configuration");
+  check(object(runtime.assets), "Complete opaque runtime asset metadata is unavailable; review before cleanup.");
   const rest = without(value, [...BETA_VOLATILE, "bindings", "env", "modules", "assets", "annotations"]);
   return { id: value.id, number: value.number, bindings: normalized,
     bindingFingerprint: hash(normalized), codeFingerprint: moduleFingerprint(value.modules, value.main_module),
-    assetFingerprint: hash(value.assets), versionSettingsFingerprint: hash(rest),
+    assetFingerprint: hash(value.assets), runtimeAssetsFingerprint: hash(runtime.assets), versionSettingsFingerprint: hash(rest),
     runtimeFingerprint: hash(runtime), scriptFingerprint: hash(without(script, ["last_deployed_from"])),
     annotationFingerprint: hash(annotations(value.annotations)), legacyAnnotationFingerprint: hash(annotations(legacy.annotations)),
-    previewFingerprint: hash(legacy.metadata?.hasPreview),
+    previewFingerprint: hash(legacy.metadata?.has_preview ?? legacy.metadata?.hasPreview),
     annotationTag: value.annotations?.["workers/tag"], annotationMessage: value.annotations?.["workers/message"],
     legacyCacheFingerprint: hash(legacy.cache_options) };
 }
@@ -269,7 +279,7 @@ async function inspectWorker(api, target, expectedVersion, latestVersion = expec
 }
 
 const SNAPSHOT = ["worker", "id", "number", "deploymentId", "latestVersionId", "bindingFingerprint", "codeFingerprint", "assetFingerprint",
-  "versionSettingsFingerprint", "runtimeFingerprint", "scriptFingerprint", "annotationFingerprint", "legacyAnnotationFingerprint",
+  "runtimeAssetsFingerprint", "versionSettingsFingerprint", "runtimeFingerprint", "scriptFingerprint", "annotationFingerprint", "legacyAnnotationFingerprint",
   "previewFingerprint", "legacyCacheFingerprint", "settingsFingerprint", "routingFingerprint"];
 const IMMUTABLE = SNAPSHOT.filter(key => !["id", "number", "deploymentId", "latestVersionId", "bindingFingerprint"].includes(key));
 const snapshot = state => Object.fromEntries(SNAPSHOT.map(key => [key, state[key]]));
@@ -369,7 +379,8 @@ export async function prepareProductionBindingCleanup(options) {
   check(removeBindings.length > 0, "No known Supabase bindings remain; no cleanup version is needed.");
   return { kind: "prepared-production-binding-cleanup", preparedAt: new Date(now).toISOString(), acceptanceFingerprint: hash(accepted),
     production: snapshot(observed.production), qa: snapshot(observed.qa), removeBindings,
-    expectedBindingFingerprint: expectedBindings(observed.production, removeBindings), accessFingerprint: observed.accessFingerprint };
+    expectedBindingFingerprint: expectedBindings(observed.production, removeBindings), accessFingerprint: observed.accessFingerprint,
+    assetPreservation: { ...ASSET_PRESERVATION } };
 }
 
 export async function createProductionBindingCleanupVersion(options) {
@@ -428,6 +439,7 @@ export async function activateProductionBindingCleanup(options) {
   await health(fetchImpl);
   const report = { stage: "cleanup_verified", ...retained, productionDeploymentId: after.production.deploymentId,
     nonTargetBindingsPreserved: true, runtimeCodeAssetsSettingsPreserved: true, qaUnchanged: true,
+    assetPreservation: { ...ASSET_PRESERVATION },
     healthD1Connected: true, healthSupabaseNotRequired: true, secretValuesInspected: false,
     databaseWrites: false, emailsSent: false, accessPolicyChanges: false, supabaseShutdownPerformed: false };
   await evidence(onEvidence, report);

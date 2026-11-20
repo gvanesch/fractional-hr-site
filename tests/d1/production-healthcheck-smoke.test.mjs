@@ -7,7 +7,7 @@ import {
   PRODUCTION_HEALTHCHECK_ORIGIN as SITE, ProductionHealthCheckError,
   productionHealthCheckFailure, prepareProductionHealthCheckSmoke,
   reserveProductionHealthCheckAttempt, verifyProductionHealthCheckSmoke,
-  runProductionHealthCheckSmoke,
+  runProductionHealthCheckSmoke, STRICT_NOTIFICATION_ROUTING, EXISTING_NOTIFICATION_ROUTING,
 } from "../../scripts/security/production-healthcheck-smoke.mjs";
 
 const ACCOUNT = "73221f18acc676e4992c89fcbf2b2a8f";
@@ -35,7 +35,7 @@ const MARKER = `SYNTHETIC PRODUCTION TEST - ${request.requestId}`;
 const ANSWERS = Object.fromEntries(Array.from({ length: 10 }, (_, index) => [index + 1, 3]));
 const failure = code => error => error instanceof ProductionHealthCheckError && error.code === code;
 
-function harness(t) {
+function harness(t, notificationRouting) {
   const sqlite = new DatabaseSync(":memory:");
   t.after(() => sqlite.close());
   for (const migration of ["0001_create_system_events.sql", "0002_create_diagnostic_submissions.sql"])
@@ -59,6 +59,12 @@ function harness(t) {
         .map(name => [`D1_${name}_MODE`, "d1"])),
     }).map(([name, text]) => ({ name, type: "plain_text", text })),
   ];
+  if (notificationRouting === EXISTING_NOTIFICATION_ROUTING) {
+    for (const name of ["CONTACT_TO_EMAIL", "CONTACT_FROM_EMAIL"]) {
+      const binding = bindings.find(item => item.name === name);
+      binding.type = "secret_text"; delete binding.text;
+    }
+  }
   const state = { bindings, versionBindings: structuredClone(bindings), activeVersion: VERSION,
     deploymentId: DEPLOYMENT, versionId: VERSION, databaseId: DATABASE, databaseName: "vanesch-prod",
     health: { status: "ok", d1: "connected", supabase: "not_required" },
@@ -156,7 +162,7 @@ function harness(t) {
     if (state.badJSON) return new Response(`Private provider response ${PROVIDER_ID}`, { status: 200 });
     return Response.json(result);
   }
-  const options = overrides => ({ request, env, fetchImpl, ...overrides });
+  const options = overrides => ({ request: notificationRouting ? { ...request, notificationRouting } : request, env, fetchImpl, ...overrides });
   return { sqlite, state, insertEvent, unchanged: () => assert.equal(existingSnapshot(), preserved),
     prepare: overrides => prepareProductionHealthCheckSmoke(options(overrides)),
     reserve: (checkpoint, method = "browser", overrides) => reserveProductionHealthCheckAttempt({ ...options(overrides), checkpoint, method }),
@@ -170,6 +176,8 @@ test("Preparation performs bounded reads and returns a UI-compatible synthetic p
   assert.equal(prepared.state, "ready");
   assert.equal(prepared.readOnly, true);
   assert.equal(prepared.databaseWrites, false);
+  assert.equal(prepared.notificationRouting, STRICT_NOTIFICATION_ROUTING);
+  assert.equal(prepared.recipientValueVerified, true);
   assert.equal(prepared.formUrl, `${SITE}/diagnostic`);
   assert.deepEqual(prepared.payload, { answers: ANSWERS, companySize: "1–25 employees", industry: "Other", role: "Other", countryRegion: MARKER });
   assert.equal(h.state.reservationWrites, 0);
@@ -187,6 +195,8 @@ test("One hosted submission proves production D1 and public result; rerun is rea
   assert.equal(first.internalNotificationStatus, "provider_accepted");
   assert.equal(first.advisorEmailProviderAccepted, true);
   assert.equal(first.participantEmails, 0);
+  assert.equal(first.notificationRouting, STRICT_NOTIFICATION_ROUTING);
+  assert.equal(first.recipientValueVerified, true);
   assert.equal(first.submissionMethod, "api");
   assert.equal(first.automaticResubmissionAllowed, false);
   assert.equal(second.reusedSubmission, true);
@@ -224,7 +234,8 @@ test("Wrong execution context and malformed request fail before network access",
     { ...env, CLOUDFLARE_ACCOUNT_ID: "other" }, { ...env, CLOUDFLARE_API_TOKEN: " " } ])
     await assert.rejects(h.run({ env: changed }), failure("production_healthcheck_context_unverified"));
   for (const changed of [ { ...request, operation: "verify-healthcheck-on-qa" }, { ...request, expectedProductionVersionId: "unknown" },
-    { ...request, requestId: "unsafe' marker" }, { ...request, email: "participant@example.invalid" }, null ])
+    { ...request, requestId: "unsafe' marker" }, { ...request, email: "participant@example.invalid" },
+    { ...request, notificationRouting: "any-recipient" }, { ...request, notificationRouting: undefined }, null ])
     await assert.rejects(h.run({ request: changed }), failure("production_healthcheck_request_invalid"));
   assert.equal(h.state.calls.length, 0);
 });
@@ -237,6 +248,7 @@ test("Both settings and active version must prove exact Greg-only delivery and p
     ["CONTACT_TO_EMAIL", "text", "greg@vanesch.uk,other@example.invalid", "production_internal_recipient_unverified"],
     ["CONTACT_TO_EMAIL", "type", "secret_text", "production_internal_recipient_unverified"],
     ["CONTACT_FROM_EMAIL", "text", "", "production_mail_transport_unverified"],
+    ["CONTACT_FROM_EMAIL", "type", "secret_text", "production_mail_transport_unverified"],
     ["D1_SYSTEM_EVENTS_MODE", "text", "shadow", "production_d1_modes_unverified"],
     ["D1_DIAGNOSTIC_SUBMISSIONS_MODE", "text", "off", "production_d1_modes_unverified"],
     ["D1_CRM_PROSPECTS_MODE", "text", "shadow", "production_d1_modes_unverified"],
@@ -422,4 +434,68 @@ test("Import is inert and unexpected failures have no provider or credential con
   assert.equal(child.stdout, "");
   assert.deepEqual(productionHealthCheckFailure(new Error(`Private response ${PUBLIC_TOKEN} ${env.CLOUDFLARE_API_TOKEN}`)),
     { code: "unexpected_production_healthcheck_failure", mutationOutcomeUnknown: null, httpStatus: null });
+});
+
+test("Explicit existing-production routing permits the observed secret bindings without claiming their recipient value", async t => {
+  const h = harness(t, EXISTING_NOTIFICATION_ROUTING), prepared = await h.prepare();
+  assert.equal(prepared.notificationRouting, EXISTING_NOTIFICATION_ROUTING);
+  assert.equal(prepared.internalRecipientBindingPresent, true);
+  assert.equal(prepared.recipientValueVerified, false);
+  assert.equal(Object.hasOwn(prepared, "internalRecipientVerified"), false);
+  const first = await h.run(), second = await h.run();
+  for (const proof of [first, second]) {
+    assert.equal(proof.notificationRouting, EXISTING_NOTIFICATION_ROUTING);
+    assert.equal(proof.recipientValueVerified, false);
+    assert.equal(proof.internalRecipientBindingPresent, true);
+    assert.equal(proof.participantEmails, 0);
+    assert.equal(proof.internalNotificationStatus, "provider_accepted");
+    assert.equal(Object.hasOwn(proof, "internalRecipientVerified"), false);
+  }
+  assert.equal(h.state.posts, 1);
+  assert.equal(h.state.notifications, 1);
+  assert.equal(h.state.reservationWrites, 1);
+  assert.doesNotMatch(JSON.stringify([prepared, first, second]), new RegExp([PUBLIC_TOKEN, SUBMISSION, PROVIDER_ID, PRIVATE_SENDER, env.CLOUDFLARE_API_TOKEN].join("|")));
+  h.unchanged();
+});
+
+test("Existing-production exception is narrow: both secret bindings, exact production modes and metadata agreement remain required", async t => {
+  for (const source of ["bindings", "versionBindings"]) for (const name of ["CONTACT_TO_EMAIL", "CONTACT_FROM_EMAIL"]) {
+    const h = harness(t, EXISTING_NOTIFICATION_ROUTING);
+    const binding = h.state[source].find(item => item.name === name);
+    binding.type = "plain_text"; binding.text = "greg@vanesch.uk";
+    await assert.rejects(h.run(), failure("production_existing_notification_secret_bindings_unverified"));
+    assert.equal(h.state.reservationWrites, 0);
+    assert.equal(h.state.posts, 0);
+  }
+  for (const change of [ h => { h.state.bindings = h.state.bindings.filter(item => item.name !== "CONTACT_TO_EMAIL"); },
+    h => { h.state.bindings.find(item => item.name === "D1_DIAGNOSTIC_SUBMISSIONS_MODE").text = "off"; },
+    h => { h.state.versionBindings.push({ name: "UNREVIEWED", type: "plain_text", text: "different" }); } ]) {
+    const h = harness(t, EXISTING_NOTIFICATION_ROUTING); change(h);
+    await assert.rejects(h.run(), ProductionHealthCheckError);
+    assert.equal(h.state.reservationWrites, 0);
+    assert.equal(h.state.posts, 0);
+  }
+});
+
+test("Switching routing declarations cannot replay or reinterpret an existing strict reservation", async t => {
+  const h = harness(t), prepared = await h.prepare();
+  await h.reserve(prepared.checkpoint);
+  for (const bindings of [h.state.bindings, h.state.versionBindings]) for (const name of ["CONTACT_TO_EMAIL", "CONTACT_FROM_EMAIL"]) {
+    const binding = bindings.find(item => item.name === name); binding.type = "secret_text"; delete binding.text;
+  }
+  await assert.rejects(h.run({ request: { ...request, notificationRouting: EXISTING_NOTIFICATION_ROUTING } }),
+    failure("production_attempt_ownership_unverified"));
+  assert.equal(h.state.reservationWrites, 1);
+  assert.equal(h.state.posts, 0);
+  assert.equal(h.state.notifications, 0);
+});
+
+test("An explicitly approved existing-routing attempt still cannot retry after unknown transport", async t => {
+  const h = harness(t, EXISTING_NOTIFICATION_ROUTING); h.state.dropPost = true;
+  await assert.rejects(h.run(), error => error instanceof ProductionHealthCheckError && error.mutationOutcomeUnknown === true);
+  h.state.dropPost = false;
+  await assert.rejects(h.run(), failure("production_existing_attempt_requires_verification_do_not_resubmit"));
+  assert.equal(h.state.posts, 1);
+  assert.equal(h.state.reservationWrites, 1);
+  assert.equal(h.state.notifications, 0);
 });

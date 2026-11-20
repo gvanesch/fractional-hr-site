@@ -1,5 +1,8 @@
 name: One production Health Check D1 proof
 
+# Default requests require readable Greg-only routing. Using the existing
+# production secret routing requires notificationRouting in a reviewed request;
+# this workflow never chooses that exception or creates the request itself.
 on:
   push:
     branches:

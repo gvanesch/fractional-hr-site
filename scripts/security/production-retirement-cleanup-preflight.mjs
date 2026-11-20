@@ -16,9 +16,9 @@ const MAX_BODY_BYTES = 64 * 1024 * 1024;
 // fields are reported as unsupported rather than silently called compatible.
 const BETA = "id number created_on urls annotations assets author_email author_id bindings env cache_options compatibility_date compatibility_flags containers exports exports_reconciliation limits main_module migration_tag migrations modules package_dependencies placement source startup_time_ms usage_model".split(" ");
 const LEGACY = "id number metadata annotations resources cache_options".split(" ");
-const PUBLICATION = "author_email author_id created_on hasPreview modified_on source".split(" ");
+const PUBLICATION = "author_email author_id created_on hasPreview has_preview modified_on source".split(" ");
 const SCRIPT = "etag handlers named_handlers placement_mode placement last_deployed_from".split(" ");
-const RUNTIME = "compatibility_date compatibility_flags usage_model limits exports migration_tag".split(" ");
+const RUNTIME = "compatibility_date compatibility_flags usage_model limits exports migration_tag assets".split(" ");
 const BINDINGS = {
   plain_text: ["name", "type", "text"], json: ["name", "type", "json"],
   secret_text: ["name", "type"], secret_key: ["name", "type"], assets: ["name", "type"],
@@ -118,7 +118,28 @@ function describeVersion(legacy, beta, diagnostic) {
   shape(legacy?.resources?.script_runtime, RUNTIME, "legacy.runtime");
   shape(beta, BETA, "beta");
   shape(beta?.assets, ["config", "jwt"], "beta.assets");
-  shape(beta?.assets?.config, ["base_path", "html_handling", "not_found_handling", "run_worker_first"], "beta.assets.config", true);
+  shape(beta?.assets?.config, ["base_path", "html_handling", "not_found_handling", "run_worker_first"], "beta.assets.config");
+  // This observed provider object has no documented mapping to beta assets.
+  // Describe only bounded nested names/types; fingerprint its COMPLETE value
+  // below. Nested fields stay opaque, never dropped or mapped by guesswork.
+  const runtimeAssets = legacy?.resources?.script_runtime?.assets;
+  const runtimeAssetShape = { fieldsVisited: 0, truncated: false };
+  diagnostic.runtimeAssetsShape = runtimeAssetShape;
+  function opaqueFields(value, path, depth = 0) {
+    if (!object(value) && !Array.isArray(value)) return;
+    const entries = Object.entries(value);
+    if (depth >= 3) { runtimeAssetShape.truncated ||= entries.length > 0; return; }
+    const group = fieldTypes[path] ??= Object.create(null);
+    for (const [key, item] of entries) {
+      if (runtimeAssetShape.fieldsVisited >= 64) { runtimeAssetShape.truncated = true; break; }
+      runtimeAssetShape.fieldsVisited++;
+      const name = Array.isArray(value) ? "[]" : safeName(key), kinds = group[name] ??= [];
+      if (!kinds.includes(type(item))) kinds.push(type(item));
+      opaqueFields(item, `${path}.${name}`, depth + 1);
+    }
+  }
+  if (object(runtimeAssets)) opaqueFields(runtimeAssets, "legacy.runtime.assets");
+  else { fieldTypes["legacy.runtime.assets"] = { value: [type(runtimeAssets)] }; unsupported.add("legacy.runtime.assets:expected_object"); }
   diagnostic.arrayElementTypes = Object.fromEntries([
     ["beta.modules", beta?.modules], ["beta.bindings", beta?.bindings], ["beta.urls", beta?.urls],
     ["legacy.bindings", legacy?.resources?.bindings],
@@ -175,16 +196,18 @@ function describeVersion(legacy, beta, diagnostic) {
   diagnostic.stage = "runtime_and_schema_comparison";
   const runtime = legacy?.resources?.script_runtime, etag = legacy?.resources?.script?.etag, jwt = beta?.assets?.jwt;
   const runtimeConsistent = object(runtime) && typeof beta?.compatibility_date === "string" &&
-    beta.compatibility_date === runtime.compatibility_date && RUNTIME.filter(key => key !== "compatibility_date")
+    beta.compatibility_date === runtime.compatibility_date && RUNTIME.filter(key => !["compatibility_date", "assets"].includes(key))
       .every(key => hash(key === "compatibility_flags" ? beta[key] ?? [] : beta[key]) ===
         hash(key === "compatibility_flags" ? runtime[key] ?? [] : runtime[key]));
   const jwtPresent = typeof jwt === "string" && jwt.length > 0;
+  const assetsCompatible = object(beta?.assets) && object(beta.assets.config) && object(runtimeAssets) && (jwt === undefined || jwtPresent);
   const annotationsValid = value => value == null || object(value) && Object.values(value).every(item => typeof item === "string");
   const schemaCompatible = Array.isArray(beta?.urls) && beta.urls.every(url => typeof url === "string") &&
     Number.isFinite(Date.parse(beta?.created_on)) && Array.isArray(legacy?.resources?.script?.handlers) &&
     annotationsValid(beta?.annotations) && annotationsValid(legacy?.annotations) &&
     (legacy?.metadata === undefined || object(legacy.metadata) && Object.entries(legacy.metadata)
-      .every(([key, value]) => key === "hasPreview" ? typeof value === "boolean" : typeof value === "string"));
+      .every(([key, value]) => ["hasPreview", "has_preview"].includes(key) ? typeof value === "boolean" : typeof value === "string") &&
+      (legacy.metadata.hasPreview === undefined || legacy.metadata.has_preview === undefined || legacy.metadata.hasPreview === legacy.metadata.has_preview));
   diagnostic.stage = "version_report_fingerprints";
   return { report: {
     fieldTypes, unsupportedFields: [...unsupported].sort(), schemaCompatible,
@@ -193,7 +216,11 @@ function describeVersion(legacy, beta, diagnostic) {
     envConsistent, runtimeConsistent,
     modules: { count: Array.isArray(modules) ? modules.length : null, valid: modulesValid,
       inventoryFingerprint: modulesValid ? hash({ main: hash(beta.main_module), modules: moduleHashes.sort((a, b) => a.nameHash.localeCompare(b.nameHash)) }) : null },
-    assets: { jwtPresent, jwtFingerprint: jwtPresent ? hash(jwt) : null, configFingerprint: object(beta?.assets?.config) ? hash(beta.assets.config) : null },
+    assets: { metadataCompatible: assetsCompatible, jwtPresent, jwtFingerprint: jwtPresent ? hash(jwt) : null,
+      metadataFingerprint: object(beta?.assets) ? hash(beta.assets) : null,
+      configFingerprint: object(beta?.assets?.config) ? hash(beta.assets.config) : null,
+      runtimeMetadataPresent: object(runtimeAssets), runtimeMetadataFingerprint: object(runtimeAssets) ? hash(runtimeAssets) : null,
+      runtimeFieldShape: runtimeAssetShape, independentContentDigestsVerified: false },
     etag: { present: typeof etag === "string" && etag.length > 0, fingerprint: typeof etag === "string" && etag.length > 0 ? hash(etag) : null },
   }, legacy, beta };
 }
@@ -315,22 +342,27 @@ export async function runCleanupMetadataPreflight({ env = process.env, fetchImpl
   diagnostics.stage = "repeat_read_fingerprints";
   const a = first.report, b = second.report;
   const stability = {
-    assetsJwtEqual: a.assets.jwtPresent && b.assets.jwtPresent && a.assets.jwtFingerprint === b.assets.jwtFingerprint,
-    assetsConfigEqual: a.assets.configFingerprint === b.assets.configFingerprint,
+    // Absent upload tokens in both reads are consistent. Their presence flags
+    // remain explicit, and neither equality nor absence is a content digest.
+    assetsJwtEqual: a.assets.jwtPresent === b.assets.jwtPresent && a.assets.jwtFingerprint === b.assets.jwtFingerprint,
+    assetsMetadataEqual: a.assets.metadataFingerprint !== null && a.assets.metadataFingerprint === b.assets.metadataFingerprint,
+    assetsConfigEqual: a.assets.configFingerprint !== null && a.assets.configFingerprint === b.assets.configFingerprint,
+    runtimeAssetsEqual: a.assets.runtimeMetadataPresent && b.assets.runtimeMetadataPresent &&
+      a.assets.runtimeMetadataFingerprint === b.assets.runtimeMetadataFingerprint,
     modulesEqual: a.modules.valid && b.modules.valid && a.modules.inventoryFingerprint === b.modules.inventoryFingerprint,
     etagEqual: a.etag.present && b.etag.present && a.etag.fingerprint === b.etag.fingerprint,
     legacyEqual: hash(first.legacy) === hash(second.legacy), betaEqual: hash(first.beta) === hash(second.beta),
   };
   const unsupportedFields = [...new Set([...a.unsupportedFields, ...b.unsupportedFields])].sort();
   const supported = report => report.bindingsConsistent && report.envConsistent && report.runtimeConsistent &&
-    report.schemaCompatible && report.modules.valid && report.assets.jwtPresent && report.etag.present;
+    report.schemaCompatible && report.modules.valid && report.assets.metadataCompatible && report.etag.present;
   diagnostics.stage = "completed";
   return { kind: "production-cleanup-metadata-preflight", observedAt: new Date(now).toISOString(), ...SCOPE,
     metadataReadCompleted: true, metadataReady: unsupportedFields.length === 0 && supported(a) && supported(b) && Object.values(stability).every(Boolean),
     worker: PRODUCTION.worker, activeVersionId: before.versionId, versionNumber: first.beta.number,
     latestVersionId: before.latestVersionId, activeEqualsLatest: true, leaseStable: true, versionReadRounds: 2, cloudflareGetRequests: diagnostics.cloudflareGetRequests,
     first: a, second: b, stability, unsupportedFields,
-    note: "Metadata readiness only. Asset JWT equality is repeat-read evidence for an upload completion token, not a documented content digest or application acceptance.",
+    note: "Metadata readiness only. Future asset preservation requires the provider env-only PATCH inheritance contract, an exact base/version sequence, and unchanged complete readable metadata. Upload JWTs may be absent; no independent asset content digests or application acceptance are verified here.",
   };
   } catch (error) {
     const failure = error instanceof PreflightError ? error : new PreflightError("unexpected_metadata_failure", null, error);

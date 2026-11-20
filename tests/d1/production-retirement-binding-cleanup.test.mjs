@@ -62,7 +62,8 @@ function fixture() {
       ...clone(runtime), cache_options: { enabled: false, cross_version_cache: false },
       exports: { default: { type: "worker", state: "created" } }, package_dependencies: [{ name: "next", installedVersion: "15.0.0", packageJsonVersion: "^15" }] };
     const legacy = { id, number: beta.number, metadata: { created_on: beta.created_on, source: "wrangler", hasPreview: false }, annotations: clone(annotations),
-      resources: { bindings: clone(bindings), script: { etag: "synthetic-identical-code-etag", handlers: ["fetch"], named_handlers: [], last_deployed_from: "wrangler" }, script_runtime: clone(runtime) },
+      resources: { bindings: clone(bindings), script: { etag: "synthetic-identical-code-etag", handlers: ["fetch"], named_handlers: [], last_deployed_from: "wrangler" },
+        script_runtime: { ...clone(runtime), assets: { opaque_test_metadata: { reference: "synthetic-private-runtime-assets", flags: [true] } } } },
       cache_options: clone(beta.cache_options) };
     return { target, active: id, order: [id], deployment: production ? "66666666-6666-4666-8666-666666666666" : "77777777-7777-4777-8777-777777777777",
       versions: new Map([[id, { beta, legacy }]]),
@@ -152,7 +153,7 @@ test("cleanup preparation is read-only, pins complete state, and returns only sa
   assert.deepEqual(prepared.removeBindings, LEGACY_SUPABASE_BINDINGS);
   assert.equal(prepared.production.id, PROD); assert.equal(prepared.qa.id, QA_ID);
   assert.equal(mutations(f.state).length, 0);
-  for (const forbidden of ["private-existing-value", "synthetic-test-token", "synthetic-private-assets-identity", "private-existing-module", "private-author", AUD])
+  for (const forbidden of ["private-existing-value", "synthetic-test-token", "synthetic-private-assets-identity", "synthetic-private-runtime-assets", "private-existing-module", "private-author", AUD])
     assert.ok(!JSON.stringify(prepared).includes(forbidden));
 });
 
@@ -184,6 +185,39 @@ test("staging performs one narrowly scoped inactive PATCH; activation is a separ
   assert.deepEqual(f.state.evidence.map(item => item.stage), ["cleanup_patch_requested_outcome_unknown", "cleanup_uploaded_not_verified",
     "cleanup_verified_not_activated", "cleanup_activation_requested_outcome_unknown", "cleanup_activated_verification_pending", "cleanup_verified"]);
   assert.ok(mutations(f.state).every(call => !call.search));
+});
+
+test("live-style metadata without an upload JWT uses merge inheritance and complete opaque asset equality", async () => {
+  const f = fixture();
+  for (const target of [f.state.prod, f.state.qa]) {
+    const value = target.versions.get(target.active);
+    delete value.beta.assets.jwt;
+    delete value.legacy.metadata.hasPreview;
+    value.legacy.metadata.has_preview = false;
+  }
+  const checkpoint = await f.prepare(), staged = await f.stage(checkpoint);
+  const report = await f.activate(checkpoint, staged);
+  assert.match(checkpoint.production.runtimeAssetsFingerprint, /^[a-f0-9]{64}$/);
+  assert.deepEqual(report.assetPreservation, {
+    basis: "provider-env-only-merge-inheritance-and-readable-metadata-equality", independentAssetContentDigestsVerified: false,
+  });
+  assert.deepEqual(Object.keys(mutations(f.state)[0].body).sort(), ["annotations", "env"]);
+  assert.equal(f.state.prod.versions.get(CANDIDATE).beta.assets.jwt, undefined);
+  assert.equal(hash(f.state.prod.versions.get(CANDIDATE).legacy.resources.script_runtime.assets), checkpoint.production.runtimeAssetsFingerprint);
+  assert.ok(!JSON.stringify([checkpoint, report]).includes("synthetic-private-runtime-assets"));
+});
+
+test("opaque nested runtime asset changes without any upload JWT stop activation", async () => {
+  for (const when of ["before-patch", "after-patch", "before-activation"]) {
+    const f = fixture(), base = f.state.prod.versions.get(PROD);
+    delete base.beta.assets.jwt;
+    const checkpoint = await f.prepare();
+    const change = id => { f.state.prod.versions.get(id).legacy.resources.script_runtime.assets.opaque_test_metadata.reference = "changed-opaque-reference"; };
+    if (when === "before-patch") { change(PROD); await assert.rejects(f.stage(checkpoint)); assert.equal(f.state.patches, 0); }
+    else if (when === "after-patch") { f.state.afterPatch = () => change(CANDIDATE); await assert.rejects(f.stage(checkpoint)); }
+    else { const staged = await f.stage(checkpoint); change(CANDIDATE); await assert.rejects(f.activate(checkpoint, staged)); }
+    assert.equal(f.state.activations, 0); assert.equal(f.state.prod.active, PROD);
+  }
 });
 
 test("stale active settings or secret inventory cannot masquerade as the known inactive candidate", async () => {
@@ -250,7 +284,9 @@ test("accepted-production proof and fixed-context guards reject before any netwo
 
 test("unavailable or unsupported provider metadata fails before the first mutation", async () => {
   for (const mutate of [
-    v => { delete v.beta.assets.jwt; }, v => { delete v.beta.assets; }, v => { delete v.beta.modules; },
+    v => { v.beta.assets.jwt = null; }, v => { delete v.beta.assets; }, v => { delete v.beta.assets.config; }, v => { delete v.beta.modules; },
+    v => { delete v.legacy.resources.script_runtime.assets; }, v => { v.legacy.resources.script_runtime.assets = []; },
+    v => { v.legacy.metadata.has_preview = true; }, v => { v.legacy.metadata.has_preview = "false"; },
     v => { v.beta.unmapped_provider_setting = true; }, v => { v.legacy.resources.unmapped = true; },
     v => { v.legacy.metadata.unmapped = true; },
     v => { v.beta.modules[0].content_base64 = "invalid?"; },

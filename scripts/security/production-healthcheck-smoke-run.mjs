@@ -8,6 +8,7 @@ import { fingerprint } from "./qa-retirement-release.mjs";
 import { ACCOUNT, CANDIDATE_REF } from "./supabase-retirement-readonly.mjs";
 import {
   prepareProductionHealthCheckSmoke, runProductionHealthCheckSmoke, productionHealthCheckFailure,
+  STRICT_NOTIFICATION_ROUTING, EXISTING_NOTIFICATION_ROUTING,
 } from "./production-healthcheck-smoke.mjs";
 
 export const REQUEST_PATH = "scripts/security/production-healthcheck-smoke-request.json";
@@ -19,6 +20,7 @@ const SHA = /^[a-f\d]{40}$/, HASH = /^[a-f\d]{64}$/;
 const CHECKPOINT_KIND = "production-healthcheck-workflow-checkpoint";
 const object = value => value != null && typeof value === "object" && !Array.isArray(value);
 const REQUEST_FIELDS = ["operation", "requestId", "requestedAt", "reviewedCommit", "expectedProductionVersionId"];
+const routingFor = request => request.notificationRouting ?? STRICT_NOTIFICATION_ROUTING;
 
 export class ProductionHealthCheckRunError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -30,8 +32,11 @@ export function validateProductionHealthCheckRequest(request, env, git, now = Da
     env.GITHUB_REPOSITORY === "gvanesch/fractional-hr-site" && env.GITHUB_REF === CANDIDATE_REF &&
     env.CLOUDFLARE_ACCOUNT_ID === ACCOUNT, "production_healthcheck_execution_not_authorized");
   const age = now - Date.parse(request?.requestedAt);
-  check(object(request) && Object.keys(request).length === REQUEST_FIELDS.length &&
-    Object.keys(request).every(key => REQUEST_FIELDS.includes(key)) &&
+  const existingRoutingDeclared = object(request) && Object.hasOwn(request, "notificationRouting");
+  const fields = existingRoutingDeclared ? [...REQUEST_FIELDS, "notificationRouting"] : REQUEST_FIELDS;
+  check(object(request) && Object.keys(request).length === fields.length &&
+    Object.keys(request).every(key => fields.includes(key)) &&
+    (!existingRoutingDeclared || request.notificationRouting === EXISTING_NOTIFICATION_ROUTING) &&
     request.operation === "verify-healthcheck-on-production" && request.requestId === HEALTHCHECK_REQUEST_ID &&
     request.expectedProductionVersionId === EXPECTED_PRODUCTION_VERSION_ID && SHA.test(request.reviewedCommit ?? "") &&
     typeof request.requestedAt === "string" && /Z$/.test(request.requestedAt) &&
@@ -41,7 +46,8 @@ export function validateProductionHealthCheckRequest(request, env, git, now = Da
     git.parents?.length === 1 && git.parents[0] === request.reviewedCommit &&
     git.changedPaths?.length === 1 && git.changedPaths[0] === REQUEST_PATH,
   "production_healthcheck_requires_request_only_reviewed_parent");
-  return { operation: request.operation, requestId: request.requestId, expectedProductionVersionId: request.expectedProductionVersionId };
+  return { operation: request.operation, requestId: request.requestId, expectedProductionVersionId: request.expectedProductionVersionId,
+    ...(existingRoutingDeclared ? { notificationRouting: EXISTING_NOTIFICATION_ROUTING } : {}) };
 }
 
 function checkedAdapterCheckpoint(value, adapterRequest) {
@@ -54,23 +60,26 @@ function checkedAdapterCheckpoint(value, adapterRequest) {
 
 function checkedPrepared(value, adapterRequest) {
   check(value?.readOnly === true && value.databaseWrites === false && value.applicationSubmissionAttempted === false &&
-    value.internalRecipientVerified === true && value.participantEmails === 0 &&
+    value.notificationRouting === routingFor(adapterRequest) && value.internalRecipientBindingPresent === true &&
+    value.recipientValueVerified === (routingFor(adapterRequest) === STRICT_NOTIFICATION_ROUTING) && value.participantEmails === 0 &&
     ["ready", "existing_submission", "reserved_attempt_requires_verification"].includes(value.state),
   "production_healthcheck_readonly_preflight_unverified");
   return { state: value.state, checkpoint: checkedAdapterCheckpoint(value.checkpoint, adapterRequest) };
 }
 
-function checkedProof(value) {
+function checkedProof(value, adapterRequest) {
   check(value?.requestId === HEALTHCHECK_REQUEST_ID && value.productionVersion === EXPECTED_PRODUCTION_VERSION_ID &&
     value.d1WriteVerified === true && value.publicResultVerified === true && value.insertEventVerified === true &&
-    value.internalRecipientVerified === true && value.participantEmails === 0 && value.existingDataChanged === false &&
+    value.notificationRouting === routingFor(adapterRequest) && value.internalRecipientBindingPresent === true &&
+    value.recipientValueVerified === (routingFor(adapterRequest) === STRICT_NOTIFICATION_ROUTING) &&
+    value.participantEmails === 0 && value.existingDataChanged === false &&
     value.automaticResubmissionAllowed === false && ["provider_accepted", "failed", "unknown"].includes(value.internalNotificationStatus) &&
     value.advisorEmailProviderAccepted === (value.internalNotificationStatus === "provider_accepted") &&
     typeof value.createdSubmission === "boolean" && value.reusedSubmission === !value.createdSubmission &&
     value.applicationSubmissionAttempted === value.createdSubmission && ["api", "browser"].includes(value.submissionMethod) &&
     (!value.createdSubmission || value.submissionMethod === "api"), "production_healthcheck_completion_unverified_do_not_resubmit");
   return Object.fromEntries(["requestId", "productionVersion", "d1WriteVerified", "publicResultVerified", "insertEventVerified",
-    "internalRecipientVerified", "internalNotificationStatus", "advisorEmailProviderAccepted", "participantEmails", "submissionMethod",
+    "notificationRouting", "internalRecipientBindingPresent", "recipientValueVerified", "internalNotificationStatus", "advisorEmailProviderAccepted", "participantEmails", "submissionMethod",
     "automaticResubmissionAllowed", "existingDataChanged", "createdSubmission", "reusedSubmission", "applicationSubmissionAttempted"]
     .map(key => [key, value[key]]));
 }
@@ -80,10 +89,12 @@ export async function prepareProductionHealthCheckRun({ request, env, git, now =
   const adapterRequest = validateProductionHealthCheckRequest(request, env, git, now);
   await onEvidence({ stage: "checking_production_without_database_writes", requestId: adapterRequest.requestId,
     sourceCommit: git.head, productionVersion: EXPECTED_PRODUCTION_VERSION_ID, requestFingerprint: fingerprint(request),
+    notificationRouting: routingFor(adapterRequest), recipientValueVerified: false,
     automaticResubmissionAllowed: false, databaseWriteStatus: "not_attempted", applicationSubmissionStatus: "not_attempted" });
   const prepared = checkedPrepared(await prepareImpl({ request: adapterRequest, env, fetchImpl }), adapterRequest);
   await onEvidence({ stage: "production_readonly_preflight_verified", preflightState: prepared.state,
-    internalRecipientVerified: true, participantEmails: 0 });
+    notificationRouting: routingFor(adapterRequest), internalRecipientBindingPresent: true,
+    recipientValueVerified: routingFor(adapterRequest) === STRICT_NOTIFICATION_ROUTING, participantEmails: 0 });
   check(prepared.state !== "reserved_attempt_requires_verification", "production_healthcheck_prior_attempt_requires_readonly_reconciliation");
   return { kind: CHECKPOINT_KIND, observedAt: new Date(now).toISOString(), sourceCommit: git.head,
     requestFingerprint: fingerprint(request), state: prepared.state, adapterCheckpoint: prepared.checkpoint };
@@ -103,11 +114,13 @@ export async function executeProductionHealthCheckRun({ request, env, git, check
   await onEvidence({ stage: current.state === "ready" ? "entering_durable_single_attempt" : "reconciling_existing_submission_readonly",
     requestId: adapterRequest.requestId, sourceCommit: git.head, productionVersion: EXPECTED_PRODUCTION_VERSION_ID,
     requestFingerprint: fingerprint(request), automaticResubmissionAllowed: false,
+    notificationRouting: routingFor(adapterRequest), internalRecipientBindingPresent: true,
+    recipientValueVerified: routingFor(adapterRequest) === STRICT_NOTIFICATION_ROUTING,
     databaseWriteStatus: current.state === "ready" ? "may_have_occurred" : "not_attempted",
     applicationSubmissionStatus: current.state === "ready" ? "may_have_occurred" : "not_attempted" });
   // The library alone owns the unique D1 reservation and normal website POST.
   // It never retries a prior reserved attempt, including a browser reservation.
-  const proof = checkedProof(await runImpl({ request: adapterRequest, env, fetchImpl }));
+  const proof = checkedProof(await runImpl({ request: adapterRequest, env, fetchImpl }), adapterRequest);
   await onEvidence({ stage: "production_healthcheck_verified", proof, automaticResubmissionAllowed: false,
     databaseWriteStatus: proof.createdSubmission ? "verified_synthetic_only" : "read_only_reconciliation",
     applicationSubmissionStatus: proof.applicationSubmissionAttempted ? "verified_once" : "not_attempted" });
@@ -142,6 +155,7 @@ async function main() {
     return;
   }
   let report = { requestId: HEALTHCHECK_REQUEST_ID, sourceCommit: git.head, productionVersion: EXPECTED_PRODUCTION_VERSION_ID,
+    notificationRouting: routingFor(request), recipientValueVerified: false,
     stage: "starting", automaticResubmissionAllowed: false, databaseWriteStatus: "not_attempted", applicationSubmissionStatus: "not_attempted" };
   const onEvidence = async update => { report = { ...report, ...update }; await saveJson(REPORT_PATH, report); };
   try {
