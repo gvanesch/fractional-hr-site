@@ -604,7 +604,15 @@ test("optional audit secret is isolated to the read-only audit step and absent f
   assert.equal(readJob.match(new RegExp(`${tokenName}:`, "g")).length, 1);
   const readStep = readJob.split("      - name: Read Worker configuration, D1 schema, Access policies and public pages\n")[1].split("      - name:")[0];
   assert.ok(readStep.includes("CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}"));
-  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && file !== "supabase-retirement-verification.yml"))
+  const plan = readFileSync(new URL("production-retirement-access-plan.yml", workflows), "utf8");
+  const [beforePlan, planAndLater] = plan.split("      - name: Read existing Access policy and prepare bounded production configuration\n");
+  assert.ok(!beforePlan.includes(tokenName));
+  const [planStep, ...laterSteps] = planAndLater.split("      - name:");
+  assert.equal(planStep.match(new RegExp(`${tokenName}:`, "g")).length, 1);
+  assert.ok(planStep.includes("run: node scripts/security/production-retirement-access-plan.mjs > production-retirement-access-plan-report.json"));
+  assert.ok(!laterSteps.join("\n").includes(tokenName));
+  assert.ok(!/wrangler|npm (?:run )?(?:build|deploy)|run:.*production-retirement-release\.mjs/.test(plan));
+  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && !["supabase-retirement-verification.yml", "production-retirement-access-plan.yml"].includes(file)))
     assert.ok(!readFileSync(new URL(file, workflows), "utf8").includes(tokenName), `Audit token must not enter ${file}`);
   assert.ok(!readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").includes(tokenName));
 });

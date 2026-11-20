@@ -119,7 +119,16 @@ export function selectQaTemplate(apps) {
   return qa[0];
 }
 
-export function inspectIdentityPolicy(policies) {
+function supportedMfaConfiguration(value) {
+  return value == null || (typeof value === "object" && !Array.isArray(value) &&
+    Object.keys(value).every(key => ["allowed_authenticators", "mfa_disabled", "session_duration"].includes(key)) &&
+    (value.mfa_disabled == null || typeof value.mfa_disabled === "boolean") &&
+    (value.allowed_authenticators == null || (Array.isArray(value.allowed_authenticators) &&
+      value.allowed_authenticators.every(method => ["totp", "biometrics", "security_key"].includes(method)))) &&
+    (value.session_duration == null || (typeof value.session_duration === "string" && /^\d+(?:h|m|s)$/.test(value.session_duration) && Number.parseInt(value.session_duration, 10) > 0)));
+}
+
+export function inspectIdentityPolicy(policies, allowedIdps = []) {
   const report = {
     policyCount: Array.isArray(policies) ? policies.length : null,
     allowPolicyCount: Array.isArray(policies) ? policies.filter(p => p.decision === "allow").length : null,
@@ -129,15 +138,30 @@ export function inspectIdentityPolicy(policies) {
   if (!Array.isArray(policies) || policies.length !== 1 || policies[0]?.decision !== "allow") return report;
   const policy = policies[0];
   const empty = value => value == null || (Array.isArray(value) && value.length === 0);
+  const emptyObject = value => value == null || (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
   const onlyGreg = Array.isArray(policy.include) && policy.include.length === 1 &&
     policy.include[0] && Object.keys(policy.include[0]).length === 1 &&
     policy.include[0].email && Object.keys(policy.include[0].email).length === 1 &&
     typeof policy.include[0].email.email === "string" && policy.include[0].email.email.trim().toLowerCase() === ADVISOR_EMAIL;
-  const simple = empty(policy.exclude) && empty(policy.require) && empty(policy.approval_groups) &&
+  const requiredLoginMethods = empty(policy.require) || (Array.isArray(policy.require) && policy.require.length === 1 &&
+    policy.require.every(rule => rule && Object.keys(rule).length === 1 && rule.login_method &&
+      Object.keys(rule.login_method).length === 1 && allowedIdps.includes(rule.login_method.id)));
+  const mfaSupported = supportedMfaConfiguration(policy.mfa_config);
+  const simple = empty(policy.exclude) && requiredLoginMethods && empty(policy.approval_groups) &&
     !policy.approval_required && !policy.purpose_justification_required &&
-    !policy.isolation_required && !policy.connection_rules && !policy.mfa_config &&
+    !policy.isolation_required && emptyObject(policy.connection_rules) && mfaSupported &&
     (policy.session_duration == null || (typeof policy.session_duration === "string" && /^\d+(?:h|m|s)$/.test(policy.session_duration) && Number.parseInt(policy.session_duration, 10) > 0));
-  return { ...report, gregOnly: onlyGreg, additionalIdentityOrRulePresent: !onlyGreg || !simple, supported: onlyGreg && simple };
+  return { ...report, gregOnly: onlyGreg, additionalIdentityOrRulePresent: !onlyGreg || !simple, supported: onlyGreg && simple,
+    restrictions: {
+      excludeRuleCount: Array.isArray(policy.exclude) ? policy.exclude.length : policy.exclude == null ? 0 : null,
+      requireRuleCount: Array.isArray(policy.require) ? policy.require.length : policy.require == null ? 0 : null,
+      requiredLoginMethodsSupported: requiredLoginMethods, approvalRequired: policy.approval_required === true,
+      approvalGroupsEmpty: empty(policy.approval_groups), purposeJustificationRequired: policy.purpose_justification_required === true,
+      isolationRequired: policy.isolation_required === true, connectionRulesEmpty: emptyObject(policy.connection_rules),
+      mfaConfigurationPresent: policy.mfa_config != null, mfaConfigurationSupported: mfaSupported,
+      policySessionDurationPresent: policy.session_duration != null,
+    },
+  };
 }
 
 export function inspectQaLogin(app, identityProviders) {
@@ -174,7 +198,7 @@ export function inspectQaLogin(app, identityProviders) {
 export function buildAccessPlan({ organization, apps, policies, identityProviders }) {
   requireCondition(organization?.auth_domain?.replace(/^https:\/\//, "").replace(/\/$/, "").toLowerCase() === EXPECTED_ACCESS_AUTH_DOMAIN, "zero_trust_team_mismatch");
   const qa = selectQaTemplate(apps);
-  const identity = inspectIdentityPolicy(policies), login = inspectQaLogin(qa, identityProviders);
+  const login = inspectQaLogin(qa, identityProviders), identity = inspectIdentityPolicy(policies, login.allowedIdps);
   const routesCovered = TARGETS.production.hosts.every(host => PROTECTED_PATHS.every(path =>
     PRODUCTION_DESTINATIONS.some(d => matchesDestination(d.uri, new URL(`https://${host}${path}`)))));
   const publicPaths = ["/", "/diagnostic", "/diagnostic-assessment", "/api/health", ...PUBLIC_POST_ONLY_PATHS];
@@ -183,8 +207,12 @@ export function buildAccessPlan({ organization, apps, policies, identityProvider
   requireCondition(PRODUCTION_DESTINATIONS.length === 42 && PRODUCTION_DESTINATIONS.every(d => d.uri.length <= 63) &&
     routesCovered && publicPathsExcluded, "production_destination_plan_invalid");
   const ready = identity.supported && login.report.supported;
-  const policy = { name: PRODUCTION_POLICY_NAME, decision: "allow", include: [{ email: { email: ADVISOR_EMAIL } }], exclude: [], require: [],
-    ...(identity.supported && policies[0].session_duration ? { session_duration: policies[0].session_duration } : {}) };
+  const policy = { name: PRODUCTION_POLICY_NAME, decision: "allow", include: [{ email: { email: ADVISOR_EMAIL } }], exclude: [],
+    require: identity.supported ? structuredClone(policies[0].require ?? []) : [],
+    ...(identity.supported && policies[0].session_duration ? { session_duration: policies[0].session_duration } : {}),
+    ...(identity.supported && policies[0].mfa_config != null ? { mfa_config: structuredClone(policies[0].mfa_config) } : {}),
+    ...(identity.supported && policies[0].connection_rules != null ? { connection_rules: {} } : {}),
+  };
   const application = {
     name: PRODUCTION_APP_NAME, type: "self_hosted", domain: "www.vanesch.uk/advisor",
     destinations: PRODUCTION_DESTINATIONS.map(d => ({ ...d })),

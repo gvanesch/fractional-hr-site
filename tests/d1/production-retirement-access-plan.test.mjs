@@ -62,6 +62,20 @@ test("unresolved/non-OTP provider and unsupported login settings remain unready"
   }
 });
 
+test("reviewed OTP requirements and supported MFA/session restrictions are preserved exactly", () => {
+  const f = fixture();
+  f.policies[0].require = [{login_method:{id:idpId}}];
+  f.policies[0].mfa_config = {mfa_disabled:false,allowed_authenticators:["security_key"],session_duration:"1h"};
+  f.policies[0].connection_rules = {};
+  const plan = buildAccessPlan(f);
+  assert.equal(plan.report.planReady, true);
+  assert.deepEqual(plan.policy.require, f.policies[0].require);
+  assert.deepEqual(plan.policy.mfa_config, f.policies[0].mfa_config);
+  assert.equal(JSON.stringify(plan.report).includes(idpId), false);
+  f.policies[0].require[0].login_method.id = policyId;
+  assert.equal(buildAccessPlan(f).report.planReady, false);
+});
+
 test("existing exact/wildcard production coverage or a mixed-host QA template blocks the plan", () => {
   for (const uri of ["www.vanesch.uk/advisor", "vanesch.uk/api/anything", "*.vanesch.uk/advisor"] ) {
     const f = fixture(); f.apps.push({ id: policyId, type: "self_hosted", destinations: [{ type: "public", uri }] });
@@ -133,5 +147,8 @@ test("source fingerprints change on QA and application inventory drift", () => {
 test("planner workflow supplies token only to the read step and includes no deployment or mutation command", async () => {
   const workflow = await readFile(new URL("../../.github/workflows/production-retirement-access-plan.yml", import.meta.url), "utf8");
   assert.equal((workflow.match(/secrets\.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN/g) ?? []).length, 1);
-  assert.equal(/wrangler|deploy|CLOUDFLARE_API_TOKEN|SUPABASE_SERVICE_ROLE_KEY/.test(workflow), false);
+  assert.equal(/wrangler|deploy|SUPABASE_SERVICE_ROLE_KEY/.test(workflow), false);
+  const preflightStep = workflow.split("      - name: Read actual production runtime and release eligibility\n")[1].split("      - name:")[0];
+  assert.equal((preflightStep.match(/secrets\.CLOUDFLARE_API_TOKEN/g) ?? []).length, 1);
+  assert.equal(preflightStep.includes("CLOUDFLARE_RETIREMENT_AUDIT_TOKEN"), false);
 });
