@@ -41,7 +41,8 @@ Greg has asked for independent implementation now, with notification at genuine 
 - [x] Existing baseline workflow/export regression tests pass; no live questionnaire or D1 record was changed.
 - [x] Local notifications, system events and scheduled digest integration uses D1 and the appropriate authorization, with email delivery mocked.
 - [x] Next.js and OpenNext Cloudflare Worker builds succeed without Supabase credentials after the Next.js 16.4.5 security patch.
-- [ ] Hosted QA and a bounded production smoke test confirm behavior beyond local simulation.
+- [x] Hosted QA Health Check proof: one labelled synthetic submission was read back from actual QA D1, the public result matched, and the notification provider accepted the Greg-only advisor email. No participant email was sent. See [run 44710395735](https://github.com/gvanesch/fractional-hr-site/actions/runs/44710395735).
+- [ ] Hosted signed-in advisor/CRM/project acceptance and a bounded production smoke test confirm the remaining behavior beyond local simulation.
 
 There is no Supabase row-count/checksum parity gate or historical archive requirement. Existing D1 recovery remains relevant to normal operations; it is not evidence that Supabase test data must be retained.
 
@@ -59,6 +60,10 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 - The QA advisor browser check reached the existing Cloudflare email-code login at `gregvanesch.cloudflareaccess.com`. There is no authenticated advisor session in this test browser. Complete that login before claiming hosted advisor/CRM/project UI verification.
 - The initial complete regression run after the application fix and security patch passed 144 tests. The audit was then extended with additional parser/safety coverage; see the latest CI run for the final test count.
 - Next.js 16.4.2 triggered a security build failure. The candidate now uses the same-minor [16.4.5 security release](https://github.com/vercel/next.js/releases/tag/v16.4.5); React and OpenNext versions are unchanged. Both the Next build and the complete OpenNext Worker bundle passed locally with Supabase URL and keys absent.
+- [Run 44710175252](https://github.com/gvanesch/fractional-hr-site/actions/runs/44710175252) also passed the no-Supabase tests and complete Worker build in GitHub Actions. Its overall status remains red because live retirement readiness is deliberately separate and production still uses Supabase authentication.
+- The expanded Access audit received an empty application list (zero returned and zero reported) in both environments, despite the browser reaching QA's existing Access login. This is an unresolved management-visibility issue, not proof that no policy exists. [Cloudflare documents that resource-scoped roles can return filtered lists](https://developers.cloudflare.com/changelog/product/access/). Verify the account/credential's scope before creating or changing production Access applications.
+- The original `/api/advisor-daily-action-digest` URL is behind QA's Access rule, while `/api/cron/advisor-daily-action-digest` is reachable for its independent bearer authorization. Preserve a working scheduler endpoint when configuring production Access.
+- The hosted QA proof is request `retirement-20261120-01`, pinned to QA Worker version `31410344-cdba-4b49-9d9d-88e546830083`. Its synthetic row and attempt marker are retained only in QA to prevent duplicate submissions/mail on reruns.
 - Existing historical release scripts deliberately pin the previous Supabase-auth checkpoint. They are not suitable as a new retirement release procedure.
 - Notify Greg only when a concrete unresolved decision, access requirement or failed acceptance test needs his input. Do not send obsolete data-reconciliation tasks.
 

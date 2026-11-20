@@ -43,6 +43,9 @@ jobs:
         run: npm run test:d1
       - name: Next and Cloudflare Worker build with no Supabase URL or keys
         run: npx opennextjs-cloudflare build
+      - name: Exercise built Worker with isolated local D1 and no email transport
+        timeout-minutes: 5
+        run: node scripts/security/local-worker-smoke.mjs
 
   live-readonly:
     name: Inspect ${{ matrix.target }} without writes
