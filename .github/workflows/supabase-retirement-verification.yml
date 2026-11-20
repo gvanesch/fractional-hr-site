@@ -65,6 +65,10 @@ jobs:
         with:
           node-version: 24
       - name: Read Worker configuration, D1 schema, Access policies and public pages
+        env:
+          # Optional, read-only Access/Workers CI token. Never used by builds,
+          # tests, application runtime or deployment workflows.
+          CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}
         run: node scripts/security/supabase-retirement-readonly.mjs "${{ matrix.target }}" > retirement-${{ matrix.target }}.json
       - name: Publish sanitized evidence
         if: always()

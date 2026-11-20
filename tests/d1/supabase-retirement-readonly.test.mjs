@@ -1,13 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import {
   ACCOUNT, CANDIDATE_REF, TARGETS, MODES, REQUIRED_BINDINGS, REQUIRED_TABLES,
-  SCHEMA_SELECT, PROTECTED_PATHS, EXPECTED_ACCESS_AUTH_DOMAIN, inspectSettings, inspectAccessOrganization, inspectWorkerBuildSettings, matchesDestination, runAudit, validateContext, failureReport,
+  SCHEMA_SELECT, PROTECTED_PATHS, EXPECTED_ACCESS_AUTH_DOMAIN, inspectSettings, inspectAccessOrganization, inspectWorkerBuildSettings, inspectWorkerBuildTriggers, matchesDestination, runAudit, validateContext, failureReport,
 } from "../../scripts/security/supabase-retirement-readonly.mjs";
 
 const privateValue = "private-value-must-not-be-logged";
+const auditPrivateValue = "audit-token-must-not-be-logged";
 const workerTag = "12345678901234567890123456789012";
+function fixtureBuildTrigger({ index = 0, includes = ["migration/d1"], excludes = [] } = {}) {
+  return {
+    trigger_uuid: `${String(index).padStart(8, "0")}-0000-4000-8000-000000000000`, external_script_id: workerTag,
+    branch_includes: includes, branch_excludes: excludes, deleted_on: null,
+    repo_connection: { provider_type: "github", provider_account_name: "gvanesch", repo_name: "fractional-hr-site", repo_id: privateValue, deleted_on: null },
+    trigger_name: privateValue, build_command: privateValue, deploy_command: privateValue,
+    build_token_uuid: privateValue, environment_variables: { PRIVATE: auditPrivateValue },
+  };
+}
 function fixtureBuildSettings({ branch = "migration/d1", previewsEnabled = false } = {}) {
   return {
     script_tag: workerTag,
@@ -30,7 +40,7 @@ function fixtureBindings(target = TARGETS.production) {
     { name: "SUPABASE_SERVICE_ROLE_KEY", type: "secret_text", text: privateValue },
   ];
 }
-function fixture({ targetName = "production", missingMode, accessUnavailable = false, supabaseRequired = false, missingTable, applications } = {}) {
+function fixture({ targetName = "production", missingMode, accessUnavailable = false, supabaseRequired = false, missingTable, applications, auditToken, buildTriggers } = {}) {
   const target = TARGETS[targetName];
   const requests = [];
   const fetchImpl = async (url, options = {}) => {
@@ -38,7 +48,8 @@ function fixture({ targetName = "production", missingMode, accessUnavailable = f
     requests.push({ url, options });
     if (url.startsWith("https://api.cloudflare.com/")) {
       assert.equal(options.redirect, "error", "never forward API credentials across a redirect");
-      assert.equal(options.headers.Authorization, `Bearer ${privateValue}`);
+      const dedicatedRead = auditToken && (/\/access\//.test(url) || /\/builds\/workers\/[a-f\d]{32}\/triggers\?/.test(url));
+      assert.equal(options.headers.Authorization, `Bearer ${dedicatedRead ? auditToken : privateValue}`);
       let result;
       if (url.endsWith("/query")) {
         assert.equal(options.method, "POST");
@@ -58,6 +69,7 @@ function fixture({ targetName = "production", missingMode, accessUnavailable = f
           }));
         } else if (url.endsWith("/policies")) result = [{ decision: "allow", include: [{ email: { email: "private-person@example.invalid" } }] }];
         else if (url.endsWith("/workers/scripts")) result = [{ id: target.worker, tag: "12345678901234567890123456789012" }];
+        else if (url.includes(`/builds/workers/${workerTag}/triggers?`)) result = buildTriggers ?? [fixtureBuildTrigger()];
         else if (url.endsWith(`/builds/workers/${workerTag}`)) result = fixtureBuildSettings();
         else if (url.endsWith("/deployments")) result = { deployments: [{ versions: [{ version_id: "00000000-0000-4000-8000-000000000000", percentage: 100 }] }] };
         else assert.fail(`Unexpected API path: ${url}`);
@@ -373,4 +385,226 @@ test("unrecognized self-hosted application destination structure keeps coverage 
   assert.equal(result.access.coverageStatus, "unknown");
   assert.ok(!result.blockers.some(message => message.includes("No candidate")));
   assert.ok(!JSON.stringify(result).includes(privateValue));
+});
+
+test("optional audit credential reaches only Access metadata and read-only Worker trigger inventory", async () => {
+  for (const targetName of ["production", "qa"]) {
+    const f = fixture({ targetName, auditToken: auditPrivateValue });
+    const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, targetName, fetchImpl: f.fetchImpl });
+    assert.equal(result.readOnlyChecksPassed, true);
+    for (const { url, options } of f.requests) {
+      const dedicated = /\/access\//.test(url) || /\/builds\/workers\/[a-f\d]{32}\/triggers\?/.test(url);
+      if (dedicated) {
+        assert.equal(options.method, "GET");
+        assert.equal(options.body, undefined);
+        assert.equal(options.redirect, "error");
+        assert.equal(options.headers.Authorization, `Bearer ${auditPrivateValue}`);
+      } else if (url.startsWith("https://api.cloudflare.com/")) assert.equal(options.headers.Authorization, `Bearer ${privateValue}`);
+      else assert.equal(options.headers, undefined);
+    }
+    assert.equal(f.requests.filter(r => r.options.method === "POST").length, 1, "Only the existing fixed schema SELECT may POST");
+    assert.ok(!f.requests.some(r => /environment_variables|\/logs|\/tokens/.test(r.url)));
+    assert.ok(!f.requests.some(r => r.url.endsWith(`/builds/workers/${workerTag}`)), "The dedicated path must not use the broader legacy build-configuration endpoint");
+    assert.ok(f.requests.some(r => r.url.endsWith("/settings") && r.options.headers.Authorization === `Bearer ${privateValue}`));
+    if (targetName === "production") {
+      assert.equal(result.externalBuilds.source, "worker_triggers");
+      assert.equal(result.externalBuilds.inventoryComplete, true);
+      assert.equal(result.externalBuilds.productionBranch, "migration/d1");
+      assert.equal(result.externalBuilds.mainPushMatchesListedTrigger, false);
+      assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null, "A negative trigger projection is not proof that every build integration is disabled");
+    } else assert.ok(!f.requests.some(r => r.url.includes("/builds/")));
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+    assert.ok(!JSON.stringify(result).includes(auditPrivateValue));
+    assert.ok(!JSON.stringify(result).includes(workerTag));
+  }
+});
+
+test("missing or blank optional audit token preserves the established credential and legacy build inspection", async () => {
+  for (const token of [undefined, "", "   "]) {
+    const f = fixture();
+    const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: token }, fetchImpl: f.fetchImpl });
+    assert.equal(result.externalBuilds.productionBranch, "migration/d1");
+    assert.equal(result.externalBuilds.mainPushMayTriggerBuild, false);
+    assert.ok(f.requests.some(r => r.url.endsWith(`/builds/workers/${workerTag}`)));
+    assert.ok(!f.requests.some(r => r.url.includes("/triggers?")));
+  }
+});
+
+test("documented trigger projection reports main eligibility without echoing private trigger configuration", () => {
+  const cases = [
+    { triggers: [fixtureBuildTrigger({ includes: ["main"] })], main: true },
+    { triggers: [fixtureBuildTrigger()], main: false },
+    { triggers: [fixtureBuildTrigger(), fixtureBuildTrigger({ index: 1, includes: ["*"], excludes: ["migration/d1"] })], main: true },
+    { triggers: [fixtureBuildTrigger({ includes: ["*"], excludes: ["main"] })], main: false },
+    { triggers: [fixtureBuildTrigger({ includes: [privateValue] })], main: false },
+    { triggers: [], main: false },
+  ];
+  for (const { triggers, main } of cases) {
+    const result = inspectWorkerBuildTriggers(triggers, workerTag);
+    assert.equal(result.readable, true);
+    assert.equal(result.inventoryComplete, true);
+    assert.equal(result.mainPushMatchesListedTrigger, main);
+    assert.equal(result.mainPushMayTriggerBuild, main ? true : null);
+    assert.equal(result.previewsEnabled, null, "Do not infer modern Preview settings from a legacy trigger projection");
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+    assert.ok(!JSON.stringify(result).includes(auditPrivateValue));
+    assert.ok(!JSON.stringify(result).includes(workerTag));
+  }
+  const deleted = fixtureBuildTrigger({ includes: ["main"] });
+  deleted.deleted_on = "2026-01-01T00:00:00Z";
+  assert.equal(inspectWorkerBuildTriggers([deleted], workerTag).mainPushMatchesListedTrigger, false);
+});
+
+test("unrecognized trigger data or rules remain unknown instead of proving no automatic builds", () => {
+  const valid = fixtureBuildTrigger();
+  for (const triggers of [
+    {}, [privateValue], [{ ...valid, trigger_uuid: undefined }], [valid, valid],
+    [{ ...valid, external_script_id: "different" }], [{ ...valid, repo_connection: undefined }],
+    [{ ...valid, branch_includes: undefined }], [{ ...valid, branch_excludes: undefined }],
+    [{ ...valid, branch_includes: ["feature/*"] }], [{ ...valid, branch_includes: ["*"], branch_excludes: [] }],
+    [{ ...valid, deleted_on: privateValue }],
+  ]) {
+    const result = inspectWorkerBuildTriggers(triggers, workerTag);
+    assert.equal(result.readable, false);
+    assert.equal(result.mainPushMatchesListedTrigger, null);
+    assert.equal(result.mainPushMayTriggerBuild, null);
+    assert.ok(result.failure.code);
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+  }
+});
+
+test("dedicated trigger pagination uses only bounded GETs and completes before reporting branch eligibility", async () => {
+  const f = fixture({ auditToken: auditPrivateValue });
+  const pages = [];
+  const fetchImpl = async (url, options) => {
+    if (String(url).includes("/triggers?")) {
+      assert.equal(options.method, "GET");
+      assert.equal(options.body, undefined);
+      assert.equal(options.headers.Authorization, `Bearer ${auditPrivateValue}`);
+      assert.equal(options.redirect, "error");
+      const page = Number(new URL(url).searchParams.get("page"));
+      pages.push(page);
+      return Response.json({ success: true, result: [fixtureBuildTrigger({ index: page, includes: [page === 2 ? "main" : "migration/d1"] })],
+        result_info: { page, per_page: 1, count: 1, total_pages: 2, total_count: 2 } });
+    }
+    return f.fetchImpl(url, options);
+  };
+  const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, fetchImpl });
+  assert.deepEqual(pages, [1, 2]);
+  assert.equal(result.externalBuilds.inventoryComplete, true);
+  assert.equal(result.externalBuilds.triggerCount, 2);
+  assert.equal(result.externalBuilds.pagesFetched, 2);
+  assert.equal(result.externalBuilds.mainPushMayTriggerBuild, true);
+});
+
+test("partial, repeated, changing or unrecognized pagination cannot produce a completed trigger inventory", async () => {
+  const cases = [
+    { response: page => page === 2 ? new Response(privateValue, { status: 403 }) : Response.json({ success: true, result: [fixtureBuildTrigger()], result_info: { page, per_page: 1, count: 1, total_pages: 2, total_count: 2 } }), code: "http_failure" },
+    { response: page => Response.json({ success: true, result: [fixtureBuildTrigger()], result_info: { page, per_page: 1, count: 1, total_pages: 2, total_count: 2 } }), code: "invalid_or_duplicate_trigger" },
+    { response: page => Response.json({ success: true, result: [fixtureBuildTrigger({ index: page })], result_info: { page: 1, per_page: 1, count: 1, total_pages: 2, total_count: 2 } }), code: "invalid_trigger_pagination" },
+    { response: page => Response.json({ success: true, result: [fixtureBuildTrigger({ index: page })], result_info: { page, per_page: 1, count: 1, total_pages: 3, total_count: page === 1 ? 3 : 4 } }), code: "changing_trigger_pagination" },
+    { response: page => Response.json({ success: true, result: [fixtureBuildTrigger({ index: page })], result_info: { page, per_page: page, count: 1, total_pages: 2, total_count: 2 } }), code: "changing_trigger_pagination" },
+    { response: () => Response.json({ success: true, result: [], result_info: { page: 1, count: 0, total_pages: 1, total_count: 2 } }), code: "inconsistent_trigger_pagination" },
+    { response: () => Response.json({ success: true, result: [fixtureBuildTrigger()], result_info: { page: 1, total_pages: 0 } }), code: "inconsistent_trigger_pagination" },
+    { response: () => Response.json({ success: true, result: [], result_info: { per_page: 1000 } }), code: "invalid_trigger_pagination" },
+    { response: () => Response.json({ success: true, result: [], result_info: { cursor: privateValue } }), code: "invalid_trigger_pagination" },
+  ];
+  for (const item of cases) {
+    const f = fixture({ auditToken: auditPrivateValue });
+    const fetchImpl = (url, options) => String(url).includes("/triggers?") ? item.response(Number(new URL(url).searchParams.get("page"))) : f.fetchImpl(url, options);
+    const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, fetchImpl });
+    assert.equal(result.externalBuilds.inventoryComplete, false);
+    assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null);
+    assert.equal(result.externalBuilds.configurationFound, null);
+    assert.equal(result.externalBuilds.failure.code, item.code);
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+    assert.ok(!JSON.stringify(result).includes(auditPrivateValue));
+    assert.equal(result.health.d1Connected, true, "Optional trigger failure must preserve other audit evidence");
+  }
+});
+
+test("trigger inventory stops after five pages and never follows provider URLs or asks for build logs", async () => {
+  const f = fixture({ auditToken: auditPrivateValue });
+  let requests = 0;
+  const fetchImpl = (url, options) => {
+    if (String(url).includes("/triggers?")) {
+      requests++;
+      const page = Number(new URL(url).searchParams.get("page"));
+      return Response.json({ success: true, result: [fixtureBuildTrigger({ index: page })],
+        result_info: { page, per_page: 1, count: 1, total_pages: 1000, total_count: 1000 } });
+    }
+    return f.fetchImpl(url, options);
+  };
+  const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, fetchImpl });
+  assert.equal(requests, 5);
+  assert.equal(result.externalBuilds.failure.code, "trigger_pagination_limit");
+  assert.equal(result.externalBuilds.triggerCount, 5);
+  assert.equal(result.externalBuilds.inventoryComplete, false);
+  assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null);
+});
+
+test("audit-token denials and unsafe provider responses stay sanitized with no credential fallback", async () => {
+  for (const response of [
+    () => new Response(auditPrivateValue, { status: 403 }),
+    () => { throw new Error(`${privateValue} ${auditPrivateValue}`); },
+    () => new Response(auditPrivateValue, { status: 200 }),
+    () => Response.json({ success: true, result: { environment_variables: auditPrivateValue } }),
+    () => Response.json({ success: "false", result: [] }),
+    () => Response.json(null),
+  ]) {
+    const f = fixture({ auditToken: auditPrivateValue });
+    let attempts = 0;
+    const fetchImpl = (url, options) => {
+      if (String(url).includes("/triggers?")) {
+        attempts++;
+        assert.equal(options.headers.Authorization, `Bearer ${auditPrivateValue}`);
+        return response();
+      }
+      return f.fetchImpl(url, options);
+    };
+    const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, fetchImpl });
+    assert.equal(attempts, 1);
+    assert.equal(result.externalBuilds.readable, false);
+    assert.equal(result.externalBuilds.mainPushMayTriggerBuild, null);
+    assert.ok(!f.requests.some(r => r.url.endsWith(`/builds/workers/${workerTag}`)));
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+    assert.ok(!JSON.stringify(result).includes(auditPrivateValue));
+  }
+});
+
+test("dedicated Access read failures never retry with the deployment credential", async () => {
+  for (const deniedEndpoint of ["/access/organizations", "/access/apps?", "/policies"]) {
+    const f = fixture({ auditToken: auditPrivateValue });
+    let attempts = 0;
+    const fetchImpl = (url, options) => {
+      if (String(url).includes(deniedEndpoint)) {
+        attempts++;
+        assert.equal(options.method, "GET");
+        assert.equal(options.body, undefined);
+        assert.equal(options.headers.Authorization, `Bearer ${auditPrivateValue}`);
+        return new Response(`${privateValue} ${auditPrivateValue}`, { status: 403 });
+      }
+      return f.fetchImpl(url, options);
+    };
+    const result = await runAudit({ env: { ...env, CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: auditPrivateValue }, fetchImpl });
+    assert.equal(attempts, deniedEndpoint === "/policies" ? TARGETS.production.hosts.length : 1);
+    assert.equal(result.readOnlyChecksPassed, false);
+    assert.equal(result.health.d1Connected, true);
+    assert.ok(!JSON.stringify(result).includes(privateValue));
+    assert.ok(!JSON.stringify(result).includes(auditPrivateValue));
+  }
+});
+
+test("optional audit secret is isolated to the read-only audit step and absent from build/deploy workflow jobs", () => {
+  const workflows = new URL("../../.github/workflows/", import.meta.url);
+  const tokenName = "CLOUDFLARE_RETIREMENT_AUDIT_TOKEN";
+  const source = readFileSync(new URL("supabase-retirement-verification.yml", workflows), "utf8");
+  const [buildJob, readJob] = source.split("  live-readonly:");
+  assert.ok(!buildJob.includes(tokenName));
+  assert.equal(readJob.match(new RegExp(`${tokenName}:`, "g")).length, 1);
+  const readStep = readJob.split("      - name: Read Worker configuration, D1 schema, Access policies and public pages\n")[1].split("      - name:")[0];
+  assert.ok(readStep.includes("CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}"));
+  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && file !== "supabase-retirement-verification.yml"))
+    assert.ok(!readFileSync(new URL(file, workflows), "utf8").includes(tokenName), `Audit token must not enter ${file}`);
+  assert.ok(!readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").includes(tokenName));
 });

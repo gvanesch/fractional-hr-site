@@ -68,7 +68,36 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 - Existing historical release scripts deliberately pin the previous Supabase-auth checkpoint. They are not suitable as a new retirement release procedure.
 - Notify Greg only when a concrete unresolved decision, access requirement or failed acceptance test needs his input. Do not send obsolete data-reconciliation tasks.
 - [QA release run 44729377399](https://github.com/gvanesch/fractional-hr-site/actions/runs/44729377399) deployed version `f6076224-8523-4761-8148-69b637e2e542`, preserving existing QA configuration and leaving production unchanged. All 180 tests passed. [Post-release Health Check run 44729875924](https://github.com/gvanesch/fractional-hr-site/actions/runs/44729875924) verified a fresh D1 write, public result and Greg-only notification acceptance on the new QA version. See the hosted acceptance record for UI checks and logout.
-- The expanded read-only audit returned HTTP 403 for Zero Trust organization settings and production Workers Builds settings. A separate authenticated Cloudflare administration session is now the concrete access requirement. Do not broaden the deployment token or infer that an empty app list means no applications exist.
+- The expanded read-only audit returned HTTP 403 for Zero Trust organization settings and production Workers Builds settings. Greg then attempted the separate Cloudflare administration sign-in, but the dashboard returned `API Request Failed: post https://dash.cloudflare.com/api/v4/login (403)`. The sign-in was attempted; this is an access blocker, not an outstanding request to retry the same login. The cause is unverified, and neither a wrong password nor bot blocking can be inferred from that generic denial. Further automated sign-in attempts stopped.
+
+## Limited audit access after the dashboard sign-in failure
+
+The alternative is a separate, short-lived, user-owned API token for the read-only inspection. The existing deployment credential is not edited or rotated. The candidate accepts an optional GitHub repository secret named `CLOUDFLARE_RETIREMENT_AUDIT_TOKEN` for Access configuration reads and the documented Workers CI read endpoint. Existing Worker, D1 schema and Worker-tag inspection continues through the current credential; the new credential is not supplied to application builds, deployments or runtime.
+
+The user action is specific:
+
+1. In Cloudflare, use **My Profile > API Tokens** to create a custom user token named **D1 retirement audit**. The Builds API requires a user-owned token; an account-owned token created under **Manage Account > API Tokens** is not supported by the documented Builds API.
+2. Select **Account** permissions, restricted to the website's account `73221f18acc676e4992c89fcbf2b2a8f`:
+
+   | Permission | Access | Purpose |
+   | --- | --- | --- |
+   | Access: Apps and Policies | Read | Inspect advisor applications and access policies |
+   | Access: Organizations, Identity Providers, and Groups | Read | Verify the Zero Trust team and identity configuration |
+   | Workers CI | Read | Inspect production build triggers through the documented read endpoint |
+
+3. Set a seven-day expiry. If a named Read option is unavailable, report the label shown rather than substituting Edit or a broader permission.
+4. Save the generated value directly into **gvanesch/fractional-hr-site > Settings > Secrets and variables > Actions > New repository secret**, named exactly `CLOUDFLARE_RETIREMENT_AUDIT_TOKEN`. Do not paste it into chat, email, source files or workflow logs. The existing `CLOUDFLARE_API_TOKEN` remains as it is.
+5. Notify the assistant when the secret is saved. It can then run the bounded read-only inspection and report the actual production policy/configuration. Production policy changes remain subject to the verified cutover procedure above; creation of the read token does not establish retirement readiness by itself.
+
+The extra credential is used only for account-local GET requests to Access organization/application/policy endpoints and `/builds/workers/{tag}/triggers`. Missing, denied, malformed or partial inventories remain unknown; they do not prove that applications or build triggers are absent. A successful read does not deploy, send email, modify D1 records, change Access policies or pause Supabase.
+
+Validation of this optional path: all **30 focused audit tests passed** (20 existing and 10 new), ESLint passed for the changed JavaScript files, and independent review found no remaining blocking issue. The new checks cover credential routing, no fallback after denial, secret isolation from build/deploy workflows, strict response envelopes, bounded pagination and sanitized output. The optional token has not been provisioned or used live. The deployed QA application and its prior 180-test acceptance remain unchanged.
+
+The prior unified `/builds/workers/{tag}` endpoint and its parser were checked against the current official guide and are documented. Its observed 403 occurred before parsing. The separate `/triggers` endpoint is selected for the new credential because its API reference explicitly accepts **Workers CI Read**. There is no claim that Workers Scripts Read alone authorizes Builds, nor that the dashboard's sign-in 403 and the automation credential's 403 have the same cause.
+
+References: [Access applications](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/list/), [Zero Trust organization](https://developers.cloudflare.com/api/resources/zero_trust/subresources/organizations/methods/list/), [Worker triggers and read permission](https://developers.cloudflare.com/api/resources/workers_builds/subresources/triggers/methods/list/), [Builds token requirements](https://developers.cloudflare.com/workers/ci-cd/builds/api-reference/), [token creation and scope](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/), [GitHub repository secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+
+Follow-up emails must treat the failed dashboard sign-in as already attempted. The new user action is provision of this limited audit secret; do not continue sending requests to repeat the rejected browser login.
 
 ## QA candidate release mechanism
 The dedicated `qa-retirement-release.yml` workflow is triggered only by a separate, current request file committed directly above its reviewed candidate. It verifies the fixed QA Worker/D1 account, existing bindings and secret names, runtime compatibility, Wrangler grouping tags, route/schedule fingerprints and production version before uploading. It uploads an inactive QA version, verifies inherited configuration, repeats the lease checks, and activates only that QA version. No migrations, record writes, mail, secret rotation, Access policy changes or production writes are included. Wrangler can internally retry inactive uploads; the activation request is issued once and an uncertain outcome is not retried automatically. The exact previous QA version is retained in sanitized evidence for recovery.

@@ -162,6 +162,123 @@ export function inspectWorkerBuildSettings(configuration, workerId) {
   };
 }
 
+const BUILD_TRIGGER_PAGE_SIZE = 100;
+const BUILD_TRIGGER_MAX_PAGES = 5;
+const UUID = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
+const branchName = value => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$/.test(value);
+const deletedState = value => value == null ? false : typeof value === "string" && Number.isFinite(Date.parse(value)) ? true : null;
+
+function workerTriggerFailure(code, httpStatus = null, pagesFetched = 0, triggerCount = 0, workerMatched = true) {
+  return {
+    ...workerBuildFailure(code, httpStatus, workerMatched), source: "worker_triggers",
+    inventoryComplete: false, parsingComplete: false, pagesFetched, triggerCount,
+    mainPushMatchesListedTrigger: null, coverage: "listed_worker_triggers_only",
+  };
+}
+
+export function inspectWorkerBuildTriggers(triggers, workerId, pagesFetched = 1) {
+  // Project only booleans, counts and two known project branch labels. Never
+  // emit trigger/repository IDs, names, arbitrary branch patterns, commands,
+  // build tokens, environment variables or the wider response.
+  if (!Array.isArray(triggers) || triggers.length > BUILD_TRIGGER_PAGE_SIZE * BUILD_TRIGGER_MAX_PAGES)
+    return workerTriggerFailure("invalid_trigger_inventory", null, pagesFetched);
+  const identities = new Set(), rows = [];
+  for (const trigger of triggers) {
+    if (!trigger || typeof trigger !== "object" || Array.isArray(trigger) || !UUID.test(trigger.trigger_uuid ?? "") || identities.has(trigger.trigger_uuid))
+      return workerTriggerFailure("invalid_or_duplicate_trigger", null, pagesFetched, triggers.length);
+    identities.add(trigger.trigger_uuid);
+    if (trigger.external_script_id !== workerId)
+      return workerTriggerFailure("trigger_worker_unverified", null, pagesFetched, triggers.length, false);
+    const repository = trigger.repo_connection;
+    const includes = trigger.branch_includes, excludes = trigger.branch_excludes;
+    const triggerDeleted = deletedState(trigger.deleted_on), repositoryDeleted = deletedState(repository?.deleted_on);
+    if (!repository || typeof repository !== "object" || Array.isArray(repository) ||
+        !["github", "gitlab", "gitlab_internal", "origin"].includes(repository.provider_type) ||
+        ![repository.provider_account_name, repository.repo_name].every(value => typeof value === "string" && value.length > 0 && value.length <= 256) ||
+        !Array.isArray(includes) || !Array.isArray(excludes) || includes.length !== 1 || excludes.length > 100 ||
+        triggerDeleted === null || repositoryDeleted === null)
+      return workerTriggerFailure("invalid_build_trigger", null, pagesFetched, triggers.length);
+    const production = branchName(includes[0]) && excludes.length === 0;
+    const legacyBranches = includes[0] === "*" && excludes.length > 0 && excludes.every(branchName);
+    // The supported API's branch combinations are an exact production branch,
+    // or legacy branch builds excluding one or more exact production branches.
+    // Unknown glob/rule forms remain unknown instead of yielding a safe result.
+    if (!production && !legacyBranches) return workerTriggerFailure("unrecognized_trigger_branch_rules", null, pagesFetched, triggers.length);
+    const repositoryMatches = repository.provider_type === "github" && repository.provider_account_name.toLowerCase() === "gvanesch" && repository.repo_name.toLowerCase() === "fractional-hr-site";
+    rows.push({ active: !triggerDeleted && !repositoryDeleted, repositoryMatches,
+      productionBranch: production ? includes[0] : null, legacyBranches,
+      matchesMain: production ? includes[0] === "main" : !excludes.includes("main") });
+  }
+  const active = rows.filter(row => row.active && row.repositoryMatches);
+  const productionBranches = [...new Set(active.map(row => row.productionBranch).filter(Boolean))];
+  const mainMatch = active.some(row => row.matchesMain);
+  return {
+    checked: true, workerMatched: true, readable: true, configurationFound: triggers.length > 0,
+    source: "worker_triggers", inventoryComplete: true, parsingComplete: true, pagesFetched,
+    triggerCount: triggers.length, activeMatchingRepositoryTriggers: active.length,
+    repositoryMatches: rows.length ? rows.some(row => row.repositoryMatches) : null,
+    productionBranch: productionBranches.length === 1 && ["main", "migration/d1"].includes(productionBranches[0]) ? productionBranches[0] : null,
+    legacyBranchBuildsFound: active.some(row => row.legacyBranches), previewsEnabled: null,
+    mainPushMatchesListedTrigger: mainMatch,
+    // This endpoint alone cannot prove all newer Preview/build integrations are
+    // disabled. A negative listed-trigger match is therefore not a broad safe-
+    // to-push assertion; a positive match is enough to flag potential execution.
+    mainPushMayTriggerBuild: mainMatch ? true : null,
+    coverage: "listed_worker_triggers_only", failure: null,
+  };
+}
+
+async function readWorkerBuildTriggers(api, workerId) {
+  const triggers = [], identities = new Set();
+  let pagesFetched = 0, expectedTotal = null, expectedPages = null, expectedPageSize = null;
+  const fail = (code, status = null) => workerTriggerFailure(code, status, pagesFetched, triggers.length);
+  try {
+    for (let page = 1; page <= BUILD_TRIGGER_MAX_PAGES; page++) {
+      const response = await api(`builds/workers/${workerId}/triggers?page=${page}&per_page=${BUILD_TRIGGER_PAGE_SIZE}`, {
+        optional: true, operation: "worker_build_trigger_inventory",
+      });
+      if (response.unavailable) return fail(response.code, response.status);
+      if (!Array.isArray(response.result) || response.result.length > BUILD_TRIGGER_PAGE_SIZE) return fail("invalid_trigger_inventory");
+      pagesFetched++;
+      const info = response.result_info;
+      if (info !== undefined && (!info || typeof info !== "object" || Array.isArray(info) ||
+          Object.keys(info).some(key => !["count", "page", "per_page", "total_count", "total_pages"].includes(key)) ||
+          Object.values(info).some(value => !Number.isSafeInteger(value) || value < 0) ||
+          (info.page !== undefined && info.page !== page) || (info.count !== undefined && info.count !== response.result.length) ||
+          (info.per_page !== undefined && (info.per_page < 1 || info.per_page > BUILD_TRIGGER_PAGE_SIZE || response.result.length > info.per_page))))
+        return fail("invalid_trigger_pagination");
+      if (info?.per_page !== undefined) {
+        if (expectedPageSize !== null && expectedPageSize !== info.per_page) return fail("changing_trigger_pagination");
+        expectedPageSize = info.per_page;
+      }
+      if (info?.total_count !== undefined) {
+        if (expectedTotal !== null && expectedTotal !== info.total_count) return fail("changing_trigger_pagination");
+        expectedTotal = info.total_count;
+      }
+      if (info?.total_pages !== undefined) {
+        if (expectedPages !== null && expectedPages !== info.total_pages) return fail("changing_trigger_pagination");
+        expectedPages = info.total_pages;
+      }
+      for (const trigger of response.result) {
+        if (!UUID.test(trigger?.trigger_uuid ?? "") || identities.has(trigger.trigger_uuid)) return fail("invalid_or_duplicate_trigger");
+        identities.add(trigger.trigger_uuid);
+        triggers.push(trigger);
+      }
+      if ((expectedTotal !== null && triggers.length > expectedTotal) || (expectedPages === 0 && triggers.length > 0) ||
+          (expectedPages !== null && page > Math.max(1, expectedPages))) return fail("inconsistent_trigger_pagination");
+      const lastByPages = expectedPages !== null ? page >= Math.max(1, expectedPages) : null;
+      const lastByTotal = expectedTotal !== null ? triggers.length >= expectedTotal : null;
+      if (lastByPages !== null && lastByTotal !== null && lastByPages !== lastByTotal) return fail("inconsistent_trigger_pagination");
+      const finished = lastByPages ?? lastByTotal ?? (response.result.length < (info?.per_page ?? BUILD_TRIGGER_PAGE_SIZE));
+      if (finished) return inspectWorkerBuildTriggers(triggers, workerId, pagesFetched);
+      if (!response.result.length) return fail("incomplete_trigger_inventory");
+    }
+    return fail("trigger_pagination_limit");
+  } catch (error) {
+    return fail(error instanceof AuditError ? error.code : "unexpected_failure", error instanceof AuditError ? error.httpStatus : null);
+  }
+}
+
 // Conservative inventory matching, not a replacement for Cloudflare's policy
 // evaluation. More-specific overlapping apps and policy selectors need review.
 // https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/
@@ -217,12 +334,20 @@ function destinationProtectsPath(destination, target, url, workerId) {
 export async function runAudit({ env = process.env, targetName = "production", fetchImpl = fetch } = {}) {
   const target = validateContext(env, targetName);
   const token = env.CLOUDFLARE_API_TOKEN.trim();
+  const auditToken = typeof env.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN === "string" ? env.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN.trim() : "";
   const base = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/`;
   async function api(path, { optional = false, schema = false, operation = "metadata" } = {}) {
+    // The optional user-owned credential is confined to these GET endpoints.
+    // Worker settings, D1, secret-name inventory and immutable tag lookup retain
+    // the established token. Never fall back to it after an audit-token denial.
+    const auditRead = /^(?:access\/organizations|access\/apps\?page=\d{1,2}&per_page=100|access\/apps\/[a-f\d-]{36}\/policies|builds\/workers\/[a-f\d]{32}\/triggers\?page=[1-5]&per_page=100)$/i.test(path);
+    if (schema && path !== `d1/database/${target.database}/query`) throw new AuditError("d1_schema", "unexpected_schema_target");
+    if (auditToken && /^(?:access|builds)\//.test(path) && !auditRead) throw new AuditError(operation, "unsupported_audit_read_endpoint");
+    const requestToken = auditToken && auditRead && !schema ? auditToken : token;
     let response;
     try { response = await fetchImpl(base + path, {
       method: schema ? "POST" : "GET", redirect: "error",
-      headers: { Authorization: `Bearer ${token}`, ...(schema ? { "Content-Type": "application/json" } : {}) },
+      headers: { Authorization: `Bearer ${requestToken}`, ...(schema ? { "Content-Type": "application/json" } : {}) },
       ...(schema ? { body: JSON.stringify({ sql: SCHEMA_SELECT }) } : {}),
       signal: AbortSignal.timeout(15000),
     }); } catch {
@@ -235,7 +360,7 @@ export async function runAudit({ env = process.env, targetName = "production", f
     }
     let data;
     try { data = await response.json(); } catch { throw new AuditError(operation, "invalid_json", response.status); }
-    if (!data.success) {
+    if (!data || typeof data !== "object" || Array.isArray(data) || data.success !== true) {
       if (optional) return { unavailable: true, status: response.status, operation, code: "provider_rejected" };
       throw new AuditError(operation, "provider_rejected", response.status);
     }
@@ -303,6 +428,7 @@ export async function runAudit({ env = process.env, targetName = "production", f
   let externalBuilds = { checked: false };
   if (targetName === "production") {
     if (!workerId) externalBuilds = workerBuildFailure(workerIdentityFailure?.code ?? "worker_identity_unverified", workerIdentityFailure?.httpStatus);
+    else if (auditToken) externalBuilds = await readWorkerBuildTriggers(api, workerId);
     else {
       try {
         const builds = await api(`builds/workers/${workerId}`, { optional: true, operation: "worker_build_configuration" });
