@@ -290,19 +290,21 @@ export async function readProductionAccessPlan({ env = process.env, fetchImpl = 
 // selectors or provider configuration. This does not resume the mutation.
 export async function inspectRecordedPolicyMetadata({ env = process.env, fetchImpl = fetch } = {}) {
   const id = "f0f42710-0b34-4dd8-b44a-c63c308fa6de";
-  const body = await createAccessReader(env, fetchImpl)(`access/policies/${id}`);
+  const get = createAccessReader(env, fetchImpl);
+  const [body, apps] = await Promise.all([get(`access/policies/${id}`), readCompleteList(get, "access/apps")]);
   const policy = body.result;
   requireCondition(policy && typeof policy === "object" && !Array.isArray(policy) && policy.id === id &&
     policy.name === `${PRODUCTION_POLICY_NAME} [retirement-20261120-production-01]`, "recorded_policy_identity_mismatch");
-  const fields = {};
-  for (const [name, value] of Object.entries(policy)) {
+  const shape = record => Object.fromEntries(Object.entries(record).map(([name, value]) => {
     requireCondition(/^[a-z_]{1,64}$/.test(name), "unsupported_policy_metadata_field_name");
-    fields[name] = value == null ? { kind: "null" } : Array.isArray(value) ? { kind: "array", count: value.length } :
-      typeof value === "string" ? { kind: "string", length: value.length, uuidAliasMatchesId: UUID.test(value) ? value === id : null } :
-      typeof value === "boolean" ? { kind: "boolean", value } : { kind: typeof value };
-  }
+    return [name, value == null ? { kind: "null" } : Array.isArray(value) ? { kind: "array", count: value.length } :
+      typeof value === "string" ? { kind: "string", length: value.length, uuidAliasMatchesId: UUID.test(value) ? value === record.id : null } :
+      typeof value === "boolean" ? { kind: "boolean", value } : { kind: typeof value }];
+  }));
+  const qa = selectQaTemplate(apps);
   return { readOnly: true, mutationAttempted: false, policyId: id, recordedRequestIdentityMatches: true,
-    appCount: Number.isSafeInteger(policy.app_count) ? policy.app_count : null, fields };
+    appCount: Number.isSafeInteger(policy.app_count) ? policy.app_count : null, fields: shape(policy),
+    qaApplicationFields: shape(qa), qaEmbeddedPolicyFields: Array.isArray(qa.policies) ? qa.policies.map(shape) : [] };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
