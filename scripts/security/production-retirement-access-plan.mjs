@@ -128,6 +128,34 @@ function supportedMfaConfiguration(value) {
     (value.session_duration == null || (typeof value.session_duration === "string" && /^\d+(?:h|m|s)$/.test(value.session_duration) && Number.parseInt(value.session_duration, 10) > 0)));
 }
 
+export function inspectConnectionRules(value) {
+  const object = item => item != null && typeof item === "object" && !Array.isArray(item);
+  const report = { present: value != null, sshPresent: false, rdpPresent: false, unknownProtocolCount: 0,
+    inactiveSshDefaults: false, supported: false };
+  if (value == null) return { report: { ...report, supported: true }, payload: undefined };
+  if (!object(value)) return { report, payload: undefined };
+  report.sshPresent = Object.hasOwn(value, "ssh"); report.rdpPresent = Object.hasOwn(value, "rdp");
+  report.unknownProtocolCount = Object.keys(value).filter(key => !["ssh", "rdp"].includes(key)).length;
+  if (report.unknownProtocolCount) return { report, payload: undefined };
+  // HTTP applications have no SSH target. Only recognize an absent or inert
+  // SSH structure, never discard usernames or an enabled email-alias rule.
+  const ssh = value.ssh;
+  const inactiveSsh = ssh == null || (object(ssh) && Object.keys(ssh).every(key => ["usernames", "allow_email_alias"].includes(key)) &&
+    (ssh.usernames == null || (Array.isArray(ssh.usernames) && ssh.usernames.length === 0)) &&
+    (ssh.allow_email_alias == null || ssh.allow_email_alias === false));
+  report.inactiveSshDefaults = report.sshPresent && inactiveSsh;
+  if (!inactiveSsh) return { report, payload: undefined };
+  const rdp = value.rdp;
+  const rdpKeys = ["allowed_clipboard_local_to_remote_formats", "allowed_clipboard_remote_to_local_formats"];
+  const supportedRdp = rdp == null || (object(rdp) && Object.keys(rdp).every(key => rdpKeys.includes(key)) &&
+    Object.values(rdp).every(formats => Array.isArray(formats) && formats.length <= 2 &&
+      new Set(formats).size === formats.length && formats.every(format => ["text", "file"].includes(format))));
+  if (!supportedRdp) return { report, payload: undefined };
+  // The reusable-policy API documents RDP rules. Preserve those exactly; an
+  // inert legacy SSH default is not a criterion for this HTTP application.
+  return { report: { ...report, supported: true }, payload: rdp == null ? undefined : { rdp: structuredClone(rdp) } };
+}
+
 export function inspectIdentityPolicy(policies, allowedIdps = []) {
   const report = {
     policyCount: Array.isArray(policies) ? policies.length : null,
@@ -147,9 +175,10 @@ export function inspectIdentityPolicy(policies, allowedIdps = []) {
     policy.require.every(rule => rule && Object.keys(rule).length === 1 && rule.login_method &&
       Object.keys(rule.login_method).length === 1 && allowedIdps.includes(rule.login_method.id)));
   const mfaSupported = supportedMfaConfiguration(policy.mfa_config);
+  const connectionRules = inspectConnectionRules(policy.connection_rules);
   const simple = empty(policy.exclude) && requiredLoginMethods && empty(policy.approval_groups) &&
     !policy.approval_required && !policy.purpose_justification_required &&
-    !policy.isolation_required && emptyObject(policy.connection_rules) && mfaSupported &&
+    !policy.isolation_required && connectionRules.report.supported && mfaSupported &&
     (policy.session_duration == null || (typeof policy.session_duration === "string" && /^\d+(?:h|m|s)$/.test(policy.session_duration) && Number.parseInt(policy.session_duration, 10) > 0));
   return { ...report, gregOnly: onlyGreg, additionalIdentityOrRulePresent: !onlyGreg || !simple, supported: onlyGreg && simple,
     restrictions: {
@@ -158,6 +187,7 @@ export function inspectIdentityPolicy(policies, allowedIdps = []) {
       requiredLoginMethodsSupported: requiredLoginMethods, approvalRequired: policy.approval_required === true,
       approvalGroupsEmpty: empty(policy.approval_groups), purposeJustificationRequired: policy.purpose_justification_required === true,
       isolationRequired: policy.isolation_required === true, connectionRulesEmpty: emptyObject(policy.connection_rules),
+      connectionRules: connectionRules.report,
       mfaConfigurationPresent: policy.mfa_config != null, mfaConfigurationSupported: mfaSupported,
       policySessionDurationPresent: policy.session_duration != null,
     },
@@ -211,7 +241,8 @@ export function buildAccessPlan({ organization, apps, policies, identityProvider
     require: identity.supported ? structuredClone(policies[0].require ?? []) : [],
     ...(identity.supported && policies[0].session_duration ? { session_duration: policies[0].session_duration } : {}),
     ...(identity.supported && policies[0].mfa_config != null ? { mfa_config: structuredClone(policies[0].mfa_config) } : {}),
-    ...(identity.supported && policies[0].connection_rules != null ? { connection_rules: {} } : {}),
+    ...(identity.supported && inspectConnectionRules(policies[0].connection_rules).payload ?
+      { connection_rules: inspectConnectionRules(policies[0].connection_rules).payload } : {}),
   };
   const application = {
     name: PRODUCTION_APP_NAME, type: "self_hosted", domain: "www.vanesch.uk/advisor",

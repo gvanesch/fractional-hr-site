@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   AccessPlanError, PRODUCTION_DESTINATIONS, buildAccessPlan, createAccessReader,
-  inspectIdentityPolicy, readCompleteList, readProductionAccessPlan,
+  inspectIdentityPolicy, inspectConnectionRules, readCompleteList, readProductionAccessPlan,
 } from "../../scripts/security/production-retirement-access-plan.mjs";
 import { ACCOUNT, CANDIDATE_REF, EXPECTED_ACCESS_AUTH_DOMAIN, TARGETS } from "../../scripts/security/supabase-retirement-readonly.mjs";
 
@@ -74,6 +74,21 @@ test("reviewed OTP requirements and supported MFA/session restrictions are prese
   assert.equal(JSON.stringify(plan.report).includes(idpId), false);
   f.policies[0].require[0].login_method.id = policyId;
   assert.equal(buildAccessPlan(f).report.planReady, false);
+});
+
+test("documented connection rules preserve RDP restrictions and normalize only inert SSH defaults", () => {
+  const f = fixture();
+  f.policies[0].connection_rules = {ssh:{usernames:[],allow_email_alias:false},rdp:{allowed_clipboard_local_to_remote_formats:[]}};
+  const plan = buildAccessPlan(f);
+  assert.equal(plan.report.planReady, true);
+  assert.deepEqual(plan.policy.connection_rules, {rdp:{allowed_clipboard_local_to_remote_formats:[]}});
+  assert.equal(plan.report.qaIdentity.restrictions.connectionRules.inactiveSshDefaults, true);
+  for (const value of [{ssh:{usernames:["private-user"]}}, {ssh:{allow_email_alias:true}},
+    {ssh:{unrecognized:"private"}}, {rdp:{allowed_clipboard_local_to_remote_formats:["unknown"]}}, {unknown:{}}]) {
+    const inspected = inspectConnectionRules(value);
+    assert.equal(inspected.report.supported, false);
+    assert.equal(JSON.stringify(inspected.report).includes("private-user"), false);
+  }
 });
 
 test("existing exact/wildcard production coverage or a mixed-host QA template blocks the plan", () => {

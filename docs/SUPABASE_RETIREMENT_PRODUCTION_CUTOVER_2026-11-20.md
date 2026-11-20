@@ -52,6 +52,8 @@ The new `production-retirement-release.mjs` module provides the guarded inactive
 
 The read-only planning workflow also runs `production-retirement-preflight.mjs`. It checks the real production and QA runtime metadata against the proposed release mechanism before any Access application is created, using the existing deployment credential for GET requests only. Its result cannot establish production Access readiness by itself.
 
+That live runtime eligibility check **passed** in [run 44762956134](https://github.com/gvanesch/fractional-hr-site/actions/runs/44762956134), at the unchanged production/QA versions. It verified production environment/site, D1 identity/modes, existing secret names, runtime/grouping, prior auth configuration and QA isolation. The separate Access-policy planner initially stopped on nonempty connection-rule metadata; its parser now distinguishes documented RDP settings from structurally inactive SSH metadata, preserves applicable settings and refuses active/unknown SSH rules. The source fingerprint continues to cover the original policy. See the latest planning run for its actual result.
+
 The current module requires the Access application to exist before production preparation/build. There may therefore be a short transition during which the edge requires Access but the old backend still presents its existing login. The implementation must account for that window and preserve recovery options; do not describe the cutover as already completed.
 
 ## Recovery
