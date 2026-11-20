@@ -1,0 +1,45 @@
+name: Read-only production advisor Access plan
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+    paths:
+      - scripts/security/production-retirement-access-plan.mjs
+      - .github/workflows/production-retirement-access-plan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-retirement-access-plan
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify read-only planner guards
+        run: node --test tests/d1/production-retirement-access-plan.test.mjs
+      - name: Read existing Access policy and prepare bounded production configuration
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+          CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}
+        run: node scripts/security/production-retirement-access-plan.mjs > production-retirement-access-plan-report.json
+      - name: Publish sanitized planning evidence
+        if: always()
+        run: cat production-retirement-access-plan-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-retirement-access-plan
+          path: production-retirement-access-plan-report.json
+          if-no-files-found: ignore
+          retention-days: 14
