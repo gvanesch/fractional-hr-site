@@ -1,0 +1,9 @@
+{
+  "operation": "deploy-reviewed-retirement-candidate-to-production",
+  "requestId": "retirement-20261120-production-01",
+  "requestedAt": "2026-11-20T16:30:01Z",
+  "reviewedCommit": "4e48034f1a619cc5b2baa54b1effeaa8b984322d",
+  "expectedProductionVersionId": "6f47c7ec-3697-486c-ad8a-a9823be99424",
+  "expectedQaVersionId": "f6076224-8523-4761-8148-69b637e2e542",
+  "expectedAccessPlanFingerprint": "e6e55cdca65458926f5e779888e1ae002a323d1176516c598477c165f2238e42"
+}
