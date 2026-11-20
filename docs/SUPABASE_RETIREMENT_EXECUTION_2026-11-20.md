@@ -24,8 +24,8 @@ Greg has asked for independent implementation now, with notification at genuine 
 
 ### B. Authentication
 - [ ] Review Cloudflare Access policy (protect advisor routes, not public questionnaire endpoints) and allowed identities.
-- [ ] Test Cloudflare JWT validation, denied access, permissions, logout, session expiry and advisor UI in QA.
-- [ ] Review any Supabase-specific logout and login routes; adapt only as needed.
+- [x] Test Cloudflare JWT validation, denied access, permissions, logout, session expiry and advisor UI in QA. Local crypto tests cover token rules; hosted sign-in, API-backed UI and logout were verified on the deployed candidate.
+- [x] Review Supabase-specific logout and login routes. The existing Access branch passed and required no auth-code change.
 - [ ] Confirm the deployed Access application protects advisor paths, permits the intended advisor identities and leaves public/participant endpoints usable.
 
 ### C. Notifications and legacy APIs
@@ -42,7 +42,8 @@ Greg has asked for independent implementation now, with notification at genuine 
 - [x] Local notifications, system events and scheduled digest integration uses D1 and the appropriate authorization, with email delivery mocked.
 - [x] Next.js and OpenNext Cloudflare Worker builds succeed without Supabase credentials after the Next.js 16.4.5 security patch.
 - [x] Hosted QA Health Check proof: one labelled synthetic submission was read back from actual QA D1, the public result matched, and the notification provider accepted the Greg-only advisor email. No participant email was sent. See [run 44710395735](https://github.com/gvanesch/fractional-hr-site/actions/runs/44710395735).
-- [ ] Hosted signed-in advisor/CRM/project acceptance and a bounded production smoke test confirm the remaining behavior beyond local simulation.
+- [x] Hosted signed-in advisor/CRM/project/baseline acceptance, including bounded synthetic writes, read-back, export and logout, passed on QA. The updated candidate was deployed and rechecked; the final hosted Health Check proof passed against that version.
+- [ ] A bounded production smoke test confirms the production transition beyond QA.
 
 There is no Supabase row-count/checksum parity gate or historical archive requirement. Existing D1 recovery remains relevant to normal operations; it is not evidence that Supabase test data must be retained.
 
@@ -55,7 +56,7 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 
 ## Current evidence and challenges
 - A read-only GET on 20 November 2026 followed `https://vanesch.uk/api/health` to `https://www.vanesch.uk/api/health` and returned HTTP 200 with `{"status":"ok","supabase":"connected","d1":"connected"}`. D1 connectivity is live; this does not establish that every feature uses D1 or that Supabase can already be paused.
-- The new auth integration tests exercise real JWT signature validation, middleware, advisor helpers and login/logout without any Supabase credentials. External Cloudflare Access policy and an actual hosted advisor login still need verification.
+- The new auth integration tests exercise real JWT signature validation, middleware, advisor helpers and login/logout without any Supabase credentials. Hosted QA sign-in and logout have passed; production Access policy and production sign-in remain unverified.
 - [Read-only CI run 44709422115](https://github.com/gvanesch/fractional-hr-site/actions/runs/44709422115) verified the expected live D1 binding, all five D1 modes and all required tables in both production and QA. Production has not enabled Access authentication and lacks the Access audience/team-domain bindings. QA reports Supabase is not required and has its Access bindings.
 - Greg completed the Cloudflare email-code sign-in on 20 November. A fresh QA advisor page recognised `greg@vanesch.uk`. Hosted advisor/CRM/project/baseline checks then passed, including synthetic CRM writes and linking, a project-details write/read/restore, and a 20-row baseline export matching the dashboard. See [hosted QA acceptance](SUPABASE_RETIREMENT_HOSTED_QA_2026-11-20.md) for scope, evidence and candidate-deployment status.
 - The initial complete regression run after the application fix and security patch passed 144 tests. The audit was then extended with additional parser/safety coverage; see the latest CI run for the final test count.
@@ -63,9 +64,11 @@ There is no Supabase row-count/checksum parity gate or historical archive requir
 - [Run 44710175252](https://github.com/gvanesch/fractional-hr-site/actions/runs/44710175252) also passed the no-Supabase tests and complete Worker build in GitHub Actions. Its overall status remains red because live retirement readiness is deliberately separate and production still uses Supabase authentication.
 - The expanded Access audit received an empty application list (zero returned and zero reported) in both environments, despite the browser reaching QA's existing Access login. This is an unresolved management-visibility issue, not proof that no policy exists. [Cloudflare documents that resource-scoped roles can return filtered lists](https://developers.cloudflare.com/changelog/product/access/). Verify the account/credential's scope before creating or changing production Access applications.
 - The original `/api/advisor-daily-action-digest` URL is behind QA's Access rule, while `/api/cron/advisor-daily-action-digest` is reachable for its independent bearer authorization. Preserve a working scheduler endpoint when configuring production Access.
-- The hosted QA proof is request `retirement-20261120-01`, pinned to QA Worker version `31410344-cdba-4b49-9d9d-88e546830083`. Its synthetic row and attempt marker are retained only in QA to prevent duplicate submissions/mail on reruns.
+- The initial hosted QA proof is request `retirement-20261120-01`, pinned to QA Worker version `31410344-cdba-4b49-9d9d-88e546830083`. Its synthetic row and attempt marker are retained only in QA to prevent duplicate submissions/mail on reruns.
 - Existing historical release scripts deliberately pin the previous Supabase-auth checkpoint. They are not suitable as a new retirement release procedure.
 - Notify Greg only when a concrete unresolved decision, access requirement or failed acceptance test needs his input. Do not send obsolete data-reconciliation tasks.
+- [QA release run 44729377399](https://github.com/gvanesch/fractional-hr-site/actions/runs/44729377399) deployed version `f6076224-8523-4761-8148-69b637e2e542`, preserving existing QA configuration and leaving production unchanged. All 180 tests passed. [Post-release Health Check run 44729875924](https://github.com/gvanesch/fractional-hr-site/actions/runs/44729875924) verified a fresh D1 write, public result and Greg-only notification acceptance on the new QA version. See the hosted acceptance record for UI checks and logout.
+- The expanded read-only audit returned HTTP 403 for Zero Trust organization settings and production Workers Builds settings. A separate authenticated Cloudflare administration session is now the concrete access requirement. Do not broaden the deployment token or infer that an empty app list means no applications exist.
 
 ## QA candidate release mechanism
 The dedicated `qa-retirement-release.yml` workflow is triggered only by a separate, current request file committed directly above its reviewed candidate. It verifies the fixed QA Worker/D1 account, existing bindings and secret names, runtime compatibility, Wrangler grouping tags, route/schedule fingerprints and production version before uploading. It uploads an inactive QA version, verifies inherited configuration, repeats the lease checks, and activates only that QA version. No migrations, record writes, mail, secret rotation, Access policy changes or production writes are included. Wrangler can internally retry inactive uploads; the activation request is issued once and an uncertain outcome is not retried automatically. The exact previous QA version is retained in sanitized evidence for recovery.
