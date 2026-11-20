@@ -622,7 +622,17 @@ test("Access credential is confined to reviewed reads and the request-gated Acce
   assert.ok(!afterApply.join("\n").includes(tokenName));
   assert.ok(cutover.includes("      - scripts/security/production-retirement-release-request.json"));
   assert.ok(!cutover.includes("workflow_dispatch"));
-  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && !["supabase-retirement-verification.yml", "production-retirement-access-plan.yml", "production-retirement-cutover.yml"].includes(file)))
+  const activation = readFileSync(new URL("production-retirement-activate-existing.yml", workflows), "utf8");
+  const [beforeActivation, activationAndLater] = activation.split("      - name: Reconcile the recorded candidate and activate it once\n");
+  assert.ok(!beforeActivation.includes(tokenName));
+  const [activationStep, ...afterActivation] = activationAndLater.split("      - name:");
+  assert.equal(activationStep.match(new RegExp(`${tokenName}:`, "g")).length, 1);
+  assert.ok(activationStep.includes("production-retirement-activate-existing.mjs preflight"));
+  assert.ok(activationStep.includes("production-retirement-activate-existing.mjs activate"));
+  assert.ok(!afterActivation.join("\n").includes(tokenName));
+  assert.ok(!/workflow_dispatch|wrangler|opennext/.test(activation));
+  assert.ok(activation.includes("      - scripts/security/production-retirement-activation-request.json"));
+  for (const file of readdirSync(workflows).filter(file => file.endsWith(".yml") && !["supabase-retirement-verification.yml", "production-retirement-access-plan.yml", "production-retirement-cutover.yml", "production-retirement-activate-existing.yml"].includes(file)))
     assert.ok(!readFileSync(new URL(file, workflows), "utf8").includes(tokenName), `Audit token must not enter ${file}`);
   assert.ok(!readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").includes(tokenName));
 });

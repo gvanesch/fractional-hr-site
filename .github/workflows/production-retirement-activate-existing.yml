@@ -1,0 +1,55 @@
+name: Activate recorded production D1 candidate
+
+on:
+  push:
+    branches:
+      - chore/supabase-retirement-2026-11
+    paths:
+      - scripts/security/production-retirement-activation-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vanesch-production-release
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: github.repository == 'gvanesch/fractional-hr-site' && github.ref == 'refs/heads/chore/supabase-retirement-2026-11' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify activation and Access guards without credentials
+        run: node --test tests/d1/production-retirement-release.test.mjs tests/d1/production-retirement-activation.test.mjs tests/d1/production-retirement-access-apply.test.mjs
+      - name: Reconcile the recorded candidate and activate it once
+        env:
+          CLOUDFLARE_ACCOUNT_ID: '73221f18acc676e4992c89fcbf2b2a8f'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_RETIREMENT_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_RETIREMENT_AUDIT_TOKEN }}
+          NEXT_PUBLIC_APP_ENV: production
+          NEXT_PUBLIC_SITE_URL: https://www.vanesch.uk
+          ADVISOR_AUTH_MODE: cloudflare_access
+          D1_SYSTEM_EVENTS_MODE: d1
+          D1_DIAGNOSTIC_SUBMISSIONS_MODE: d1
+          D1_CRM_PROSPECTS_MODE: d1
+          D1_CLIENT_DIAGNOSTIC_MODE: d1
+          D1_CLIENT_DIAGNOSTIC_SECURITY_MODE: d1
+        run: |
+          node scripts/security/production-retirement-activate-existing.mjs preflight
+          node scripts/security/production-retirement-activate-existing.mjs activate
+      - name: Retain sanitized activation and recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-retirement-recorded-activation
+          path: production-retirement-activation-report.json
+          if-no-files-found: ignore
+          retention-days: 14

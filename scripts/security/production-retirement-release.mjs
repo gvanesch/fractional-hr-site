@@ -10,6 +10,7 @@ import { ACCOUNT, QA, PRODUCTION, fingerprint, normalizeBindings } from "./qa-re
 import { MODES, PUBLIC_POST_ONLY_PATHS } from "./supabase-retirement-readonly.mjs";
 
 export const REQUEST_PATH = "scripts/security/production-retirement-release-request.json";
+export const ACTIVATION_REQUEST_PATH = "scripts/security/production-retirement-activation-request.json";
 export const CONFIG_PATH = "wrangler.production-retirement.generated.json";
 const REF = "refs/heads/chore/supabase-retirement-2026-11";
 const API = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}`;
@@ -29,9 +30,19 @@ function check(condition, message) {
   if (!condition) throw new ProductionReleaseError(message);
 }
 
-export function validateProductionRequest(request, env, git, now = Date.now()) {
+function validateProductionEnvironment(env) {
   check(env.GITHUB_REPOSITORY === "gvanesch/fractional-hr-site" && env.GITHUB_REF === REF &&
     env.CLOUDFLARE_ACCOUNT_ID === ACCOUNT && Boolean(env.CLOUDFLARE_API_TOKEN?.trim()), "Production release context is not verified.");
+  check(env.NEXT_PUBLIC_APP_ENV === "production" && HOSTS.some(host => env.NEXT_PUBLIC_SITE_URL === `https://${host}`) &&
+    env.ADVISOR_AUTH_MODE === "cloudflare_access" && MODES.every(name => env[name] === "d1") &&
+    !env.CLOUDFLARE_ENV && !env.NEXT_DEV_WRANGLER_ENV,
+  "Production build/runtime environment differs from the reviewed D1/Access target.");
+  check(!Object.entries(env).some(([name, value]) => /SUPABASE/i.test(name) && Boolean(value)),
+    "Production must build and release without Supabase environment values.");
+}
+
+export function validateProductionRequest(request, env, git, now = Date.now()) {
+  validateProductionEnvironment(env);
   const age = now - Date.parse(request?.requestedAt);
   check(request?.operation === "deploy-reviewed-retirement-candidate-to-production" &&
     /^[a-z0-9][a-z0-9-]{7,63}$/.test(request.requestId ?? "") && SHA.test(request.reviewedCommit ?? "") &&
@@ -41,12 +52,6 @@ export function validateProductionRequest(request, env, git, now = Date.now()) {
   check(SHA.test(git?.head ?? "") && git.head === env.GITHUB_SHA && git.parent === request.reviewedCommit &&
     git.changedPaths?.length === 1 && git.changedPaths[0] === REQUEST_PATH,
   "The production request must be the only change on top of the reviewed candidate.");
-  check(env.NEXT_PUBLIC_APP_ENV === "production" && HOSTS.some(host => env.NEXT_PUBLIC_SITE_URL === `https://${host}`) &&
-    env.ADVISOR_AUTH_MODE === "cloudflare_access" && MODES.every(name => env[name] === "d1") &&
-    !env.CLOUDFLARE_ENV && !env.NEXT_DEV_WRANGLER_ENV,
-  "Production build/runtime environment differs from the reviewed D1/Access target.");
-  check(!Object.entries(env).some(([name, value]) => /SUPABASE/i.test(name) && Boolean(value)),
-    "Production must build and release without Supabase environment values.");
 }
 
 // inspectAccess is owned by the Access-plan module. It must perform new reads,
@@ -96,7 +101,7 @@ function nonBindingSettings(settings) {
   return Object.fromEntries(Object.entries(settings).filter(([key]) => !["bindings", "assets", "annotations"].includes(key)));
 }
 
-async function inspectWorker(api, worker, expectedVersion, { latestMayDiffer = false } = {}) {
+async function inspectWorker(api, worker, expectedVersion, { expectedLatestVersionId = expectedVersion } = {}) {
   const prefix = `/workers/scripts/${worker}`;
   const [settings, secrets, deployments, schedules, subdomain, versions] = await Promise.all([
     api(`${prefix}/settings`), api(`${prefix}/secrets`), api(`${prefix}/deployments`),
@@ -107,15 +112,20 @@ async function inspectWorker(api, worker, expectedVersion, { latestMayDiffer = f
     deployment.versions[0].version_id === expectedVersion && deployment.versions[0].percentage === 100,
   "The current Worker deployment differs from the production release lease.");
   check(Array.isArray(versions?.items) && UUID.test(versions.items[0]?.id ?? "") &&
-    (latestMayDiffer || versions.items[0].id === expectedVersion),
+    versions.items[0].id === expectedLatestVersionId,
   "An unknown or undeployed Worker version prevents safe binding inheritance.");
   check(Array.isArray(schedules?.schedules) && typeof subdomain?.enabled === "boolean",
     "Worker schedule/routing metadata is unavailable.");
-  const bindings = normalizeBindings(settings?.bindings, secrets);
+  const settingsBindings = normalizeBindings(settings?.bindings, secrets);
   const active = await api(`${prefix}/versions/${expectedVersion}`);
-  check(active?.id === expectedVersion && active.resources?.script_runtime &&
-    fingerprint(normalizeBindings(active.resources.bindings)) === fingerprint(bindings),
-  "Active Worker version and settings do not agree.");
+  const latest = expectedLatestVersionId === expectedVersion ? active : await api(`${prefix}/versions/${expectedLatestVersionId}`);
+  check(active?.id === expectedVersion && active.resources?.script_runtime && latest?.id === expectedLatestVersionId &&
+    latest.resources?.script_runtime && fingerprint(normalizeBindings(latest.resources.bindings)) === fingerprint(settingsBindings),
+  "The known latest Worker version and settings do not agree.");
+  // /settings and /secrets describe the latest uploaded configuration, which can
+  // be inactive. The deployment lease and immutable version endpoint identify
+  // serving bindings. Never accept an arbitrary latest version to bridge these.
+  const bindings = normalizeBindings(active.resources.bindings);
   return { worker, versionId: expectedVersion, deploymentId: deployment.id, latestVersionId: versions.items[0].id,
     bindings, settings, runtime: active.resources.script_runtime,
     bindingFingerprint: fingerprint(bindings), settingsFingerprint: fingerprint(nonBindingSettings(settings)),
@@ -306,6 +316,10 @@ export async function readProductionEligibility({ env, repositoryConfig, expecte
   ]);
   check((database?.uuid ?? database?.id) === PRODUCTION.database && database?.name === "vanesch-prod", "Production D1 identity is not verified.");
   validateQaIsolation(qa, repositoryConfig);
+  return productionEligibility(production, qa, repositoryConfig);
+}
+
+function productionEligibility(production, qa, repositoryConfig) {
   const generated = createProductionConfig(repositoryConfig, production, { audience: "0".repeat(64), teamDomain: TEAM });
   return {
     eligibleForReviewedAuthChange: true, productionVersionId: production.versionId, qaVersionId: qa.versionId,
@@ -372,7 +386,7 @@ export async function deployProductionRelease({ request, env, git, config, check
     fingerprint(candidate.resources?.script_runtime) === fingerprint(before.runtime),
   "Uploaded production version does not match the reviewed code, auth bindings and runtime.");
   const [lease, qaLease, accessLease] = await Promise.all([
-    inspectWorker(api, PRODUCTION.worker, request.expectedProductionVersionId, { latestMayDiffer: true }),
+    inspectWorker(api, PRODUCTION.worker, request.expectedProductionVersionId, { expectedLatestVersionId: uploadedVersion }),
     inspectWorker(api, QA.worker, request.expectedQaVersionId), readAccess(inspectAccess, request),
   ]);
   compareLease(lease, checkpoint.production, { candidateVersion: uploadedVersion });
@@ -396,6 +410,131 @@ export async function deployProductionRelease({ request, env, git, config, check
     healthSupabaseNotRequired: true, publicPagesPassed: true, publicApiBoundariesPassed: true, anonymousAdvisorAccessProtected: true,
     authenticatedAdvisorFlowTested: false, databaseWrites: false, emailsSent: false, secretChanges: false,
     accessPolicyChanges: false, supabaseShutdownPerformed: false };
+  await onEvidence(report);
+  return report;
+}
+
+function validateRecordedActivation({ request, env, git, originalRequest, originalSourceCommit, recordedReport, originalEligibility, now }) {
+  validateProductionEnvironment(env);
+  const age = now - Date.parse(request?.requestedAt);
+  const requestFields = ["operation", "requestId", "requestedAt", "reviewedCommit", "expectedProductionVersionId", "expectedQaVersionId",
+    "expectedAccessPlanFingerprint", "candidateVersionId", "originalRequestFingerprint", "originalSourceCommit", "recordedReportFingerprint", "originalEligibilityFingerprint"];
+  check(request && Object.keys(request).every(key => requestFields.includes(key)) &&
+    request.operation === "activate-recorded-retirement-candidate-to-production" &&
+    /^[a-z0-9][a-z0-9-]{7,63}$/.test(request.requestId ?? "") && SHA.test(request.reviewedCommit ?? "") &&
+    UUID.test(request.expectedProductionVersionId ?? "") && UUID.test(request.expectedQaVersionId ?? "") &&
+    UUID.test(request.candidateVersionId ?? "") && new Set([request.expectedProductionVersionId, request.expectedQaVersionId, request.candidateVersionId]).size === 3 &&
+    HASH.test(request.expectedAccessPlanFingerprint ?? "") && SHA.test(originalSourceCommit ?? "") &&
+    request.originalSourceCommit === originalSourceCommit && Number.isFinite(age) && age >= 0 && age <= 24 * 60 * 60 * 1000,
+  "A current exact request to activate the recorded production candidate is required.");
+  check(SHA.test(git?.head ?? "") && git.head === env.GITHUB_SHA && git.parent === request.reviewedCommit &&
+    git.changedPaths?.length === 1 && git.changedPaths[0] === ACTIVATION_REQUEST_PATH,
+  "The activation request must be the only change on top of its reviewed implementation.");
+  check(originalRequest?.operation === "deploy-reviewed-retirement-candidate-to-production" &&
+    /^[a-z0-9][a-z0-9-]{7,63}$/.test(originalRequest.requestId ?? "") && SHA.test(originalRequest.reviewedCommit ?? "") &&
+    Number.isFinite(Date.parse(originalRequest.requestedAt)) && Date.parse(originalRequest.requestedAt) <= now &&
+    originalRequest.expectedProductionVersionId === request.expectedProductionVersionId &&
+    originalRequest.expectedQaVersionId === request.expectedQaVersionId && originalRequest.expectedAccessPlanFingerprint === request.expectedAccessPlanFingerprint &&
+    request.originalRequestFingerprint === fingerprint(originalRequest) && request.recordedReportFingerprint === fingerprint(recordedReport) &&
+    request.originalEligibilityFingerprint === fingerprint(originalEligibility),
+  "The original request, recorded outcome or pre-upload eligibility differs from the reviewed activation request.");
+  const worker = recordedReport?.worker;
+  check(recordedReport?.stage === "worker" && recordedReport.stopped === true && recordedReport.sourceCommit === originalSourceCommit &&
+    recordedReport.requestId === originalRequest.requestId && HASH.test(recordedReport.buildFingerprint ?? "") &&
+    recordedReport.failure === "Active Worker version and settings do not agree." &&
+    worker?.stage === "uploaded_not_activated" && worker.previousProductionVersion === request.expectedProductionVersionId &&
+    worker.qaVersion === request.expectedQaVersionId && worker.uploadedProductionVersion === request.candidateVersionId &&
+    worker.previousVersionUsesSupabaseAuth === true && worker.accessRollbackIsSeparate === true && !worker.deployedProductionVersion,
+  "Only the positively recorded inactive upload stopped by the settings/version mismatch can continue.");
+  const access = recordedReport.access;
+  const ownershipRequest = originalRequest.accessRecovery?.originalRequest ?? originalRequest;
+  check(access?.kind === "production-retirement-access-checkpoint" && access.stage === "verified" &&
+    access.requestId === ownershipRequest.requestId && access.requestFingerprint === fingerprint(ownershipRequest) &&
+    access.planFingerprint === request.expectedAccessPlanFingerprint && UUID.test(access.applicationId ?? "") &&
+    UUID.test(access.policyId ?? "") && HASH.test(access.policyFingerprint ?? "") && HASH.test(access.applicationFingerprint ?? "") &&
+    access.workerEligibilityFingerprint === request.originalEligibilityFingerprint &&
+    (originalRequest.accessRecovery ? access.resumeExecutionFingerprint === fingerprint(originalRequest) &&
+      access.resumeExecutionSourceCommit === originalSourceCommit && access.resumeEvidenceFingerprint === fingerprint(originalRequest.accessRecovery.evidence) :
+      access.sourceCommit === originalSourceCommit),
+  "The recorded Access ownership or original Worker eligibility is not verified.");
+}
+
+// Read-only reconciliation for the single positively recorded inactive upload.
+// The caller supplies the original source-gated request/report and must retain
+// the original Access ownership checkpoint. No build, upload or policy writer
+// is accepted here or in the activation function below.
+export async function readRecordedProductionCandidate({ request, env, git, originalRequest, originalSourceCommit, recordedReport,
+  originalEligibility, repositoryConfig, inspectAccess, fetchImpl = fetch, now = Date.now() }) {
+  validateRecordedActivation({ request, env, git, originalRequest, originalSourceCommit, recordedReport, originalEligibility, now });
+  const api = client(env, fetchImpl);
+  const [production, qa, database, access, candidate] = await Promise.all([
+    inspectWorker(api, PRODUCTION.worker, request.expectedProductionVersionId, { expectedLatestVersionId: request.candidateVersionId }),
+    inspectWorker(api, QA.worker, request.expectedQaVersionId), api(`/d1/database/${PRODUCTION.database}`),
+    readAccess(inspectAccess, originalRequest), api(`/workers/scripts/${PRODUCTION.worker}/versions/${request.candidateVersionId}`),
+  ]);
+  check((database?.uuid ?? database?.id) === PRODUCTION.database && database?.name === "vanesch-prod", "Production D1 identity is not verified.");
+  validateQaIsolation(qa, repositoryConfig);
+  const eligibility = productionEligibility(production, qa, repositoryConfig);
+  check(fingerprint(eligibility) === request.originalEligibilityFingerprint,
+    "Production or QA bindings, runtime, settings, grouping, routes or schedules changed since the original upload preflight.");
+  check(access.applicationId === recordedReport.access.applicationId && access.applicationFingerprint === recordedReport.access.applicationFingerprint,
+    "The verified production Access app differs from the recorded upload ownership.");
+  const generated = createProductionConfig(repositoryConfig, production, access);
+  check(candidate?.id === request.candidateVersionId &&
+    candidate.annotations?.["workers/tag"] === `retirement-${fingerprint(originalRequest).slice(0, 24)}` &&
+    candidate.annotations?.["workers/message"] === `production-retirement-${originalSourceCommit}` &&
+    fingerprint(normalizeBindings(candidate.resources?.bindings)) === generated.expectedBindingFingerprint &&
+    fingerprint(candidate.resources?.script_runtime) === fingerprint(production.runtime),
+  "The recorded candidate does not match its original source, exact auth binding changes or existing runtime.");
+  return {
+    kind: "production-recorded-candidate-checkpoint", stage: "recorded_candidate_verified_inactive", preparedAt: new Date(now).toISOString(),
+    requestFingerprint: fingerprint(request), sourceCommit: git.head, originalRequestFingerprint: fingerprint(originalRequest),
+    originalSourceCommit, recordedReportFingerprint: fingerprint(recordedReport), originalEligibilityFingerprint: fingerprint(eligibility),
+    candidateVersionId: request.candidateVersionId,
+    candidateFingerprint: fingerprint({ id: candidate.id, annotations: candidate.annotations, resources: candidate.resources }),
+    production: snapshot(production), qa: snapshot(qa), expectedBindingFingerprint: generated.expectedBindingFingerprint,
+    accessFingerprint: fingerprint(access), databaseWrites: false, emailsSent: false, uploadsPerformed: false, deploymentsChanged: false,
+  };
+}
+
+export async function activateRecordedProductionCandidate({ request, env, git, originalRequest, originalSourceCommit, recordedReport,
+  originalEligibility, repositoryConfig, inspectAccess, checkpoint, onEvidence, fetchImpl = fetch, now = Date.now() }) {
+  validateRecordedActivation({ request, env, git, originalRequest, originalSourceCommit, recordedReport, originalEligibility, now });
+  const age = now - Date.parse(checkpoint?.preparedAt);
+  check(checkpoint?.kind === "production-recorded-candidate-checkpoint" && checkpoint.stage === "recorded_candidate_verified_inactive" &&
+    checkpoint.requestFingerprint === fingerprint(request) && checkpoint.sourceCommit === git.head &&
+    Number.isFinite(age) && age >= 0 && age <= 60 * 60 * 1000 && typeof onEvidence === "function",
+  "A fresh recorded-candidate checkpoint and durable evidence writer are required before activation.");
+  const fresh = await readRecordedProductionCandidate({ request, env, git, originalRequest, originalSourceCommit, recordedReport,
+    originalEligibility, repositoryConfig, inspectAccess, fetchImpl, now });
+  const withoutTime = value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "preparedAt"));
+  check(fingerprint(withoutTime(fresh)) === fingerprint(withoutTime(checkpoint)),
+    "The recorded production candidate, active deployment, QA or Access changed after reconciliation.");
+  const recovery = { previousProductionVersion: request.expectedProductionVersionId, qaVersion: request.expectedQaVersionId,
+    previousVersionUsesSupabaseAuth: true, accessRollbackIsSeparate: true, uploadedProductionVersion: request.candidateVersionId,
+    originalSourceCommit, originalRequestFingerprint: fingerprint(originalRequest), activationRequestId: request.requestId,
+    uploadsPerformed: false, accessPolicyChanges: false };
+  await onEvidence({ stage: "activation_requested_outcome_unknown", ...recovery });
+  const api = client(env, fetchImpl);
+  await api(`/workers/scripts/${PRODUCTION.worker}/deployments`, { method: "POST", body: JSON.stringify({
+    strategy: "percentage", versions: [{ version_id: request.candidateVersionId, percentage: 100 }],
+    annotations: { "workers/message": `production-retirement-${originalSourceCommit}` },
+  }) });
+  await onEvidence({ stage: "activated_verification_pending", ...recovery, deployedProductionVersion: request.candidateVersionId });
+  const [after, qaAfter, accessAfter] = await Promise.all([
+    inspectWorker(api, PRODUCTION.worker, request.candidateVersionId), inspectWorker(api, QA.worker, request.expectedQaVersionId),
+    readAccess(inspectAccess, originalRequest),
+  ]);
+  compareLease(after, checkpoint.production, { candidateVersion: request.candidateVersionId, activated: true,
+    expectedBindings: checkpoint.expectedBindingFingerprint });
+  compareLease(qaAfter, checkpoint.qa);
+  check(fingerprint(accessAfter) === checkpoint.accessFingerprint, "Production Access changed after activating the recorded candidate.");
+  await verifyPublicProduction(fetchImpl, { requireIndependent: true });
+  const report = { stage: "verified", requestId: request.requestId, candidateCommit: originalSourceCommit, activationSourceCommit: git.head,
+    ...recovery, deployedProductionVersion: request.candidateVersionId, onlyAuthBindingsChanged: AUTH_NAMES,
+    productionResourcesSecretsSettingsRoutesSchedulesPreserved: true, qaUnchanged: true, healthD1Connected: true,
+    healthSupabaseNotRequired: true, publicPagesPassed: true, publicApiBoundariesPassed: true, anonymousAdvisorAccessProtected: true,
+    authenticatedAdvisorFlowTested: false, databaseWrites: false, emailsSent: false, secretChanges: false, supabaseShutdownPerformed: false };
   await onEvidence(report);
   return report;
 }
