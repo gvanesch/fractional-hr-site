@@ -1,0 +1,7 @@
+{
+  "operation": "verify-production-cron-dry-runs",
+  "requestId": "retirement-20261120-production-cron-proof-01",
+  "requestedAt": "2026-11-20T17:13:23.280Z",
+  "reviewedCommit": "c6a039bb3651ceed7abc93bca5141c6549abe80b",
+  "expectedProductionVersionId": "9bd890ab-41e1-4845-867c-f6d4eb85196f"
+}
